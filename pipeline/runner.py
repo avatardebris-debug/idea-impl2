@@ -94,17 +94,20 @@ def _check_ollama_model(model: str) -> None:
         print(f"     Start Ollama first: ollama serve &")
         sys.exit(1)
     # 2. Check model exists — resolve the EXACT canonical name from the API.
-    # Ollama may normalize case (q4_K_M → q4_k_m) internally even though
-    # `ollama list` shows the original case. Using the API name prevents 404s.
+    # Ollama may normalize case (q4_K_M → q4_k_m) internally.
+    # IMPORTANT: We do NOT do loose partial matching — "qwen3.6" must not
+    # accidentally match "qwen3.5". Match must include both base AND tag.
     available = [m.get("name", "") for m in data.get("models", [])]
-    model_base = model.split(":")[0].lower()
-    model_tag  = model.split(":")[1].lower() if ":" in model else ""
 
-    # Try exact match first, then case-insensitive match
+    # Try exact match first (case-insensitive)
     canonical = next((m for m in available if m.lower() == model.lower()), None)
     if canonical is None:
-        # Partial match on base name
-        canonical = next((m for m in available if model_base in m.lower()), None)
+        # Case-insensitive match on full name including tag
+        model_lower = model.lower()
+        canonical = next(
+            (m for m in available if m.lower() == model_lower),
+            None,
+        )
 
     if canonical is None:
         print(f"\n  ❌ Model '{model}' not found in Ollama.")
@@ -115,6 +118,11 @@ def _check_ollama_model(model: str) -> None:
     if canonical != model:
         print(f"  Model name resolved: '{model}' -> '{canonical}' (using API canonical name)")
         model = canonical  # Use the exact name the API knows about
+
+    # Prevent Ollama from auto-pulling models during the pipeline run.
+    # Without this, if any agent accidentally uses a wrong model name,
+    # Ollama silently downloads it (23GB+) instead of erroring.
+    os.environ.setdefault("OLLAMA_NO_PULL", "1")
 
     # 3. Warm up: trigger a tiny inference to load model into VRAM
     print(f"  Model:    {model} (warming up...)", end="", flush=True)
@@ -309,6 +317,7 @@ class AgentSupervisor:
         # them up even if the argparse defaults are used instead of CLI args.
         env["PIPELINE_MODEL"] = self.model
         env["PIPELINE_PROVIDER"] = self.provider
+        env["OLLAMA_NO_PULL"] = "1"   # never auto-download a model mid-pipeline
 
         log_path = PIPELINE_DIR / "logs" / f"{role}.out"
         log_path.parent.mkdir(parents=True, exist_ok=True)

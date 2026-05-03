@@ -343,6 +343,7 @@ class OllamaAdapter(LLMBase):
             "messages": self._normalize_messages(messages),
             "stream": False,
             "options": options,
+            "keep_alive": -1,   # pin model in VRAM; prevents Ollama from unloading between calls
         }
         if tools:
             payload["tools"] = [
