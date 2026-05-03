@@ -6,7 +6,8 @@ Swap providers with a single string:
     llm = get_llm("openai")
     llm = get_llm("claude")
     llm = get_llm("gemini")
-    llm = get_llm("ollama", model="llama3")
+    llm = get_llm("ollama", model="qwen3.5:35b")
+    llm = get_llm("grok", model="grok-3")   # requires XAI_API_KEY env var
 """
 
 from __future__ import annotations
@@ -433,6 +434,86 @@ class OllamaAdapter(LLMBase):
 
 
 # ---------------------------------------------------------------------------
+# xAI / Grok  (OpenAI-compatible API — pip install openai)
+# Docs: https://docs.x.ai/api
+# Set env var: XAI_API_KEY=xai-...
+# ---------------------------------------------------------------------------
+
+class GrokAdapter(LLMBase):
+    """
+    xAI Grok via its OpenAI-compatible REST API.
+    Uses the openai SDK pointed at https://api.x.ai/v1.
+    Requires XAI_API_KEY environment variable.
+
+    Recommended models:
+        grok-3            — most capable, best for complex coding
+        grok-3-fast       — faster, lower cost
+        grok-3-mini       — lightweight reasoning model
+        grok-3-mini-fast  — fastest / cheapest
+    """
+
+    BASE_URL = "https://api.x.ai/v1"
+    DEFAULT_MODEL = "grok-3"
+
+    def __init__(self, model: str = DEFAULT_MODEL, temperature: float = 0.7):
+        import os
+        try:
+            from openai import OpenAI
+        except ImportError:
+            raise ImportError("pip install openai  # Grok uses the OpenAI-compatible SDK")
+        api_key = os.environ.get("XAI_API_KEY")
+        if not api_key:
+            raise EnvironmentError(
+                "XAI_API_KEY is not set. "
+                "Get your key at https://console.x.ai and set:\n"
+                "  export XAI_API_KEY=xai-..."
+            )
+        self.client = OpenAI(api_key=api_key, base_url=self.BASE_URL)
+        self.model = model
+        self.temperature = temperature
+
+    def chat(self, messages, tools=None) -> Message:
+        import json
+        kwargs: dict[str, Any] = dict(
+            model=self.model,
+            messages=messages,
+            temperature=self.temperature,
+        )
+        if tools:
+            kwargs["tools"] = [
+                {"type": "function", "function": t} for t in tools
+            ]
+            kwargs["tool_choice"] = "auto"
+
+        resp = self.client.chat.completions.create(**kwargs)
+        choice = resp.choices[0].message
+
+        tool_calls = []
+        if choice.tool_calls:
+            for tc in choice.tool_calls:
+                tool_calls.append({
+                    "id": tc.id,
+                    "name": tc.function.name,
+                    "args": json.loads(tc.function.arguments),
+                })
+
+        usage = None
+        if hasattr(resp, "usage") and resp.usage:
+            usage = TokenUsage(
+                prompt_tokens=resp.usage.prompt_tokens or 0,
+                completion_tokens=resp.usage.completion_tokens or 0,
+                total_tokens=resp.usage.total_tokens or 0,
+            )
+
+        return Message(
+            role="assistant",
+            content=choice.content or "",
+            tool_calls=tool_calls,
+            usage=usage,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Factory
 # ---------------------------------------------------------------------------
 
@@ -441,6 +522,7 @@ PROVIDERS = {
     "claude": ClaudeAdapter,
     "gemini": GeminiAdapter,
     "ollama": OllamaAdapter,
+    "grok":   GrokAdapter,
 }
 
 
@@ -456,12 +538,16 @@ def get_llm(
     Return a model-agnostic LLM adapter.
 
     Args:
-        provider:    "openai" | "claude" | "gemini" | "ollama"
+        provider:    "openai" | "claude" | "gemini" | "ollama" | "grok"
         model:       Optional model override (uses provider default if None)
         temperature: Sampling temperature (0.0–1.0, default 0.7)
         base_url:    Optional base URL for remote instances (Ollama only)
-        num_ctx:     Ollama context window size (default 16384 — prevents truncation)
-        think:       Qwen3 thinking mode — None=default, False=off, True=on (Ollama only)
+        num_ctx:     Ollama context window size (default 16384)
+        think:       Qwen3 thinking mode (Ollama only)
+
+    Grok setup:
+        export XAI_API_KEY=xai-...   # from https://console.x.ai
+        python pipeline/runner.py --provider grok --model grok-3 ...
     """
     if provider not in PROVIDERS:
         raise ValueError(f"Unknown provider '{provider}'. Choose from: {list(PROVIDERS)}")

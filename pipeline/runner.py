@@ -1488,7 +1488,7 @@ def main():
     parser.add_argument("--resume", action="store_true",
                         help="Resume a previously stopped pipeline")
     parser.add_argument("--provider", default="ollama",
-                        choices=["openai", "claude", "gemini", "ollama"],
+                        choices=["openai", "claude", "gemini", "ollama", "grok"],
                         help="LLM provider (default: ollama)")
     parser.add_argument("--model", default=os.environ.get("PIPELINE_MODEL", "qwen3.5:35b"),
                         help="LLM model (default: qwen3.5:35b, or $PIPELINE_MODEL env var)")

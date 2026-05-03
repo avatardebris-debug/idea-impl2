@@ -355,7 +355,7 @@ def main() -> None:
     parser.add_argument("task", help="The task for the agent to complete")
     parser.add_argument(
         "--provider", default="openai",
-        choices=["openai", "claude", "gemini", "ollama"],
+        choices=["openai", "claude", "gemini", "ollama", "grok"],
         help="LLM provider to use (default: openai)",
     )
     parser.add_argument("--model", default=None, help="Model override (uses provider default if omitted)")
