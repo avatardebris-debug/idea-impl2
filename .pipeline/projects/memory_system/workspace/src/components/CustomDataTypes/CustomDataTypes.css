@@ -1,0 +1,391 @@
+/**
+ * Styles for custom data type components
+ */
+
+/* Base styles for all item types */
+.word-item,
+.phrase-item,
+.image-item,
+.date-item,
+.card-item,
+.number-item {
+  border-radius: 8px;
+  padding: 12px;
+  margin: 4px 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.word-item:hover,
+.phrase-item:hover,
+.image-item:hover,
+.date-item:hover,
+.card-item:hover,
+.number-item:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.word-item.selected,
+.phrase-item.selected,
+.image-item.selected,
+.date-item.selected,
+.card-item.selected,
+.number-item.selected {
+  border-color: #2196F3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+}
+
+/* Word Item */
+.word-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.word-item-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.word-item-definition {
+  font-size: 14px;
+  color: #666;
+  font-style: italic;
+}
+
+.word-item-pos {
+  font-size: 12px;
+  color: #999;
+  margin-left: 4px;
+}
+
+.word-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.word-item-tag {
+  background: #E3F2FD;
+  color: #1976D2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Phrase Item */
+.phrase-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.phrase-item-text {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  font-style: italic;
+}
+
+.phrase-item-attribution {
+  font-size: 13px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.phrase-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.phrase-item-tag {
+  background: #F3E5F5;
+  color: #7B1FA2;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Image Item */
+.image-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.image-item-display {
+  max-width: 100%;
+  max-height: 150px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.image-item-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+.image-item-icon {
+  font-size: 32px;
+}
+
+.image-item-label {
+  font-size: 14px;
+  color: #666;
+}
+
+.image-item-alt {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+}
+
+.image-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.image-item-tag {
+  background: #E8F5E9;
+  color: #388E3C;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Date Item */
+.date-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-item-date {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.date-item-event {
+  font-size: 14px;
+  color: #666;
+}
+
+.date-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.date-item-tag {
+  background: #FFF3E0;
+  color: #E65100;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Card Item */
+.card-item {
+  background: #fff;
+  border: 2px solid #e0e0e0;
+}
+
+.card-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-item-suit {
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.card-item-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+}
+
+.card-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.card-item-tag {
+  background: #FCE4EC;
+  color: #C2185B;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Number Item */
+.number-item {
+  background: #fff;
+  border: 2px solid #e0e0e0;
+}
+
+.number-item-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.number-item-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  font-family: 'Courier New', monospace;
+}
+
+.number-item-format {
+  font-size: 12px;
+  color: #666;
+  background: #f5f5f5;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.number-item-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.number-item-tag {
+  background: #E0F7FA;
+  color: #0097A7;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+}
+
+/* Draggable items */
+.draggable-item {
+  user-select: none;
+}
+
+.draggable-item.selected {
+  border: 2px solid #2196F3;
+  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.2);
+}
+
+/* Droppable locations */
+.droppable-location {
+  min-height: 100px;
+  border: 2px dashed #ccc;
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  transition: all 0.2s ease;
+  background: #fafafa;
+}
+
+.droppable-location.drop-target {
+  border-color: #4CAF50;
+  background: #E8F5E9;
+  transform: scale(1.02);
+}
+
+.droppable-location.drag-over {
+  border-color: #2196F3;
+  background: #E3F2FD;
+}
+
+/* Room container */
+.room-container {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.room-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #eee;
+}
+
+.room-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+.room-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Location container */
+.location-container {
+  margin-bottom: 24px;
+}
+
+.location-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #eee;
+}
+
+.location-description {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .word-item,
+  .phrase-item,
+  .image-item,
+  .date-item,
+  .card-item,
+  .number-item {
+    padding: 8px;
+  }
+
+  .word-item-text,
+  .phrase-item-text,
+  .date-item-date {
+    font-size: 14px;
+  }
+
+  .card-item-suit,
+  .card-item-value,
+  .number-item-value {
+    font-size: 20px;
+  }
+}

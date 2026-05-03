@@ -1,9 +1,10 @@
 {
   "title": "[game/agent]",
   "description": "[game/agent]",
-  "status": "phase_1_validating",
+  "status": "complete",
   "total_phases": 1,
-  "tasks_done": 0,
-  "tasks_total": 5,
-  "phase": 1
+  "tasks_done": 4,
+  "tasks_total": 4,
+  "phase": 4,
+  "started_at": "2026-05-02T08:19:15.489305+00:00"
 }

@@ -1,18 +1,39 @@
+import { PalaceExerciseSession } from './memoryPalace';
+
+/**
+ * Item in a memory palace room
+ */
+export interface Item {
+  id: string;
+  text: string;
+  createdAt: string;
+}
+
+/**
+ * Room for memory palace exercises
+ */
 export interface Room {
   id: string;
   name: string;
   description: string;
-  items: string[];
+  items: Item[];
 }
 
+/**
+ * Memory palace for storing memory items
+ */
 export interface Palace {
   id: string;
   name: string;
   description: string;
   rooms: Room[];
+  relationships: string[]; // IDs of relationships
   createdAt: string;
 }
 
+/**
+ * Memory palace statistics
+ */
 export interface PalaceStats {
   palaceId: string;
   palaceName: string;
@@ -25,28 +46,13 @@ export interface PalaceStats {
   sessionHistory: PalaceExerciseSession[];
 }
 
+/**
+ * Memory palace exercise statistics
+ */
 export interface PalaceExerciseStats {
   palaceId: string;
   palaceName: string;
   roomsVisited: number;
   timeElapsed: number;
   itemsPlaced: number;
-}
-
-/**
- * Exercise session record for progress tracking
- */
-export interface PalaceExerciseSession {
-  id: string;
-  palaceId: string;
-  palaceName: string;
-  exerciseType: 'spatial' | 'recall';
-  startTime: string;
-  endTime: string;
-  duration: number; // in seconds
-  score: number;
-  totalItems: number;
-  correctItems: number;
-  accuracy: number;
-  difficulty: string;
 }

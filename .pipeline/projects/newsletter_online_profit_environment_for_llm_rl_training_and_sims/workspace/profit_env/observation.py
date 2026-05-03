@@ -1,92 +1,89 @@
 """Observation module for the Newsletter Online Profit Environment."""
 
-from dataclasses import dataclass, field
-from typing import Dict, Any, List
-import numpy as np
+from dataclasses import dataclass
+from typing import Dict
 
 
 @dataclass
 class Observation:
-    """Observation from the newsletter environment.
+    """Observation representation for the newsletter environment.
     
-    Attributes:
-        subscribers: Current number of subscribers
-        cumulative_profit: Total profit accumulated
-        revenue: Current week's revenue
-        profit: Current week's profit
-        engagement_score: Current engagement score (0-1)
-        churn_rate: Current churn rate (0-1)
-        acquisition_rate: Current acquisition rate (0-1)
-        seasonal_factor: Current seasonal factor
-        competitor_pressure: Current competitor pressure
-        week: Current week number
-        history: Recent history of observations
+    This class represents the observation space available to the agent,
+    containing normalized state features that the agent can use to make decisions.
     """
-    subscribers: int = 0
-    cumulative_profit: float = 0.0
+    
+    # Core metrics (normalized to [0, 1])
+    subscribers: float = 0.0
     revenue: float = 0.0
     profit: float = 0.0
-    engagement_score: float = 0.75
+    
+    # Engagement and quality
+    engagement: float = 0.75
+    
+    # Time
+    week: float = 0.0
+    
+    # Cumulative metrics
+    cumulative_profit: float = 0.0
+    
+    # Rates and parameters
     churn_rate: float = 0.05
-    acquisition_rate: float = 0.1
-    seasonal_factor: float = 1.0
-    competitor_pressure: float = 0.5
-    week: int = 0
-    history: List[Dict[str, Any]] = field(default_factory=list)
+    growth_rate: float = 0.1
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert observation to dictionary."""
-        return {
-            'subscribers': self.subscribers,
-            'cumulative_profit': self.cumulative_profit,
-            'revenue': self.revenue,
-            'profit': self.profit,
-            'engagement_score': self.engagement_score,
-            'churn_rate': self.churn_rate,
-            'acquisition_rate': self.acquisition_rate,
-            'seasonal_factor': self.seasonal_factor,
-            'competitor_pressure': self.competitor_pressure,
-            'week': self.week,
-        }
+    # Revenue breakdown
+    sponsor_revenue: float = 0.0
+    ad_revenue: float = 0.0
     
-    def to_array(self) -> np.ndarray:
-        """Convert observation to numpy array.
+    def to_dict(self) -> Dict:
+        """Convert observation to dictionary.
         
         Returns:
-            Array of observation features
+            Dictionary representation of observation
         """
-        return np.array([
-            self.subscribers / 10000.0,  # Normalize subscribers
-            self.cumulative_profit / 10000.0,  # Normalize profit
-            self.revenue / 10000.0,  # Normalize revenue
-            self.profit / 1000.0,  # Normalize profit
-            self.engagement_score,
-            self.churn_rate,
-            self.acquisition_rate,
-            self.seasonal_factor,
-            self.competitor_pressure,
-            self.week / 52.0,  # Normalize week
-        ])
+        return {
+            "subscribers": self.subscribers,
+            "revenue": self.revenue,
+            "profit": self.profit,
+            "engagement": self.engagement,
+            "week": self.week,
+            "cumulative_profit": self.cumulative_profit,
+            "churn_rate": self.churn_rate,
+            "growth_rate": self.growth_rate,
+            "sponsor_revenue": self.sponsor_revenue,
+            "ad_revenue": self.ad_revenue
+        }
     
     @classmethod
-    def from_state(cls, state) -> 'Observation':
-        """Create observation from state.
+    def from_dict(cls, data: Dict) -> "Observation":
+        """Create observation from dictionary.
         
         Args:
-            state: NewsletterState object
+            data: Dictionary containing observation data
             
         Returns:
             Observation object
         """
         return cls(
-            subscribers=state.subscribers,
-            cumulative_profit=state.cumulative_profit,
-            revenue=state.revenue,
-            profit=state.profit,
-            engagement_score=state.engagement_score,
-            churn_rate=state.churn_rate,
-            acquisition_rate=state.acquisition_rate,
-            seasonal_factor=state.seasonal_factor,
-            competitor_pressure=state.competitor_pressure,
-            week=state.week,
+            subscribers=data.get("subscribers", 0.0),
+            revenue=data.get("revenue", 0.0),
+            profit=data.get("profit", 0.0),
+            engagement=data.get("engagement", 0.75),
+            week=data.get("week", 0.0),
+            cumulative_profit=data.get("cumulative_profit", 0.0),
+            churn_rate=data.get("churn_rate", 0.05),
+            growth_rate=data.get("growth_rate", 0.1),
+            sponsor_revenue=data.get("sponsor_revenue", 0.0),
+            ad_revenue=data.get("ad_revenue", 0.0)
         )
+    
+    def __len__(self) -> int:
+        """Return the number of features in the observation."""
+        return len(self.to_dict())
+    
+    def __iter__(self):
+        """Iterate over observation values."""
+        return iter(self.to_dict().values())
+    
+    def __getitem__(self, key) -> float:
+        """Get observation value by key."""
+        return self.to_dict()[key]

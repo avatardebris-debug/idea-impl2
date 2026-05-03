@@ -1,0 +1,433 @@
+.memory-palace-visualization {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  border-radius: 12px;
+  padding: 20px;
+  color: white;
+  overflow: hidden;
+}
+
+.memory-palace-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.memory-palace-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.memory-palace-header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.memory-palace-visualization-area {
+  flex: 1;
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 400px;
+}
+
+.memory-palace-grid {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.memory-palace-grid .grid-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.memory-palace-grid .grid-line.horizontal {
+  width: 100%;
+  height: 1px;
+}
+
+.memory-palace-grid .grid-line.vertical {
+  height: 100%;
+  width: 1px;
+}
+
+.memory-palace-rooms {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.memory-palace-room {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  animation: roomEntrance 0.6s ease-out;
+  transform-origin: center center;
+}
+
+@keyframes roomEntrance {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.memory-palace-room:hover {
+  transform: scale(1.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+}
+
+.memory-palace-room.active {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.6);
+  border: 2px solid #fff;
+}
+
+.memory-palace-room.hovered {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.5);
+}
+
+.memory-palace-room.empty {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+  opacity: 0.7;
+}
+
+.memory-palace-room-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+  color: white;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.memory-palace-room-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.memory-palace-item {
+  font-size: 0.65rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  animation: itemEntrance 0.4s ease-out;
+  animation-fill-mode: both;
+}
+
+@keyframes itemEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.memory-palace-room-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: white;
+}
+
+.memory-palace-room-status .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #9ca3af;
+}
+
+.memory-palace-room-status .status-dot.active {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.8);
+}
+
+.memory-palace-room-status .status-dot.hovered {
+  background: #f59e0b;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+}
+
+.memory-palace-room-status .status-dot.filled {
+  background: #10b981;
+}
+
+.memory-palace-room-status .status-dot.empty {
+  background: #6b7280;
+}
+
+.memory-palace-connections {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.memory-palace-connection {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: all 0.3s ease;
+}
+
+.memory-palace-view-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.memory-palace-view-controls .view-mode-btn {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.memory-palace-view-controls .view-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.memory-palace-view-controls .view-mode-btn.active {
+  background: #667eea;
+  color: white;
+}
+
+.memory-palace-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 6px 12px;
+  border-radius: 6px;
+}
+
+.memory-palace-zoom-controls .zoom-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.2rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.memory-palace-zoom-controls .zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.memory-palace-zoom-controls .zoom-level {
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 45px;
+  text-align: center;
+}
+
+.memory-palace-stats {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  gap: 20px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px 20px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.memory-palace-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.memory-palace-stats .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.memory-palace-stats .stat-label {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 4px;
+}
+
+.memory-palace-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.memory-palace-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+.memory-palace-empty p {
+  margin: 8px 0;
+  font-size: 1rem;
+}
+
+.memory-palace-empty-hint {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 12px;
+}
+
+.memory-palace-legend {
+  display: flex;
+  gap: 20px;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.memory-palace-legend .legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.memory-palace-legend .legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.memory-palace-legend .legend-dot.active {
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.memory-palace-legend .legend-dot.hovered {
+  background: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+}
+
+.memory-palace-legend .legend-dot.filled {
+  background: #10b981;
+}
+
+.memory-palace-legend .legend-dot.empty {
+  background: #6b7280;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .memory-palace-visualization {
+    padding: 15px;
+  }
+
+  .memory-palace-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .memory-palace-rooms {
+    overflow: auto;
+  }
+
+  .memory-palace-stats {
+    position: static;
+    margin-top: 15px;
+    justify-content: center;
+  }
+
+  .memory-palace-legend {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* Animation for room entrance */
+.memory-palace-room:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.memory-palace-room:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.memory-palace-room:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.memory-palace-room:nth-child(4) {
+  animation-delay: 0.4s;
+}
+
+.memory-palace-room:nth-child(5) {
+  animation-delay: 0.5s;
+}
+
+.memory-palace-room:nth-child(6) {
+  animation-delay: 0.6s;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .memory-palace-visualization {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  }
+
+  .memory-palace-visualization-area {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .memory-palace-stats {
+    background: rgba(0, 0, 0, 0.5);
+  }
+}

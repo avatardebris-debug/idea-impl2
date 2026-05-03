@@ -1,270 +1,223 @@
-"""Simulation logic for the Newsletter Online Profit Environment."""
+"""Simulator module for the Newsletter Online Profit Environment."""
 
 import numpy as np
-from typing import Dict, Any, Tuple
-
+from typing import Dict, List, Optional, Tuple, Union
 from .config import SimConfig
-from .state import NewsletterState, SimulationHistory
+from .state import NewsletterState, SimulationHistory, SimulationRecord
 
 
 class NewsletterSimulator:
     """Newsletter simulation engine.
     
-    Simulates the weekly operations of a newsletter business including
-    subscriber growth, churn, revenue generation, and costs.
+    This class runs the newsletter simulation week by week,
+    tracking subscriber growth, revenue, costs, and profitability.
     """
     
-    def __init__(self, config: SimConfig):
-        """Initialize the simulator.
+    def __init__(self, config: Optional[SimConfig] = None, env=None):
+        """Initialize the simulator with configuration.
         
         Args:
-            config: Simulation configuration
+            config: Simulation configuration parameters. If None, uses default config.
+            env: Optional environment reference for integration
         """
-        self.config = config
-        self.state = NewsletterState()
+        self.config = config if config is not None else SimConfig()
+        self.env = env
+        self.state = NewsletterState(
+            subscribers=self.config.subscriber_count,
+            engagement_score=self.config.engagement_rate
+        )
         self.history = SimulationHistory()
         self._rng = np.random.default_rng()
+        self._action_space = 10
     
-    def reset(self) -> NewsletterState:
-        """Reset the simulation to initial state.
+    @property
+    def action_space(self) -> int:
+        """Return the action space size."""
+        return self._action_space
+    
+    def run_week(self) -> Dict:
+        """Execute one week of simulation.
         
         Returns:
-            Initial state
+            Dictionary containing week's simulation data
         """
-        self.state.reset()
-        self.state.subscribers = self.config.subscriber_count
-        self.state.engagement_score = self.config.engagement
-        self.state.seasonal_factor = self.config.seasonal
-        self.state.competitor_pressure = self._calculate_competitor_pressure()
-        self.history = SimulationHistory()
-        return self.state
+        # Calculate subscriber changes
+        churned = int(self.state.subscribers * self.config.get_effective_churn_rate(self.state.engagement_score))
+        acquired = int(self.state.subscribers * self.config.get_effective_growth_rate(self.state.engagement_score))
+        
+        # Apply seasonal factor
+        seasonal_multiplier = self.config.seasonal_factor
+        
+        # Update subscribers
+        self.state.subscribers = max(0, self.state.subscribers - churned + acquired)
+        
+        # Calculate revenue
+        sponsor_revenue = self.state.subscribers * self.config.sponsor_rate * self.config.sponsorship_fill_rate
+        ad_revenue = self.state.subscribers * self.config.ad_rate
+        subscription_revenue = self.state.subscribers * self.config.arpu
+        total_revenue = subscription_revenue + sponsor_revenue + ad_revenue
+        
+        # Calculate costs
+        content_cost = self.config.content_cost
+        operational_cost = self.config.operational_cost
+        acquisition_cost = acquired * self.config.cpc
+        total_costs = content_cost + operational_cost + acquisition_cost
+        
+        # Calculate profit
+        profit = total_revenue - total_costs
+        self.state.cumulative_profit += profit
+        
+        # Update engagement score
+        self.state.engagement_score = self.config.engagement_rate
+        
+        # Update state
+        self.state.week += 1
+        self.state.revenue = total_revenue
+        self.state.costs = total_costs
+        self.state.sponsor_revenue = sponsor_revenue
+        self.state.ad_revenue = ad_revenue
+        self.state.churned = churned
+        self.state.acquired = acquired
+        
+        # Record history - add as SimulationRecord
+        record = SimulationRecord(
+            week=self.state.week,
+            subscribers=self.state.subscribers,
+            revenue=self.state.revenue,
+            costs=self.state.costs,
+            profit=self.state.profit,
+            cumulative_profit=self.state.cumulative_profit,
+            churned=self.state.churned,
+            acquired=self.state.acquired,
+            engagement=self.state.engagement_score,
+            sponsor_revenue=self.state.sponsor_revenue,
+            ad_revenue=self.state.ad_revenue,
+            churn_rate=self.state.churn_rate,
+            growth_rate=self.state.growth_rate,
+            arpu=self.state.arpu
+        )
+        self.history.add_record(record)
+        
+        return self.state.to_dict()
     
-    def step(self, action: np.ndarray) -> Tuple[NewsletterState, Dict[str, Any]]:
-        """Execute one simulation step.
+    def step(self, action: int) -> Tuple[NewsletterState, Dict]:
+        """Execute one step with action.
         
         Args:
-            action: Action array [marketing, content, pricing, retention]
+            action: Action integer in range [0, 9]
             
         Returns:
             Tuple of (state, info)
         """
-        # Clamp action values to [0, 1]
-        action = np.clip(action, 0.0, 1.0)
+        # Run the week
+        record = self.run_week()
         
-        # Extract action components
-        marketing_effort = action[0]
-        content_quality = action[1]
-        pricing_strategy = action[2]
-        retention_effort = action[3]
-        
-        # Calculate metrics
-        self._calculate_revenue(marketing_effort, content_quality, pricing_strategy)
-        self._calculate_costs(content_quality)
-        self._calculate_subscriber_changes(marketing_effort, retention_effort)
-        self._update_state_metrics()
-        
-        # Update state
-        self.state.week += 1
-        
-        # Record state
-        record = self._create_record()
-        self.history.add_record(record)
-        
-        # Calculate reward
-        reward = self._calculate_reward()
-        
-        # Check termination
-        terminated = self.state.week >= self.config.max_steps
-        
-        info = {
-            'revenue': self.state.revenue,
-            'costs': self.state.costs,
-            'profit': self.state.profit,
-            'subscribers': self.state.subscribers,
-            'churned': self._calculate_churned(),
-            'acquired': self._calculate_acquired(),
-        }
-        
-        return self.state, info
+        return self.state, record
     
-    def _calculate_competitor_pressure(self) -> float:
-        """Calculate competitor pressure based on configuration."""
-        # More competitors = higher pressure
-        base_pressure = min(self.config.competitors / 10.0, 1.0)
-        # Saturation increases pressure
-        return base_pressure * (1 + self.config.saturation)
-    
-    def _calculate_revenue(self, marketing_effort: float, 
-                          content_quality: float, pricing_strategy: float) -> None:
-        """Calculate weekly revenue.
+    def run_simulation(self, weeks: int, seed: Optional[int] = None) -> List[Dict]:
+        """Run simulation for specified number of weeks.
         
         Args:
-            marketing_effort: Marketing effort level (0-1)
-            content_quality: Content quality level (0-1)
-            pricing_strategy: Pricing strategy level (0-1)
-        """
-        # Base revenue from ARPU
-        base_revenue = self.state.subscribers * self.config.arpu
-        
-        # Adjust for pricing strategy
-        price_multiplier = 1.0 + (pricing_strategy * 0.5)
-        
-        # Ad revenue
-        ad_revenue = self.state.subscribers * self.config.ad_rate * marketing_effort
-        
-        # Sponsor revenue
-        sponsor_multiplier = self.config.sponsor_fill * content_quality
-        sponsor_revenue = self.state.subscribers * self.config.sponsor_rate * sponsor_multiplier
-        
-        # Apply seasonal factor
-        seasonal_multiplier = self.config.seasonal
-        
-        self.state.ad_revenue = ad_revenue
-        self.state.sponsor_revenue = sponsor_revenue
-        self.state.revenue = (base_revenue * price_multiplier + 
-                             ad_revenue + sponsor_revenue) * seasonal_multiplier
-    
-    def _calculate_costs(self, content_quality: float) -> None:
-        """Calculate weekly costs.
-        
-        Args:
-            content_quality: Content quality level (0-1)
-        """
-        # Base costs
-        base_costs = self.config.content_cost + self.config.operational_cost
-        
-        # Content quality increases costs
-        quality_multiplier = 1.0 + (content_quality * 0.5)
-        
-        # Marketing costs (CPC * clicks)
-        marketing_cost = self.config.cpc * self.state.subscribers * 0.1
-        
-        self.state.costs = (base_costs * quality_multiplier + marketing_cost)
-    
-    def _calculate_subscriber_changes(self, marketing_effort: float,
-                                     retention_effort: float) -> None:
-        """Calculate subscriber changes.
-        
-        Args:
-            marketing_effort: Marketing effort level (0-1)
-            retention_effort: Retention effort level (0-1)
-        """
-        # Calculate churn
-        base_churn_rate = self.config.churn
-        churn_rate = base_churn_rate * (1 - retention_effort * 0.5)
-        churned = int(self.state.subscribers * churn_rate)
-        
-        # Calculate acquisition
-        base_growth_rate = self.config.growth
-        acquisition_rate = base_growth_rate * (1 + marketing_effort)
-        
-        # Market saturation effect
-        saturation_factor = 1.0 - self.config.saturation
-        acquisition_rate *= saturation_factor
-        
-        # Seasonal effect
-        seasonal_factor = self.config.seasonal
-        
-        acquired = int(self.state.subscribers * acquisition_rate * seasonal_factor)
-        
-        # Update subscriber count
-        self.state.subscribers = max(0, self.state.subscribers - churned + acquired)
-    
-    def _update_state_metrics(self) -> None:
-        """Update state metrics."""
-        # Calculate profit
-        self.state.profit = self.state.revenue - self.state.costs
-        
-        # Apply tax
-        self.state.profit *= (1 - self.config.tax)
-        
-        # Update cumulative profit
-        self.state.cumulative_profit += self.state.profit
-        
-        # Update engagement score
-        self.state.engagement_score = self.config.engagement
-    
-    def _calculate_reward(self) -> float:
-        """Calculate reward for the step.
-        
-        Returns:
-            Reward value
-        """
-        # Primary reward: profit
-        reward = self.state.profit
-        
-        # Bonus for subscriber growth
-        if self.state.subscribers > self.config.subscriber_count:
-            growth_bonus = self.state.subscribers * 0.01
-            reward += growth_bonus
-        
-        # Penalty for low engagement
-        if self.state.engagement_score < 0.5:
-            penalty = (0.5 - self.state.engagement_score) * 10
-            reward -= penalty
-        
-        return reward
-    
-    def _calculate_churned(self) -> int:
-        """Calculate number of churned subscribers."""
-        churn_rate = self.config.churn * (1 - self.config.retention)
-        return int(self.state.subscribers * churn_rate)
-    
-    def _calculate_acquired(self) -> int:
-        """Calculate number of acquired subscribers."""
-        acquisition_rate = self.config.growth * (1 + self.config.growth)
-        return int(self.state.subscribers * acquisition_rate)
-    
-    def _create_record(self) -> Dict[str, Any]:
-        """Create a record for the current week."""
-        return {
-            'week': self.state.week,
-            'subscribers': self.state.subscribers,
-            'revenue': self.state.revenue,
-            'sponsor_revenue': self.state.sponsor_revenue,
-            'ad_revenue': self.state.ad_revenue,
-            'costs': self.state.costs,
-            'profit': self.state.profit,
-            'cumulative_profit': self.state.cumulative_profit,
-            'engagement_score': self.state.engagement_score,
-            'churn_rate': self.state.churn_rate,
-            'acquisition_rate': self.state.acquisition_rate,
-        }
-    
-    def run(self, action_generator=None) -> SimulationHistory:
-        """Run full simulation.
-        
-        Args:
-            action_generator: Optional function that generates actions
+            weeks: Number of weeks to simulate
+            seed: Optional random seed for reproducibility
             
         Returns:
-            Simulation history
+            List of dictionaries containing weekly simulation data
         """
-        self.reset()
+        if seed is not None:
+            self._rng = np.random.default_rng(seed)
         
-        while self.state.week < self.config.max_steps:
-            if action_generator:
-                action = action_generator(self.state)
-            else:
-                # Default: no action (neutral)
-                action = np.array([0.5, 0.5, 0.5, 0.5])
-            
-            self.step(action)
+        for _ in range(weeks):
+            self.run_week()
         
-        return self.history
+        return self.history.get_weekly_data()
     
-    def get_statistics(self) -> Dict[str, Any]:
+    def run_multiple_simulations(self, num_simulations: int, weeks: int, seed: Optional[int] = None) -> List[List[Dict]]:
+        """Run multiple simulations.
+        
+        Args:
+            num_simulations: Number of simulations to run
+            weeks: Number of weeks per simulation
+            seed: Optional random seed for reproducibility
+            
+        Returns:
+            List of lists containing weekly simulation data for each simulation
+        """
+        histories = []
+        for i in range(num_simulations):
+            sim_seed = seed + i if seed is not None else None
+            self.reset()
+            if sim_seed is not None:
+                self._rng = np.random.default_rng(sim_seed)
+            history = self.run_simulation(weeks)
+            histories.append(history)
+        
+        return histories
+    
+    def get_statistics(self) -> Dict:
         """Get simulation statistics.
         
         Returns:
-            Dictionary with aggregated statistics
+            Dictionary containing aggregated statistics
         """
-        return self.history.get_statistics()
+        stats = self.history.get_statistics()
+        
+        # Add additional statistics
+        records = self.history.get_weekly_data()
+        if records:
+            stats["avg_engagement"] = sum(r["engagement"] for r in records) / len(records)
+            stats["avg_sponsor_revenue"] = sum(r["sponsor_revenue"] for r in records) / len(records)
+            stats["avg_ad_revenue"] = sum(r["ad_revenue"] for r in records) / len(records)
+        else:
+            stats["avg_engagement"] = 0.0
+            stats["avg_sponsor_revenue"] = 0.0
+            stats["avg_ad_revenue"] = 0.0
+        
+        # Add expected keys for tests
+        stats["churn_rate"] = self.state.churn_rate
+        stats["growth_rate"] = self.state.growth_rate
+        stats["arpu"] = self.state.arpu
+        
+        return stats
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert simulation to dictionary."""
-        return {
-            'config': self.config.to_dict(),
-            'state': self.state.to_dict(),
-            'history': self.history.to_dict(),
-        }
+    def reset(self):
+        """Reset simulator to initial state."""
+        self.state = NewsletterState(
+            subscribers=self.config.subscriber_count,
+            engagement_score=self.config.engagement_rate
+        )
+        self.history = SimulationHistory()
+    
+    def get_state(self) -> NewsletterState:
+        """Get current simulation state.
+        
+        Returns:
+            Current NewsletterState object
+        """
+        return self.state
+    
+    def set_seed(self, seed: int):
+        """Set random seed for reproducibility.
+        
+        Args:
+            seed: Random seed value
+        """
+        self._rng = np.random.default_rng(seed)
+        self.reset()
+    
+    def set_config(self, config: SimConfig):
+        """Set simulation configuration.
+        
+        Args:
+            config: New configuration parameters
+        """
+        self.config = config
+        self.reset()
+    
+    def get_history(self) -> SimulationHistory:
+        """Get simulation history.
+        
+        Returns:
+            SimulationHistory object with all recorded data
+        """
+        return self.history

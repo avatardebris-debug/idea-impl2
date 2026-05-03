@@ -1,0 +1,54 @@
+.memory-palace-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+}
+
+.memory-palace-content {
+  flex: 1;
+  min-height: 400px;
+}
+
+.memory-palace-status {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #666;
+  align-items: center;
+}
+
+.memory-palace-status-item {
+  font-weight: 500;
+}
+
+.memory-palace-status-divider {
+  color: #ccc;
+}
+
+.memory-palace-status-selected {
+  color: #007bff;
+  font-weight: 600;
+}
+
+@media (max-width: 480px) {
+  .memory-palace-canvas {
+    padding: 12px;
+  }
+
+  .memory-palace-status {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .memory-palace-status-divider {
+    display: none;
+  }
+}

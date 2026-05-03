@@ -1,0 +1,297 @@
+.story-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.story-builder-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.story-builder-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.story-builder-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.story-builder-main {
+  display: flex;
+  gap: 16px;
+  min-height: 300px;
+}
+
+.story-builder-item-selector {
+  flex: 0 0 250px;
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.story-builder-item-selector h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.story-builder-item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.story-builder-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.story-builder-item:hover {
+  background: #e0e0e0;
+  transform: translateX(2px);
+}
+
+.story-builder-item.selected {
+  background: #4361ee;
+  color: white;
+}
+
+.story-builder-item-icon {
+  font-size: 1.2rem;
+}
+
+.story-builder-item-text {
+  font-size: 0.9rem;
+}
+
+.story-builder-story-editor {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.story-builder-editor {
+  flex: 1;
+  min-height: 200px;
+}
+
+.story-builder-textarea {
+  width: 100%;
+  min-height: 200px;
+  padding: 12px;
+  font-family: inherit;
+  font-size: 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.story-builder-textarea:focus {
+  outline: none;
+  border-color: #4361ee;
+  box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+}
+
+.story-builder-preview {
+  background: white;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.story-builder-preview h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.story-builder-story-content {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+.story-builder-story-content p {
+  margin: 0 0 12px 0;
+}
+
+.story-builder-story-content p:last-child {
+  margin-bottom: 0;
+}
+
+.story-builder-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.story-builder-status.success {
+  background: #d4edda;
+  color: #155724;
+}
+
+.story-builder-status.error {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.story-builder-status.info {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.story-builder-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.story-builder-button:hover {
+  transform: translateY(-1px);
+}
+
+.story-builder-button:active {
+  transform: translateY(0);
+}
+
+.story-builder-button-primary {
+  background: #4361ee;
+  color: white;
+}
+
+.story-builder-button-primary:hover {
+  background: #3a56d4;
+}
+
+.story-builder-button-secondary {
+  background: #6c757d;
+  color: white;
+}
+
+.story-builder-button-secondary:hover {
+  background: #5a6268;
+}
+
+.story-builder-button-success {
+  background: #28a745;
+  color: white;
+}
+
+.story-builder-button-success:hover {
+  background: #218838;
+}
+
+.story-builder-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.story-builder-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: #6c757d;
+}
+
+.story-builder-empty-state-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.story-builder-empty-state-text {
+  font-size: 0.9rem;
+}
+
+.story-builder-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: #e9ecef;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.story-builder-item-badge.card {
+  background: #d4edda;
+  color: #155724;
+}
+
+.story-builder-item-badge.number {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.story-builder-item-badge.text {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+
+.story-builder-loci-indicator {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.story-builder-loci-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+}
+
+.story-builder-loci-dot.active {
+  background: #4361ee;
+}
+
+.story-builder-loci-dot.completed {
+  background: #28a745;
+}
+
+@media (max-width: 768px) {
+  .story-builder-main {
+    flex-direction: column;
+  }
+
+  .story-builder-item-selector {
+    flex: none;
+    width: 100%;
+  }
+}

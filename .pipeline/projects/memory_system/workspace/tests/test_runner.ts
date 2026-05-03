@@ -7,6 +7,7 @@ import * as palaceTemplatesTests from './palaceTemplates.test';
 import * as palaceExportImportTests from './palaceExportImport.test';
 import * as progressTrackingTests from './progressTracking.test';
 import * as spatialExerciseTests from './SpatialExercise.test';
+import * as accuracyAnalyticsTests from '../src/utils/accuracyAnalytics.test';
 
 /**
  * Run all test suites
@@ -44,6 +45,12 @@ export const runAllTests = async (): Promise<{
   results.push(spatialResult);
   passed += spatialResult.passed;
   failed += spatialResult.failed;
+
+  // Run accuracy analytics tests
+  const accuracyResult = await runTestSuite('Accuracy Analytics', accuracyAnalyticsTests);
+  results.push(accuracyResult);
+  passed += accuracyResult.passed;
+  failed += accuracyResult.failed;
 
   return {
     passed,

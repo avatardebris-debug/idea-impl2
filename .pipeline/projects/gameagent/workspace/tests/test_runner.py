@@ -2,7 +2,8 @@
 
 import pytest
 
-from gameagent.agent.base import GreedyAgent, RandomAgent
+from gameagent.agent.base import RandomAgent
+from gameagent.agent.greedy_agent import GreedyAgent
 from gameagent.env.types import GridConfig
 from gameagent.sim.runner import EpisodeRunner
 from gameagent.sim.types import SimulationConfig

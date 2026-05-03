@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from gameagent.agent.base import BaseAgent, GreedyAgent, RandomAgent
+from gameagent.agent import BaseAgent, GreedyAgent, RandomAgent
 from gameagent.env.grid_world import GridWorld
 from gameagent.env.types import GridConfig
 from gameagent.sim.types import EpisodeResult, SimulationConfig, SimulationResult
@@ -53,7 +53,7 @@ class EpisodeRunner:
         truncated = False
 
         while not terminated and not truncated:
-            observation = self._env.reset() if num_steps == 0 else self._env._get_observation()
+            observation = self._env._get_observation()
             action = self.agent.act(observation)
             result = self._env.step(action)
 
@@ -71,6 +71,7 @@ class EpisodeRunner:
             truncated=truncated,
             start_time=start_time,
             end_time=end_time,
+            seed=self.config.seed,
         )
 
     def run_simulation(self) -> SimulationResult:
@@ -92,11 +93,16 @@ class EpisodeRunner:
         total_steps = [r.num_steps for r in episode_results]
         successes = sum(1 for r in episode_results if r.terminated)
 
+        mean_reward = sum(total_rewards) / len(total_rewards)
+        mean_steps = sum(total_steps) / len(total_steps)
+        std_reward = (sum((r - mean_reward) ** 2 for r in total_rewards) / len(total_rewards)) ** 0.5
+
         return SimulationResult(
             total_episodes=self.config.num_episodes,
             episode_results=episode_results,
-            mean_reward=sum(total_rewards) / len(total_rewards),
-            mean_steps=sum(total_steps) / len(total_steps),
+            mean_reward=mean_reward,
+            std_reward=std_reward,
+            mean_steps=mean_steps,
             success_rate=successes / len(episode_results),
             start_time=start_time,
             end_time=end_time,

@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from gameagent.agent.base import GreedyAgent, RandomAgent
+from gameagent.agent import GreedyAgent, RandomAgent
 from gameagent.agent.q_learning import QLearningAgent
 from gameagent.env.grid_world import GridWorld
 from gameagent.env.types import GridConfig

@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import numpy as np
 
-from gameagent.agent.base import BaseAgent, GreedyAgent, RandomAgent
+from gameagent.agent import BaseAgent, GreedyAgent, RandomAgent
 from gameagent.agent.q_learning import QLearningAgent
 from gameagent.env.grid_world import GridWorld
 from gameagent.env.types import Action, GridConfig
@@ -57,7 +57,6 @@ class GridWorldTrainer:
             epsilon=self.config.epsilon_start,
             epsilon_decay=self.config.epsilon_decay,
             epsilon_min=self.config.epsilon_min,
-            name="TrainedAgent",
         )
 
     def create_env(self) -> GridWorld:
@@ -82,9 +81,11 @@ class GridWorldTrainer:
         steps = 0
 
         while True:
+            state_key = agent._get_state_key(obs)
             action = agent.act(obs)
             result = env.step(action)
-            agent.update(obs, action, result.reward, result.observation, result.terminated)
+            next_state_key = agent._get_state_key(result.observation)
+            agent.update(state_key, action, result.reward, next_state_key, result.terminated)
             total_reward += result.reward
             steps += 1
 
@@ -126,10 +127,10 @@ class GridWorldTrainer:
                 successes += 1
 
         return {
-            "mean_reward": np.mean(rewards),
-            "mean_steps": np.mean(steps_list),
+            "mean_reward": float(np.mean(rewards)),
+            "mean_steps": float(np.mean(steps_list)),
             "success_rate": successes / num_episodes,
-            "std_reward": np.std(rewards),
+            "std_reward": float(np.std(rewards)),
         }
 
     def train(self) -> TrainingResult:
@@ -207,11 +208,10 @@ class GridWorldTrainer:
             learning_rate=data["learning_rate"],
             discount_factor=data["discount_factor"],
             epsilon=data["epsilon"],
-            name="LoadedAgent",
         )
 
         for state_str, actions in data["q_table"].items():
-            state = eval(state_str)  # Note: eval is used for simplicity; in production, use a safer method
+            state = eval(state_str)
             for action_str, value in actions.items():
                 action = Action(int(action_str))
                 agent.q_table[state][action] = value

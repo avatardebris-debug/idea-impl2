@@ -1,0 +1,400 @@
+.memory-palace-analytics {
+  padding: 24px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.analytics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.analytics-header h2 {
+  font-size: 1.75rem;
+  color: #1a1a2e;
+  margin: 0;
+}
+
+.refresh-button {
+  padding: 8px 16px;
+  background: #4361ee;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.refresh-button:hover {
+  background: #3a56d4;
+}
+
+.analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.analytics-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-card.full-width {
+  grid-column: 1 / -1;
+}
+
+.analytics-card h3 {
+  font-size: 1.25rem;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+/* Accuracy Gauge */
+.accuracy-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.accuracy-gauge svg {
+  margin-bottom: 8px;
+}
+
+.accuracy-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #1a1a2e;
+}
+
+.performance-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metrics-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.metric-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.metric-value {
+  font-weight: bold;
+  color: #1a1a2e;
+}
+
+/* Trends */
+.trends-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analytics-trend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.trend-icon {
+  font-size: 1.25rem;
+}
+
+.trend-label {
+  font-weight: 500;
+  color: #495057;
+  flex: 1;
+}
+
+.trend-indicator {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Mastery */
+.mastery-container {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mastery-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  color: white;
+  font-weight: bold;
+  font-size: 0.875rem;
+  text-transform: capitalize;
+}
+
+.mastery-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mastery-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.stat-label {
+  font-weight: 500;
+  color: #495057;
+}
+
+.stat-value {
+  font-weight: bold;
+  color: #1a1a2e;
+}
+
+/* Learning Curve */
+.learning-curve-chart {
+  position: relative;
+  height: 200px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.chart-placeholder {
+  text-align: center;
+  color: #6c757d;
+  padding: 40px 0;
+}
+
+.chart-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+/* Error Analysis */
+.error-analysis h4 {
+  font-size: 1rem;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.no-errors {
+  color: #28a745;
+  font-style: italic;
+}
+
+.error-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.error-item {
+  display: flex;
+  gap: 12px;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.error-type {
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  min-width: 80px;
+  text-align: center;
+}
+
+.error-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.error-item-label {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.error-item-value {
+  font-size: 0.875rem;
+  color: #1a1a2e;
+  font-family: monospace;
+  background: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.error-more {
+  text-align: center;
+  color: #6c757d;
+  font-size: 0.875rem;
+  padding: 8px;
+}
+
+/* Recommendations */
+.recommendations h4 {
+  font-size: 1rem;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 12px;
+}
+
+.no-recommendations {
+  color: #6c757d;
+  font-style: italic;
+}
+
+.recommendation-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recommendation-item {
+  padding: 12px;
+  background: #e7f5ff;
+  border-left: 4px solid #4361ee;
+  border-radius: 4px;
+  color: #1a1a2e;
+  line-height: 1.5;
+}
+
+/* Position Analysis */
+.position-analysis {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.position-section h4 {
+  font-size: 0.875rem;
+  color: #1a1a2e;
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.position-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.position-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.position-number {
+  font-weight: 500;
+  color: #1a1a2e;
+}
+
+.position-accuracy {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.no-positions {
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Loading & Error States */
+.loading,
+.error {
+  text-align: center;
+  padding: 40px;
+  color: #6c757d;
+}
+
+.error {
+  color: #dc3545;
+}
+
+.retry-button {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.retry-button:hover {
+  background: #c82333;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .refresh-button {
+    width: 100%;
+  }
+
+  .mastery-container {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

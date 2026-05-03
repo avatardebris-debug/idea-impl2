@@ -1,0 +1,400 @@
+.exercise-session-manager {
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.exercise-session-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 2px solid #f0f0f0;
+}
+
+.exercise-session-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.toggle-history-btn {
+  padding: 8px 16px;
+  border: 2px solid #667eea;
+  background: white;
+  color: #667eea;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.toggle-history-btn:hover {
+  background: #667eea;
+  color: white;
+}
+
+.exercise-session-current {
+  margin-bottom: 20px;
+}
+
+.session-active {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.session-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.session-status.active {
+  background: #10b981;
+  color: white;
+}
+
+.session-status.completed {
+  background: #6b7280;
+  color: white;
+}
+
+.session-name {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.exercise-session-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 15px;
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
+}
+
+.exercise-session-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.exercise-session-stats .stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.exercise-session-stats .stat-label {
+  font-size: 0.85rem;
+  color: #667280;
+  margin-top: 4px;
+}
+
+.exercise-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.exercise-btn {
+  flex: 1;
+  min-width: 120px;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.exercise-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.exercise-btn.recall {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.exercise-btn.recall:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.exercise-btn.review {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: white;
+}
+
+.exercise-btn.review:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
+}
+
+.exercise-btn.quiz {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
+}
+
+.exercise-btn.quiz:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 172, 254, 0.4);
+}
+
+.active-exercise-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 15px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 6px;
+  color: #92400e;
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+}
+
+.active-exercise-indicator .indicator-dot {
+  width: 8px;
+  height: 8px;
+  background: #f59e0b;
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.end-session-btn {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #ef4444;
+  background: white;
+  color: #ef4444;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.end-session-btn:hover:not(:disabled) {
+  background: #ef4444;
+  color: white;
+}
+
+.end-session-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.no-session {
+  text-align: center;
+  padding: 30px;
+  color: #667280;
+}
+
+.no-session p {
+  margin-bottom: 15px;
+  font-size: 1.1rem;
+}
+
+.start-session-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.start-session-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+/* Session History */
+.exercise-session-history {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #f0f0f0;
+}
+
+.exercise-session-history h3 {
+  margin: 0 0 15px 0;
+  font-size: 1.2rem;
+  color: #1a202c;
+}
+
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  background: #f7fafc;
+  border-radius: 8px;
+  border-left: 4px solid #667eea;
+}
+
+.session-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-info .session-name {
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.session-info .session-date {
+  font-size: 0.85rem;
+  color: #667280;
+}
+
+.session-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 0.9rem;
+  color: #667280;
+}
+
+.session-stats span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.delete-session-btn {
+  padding: 6px 12px;
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-session-btn:hover {
+  background: #dc2626;
+}
+
+.no-sessions {
+  text-align: center;
+  padding: 20px;
+  color: #667280;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .exercise-session-manager {
+    padding: 15px;
+  }
+
+  .exercise-session-header {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .exercise-session-stats {
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .exercise-actions {
+    flex-direction: column;
+  }
+
+  .exercise-btn {
+    width: 100%;
+  }
+
+  .session-item {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .session-stats {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .delete-session-btn {
+    width: 100%;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .exercise-session-manager {
+    background: #1a202c;
+    color: #e2e8f0;
+  }
+
+  .exercise-session-header {
+    border-bottom-color: #2d3748;
+  }
+
+  .exercise-session-stats {
+    background: #2d3748;
+  }
+
+  .exercise-session-stats .stat-label {
+    color: #a0aec0;
+  }
+
+  .exercise-session-history {
+    border-top-color: #2d3748;
+  }
+
+  .session-item {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
+
+  .session-info .session-date {
+    color: #a0aec0;
+  }
+
+  .session-stats {
+    color: #a0aec0;
+  }
+
+  .active-exercise-indicator {
+    background: #451a03;
+    border-color: #d97706;
+    color: #fbbf24;
+  }
+}

@@ -16,6 +16,7 @@ class SimulationConfig:
     goal_position: tuple[int, int] = (4, 4)
     seed: int = 42
     obstacles: list[tuple[int, int]] = field(default_factory=list)
+    render: bool = False
 
 
 @dataclass
@@ -28,6 +29,7 @@ class EpisodeResult:
     truncated: bool
     start_time: float
     end_time: float
+    seed: int = 42
 
 
 @dataclass
@@ -37,6 +39,7 @@ class SimulationResult:
     total_episodes: int
     episode_results: list[EpisodeResult]
     mean_reward: float
+    std_reward: float
     mean_steps: float
     success_rate: float
     start_time: float

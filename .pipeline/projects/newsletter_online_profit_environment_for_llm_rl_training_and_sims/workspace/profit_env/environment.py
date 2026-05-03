@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict, Any, Tuple, Optional
 
 from .config import SimConfig
-from .state import NewsletterState, SimulationHistory
+from .state import NewsletterState, SimulationHistory, SimulationRecord
 from .simulator import NewsletterSimulator
 from .observation import Observation
 
@@ -22,8 +22,8 @@ class NewsletterEnv:
         Args:
             config: Simulation configuration. Uses default if None.
         """
-        self.config = config or SimConfig.default()
-        self.simulator = NewsletterSimulator(self.config)
+        self.config = config or SimConfig()
+        self.simulator = NewsletterSimulator(self.config, env=self)
         self.action_space = 4  # [marketing, content, pricing, retention]
         self.observation_space = 10  # 10 observation features
         self._rng = np.random.default_rng()
@@ -65,85 +65,103 @@ class NewsletterEnv:
         return observation, reward, terminated, info
     
     def _create_observation(self) -> Observation:
-        """Create observation from current state."""
-        return Observation.from_state(self.simulator.state)
+        """Create observation from current state.
+        
+        Returns:
+            Observation object with current state features
+        """
+        state = self.simulator.state
+        
+        # Normalize values for observation
+        subscribers_norm = min(state.subscribers / 10000.0, 1.0)
+        revenue_norm = min(state.revenue / 10000.0, 1.0)
+        profit_norm = min(state.profit / 1000.0, 1.0)
+        engagement_norm = state.engagement_score
+        
+        return Observation(
+            subscribers=subscribers_norm,
+            revenue=revenue_norm,
+            profit=profit_norm,
+            engagement=engagement_norm,
+            week=state.week / self.config.max_steps,
+            cumulative_profit=state.cumulative_profit / 10000.0,
+            churn_rate=state.churn_rate,
+            growth_rate=state.growth_rate,
+            sponsor_revenue=state.sponsor_revenue / 10000.0,
+            ad_revenue=state.ad_revenue / 10000.0
+        )
     
-    def _calculate_reward(self, info: Dict[str, Any]) -> float:
-        """Calculate reward for the step.
+    def _calculate_reward(self, info: Dict) -> float:
+        """Calculate reward for the current step.
         
         Args:
-            info: Information dictionary from step
+            info: Dictionary containing simulation info
             
         Returns:
             Reward value
         """
         # Primary reward: profit
-        reward = info['profit']
+        profit = info.get("profit", 0.0)
         
-        # Bonus for subscriber growth
-        if info['subscribers'] > self.config.subscriber_count:
-            growth_bonus = info['subscribers'] * 0.01
-            reward += growth_bonus
+        # Secondary rewards
+        subscriber_growth = info.get("acquired", 0) - info.get("churned", 0)
+        engagement_bonus = info.get("engagement", 0.5) * 10
         
-        # Penalty for low engagement
-        if self.simulator.state.engagement_score < 0.5:
-            penalty = (0.5 - self.simulator.state.engagement_score) * 10
-            reward -= penalty
+        # Combine rewards
+        reward = profit * 0.7 + subscriber_growth * 0.2 + engagement_bonus * 0.1
         
         return reward
     
-    def get_observation_space(self) -> Tuple[int, int]:
-        """Get observation space dimensions.
+    def get_state(self) -> NewsletterState:
+        """Get current simulation state.
         
         Returns:
-            Tuple of (min, max) for observation values
+            Current NewsletterState object
         """
-        return (0, 10000), (0, 10000)
+        return self.simulator.state
     
-    def get_action_space(self) -> Tuple[int, int]:
-        """Get action space dimensions.
+    def get_history(self) -> SimulationHistory:
+        """Get simulation history.
         
         Returns:
-            Tuple of (min, max) for action values
+            SimulationHistory object with all recorded data
         """
-        return (0, 1), (0, 1)
+        return self.simulator.history
     
     def get_statistics(self) -> Dict[str, Any]:
         """Get simulation statistics.
         
         Returns:
-            Dictionary with aggregated statistics
+            Dictionary containing aggregated statistics
         """
         return self.simulator.get_statistics()
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert environment to dictionary."""
-        return {
-            'config': self.config.to_dict(),
-            'state': self.simulator.state.to_dict(),
-            'history': self.simulator.history.to_dict(),
-        }
-    
-    def run_simulation(self, action_generator=None) -> SimulationHistory:
-        """Run full simulation.
+    def run_simulation(self, weeks: int) -> SimulationHistory:
+        """Run simulation for specified number of weeks.
         
         Args:
-            action_generator: Optional function that generates actions
+            weeks: Number of weeks to simulate
             
         Returns:
-            Simulation history
+            SimulationHistory object with results
         """
-        return self.simulator.run(action_generator)
+        self.simulator.run_simulation(weeks)
+        return self.simulator.history
     
-    @classmethod
-    def from_config_dict(cls, config_dict: Dict[str, Any]) -> 'NewsletterEnv':
-        """Create environment from configuration dictionary.
+    def set_config(self, config: SimConfig):
+        """Update simulation configuration.
         
         Args:
-            config_dict: Configuration dictionary
-            
-        Returns:
-            NewsletterEnv instance
+            config: New configuration to use
         """
-        config = SimConfig.from_dict(config_dict)
-        return cls(config)
+        self.config = config
+        self.simulator = NewsletterSimulator(config)
+    
+    def set_seed(self, seed: int):
+        """Set random seed for reproducibility.
+        
+        Args:
+            seed: Random seed value
+        """
+        self._rng = np.random.default_rng(seed)
+        self.simulator.set_seed(seed)

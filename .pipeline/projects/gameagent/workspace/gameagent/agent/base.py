@@ -26,6 +26,14 @@ class BaseAgent(ABC):
         """Reset the agent's internal state."""
         pass
 
+    def set_training_mode(self, training: bool) -> None:
+        """Set the agent's training mode.
+
+        Args:
+            training: True for training mode, False for evaluation mode.
+        """
+        pass
+
 
 class RandomAgent(BaseAgent):
     """Random agent that selects actions uniformly at random."""
