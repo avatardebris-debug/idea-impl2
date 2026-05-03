@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Scott Adams Corpus Sample",
+  "description": "Schema for a single corpus sample of Scott Adams' writing",
+  "type": "object",
+  "required": ["id", "text", "source_type", "source_url", "date", "author"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for this corpus sample"
+    },
+    "text": {
+      "type": "string",
+      "description": "The cleaned text content of the sample"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["blog", "tweet", "book", "interview"],
+      "description": "The type of source this sample came from"
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL where this content was originally published"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Publication date in YYYY-MM-DD format"
+    },
+    "author": {
+      "type": "string",
+      "description": "Author of the content (typically 'Scott Adams')"
+    },
+    "raw_html": {
+      "type": "string",
+      "description": "Optional raw HTML from the source page",
+      "nullable": true
+    }
+  },
+  "additionalProperties": false
+}

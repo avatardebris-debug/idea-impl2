@@ -1,0 +1,81 @@
+{
+  "canonical_topics": [
+    {
+      "topic": "success",
+      "weight": 0.9,
+      "category": "core",
+      "description": "Achieving personal and professional success through systems thinking"
+    },
+    {
+      "topic": "management",
+      "weight": 0.85,
+      "category": "core",
+      "description": "Effective management strategies and organizational psychology"
+    },
+    {
+      "topic": "probability",
+      "weight": 0.8,
+      "category": "core",
+      "description": "Understanding probability and decision-making under uncertainty"
+    },
+    {
+      "topic": "habits",
+      "weight": 0.85,
+      "category": "core",
+      "description": "Building and maintaining productive habits"
+    },
+    {
+      "topic": "psychology",
+      "weight": 0.75,
+      "category": "core",
+      "description": "Behavioral psychology and human motivation"
+    },
+    {
+      "topic": "systems",
+      "weight": 0.8,
+      "category": "core",
+      "description": "Systems thinking and process optimization"
+    },
+    {
+      "topic": "creativity",
+      "weight": 0.7,
+      "category": "extended",
+      "description": "Fostering creativity and innovative thinking"
+    },
+    {
+      "topic": "leadership",
+      "weight": 0.75,
+      "category": "extended",
+      "description": "Leadership principles and team dynamics"
+    },
+    {
+      "topic": "productivity",
+      "weight": 0.8,
+      "category": "extended",
+      "description": "Maximizing personal and organizational productivity"
+    },
+    {
+      "topic": "communication",
+      "weight": 0.7,
+      "category": "extended",
+      "description": "Effective communication and persuasion techniques"
+    },
+    {
+      "topic": "finance",
+      "weight": 0.65,
+      "category": "extended",
+      "description": "Financial literacy and wealth building strategies"
+    },
+    {
+      "topic": "health",
+      "weight": 0.6,
+      "category": "extended",
+      "description": "Health optimization and wellness systems"
+    }
+  ],
+  "content_type_weights": {
+    "blog": 0.4,
+    "tweet": 0.35,
+    "linkedin": 0.25
+  }
+}

@@ -5,7 +5,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 1: Project Structure Setup
+- [x] Task 1: Project Structure Setup
 **What to build:** Initialize the workspace directory structure for the browser engine project.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/core/` (directory)
@@ -23,7 +23,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 2: Window Class Implementation
+- [x] Task 2: Window Class Implementation
 **What to build:** Core Window class that represents a draggable browser window/tab.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/core/window_manager/window.py`
@@ -43,7 +43,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 3: Window Manager Core
+- [x] Task 3: Window Manager Core
 **What to build:** Window manager that handles multiple windows, z-index ordering, and window lifecycle.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/core/window_manager/window_manager.py`
@@ -64,7 +64,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 4: Browser Engine Core
+- [x] Task 4: Browser Engine Core
 **What to build:** Core browser engine that manages tabs/windows and provides basic navigation.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py`
@@ -93,7 +93,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 5: Basic HTML Renderer
+- [x] Task 5: Basic HTML Renderer
 **What to build:** Simple HTML renderer that displays content in windows.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/html_renderer.py`
@@ -109,7 +109,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 6: Integration and Testing
+- [ ] Task 6: Integration and Testing
 **What to build:** Integration tests to verify the windowing system works end-to-end.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/tests/test_integration.py`
@@ -129,7 +129,7 @@ Build the foundational windowing system and core browser infrastructure that ena
 
 ---
 
-## Task 7: Main Entry Point
+- [ ] Task 7: Main Entry Point
 **What to build:** Main application entry point that initializes the browser engine.
 **Files:**
 - `.pipeline/projects/pocketknife_of_the_internet/workspace/main.py`

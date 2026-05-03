@@ -1,0 +1,11 @@
+{
+  "validator_phase_1_prev_failures": 0,
+  "validator_phase_1_no_progress": 1,
+  "validator_phase_2_prev_failures": 0,
+  "validator_phase_2_no_progress": 0,
+  "validator_phase_4_prev_failures": 0,
+  "validator_phase_4_no_progress": 1,
+  "validator_phase_5_prev_failures": 5,
+  "validator_phase_5_no_progress": 2,
+  "phase_5": 3
+}
