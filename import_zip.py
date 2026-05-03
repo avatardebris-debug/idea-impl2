@@ -6,10 +6,11 @@ Only imports files that are NEW or CHANGED vs what's already on disk.
 Skips files that are identical. Shows a summary before writing.
 
 Usage:
-    python import_zip.py path/to/pipeline_extract_20260502_123456.zip
-    python import_zip.py path/to/pipeline_extract.zip --dry-run
-    python import_zip.py path/to/pipeline_extract.zip --project newsletter
-    python import_zip.py path/to/pipeline_extract.zip --only-state
+    python import_zip.py                              # auto-finds latest zip in Downloads
+    python import_zip.py path/to/pipeline_extract.zip
+    python import_zip.py --dry-run                    # preview without writing
+    python import_zip.py --project newsletter         # one project only
+    python import_zip.py --only-state                 # state + phases only, no workspace code
 """
 from __future__ import annotations
 
@@ -20,9 +21,29 @@ import sys
 import zipfile
 
 
+# Locations to search for zips when no path is given (newest match wins)
+_AUTO_SEARCH_DIRS = [
+    pathlib.Path.home() / "Downloads",
+    pathlib.Path.home() / "Desktop",
+    pathlib.Path("."),
+]
+
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def find_latest_zip() -> pathlib.Path | None:
+    """Find the most recently modified pipeline_extract_*.zip across search dirs."""
+    candidates = []
+    for d in _AUTO_SEARCH_DIRS:
+        if d.is_dir():
+            candidates.extend(d.glob("pipeline_extract_*.zip"))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
 
 def file_hash(path: pathlib.Path) -> str:
     """MD5 of a file, empty string if unreadable."""
@@ -62,7 +83,8 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("zip_file", help="Path to the pipeline_extract_*.zip file")
+    parser.add_argument("zip_file", nargs="?", default=None,
+                        help="Path to pipeline_extract_*.zip (auto-detects latest in Downloads if omitted)")
     parser.add_argument("--dry-run", "-n", action="store_true",
                         help="Show what would be imported without writing anything")
     parser.add_argument("--project", "-p", default="",
@@ -75,16 +97,25 @@ def main() -> None:
                         help="Destination root directory (default: current directory)")
     args = parser.parse_args()
 
-    zip_path = pathlib.Path(args.zip_file).resolve()
-    if not zip_path.exists():
-        # Try glob if user passed a pattern
-        matches = sorted(pathlib.Path(".").glob(args.zip_file))
-        if matches:
-            zip_path = matches[-1]
-            print(f"  Using: {zip_path.name}")
-        else:
-            print(f"ERROR: File not found: {args.zip_file}")
+    zip_path: pathlib.Path | None = None
+    if args.zip_file:
+        zip_path = pathlib.Path(args.zip_file).resolve()
+        if not zip_path.exists():
+            # Try glob in cwd
+            matches = sorted(pathlib.Path(".").glob(args.zip_file))
+            if matches:
+                zip_path = max(matches, key=lambda p: p.stat().st_mtime)
+                print(f"  Using: {zip_path.name}")
+            else:
+                print(f"ERROR: File not found: {args.zip_file}")
+                sys.exit(1)
+    else:
+        zip_path = find_latest_zip()
+        if not zip_path:
+            print("ERROR: No pipeline_extract_*.zip found in Downloads, Desktop, or current directory.")
+            print("       Pass the path explicitly: python import_zip.py /path/to/file.zip")
             sys.exit(1)
+        print(f"  Auto-detected: {zip_path}")
 
     dest_root = pathlib.Path(args.dest).resolve()
 
