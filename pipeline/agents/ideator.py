@@ -100,7 +100,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider", default="ollama")
-    parser.add_argument("--model", default="qwen3.5:35b")
+    parser.add_argument("--model", default=__import__("os").environ.get("PIPELINE_MODEL", "qwen3.5:35b"))
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [ideator] %(message)s")

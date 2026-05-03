@@ -54,31 +54,38 @@ fi
 echo "[4/6] Pulling Qwen3 model (this takes a few minutes on first run)..."
 
 # Model selection based on available VRAM:
-#   80GB+ VRAM: qwen3.5:72b-q4_K_M     (best quality, dense)
-#   48GB  VRAM: qwen3.5:35b             (MoE, fast, great tool-calling)
-#   24GB  VRAM: qwen3.5:27b-q4_K_M      (dense 27B quantised, fits 3090/4090)
-#   16GB  VRAM: qwen3.5:35b-q4_K_M      (MoE quantised, ~3B active params)
+#   80GB+ VRAM: qwen3.6:72b-q4_K_M         (best quality, dense)
+#   48GB  VRAM: qwen3.6:35b                 (MoE, fast, great tool-calling)
+#   24GB  VRAM: qwen3.6:35b-a3b-q4_K_M     (MoE quantised, ~3B active params — fits 24GB)
+#   16GB  VRAM: qwen3.6:35b-a3b-q4_K_M     (same — MoE means only ~3B params active)
+#
+# Override by setting MODEL env var before running:
+#   MODEL=qwen3.5:35b bash cloud_setup.sh
 
 # Detect VRAM
-if command -v nvidia-smi &> /dev/null; then
+if [ -n "${MODEL:-}" ]; then
+    echo "  Using MODEL override: ${MODEL}"
+elif command -v nvidia-smi &> /dev/null; then
     VRAM_MB=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1 | tr -d ' ')
     echo "  Detected ${VRAM_MB}MB VRAM"
 
     if [ "$VRAM_MB" -ge 78000 ]; then
-        MODEL="qwen3.5:72b-q4_K_M"
+        MODEL="qwen3.6:72b-q4_K_M"
     elif [ "$VRAM_MB" -ge 45000 ]; then
-        MODEL="qwen3.5:35b"
-    elif [ "$VRAM_MB" -ge 22000 ]; then
-        MODEL="qwen3.5:27b-q4_K_M"
+        MODEL="qwen3.6:35b"
     else
-        MODEL="qwen3.5:35b-q4_K_M"
+        # 16GB–45GB: MoE quantised fits comfortably (~23GB loaded)
+        MODEL="qwen3.6:35b-a3b-q4_K_M"
     fi
 else
-    echo "  No GPU detected — using MoE model (runs on CPU, slowly)"
-    MODEL="qwen3.5:35b-q4_K_M"
+    echo "  No GPU detected — using MoE quantised model (runs on CPU, slowly)"
+    MODEL="qwen3.6:35b-a3b-q4_K_M"
 fi
 
 echo "  Selected model: ${MODEL}"
+# Export so the runner picks it up without needing --model flag
+export PIPELINE_MODEL="${MODEL}"
+echo "  PIPELINE_MODEL=${PIPELINE_MODEL}"
 ollama pull "${MODEL}"
 echo "  ✓ Model pulled"
 
