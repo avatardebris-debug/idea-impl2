@@ -730,9 +730,9 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         if retries_file.exists():
             try:
                 retries = json.loads(retries_file.read_text(encoding="utf-8"))
-                # Check for any no_progress streak >= 2 (our stall limit)
+                # Check for any no_progress streak >= 4 (our stall limit)
                 for k, v in retries.items():
-                    if "no_progress" in k and isinstance(v, int) and v >= 2:
+                    if "no_progress" in k and isinstance(v, int) and v >= 4:
                         # Force-mark as complete so it never comes back
                         state["status"] = "complete"
                         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
