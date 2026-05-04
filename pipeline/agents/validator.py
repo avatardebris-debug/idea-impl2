@@ -96,6 +96,7 @@ _IMPORT_TO_PIP: dict[str, str | None] = {
     "loguru": "loguru",
     "paramiko": "paramiko",
     "serial": "pyserial",
+    "yaml": "pyyaml",      # governance.py and many projects use yaml
     # stdlib aliases (no install needed)
     "tomllib": None,   # stdlib in Python 3.11+
     "typing_extensions": "typing_extensions",
@@ -231,9 +232,24 @@ def auto_install_workspace_deps(workspace: pathlib.Path) -> list[str]:
         except Exception as e:
             logger.warning("[validator] pyproject.toml parse failed: %s", e)
 
-    # --- Step 3: AST import scan ---
+    # --- Step 4: AST import scan ---
+    # First inject workspace into sys.path so local packages are importable
+    # without needing pip install — prevents trying to PyPI-install local names.
+    _local_package_names: set[str] = set()
+    if str(workspace) not in sys.path:
+        sys.path.insert(0, str(workspace))
+    # Collect names of local packages (dirs with __init__.py or .py files at root)
+    for item in workspace.iterdir():
+        if item.is_dir() and (item / "__init__.py").exists():
+            _local_package_names.add(item.name)
+        elif item.is_file() and item.suffix == ".py" and item.stem != "conftest":
+            _local_package_names.add(item.stem)
+
     third_party = _collect_imports(workspace) - stdlib
     for mod in sorted(third_party):
+        # Skip local packages — they exist on disk, not on PyPI
+        if mod in _local_package_names:
+            continue
         # Skip if already importable
         try:
             __import__(mod)
