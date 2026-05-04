@@ -25,6 +25,15 @@ class IdeatorAgent(AgentProcess):
     think = True        # chain-of-thought improves ideation quality
 
     def handle(self, msg: Message) -> AgentOutput:
+        if msg.type == "generate_ideas":
+            return self._handle_generate_ideas(msg)
+        return self._handle_standard_ideation(msg)
+
+    # ------------------------------------------------------------------
+    # Standard ideation (called after a phase completes)
+    # ------------------------------------------------------------------
+
+    def _handle_standard_ideation(self, msg: Message) -> AgentOutput:
         phase_num = msg.payload.get("phase", 1)
         review_path = msg.payload.get("review_path", "")
         master_ideas_path = msg.payload.get("master_ideas_path", "")
@@ -89,6 +98,76 @@ class IdeatorAgent(AgentProcess):
             success=result.completed,
             answer=result.answer,
             outgoing=[out_msg],
+            tokens_used=result.tokens_used,
+            steps_used=result.steps_used,
+        )
+
+    # ------------------------------------------------------------------
+    # Autonomous idea generation (called when master_ideas.md is empty)
+    # ------------------------------------------------------------------
+
+    def _handle_generate_ideas(self, msg: Message) -> AgentOutput:
+        projects_context = msg.payload.get("projects_context", "")
+        existing_ideas   = msg.payload.get("existing_ideas", "")
+        reusable_tools   = msg.payload.get("reusable_tools", "")
+        format_spec      = msg.payload.get("format_spec", "")
+        master_ideas_path = msg.payload.get("master_ideas_path", "master_ideas.md")
+
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        log_path = f".pipeline/state/idea_generation_log_{ts}.md"
+
+        task_prompt = (
+            f"You are the Ideator. The idea backlog is empty. Generate exactly 30 new ideas "
+            f"across 6 groups of 5.\n\n"
+            f"## Existing Projects (with workspace files and plans)\n"
+            f"{projects_context}\n\n"
+            f"## Reusable Shared Tools Already Built\n"
+            f"{reusable_tools}\n\n"
+            f"## Existing Ideas (do NOT duplicate these)\n"
+            f"{existing_ideas}\n\n"
+            f"## Format for each idea\n"
+            f"{format_spec}\n\n"
+            f"## The 6 Categories (5 ideas each = 30 total)\n\n"
+            f"**GROUP 1 — SIMILAR**: 5 ideas similar in scope/type to existing projects "
+            f"but targeting different niches or audiences.\n\n"
+            f"**GROUP 2 — EXPANSION**: 5 ideas that expand an existing project with new "
+            f"major features. Read the workspace files listed above to understand what was "
+            f"built and what meaningful next steps would be.\n\n"
+            f"**GROUP 3 — INDEPENDENT**: 5 fresh ideas completely unrelated to existing work. "
+            f"Think about tools, services, or products people actually pay for.\n\n"
+            f"**GROUP 4 — COMBINATION**: 5 ideas that merge 2 or more existing projects "
+            f"into a unified product. Name which projects are combined.\n\n"
+            f"**GROUP 5 — BRIDGE**: 5 ideas for connectors, APIs, or integrations that "
+            f"link existing projects together so they can share data or workflows.\n\n"
+            f"**GROUP 6 — HARNESS**: 5 ideas for improving this pipeline/toolkit itself — "
+            f"better agents, new capabilities, developer tooling, observability, etc.\n\n"
+            f"## Instructions\n"
+            f"1. Think deeply about the existing projects and their actual workspace code.\n"
+            f"2. Write all 30 ideas (one per line) in the correct format.\n"
+            f"3. APPEND them to `{master_ideas_path}` — do NOT overwrite the file.\n"
+            f"   Use a section header like: `## Auto-Generated — {ts}`\n"
+            f"4. Write a 3-line summary of what you added to `{log_path}`.\n"
+            f"5. Say DONE.\n"
+        )
+
+        result = self.call_agent(task=task_prompt, verbose=False)
+
+        # Signal the manager that ideation is complete
+        signal_msg = Message.create(
+            from_agent=self.role,
+            to_agent="manager",
+            type="PIPELINE_SIGNAL",
+            payload={
+                "signal": "IDEA_GENERATION_COMPLETE",
+                "log_path": log_path,
+                "source": "ideator",
+            },
+        )
+
+        return AgentOutput(
+            success=result.completed,
+            answer=result.answer,
+            outgoing=[signal_msg],
             tokens_used=result.tokens_used,
             steps_used=result.steps_used,
         )

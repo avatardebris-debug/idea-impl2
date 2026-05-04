@@ -458,6 +458,87 @@ def seed_idea(bus: MessageBus, title: str, description: str, deps: list | None =
     print(f"\n  Seeded idea: {title} (slug: {idea_slug}){dep_note}")
 
 
+def _request_ideation(bus: MessageBus) -> None:
+    """When master_ideas.md is exhausted, ask the Ideator to generate 30 new ideas.
+
+    Scans all completed projects for context (master_plan.md + workspace file tree),
+    reads reusable_tools.md, then sends a 'generate_ideas' message to the ideator.
+    The runner will detect new unchecked items on its next tick and resume seeding.
+    """
+    pipeline_dir = PIPELINE_DIR
+    projects_dir = pipeline_dir / "projects"
+
+    # --- Gather completed/in-progress project context ---
+    project_summaries: list[str] = []
+    if projects_dir.exists():
+        for proj_dir in sorted(projects_dir.iterdir()):
+            if not proj_dir.is_dir():
+                continue
+            ci_path = proj_dir / "state" / "current_idea.json"
+            if not ci_path.exists():
+                continue
+            try:
+                ci = json.loads(ci_path.read_text(encoding="utf-8"))
+                status = ci.get("status", "")
+                title  = ci.get("title", proj_dir.name)
+                slug   = ci.get("_slug", proj_dir.name)
+                plan_path = proj_dir / "state" / "master_plan.md"
+                plan_snippet = ""
+                if plan_path.exists():
+                    plan_snippet = plan_path.read_text(encoding="utf-8")[:600]
+                # Workspace file tree (names only)
+                ws_dir = proj_dir / "workspace"
+                ws_files: list[str] = []
+                if ws_dir.exists():
+                    for f in sorted(ws_dir.rglob("*")):
+                        if f.is_file() and "__pycache__" not in str(f):
+                            ws_files.append(str(f.relative_to(ws_dir)))
+                ws_tree = "\n    ".join(ws_files[:30]) or "(no workspace files yet)"
+                project_summaries.append(
+                    f"### {title} (slug={slug}, status={status})\n"
+                    f"Workspace files:\n    {ws_tree}\n\n"
+                    f"Plan:\n{plan_snippet}"
+                )
+            except Exception:
+                continue
+
+    # --- Existing master_ideas list (to avoid duplicates) ---
+    mi_path = PROJECT_ROOT.resolve() / "master_ideas.md"
+    existing_ideas = mi_path.read_text(encoding="utf-8") if mi_path.exists() else ""
+
+    # --- Reusable tools ---
+    tools_path = pipeline_dir / "state" / "reusable_tools.md"
+    tools_content = tools_path.read_text(encoding="utf-8") if tools_path.exists() else "(none documented yet)"
+
+    # --- Format spec ---
+    format_spec = (
+        "Each idea must be exactly one line in this format:\n"
+        "  - [ ] **[Title]** — [One sentence description. requires: dep1, dep2 (only if needed)]\n"
+        "The `requires:` part is optional — only add it if the idea genuinely depends on "
+        "another project being completed first. Keep titles concise (3-7 words)."
+    )
+
+    projects_block = "\n\n".join(project_summaries) or "(no projects yet)"
+
+    payload = {
+        "type": "generate_ideas",
+        "projects_context": projects_block[:8000],
+        "existing_ideas": existing_ideas[:4000],
+        "reusable_tools": tools_content[:2000],
+        "format_spec": format_spec,
+        "master_ideas_path": str(mi_path),
+    }
+
+    msg = Message.create(
+        from_agent="runner",
+        to_agent="ideator",
+        type="generate_ideas",
+        payload=payload,
+    )
+    bus.send(msg)
+    print("\n  🧠 master_ideas.md exhausted — queued Ideator to generate 30 new ideas...")
+
+
 def seed_from_master_list(bus: MessageBus) -> bool:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
@@ -1274,6 +1355,7 @@ def run_pipeline(
         last_orphan_requeue = 0.0   # rate-limit orphan re-queues to once per 5 min
         ORPHAN_REQUEUE_COOLDOWN = 660  # 11 min — must exceed workspace recency guard (10 min)
         _status_count = 0  # for throttling non-interactive log output
+        ideation_in_progress = False  # True while waiting for Ideator to generate new ideas
 
         while not stop_requested:
             # Time limit check
@@ -1347,8 +1429,11 @@ def run_pipeline(
                         print(f"  ▶️  Advancing to next project ({orphaned} queued)")
                     elif from_list:
                         seeded = seed_from_master_list(bus)
-                        if not seeded:
-                            print(f"  ✓ All projects exhausted.")
+                        if seeded:
+                            ideation_in_progress = False
+                        elif not ideation_in_progress:
+                            _request_ideation(bus)
+                            ideation_in_progress = True
 
                 running_agents = sum(1 for s in health.values() if s == "running")
 
@@ -1419,9 +1504,13 @@ def run_pipeline(
                             if orphaned:
                                 last_orphan_requeue = now
                                 print(f"  🔁 Re-queued {orphaned} orphaned project(s) — not seeding new ideas yet")
-                            elif not seed_from_master_list(bus):
-                                print(f"\n  ✓ All ideas processed — pipeline complete.")
-                                break
+                            else:
+                                seeded = seed_from_master_list(bus)
+                                if seeded:
+                                    ideation_in_progress = False
+                                elif not ideation_in_progress:
+                                    _request_ideation(bus)
+                                    ideation_in_progress = True
 
                 # --- Collect per-project metrics from state files ---
                 try:
