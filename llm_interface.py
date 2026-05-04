@@ -335,8 +335,6 @@ class OllamaAdapter(LLMBase):
             "temperature": self.temperature,
             "num_ctx": self.num_ctx,
         }
-        if self.think is not None:
-            options["think"] = self.think
 
         payload: dict[str, Any] = {
             "model": self.model,
@@ -345,6 +343,9 @@ class OllamaAdapter(LLMBase):
             "options": options,
             "keep_alive": -1,   # pin model in VRAM; prevents Ollama from unloading between calls
         }
+        # think is a top-level field in Ollama API, NOT inside options
+        if self.think is not None:
+            payload["think"] = self.think
         if tools:
             payload["tools"] = [
                 {"type": "function", "function": t} for t in tools
@@ -396,7 +397,14 @@ class OllamaAdapter(LLMBase):
                 raise last_error  # all retries exhausted
 
         msg = raw.get("message", {})
-        content = msg.get("content", "") or ""
+        # For thinking models (Qwen3, DeepSeek-R1), the visible response may be
+        # in 'content' OR 'thinking'. When think=True, reasoning goes in thinking
+        # and the final answer in content. When both are present, combine them.
+        thinking = msg.get("thinking", "") or ""
+        content  = msg.get("content",  "") or ""
+        # If content is empty but thinking has output, the model responded via CoT
+        if not content and thinking:
+            content = thinking
 
         # Parse tool calls — arguments may be a string or already a dict
         tool_calls = []

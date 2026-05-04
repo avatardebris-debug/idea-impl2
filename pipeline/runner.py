@@ -124,27 +124,35 @@ def _check_ollama_model(model: str) -> None:
     # Ollama silently downloads it (23GB+) instead of erroring.
     os.environ.setdefault("OLLAMA_NO_PULL", "1")
 
-    # 3. Warm up: trigger a tiny inference to load model into VRAM
+    # 3. Warm up: trigger a tiny inference to load model into VRAM.
+    # Use /api/chat with think:false — /api/generate with num_predict:5 returns
+    # empty for thinking models because all tokens go to the <think> block.
     print(f"  Model:    {model} (warming up...)", end="", flush=True)
     try:
         req = urllib.request.Request(
-            f"{base_url}/api/generate",
+            f"{base_url}/api/chat",
             data=json.dumps({
                 "model": model,
-                "prompt": "/no_think say OK",
+                "messages": [{"role": "user", "content": "/no_think say OK"}],
                 "stream": False,
+                "think": False,             # disable chain-of-thought for warmup
                 "keep_alive": -1,           # pin model in VRAM after warmup
-                "options": {"num_predict": 5},
+                "options": {"num_predict": 30},
             }).encode(),
             headers={"Content-Type": "application/json"},
         )
         resp = urllib.request.urlopen(req, timeout=300)  # 5 min — large models take time
         result = json.loads(resp.read())
-        # Check if response came back
-        if result.get("response", "").strip():
+        # Accept response from either message.content or thinking field
+        content = (
+            result.get("message", {}).get("content", "")
+            or result.get("message", {}).get("thinking", "")
+            or result.get("response", "")
+        )
+        if content.strip():
             print(" ✅")
         else:
-            print(" ⚠️  (empty response)")
+            print(" ⚠️  (empty response — model may need restart)")
     except Exception as e:
         print(f" ⚠️  warmup failed: {e}")
 
