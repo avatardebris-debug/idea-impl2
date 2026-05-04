@@ -255,11 +255,14 @@ def _slugify(title: str) -> str:
 
 
 def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
-    """Return the current_idea.json from the most recently modified project.
+    """Return the current_idea.json from the most recently modified IN-PROGRESS project.
 
+    Skips projects in terminal states (complete, budget_exceeded) so that
+    manually-edited state files don't permanently hijack the active slot.
     Falls back to the old global .pipeline/state/current_idea.json for
     backwards compatibility with runs that predate the per-project isolation.
     """
+    TERMINAL = {"complete", "budget_exceeded"}
     projects_dir = pipeline_dir / "projects"
     candidates: list[pathlib.Path] = []
 
@@ -267,13 +270,23 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
         candidates = list(projects_dir.glob("*/state/current_idea.json"))
 
     if candidates:
-        newest = max(candidates, key=lambda p: p.stat().st_mtime)
-        try:
-            state = json.loads(newest.read_text(encoding="utf-8"))
-            state.setdefault("_slug", newest.parent.parent.name)
-            return state
-        except Exception:
-            pass
+        # Prefer in-progress projects sorted by most recently modified
+        def sort_key(p: pathlib.Path):
+            try:
+                state = json.loads(p.read_text(encoding="utf-8"))
+                is_terminal = state.get("status", "") in TERMINAL
+                return (1 if is_terminal else 0, -p.stat().st_mtime)
+            except Exception:
+                return (2, 0.0)
+
+        candidates.sort(key=sort_key)
+        for path in candidates:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+                state.setdefault("_slug", path.parent.parent.name)
+                return state
+            except Exception:
+                continue
 
     # Fallback: old global location (pre-isolation runs)
     old_path = pipeline_dir / "state" / "current_idea.json"
@@ -1422,12 +1435,16 @@ def run_pipeline(
 
                 # If active project is budget_exceeded, advance to next project.
                 # Check has_active_work() not all_empty — all_empty only counts
-                # 'pending' but we just cleared all queues above.
-                if idea_state.get("status") == "budget_exceeded" and not bus.has_active_work():
+                # If active project is budget_exceeded, advance to next project.
+                # NOTE: Do NOT gate this on has_active_work() — other projects may
+                # be running in parallel and would keep this permanently stuck.
+                if idea_state.get("status") == "budget_exceeded":
+                    slug = idea_state.get("_slug", "")
                     orphaned = _rebuild_queues_from_state(bus)
                     if orphaned:
-                        print(f"  ▶️  Advancing to next project ({orphaned} queued)")
-                    elif from_list:
+                        print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
+                    elif from_list and not bus.has_active_work():
+                        # Only seed/ideate when the bus is truly idle (no other projects)
                         seeded = seed_from_master_list(bus)
                         if seeded:
                             ideation_in_progress = False
