@@ -107,6 +107,13 @@ class IdeatorAgent(AgentProcess):
     # ------------------------------------------------------------------
 
     def _handle_generate_ideas(self, msg: Message) -> AgentOutput:
+        import pathlib
+        import re
+        import logging
+        from llm_interface import get_llm
+
+        logger = logging.getLogger(__name__)
+
         projects_context = msg.payload.get("projects_context", "")
         existing_ideas   = msg.payload.get("existing_ideas", "")
         reusable_tools   = msg.payload.get("reusable_tools", "")
@@ -114,11 +121,20 @@ class IdeatorAgent(AgentProcess):
         master_ideas_path = msg.payload.get("master_ideas_path", "master_ideas.md")
 
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        log_path = f".pipeline/state/idea_generation_log_{ts}.md"
 
-        task_prompt = (
-            f"You are the Ideator. The idea backlog is empty. Generate exactly 30 new ideas "
-            f"across 6 groups of 5.\n\n"
+        # --- Call LLM DIRECTLY (no ReAct loop) ---
+        # generate_ideas is purely generative — no file tools needed.
+        # We write to master_ideas.md ourselves in Python after the call.
+        llm = get_llm(self.provider, model=self.model, temperature=0.85)
+
+        system_prompt = (
+            "You are the Ideator — a creative idea generation engine for an autonomous "
+            "software development pipeline. Generate concise, actionable software project ideas. "
+            "Respond ONLY with the list of ideas in the requested format. No preamble, no summary."
+        )
+
+        user_prompt = (
+            f"The idea backlog is empty. Generate exactly 30 new ideas across 6 groups of 5.\n\n"
             f"## Existing Projects (with workspace files and plans)\n"
             f"{projects_context}\n\n"
             f"## Reusable Shared Tools Already Built\n"
@@ -131,7 +147,7 @@ class IdeatorAgent(AgentProcess):
             f"**GROUP 1 — SIMILAR**: 5 ideas similar in scope/type to existing projects "
             f"but targeting different niches or audiences.\n\n"
             f"**GROUP 2 — EXPANSION**: 5 ideas that expand an existing project with new "
-            f"major features. Read the workspace files listed above to understand what was "
+            f"major features. Use the workspace file listings above to understand what was "
             f"built and what meaningful next steps would be.\n\n"
             f"**GROUP 3 — INDEPENDENT**: 5 fresh ideas completely unrelated to existing work. "
             f"Think about tools, services, or products people actually pay for.\n\n"
@@ -141,35 +157,83 @@ class IdeatorAgent(AgentProcess):
             f"link existing projects together so they can share data or workflows.\n\n"
             f"**GROUP 6 — HARNESS**: 5 ideas for improving this pipeline/toolkit itself — "
             f"better agents, new capabilities, developer tooling, observability, etc.\n\n"
-            f"## Instructions\n"
-            f"1. Think deeply about the existing projects and their actual workspace code.\n"
-            f"2. Write all 30 ideas (one per line) in the correct format.\n"
-            f"3. APPEND them to `{master_ideas_path}` — do NOT overwrite the file.\n"
-            f"   Use a section header like: `## Auto-Generated — {ts}`\n"
-            f"4. Write a 3-line summary of what you added to `{log_path}`.\n"
-            f"5. Say DONE.\n"
+            f"Output ONLY the 30 idea lines with group headers. Each idea on its own line:\n"
+            f"  - [ ] **[Title]** — [description]\n"
         )
 
-        result = self.call_agent(task=task_prompt, verbose=False)
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user",   "content": user_prompt},
+        ]
 
-        # Signal the manager that ideation is complete
+        logger.info("[ideator] Calling LLM directly for idea generation (no ReAct loop)")
+        response = llm.chat(messages)
+        raw_text = response.content or ""
+
+        # --- Parse idea lines from response ---
+        idea_lines = [
+            line.strip()
+            for line in raw_text.splitlines()
+            if re.match(r"^\s*-\s*\[[ xX]\]", line)
+        ]
+
+        # Force all generated ideas to unchecked [ ]
+        idea_lines = [re.sub(r"\[[ xX]\]", "[ ]", l) for l in idea_lines]
+
+        # --- Append to master_ideas.md ---
+        mi_path = pathlib.Path(master_ideas_path)
+        if not mi_path.exists():
+            mi_path = pathlib.Path("master_ideas.md")
+
+        header = f"\n\n## Auto-Generated — {ts}\n\n"
+        body   = "\n".join(idea_lines) + "\n"
+        try:
+            with open(mi_path, "a", encoding="utf-8") as f:
+                f.write(header + body)
+            logger.info(
+                "[ideator] Appended %d ideas to %s", len(idea_lines), mi_path
+            )
+        except Exception as e:
+            logger.error("[ideator] Failed to write to master_ideas.md: %s", e)
+
+        # --- Write generation log ---
+        log_dir = pathlib.Path(".pipeline/state")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_path = str(log_dir / f"idea_generation_log_{ts}.md")
+        try:
+            pathlib.Path(log_path).write_text(
+                f"# Idea Generation — {ts}\n\n"
+                f"Generated {len(idea_lines)} ideas.\n\n"
+                f"## Raw LLM output preview\n\n{raw_text[:2000]}\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+        # --- Signal manager ---
         signal_msg = Message.create(
             from_agent=self.role,
             to_agent="manager",
             type="PIPELINE_SIGNAL",
             payload={
                 "signal": "IDEA_GENERATION_COMPLETE",
+                "ideas_added": len(idea_lines),
                 "log_path": log_path,
                 "source": "ideator",
             },
         )
 
+        summary = (
+            f"Generated {len(idea_lines)} new ideas and appended to master_ideas.md"
+            if idea_lines
+            else "LLM returned no parseable idea lines — check idea_generation_log"
+        )
         return AgentOutput(
-            success=result.completed,
-            answer=result.answer,
+            success=bool(idea_lines),
+            answer=summary,
             outgoing=[signal_msg],
-            tokens_used=result.tokens_used,
-            steps_used=result.steps_used,
+            tokens_used=response.usage.total_tokens if response.usage else 0,
+            steps_used=1,
         )
 
 

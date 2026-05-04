@@ -560,7 +560,7 @@ def _request_ideation(bus: MessageBus) -> None:
     print("\n  🧠 master_ideas.md exhausted — queued Ideator to generate 30 new ideas...")
 
 
-def seed_from_master_list(bus: MessageBus) -> bool:
+def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
     Dependency syntax (append to description):
@@ -646,7 +646,7 @@ def seed_from_master_list(bus: MessageBus) -> bool:
 
     if blocked_count > 0:
         print(f"  [BLOCKED] {blocked_count} idea(s) blocked on dependencies -- will retry next tick")
-    else:
+    elif not silent:
         print("  ✗ No unchecked ideas found in master_ideas.md")
     return False
 
@@ -1375,8 +1375,10 @@ def run_pipeline(
         last_health_check = time.time()
         last_orphan_requeue = 0.0   # rate-limit orphan re-queues to once per 5 min
         ORPHAN_REQUEUE_COOLDOWN = 660  # 11 min — must exceed workspace recency guard (10 min)
+        IDEATION_TIMEOUT = 35 * 60    # 35 min — retry if ideator hasn't written ideas yet
         _status_count = 0  # for throttling non-interactive log output
         ideation_in_progress = False  # True while waiting for Ideator to generate new ideas
+        ideation_requested_at = 0.0   # timestamp of last _request_ideation() call
 
         while not stop_requested:
             # Time limit check
@@ -1453,12 +1455,18 @@ def run_pipeline(
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
                     elif from_list and not bus.has_active_work():
                         # Only seed/ideate when the bus is truly idle (no other projects)
-                        seeded = seed_from_master_list(bus)
+                        seeded = seed_from_master_list(bus, silent=ideation_in_progress)
                         if seeded:
                             ideation_in_progress = False
+                            ideation_requested_at = 0.0
                         elif not ideation_in_progress:
                             _request_ideation(bus)
                             ideation_in_progress = True
+                            ideation_requested_at = time.time()
+                        elif time.time() - ideation_requested_at > IDEATION_TIMEOUT:
+                            print("  ⏰ Ideation timed out — retrying...")
+                            ideation_in_progress = False
+                            ideation_requested_at = 0.0
 
                 running_agents = sum(1 for s in health.values() if s == "running")
 
@@ -1530,12 +1538,18 @@ def run_pipeline(
                                 last_orphan_requeue = now
                                 print(f"  🔁 Re-queued {orphaned} orphaned project(s) — not seeding new ideas yet")
                             else:
-                                seeded = seed_from_master_list(bus)
+                                seeded = seed_from_master_list(bus, silent=ideation_in_progress)
                                 if seeded:
                                     ideation_in_progress = False
+                                    ideation_requested_at = 0.0
                                 elif not ideation_in_progress:
                                     _request_ideation(bus)
                                     ideation_in_progress = True
+                                    ideation_requested_at = time.time()
+                                elif time.time() - ideation_requested_at > IDEATION_TIMEOUT:
+                                    print("  ⏰ Ideation timed out — retrying...")
+                                    ideation_in_progress = False
+                                    ideation_requested_at = 0.0
 
                 # --- Collect per-project metrics from state files ---
                 try:
