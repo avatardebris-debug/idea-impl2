@@ -1,8 +1,9 @@
-"""Newsletter Profit Simulator."""
+"""Newsletter profit simulation engine."""
 
 from __future__ import annotations
 
-from typing import List
+import random
+from typing import List, Optional
 
 from .config import SimConfig
 from .state import NewsletterState
@@ -18,22 +19,17 @@ class NewsletterSimulator:
             config: Simulation configuration.
         """
         self.config = config
-        self.current_state = NewsletterState()
-        self.history: List[NewsletterState] = []
-        # Initialize with initial values
-        self._initialize_state()
-
-    def _initialize_state(self) -> None:
-        """Initialize state with initial values."""
+        if config.seed is not None:
+            random.seed(config.seed)
         self.current_state = NewsletterState(
             month=0,
-            subscribers=self.config.initial_subscribers,
-            revenue=self.config.initial_revenue,
-            costs=self.config.content_cost + self.config.marketing_cost,
-            profit=self.config.initial_revenue - (self.config.content_cost + self.config.marketing_cost),
-            cumulative_profit=self.config.initial_revenue - (self.config.content_cost + self.config.marketing_cost),
+            subscribers=config.initial_subscribers,
+            revenue=config.initial_revenue,
+            costs=config.content_cost + config.marketing_cost,
+            profit=config.initial_revenue - (config.content_cost + config.marketing_cost),
+            cumulative_profit=0.0,
         )
-        self.history = [NewsletterState.from_dict(self.current_state.to_dict())]
+        self.history: List[NewsletterState] = [NewsletterState.from_dict(self.current_state.to_dict())]
 
     def reset(self) -> NewsletterState:
         """Reset the simulation to initial state.
@@ -41,93 +37,69 @@ class NewsletterSimulator:
         Returns:
             Initial state.
         """
-        self._initialize_state()
+        if self.config.seed is not None:
+            random.seed(self.config.seed)
+        self.current_state = NewsletterState(
+            month=0,
+            subscribers=self.config.initial_subscribers,
+            revenue=self.config.initial_revenue,
+            costs=self.config.content_cost + self.config.marketing_cost,
+            profit=self.config.initial_revenue - (self.config.content_cost + self.config.marketing_cost),
+            cumulative_profit=0.0,
+        )
+        self.history = [NewsletterState.from_dict(self.current_state.to_dict())]
         return self.current_state
 
-    def step(self, action: int | None = None) -> NewsletterState:
+    def step(self) -> NewsletterState:
         """Advance simulation by one month.
-
-        Args:
-            action: Optional action to modify parameters (for RL integration).
 
         Returns:
             Updated state.
         """
-        # Apply action if provided (for RL integration)
-        if action is not None:
-            self._apply_action(action)
-
         # Advance month
         self.current_state.month += 1
 
-        # Calculate subscriber dynamics
-        new_subscribers = self.current_state.subscribers
-        if new_subscribers > 0:
-            # Growth from organic and marketing
-            growth = new_subscribers * self.config.growth_rate
-            # Churn
-            churn = new_subscribers * self.config.churn_rate
-            # Net change
-            new_subscribers += int(growth - churn)
-            new_subscribers = max(0, new_subscribers)
+        # Update subscribers
+        new_subs = self.current_state.subscribers
+        growth = int(new_subs * self.config.growth_rate)
+        churn = int(new_subs * self.config.churn_rate)
+        new_subs = new_subs + growth - churn
+        new_subs = max(0, new_subs)
+        self.current_state.subscribers = new_subs
 
-        # Calculate revenue and costs
-        revenue = new_subscribers * self.config.revenue_per_subscriber
-        costs = self.config.content_cost + self.config.marketing_cost
-        profit = revenue - costs
-        cumulative_profit = self.current_state.cumulative_profit + profit
+        # Update revenue
+        self.current_state.revenue = self.current_state.subscribers * self.config.revenue_per_subscriber
 
-        # Update state
-        self.current_state.subscribers = new_subscribers
-        self.current_state.revenue = revenue
-        self.current_state.costs = costs
-        self.current_state.profit = profit
-        self.current_state.cumulative_profit = cumulative_profit
+        # Update costs
+        self.current_state.costs = self.config.content_cost + self.config.marketing_cost
+
+        # Update profit
+        self.current_state.profit = self.current_state.revenue - self.current_state.costs
+
+        # Update cumulative profit
+        self.current_state.cumulative_profit += self.current_state.profit
 
         # Check termination
-        if new_subscribers == 0:
+        if self.current_state.subscribers == 0:
             self.current_state.is_terminated = True
             self.current_state.termination_reason = "No subscribers remaining"
         elif self.current_state.month >= self.config.max_months:
             self.current_state.is_terminated = True
             self.current_state.termination_reason = "Maximum months reached"
 
-        # Record state
+        # Add to history
         self.history.append(NewsletterState.from_dict(self.current_state.to_dict()))
 
         return self.current_state
 
-    def _apply_action(self, action: int) -> None:
-        """Apply action to modify simulation parameters.
-
-        Args:
-            action: Action ID (0-4).
-        """
-        # For simulation mode, actions modify growth rate and marketing cost
-        if action == 1:  # Increase marketing
-            self.config.growth_rate = min(0.5, self.config.growth_rate + 0.02)
-            self.config.marketing_cost = min(5000.0, self.config.marketing_cost + 100)
-        elif action == 2:  # Decrease marketing
-            self.config.growth_rate = max(0.0, self.config.growth_rate - 0.02)
-            self.config.marketing_cost = max(0, self.config.marketing_cost - 100)
-        elif action == 3:  # Increase content quality
-            self.config.growth_rate = min(0.5, self.config.growth_rate + 0.01)
-            self.config.content_cost = min(5000.0, self.config.content_cost + 50)
-        elif action == 4:  # Decrease content quality
-            self.config.growth_rate = max(0.0, self.config.growth_rate - 0.01)
-            self.config.content_cost = max(0, self.config.content_cost - 50)
-
     def run(self) -> List[NewsletterState]:
-        """Run simulation to completion.
+        """Run the full simulation.
 
         Returns:
-            List of states from initial to final.
+            List of states over time.
         """
-        self.reset()
-
         while not self.current_state.is_terminated:
             self.step()
-
         return self.history
 
     def get_metrics(self) -> dict:
@@ -140,8 +112,6 @@ class NewsletterSimulator:
             "month": self.current_state.month,
             "subscribers": self.current_state.subscribers,
             "revenue": self.current_state.revenue,
-            "costs": self.current_state.costs,
             "profit": self.current_state.profit,
             "cumulative_profit": self.current_state.cumulative_profit,
-            "is_terminated": self.current_state.is_terminated,
         }

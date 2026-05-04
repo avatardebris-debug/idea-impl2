@@ -1,0 +1,76 @@
+{
+  "concepts": [
+    {
+      "concept_id": "test_concept",
+      "concept_name": "test_concept",
+      "status": "not_started",
+      "mastery_percentage": 0.0,
+      "last_studied": null,
+      "study_sessions": 0,
+      "average_score": 0.0,
+      "estimated_time_spent": "0 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    },
+    {
+      "concept_id": "concept_1",
+      "concept_name": "concept_1",
+      "status": "mastered",
+      "mastery_percentage": 100,
+      "last_studied": "2026-04-30T21:38:25.522429",
+      "study_sessions": 12,
+      "average_score": 87.5,
+      "estimated_time_spent": "30 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    },
+    {
+      "concept_id": "concept_2",
+      "concept_name": "concept_2",
+      "status": "not_started",
+      "mastery_percentage": 0.0,
+      "last_studied": null,
+      "study_sessions": 0,
+      "average_score": 0.0,
+      "estimated_time_spent": "0 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    },
+    {
+      "concept_id": "python_basics",
+      "concept_name": "python_basics",
+      "status": "in_progress",
+      "mastery_percentage": 60,
+      "last_studied": "2026-04-30T21:38:25.469008",
+      "study_sessions": 2,
+      "average_score": 60.0,
+      "estimated_time_spent": "45 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    },
+    {
+      "concept_id": "concept_easy",
+      "concept_name": "concept_easy",
+      "status": "mastered",
+      "mastery_percentage": 95,
+      "last_studied": "2026-04-30T21:38:25.481570",
+      "study_sessions": 2,
+      "average_score": 95.0,
+      "estimated_time_spent": "20 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    },
+    {
+      "concept_id": "concept_0",
+      "concept_name": "concept_0",
+      "status": "in_progress",
+      "mastery_percentage": 50,
+      "last_studied": "2026-04-30T21:38:25.534940",
+      "study_sessions": 2,
+      "average_score": 50.0,
+      "estimated_time_spent": "30 min",
+      "difficulty_level": "intermediate",
+      "notes": ""
+    }
+  ]
+}

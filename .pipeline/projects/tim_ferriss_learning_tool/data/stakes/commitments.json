@@ -1,0 +1,92 @@
+{
+  "commitments": [
+    {
+      "commitment_id": "commitment_1",
+      "goal_id": "goal_1",
+      "goal_description": "Learn Python",
+      "commitment_date": "2026-04-30T21:34:03.581970",
+      "deadline": "2026-05-30T21:34:03.581960",
+      "public_platform": "twitter",
+      "audience_size": 500,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_2",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-04-30T21:34:03.589125",
+      "deadline": "2026-05-30T21:34:03.589118",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_3",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-04-30T21:34:03.602383",
+      "deadline": "2026-05-30T21:34:03.602376",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_4",
+      "goal_id": "goal_1",
+      "goal_description": "Test goal",
+      "commitment_date": "2026-04-30T21:34:03.707609",
+      "deadline": "2026-05-30T21:34:03.707601",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_5",
+      "goal_id": "goal_1",
+      "goal_description": "Learn Python",
+      "commitment_date": "2026-04-30T21:38:25.314161",
+      "deadline": "2026-05-30T21:38:25.314153",
+      "public_platform": "twitter",
+      "audience_size": 500,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_6",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-04-30T21:38:25.321092",
+      "deadline": "2026-05-30T21:38:25.321085",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_7",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-04-30T21:38:25.333698",
+      "deadline": "2026-05-30T21:38:25.333691",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_8",
+      "goal_id": "goal_1",
+      "goal_description": "Test goal",
+      "commitment_date": "2026-04-30T21:38:25.431401",
+      "deadline": "2026-05-30T21:38:25.431393",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    }
+  ]
+}

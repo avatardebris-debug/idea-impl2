@@ -1,0 +1,24 @@
+{
+  "widgets": [
+    {
+      "widget_id": "widget_46f79309",
+      "widget_type": "progress_overview",
+      "title": "Progress Overview",
+      "description": "Overview of progress",
+      "data_source": "progress_tracker",
+      "config": {
+        "show_charts": true
+      },
+      "created_date": "2026-04-30T21:34:04.322244"
+    },
+    {
+      "widget_id": "widget_21924422",
+      "widget_type": "progress_overview",
+      "title": "Progress Overview",
+      "description": "Overview",
+      "data_source": "progress_tracker",
+      "config": {},
+      "created_date": "2026-04-30T21:34:04.324132"
+    }
+  ]
+}

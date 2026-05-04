@@ -1,0 +1,582 @@
+{
+  "metrics": {
+    "test_metric": [
+      {
+        "metric_name": "test_metric",
+        "value": 42.0,
+        "timestamp": "2026-04-30T21:34:04.236179",
+        "metadata": {
+          "test": true
+        }
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 10.0,
+        "timestamp": "2026-04-30T21:34:04.244074",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 20.0,
+        "timestamp": "2026-04-30T21:34:04.244389",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 30.0,
+        "timestamp": "2026-04-30T21:34:04.244725",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 1.0,
+        "timestamp": "2026-04-30T21:34:04.262608",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 2.0,
+        "timestamp": "2026-04-30T21:34:04.263759",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 3.0,
+        "timestamp": "2026-04-30T21:34:04.264833",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 4.0,
+        "timestamp": "2026-04-30T21:34:04.265766",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 5.0,
+        "timestamp": "2026-04-30T21:34:04.266654",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 6.0,
+        "timestamp": "2026-04-30T21:34:04.267227",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 7.0,
+        "timestamp": "2026-04-30T21:34:04.267609",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 8.0,
+        "timestamp": "2026-04-30T21:34:04.268038",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 9.0,
+        "timestamp": "2026-04-30T21:34:04.268458",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 10.0,
+        "timestamp": "2026-04-30T21:34:04.268859",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 1.0,
+        "timestamp": "2026-04-30T21:34:04.284984",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 2.0,
+        "timestamp": "2026-04-30T21:34:04.285497",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 3.0,
+        "timestamp": "2026-04-30T21:34:04.285934",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 4.0,
+        "timestamp": "2026-04-30T21:34:04.286402",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 5.0,
+        "timestamp": "2026-04-30T21:34:04.286855",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 6.0,
+        "timestamp": "2026-04-30T21:34:04.287331",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 7.0,
+        "timestamp": "2026-04-30T21:34:04.287796",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 8.0,
+        "timestamp": "2026-04-30T21:34:04.288283",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 9.0,
+        "timestamp": "2026-04-30T21:34:04.288767",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 10.0,
+        "timestamp": "2026-04-30T21:34:04.289278",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 1.0,
+        "timestamp": "2026-04-30T21:34:04.305243",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 2.0,
+        "timestamp": "2026-04-30T21:34:04.305881",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 3.0,
+        "timestamp": "2026-04-30T21:34:04.306475",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 4.0,
+        "timestamp": "2026-04-30T21:34:04.307047",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 5.0,
+        "timestamp": "2026-04-30T21:34:04.307633",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 6.0,
+        "timestamp": "2026-04-30T21:34:04.308216",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 7.0,
+        "timestamp": "2026-04-30T21:34:04.308833",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 8.0,
+        "timestamp": "2026-04-30T21:34:04.309484",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 9.0,
+        "timestamp": "2026-04-30T21:34:04.310082",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 10.0,
+        "timestamp": "2026-04-30T21:34:04.310706",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 1.0,
+        "timestamp": "2026-04-30T21:34:04.313367",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 2.0,
+        "timestamp": "2026-04-30T21:34:04.313987",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 3.0,
+        "timestamp": "2026-04-30T21:34:04.314677",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 4.0,
+        "timestamp": "2026-04-30T21:34:04.315374",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 5.0,
+        "timestamp": "2026-04-30T21:34:04.316178",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 6.0,
+        "timestamp": "2026-04-30T21:34:04.316856",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 7.0,
+        "timestamp": "2026-04-30T21:34:04.317563",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 8.0,
+        "timestamp": "2026-04-30T21:34:04.318264",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 9.0,
+        "timestamp": "2026-04-30T21:34:04.318958",
+        "metadata": {}
+      },
+      {
+        "metric_name": "test_metric",
+        "value": 10.0,
+        "timestamp": "2026-04-30T21:34:04.319682",
+        "metadata": {}
+      }
+    ],
+    "practice_duration": [
+      {
+        "metric_name": "practice_duration",
+        "value": 30,
+        "timestamp": "2026-04-30T21:34:04.237992",
+        "metadata": {
+          "activity_id": "activity_123"
+        }
+      },
+      {
+        "metric_name": "practice_duration",
+        "value": 30,
+        "timestamp": "2026-04-30T21:34:04.403267",
+        "metadata": {
+          "activity_id": "activity_1f8d6644"
+        }
+      },
+      {
+        "metric_name": "practice_duration",
+        "value": -30,
+        "timestamp": "2026-04-30T21:34:04.507563",
+        "metadata": {
+          "activity_id": "activity_34f167e3"
+        }
+      }
+    ],
+    "assessment_scores": [
+      {
+        "metric_name": "assessment_scores",
+        "value": 85.0,
+        "timestamp": "2026-04-30T21:34:04.240163",
+        "metadata": {
+          "activity_id": "activity_123"
+        }
+      },
+      {
+        "metric_name": "assessment_scores",
+        "value": 85.0,
+        "timestamp": "2026-04-30T21:34:04.420213",
+        "metadata": {
+          "activity_id": "activity_495093f7"
+        }
+      },
+      {
+        "metric_name": "assessment_scores",
+        "value": 150.0,
+        "timestamp": "2026-04-30T21:34:04.515466",
+        "metadata": {
+          "activity_id": "activity_0b4f3862"
+        }
+      }
+    ],
+    "completion_rate": [
+      {
+        "metric_name": "completion_rate",
+        "value": 75.0,
+        "timestamp": "2026-04-30T21:34:04.242122",
+        "metadata": {
+          "activity_id": "activity_123"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.391198",
+        "metadata": {
+          "activity_id": "activity_8f9b7717"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.395329",
+        "metadata": {
+          "activity_id": "activity_a453e35b"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 50.0,
+        "timestamp": "2026-04-30T21:34:04.397104",
+        "metadata": {
+          "activity_id": "activity_a453e35b"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.401178",
+        "metadata": {
+          "activity_id": "activity_1f8d6644"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.418181",
+        "metadata": {
+          "activity_id": "activity_495093f7"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.424778",
+        "metadata": {
+          "activity_id": "activity_5c1c907e"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 50.0,
+        "timestamp": "2026-04-30T21:34:04.426857",
+        "metadata": {
+          "activity_id": "activity_5c1c907e"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.431331",
+        "metadata": {
+          "activity_id": "activity_54fba2ba"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.433284",
+        "metadata": {
+          "activity_id": "activity_9aa45dbc"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 50.0,
+        "timestamp": "2026-04-30T21:34:04.435404",
+        "metadata": {
+          "activity_id": "activity_54fba2ba"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 100.0,
+        "timestamp": "2026-04-30T21:34:04.437419",
+        "metadata": {
+          "activity_id": "activity_9aa45dbc"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.451923",
+        "metadata": {
+          "activity_id": "activity_827a5c29"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.476829",
+        "metadata": {
+          "activity_id": "activity_5acf8773"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.483832",
+        "metadata": {
+          "activity_id": "activity_ad78eb78"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.485952",
+        "metadata": {
+          "activity_id": "activity_ad78eb78"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 100.0,
+        "timestamp": "2026-04-30T21:34:04.488160",
+        "metadata": {
+          "activity_id": "activity_ad78eb78"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 150.0,
+        "timestamp": "2026-04-30T21:34:04.490473",
+        "metadata": {
+          "activity_id": "activity_ad78eb78"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.505309",
+        "metadata": {
+          "activity_id": "activity_34f167e3"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.513101",
+        "metadata": {
+          "activity_id": "activity_0b4f3862"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.520437",
+        "metadata": {
+          "activity_id": "activity_665d8bd9"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.522990",
+        "metadata": {
+          "activity_id": "activity_e7ccfd51"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.525382",
+        "metadata": {
+          "activity_id": "activity_a75ee14f"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.527857",
+        "metadata": {
+          "activity_id": "activity_0095cdfb"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.530252",
+        "metadata": {
+          "activity_id": "activity_ea388638"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.532992",
+        "metadata": {
+          "activity_id": "activity_0bda90d4"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.535606",
+        "metadata": {
+          "activity_id": "activity_32a18057"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.538387",
+        "metadata": {
+          "activity_id": "activity_58d7893b"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.540951",
+        "metadata": {
+          "activity_id": "activity_db59b538"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.543501",
+        "metadata": {
+          "activity_id": "activity_6594956f"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.558723",
+        "metadata": {
+          "activity_id": "activity_ed29c389"
+        }
+      },
+      {
+        "metric_name": "completion_rate",
+        "value": 0.0,
+        "timestamp": "2026-04-30T21:34:04.563975",
+        "metadata": {
+          "activity_id": "activity_b4d7b4cd"
+        }
+      }
+    ]
+  }
+}

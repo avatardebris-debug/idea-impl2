@@ -4,16 +4,16 @@ import argparse
 import json
 import csv
 import sys
-from typing import Optional
+from typing import List, Optional
 from .config import SimConfig
 from .simulator import NewsletterSimulator
 
 
 def create_parser() -> argparse.ArgumentParser:
-    """Create argument parser for the CLI.
+    """Create the argument parser for the CLI.
     
     Returns:
-        Configured ArgumentParser instance
+        Configured ArgumentParser instance.
     """
     parser = argparse.ArgumentParser(
         description="Newsletter Online Profit Environment - Simulation and Analysis Tool"
@@ -22,284 +22,180 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
     # Sim subcommand
-    sim_parser = subparsers.add_parser("sim", help="Simulation commands")
+    sim_parser = subparsers.add_parser("sim", help="Simulation commands", add_help=False)
     sim_subparsers = sim_parser.add_subparsers(dest="sim_command", help="Simulation subcommands")
     
     # Sim run subcommand
-    sim_run_parser = sim_subparsers.add_parser("run", help="Run a simulation")
-    sim_run_parser.add_argument("--weeks", type=int, default=52, help="Number of weeks to simulate")
-    sim_run_parser.add_argument("--subscribers", type=int, default=1000, help="Initial subscriber count")
-    sim_run_parser.add_argument("--cpc", type=float, default=2.50, help="Cost per click for acquisition")
-    sim_run_parser.add_argument("--retention", type=float, default=0.95, help="Subscriber retention rate")
-    sim_run_parser.add_argument("--arpu", type=float, default=5.00, help="Average revenue per user")
-    sim_run_parser.add_argument("--ad_rate", type=float, default=0.50, help="Revenue per subscriber from ads")
-    sim_run_parser.add_argument("--sponsor_rate", type=float, default=100.00, help="Revenue per subscriber from sponsors")
-    sim_run_parser.add_argument("--content_cost", type=float, default=500.00, help="Weekly content creation cost")
-    sim_run_parser.add_argument("--operational_cost", type=float, default=300.00, help="Weekly operational cost")
-    sim_run_parser.add_argument("--growth", type=float, default=0.1, help="Growth rate")
-    sim_run_parser.add_argument("--churn", type=float, default=0.05, help="Churn rate")
-    sim_run_parser.add_argument("--seasonal", type=float, default=1.0, help="Seasonal factor")
-    sim_run_parser.add_argument("--competitors", type=int, default=5, help="Number of competitors")
-    sim_run_parser.add_argument("--saturation", type=float, default=0.3, help="Market saturation")
-    sim_run_parser.add_argument("--conversion", type=float, default=0.02, help="Conversion rate")
-    sim_run_parser.add_argument("--engagement", type=float, default=0.75, help="Engagement score")
-    sim_run_parser.add_argument("--sponsor_fill", type=float, default=0.8, help="Sponsor fill rate")
-    sim_run_parser.add_argument("--refund", type=float, default=0.01, help="Refund rate")
-    sim_run_parser.add_argument("--tax", type=float, default=0.25, help="Tax rate")
-    sim_run_parser.add_argument("--discount", type=float, default=0.1, help="Discount rate")
+    run_parser = sim_subparsers.add_parser("run", help="Run a simulation")
+    _add_common_args(run_parser)
     
     # Sim stats subcommand
-    sim_stats_parser = sim_subparsers.add_parser("stats", help="Show simulation statistics")
-    sim_stats_parser.add_argument("--weeks", type=int, default=52, help="Number of weeks to simulate")
-    sim_stats_parser.add_argument("--subscribers", type=int, default=1000, help="Initial subscriber count")
-    sim_stats_parser.add_argument("--cpc", type=float, default=2.50, help="Cost per click for acquisition")
-    sim_stats_parser.add_argument("--retention", type=float, default=0.95, help="Subscriber retention rate")
-    sim_stats_parser.add_argument("--arpu", type=float, default=5.00, help="Average revenue per user")
-    sim_stats_parser.add_argument("--ad_rate", type=float, default=0.50, help="Revenue per subscriber from ads")
-    sim_stats_parser.add_argument("--sponsor_rate", type=float, default=100.00, help="Revenue per subscriber from sponsors")
-    sim_stats_parser.add_argument("--content_cost", type=float, default=500.00, help="Weekly content creation cost")
-    sim_stats_parser.add_argument("--operational_cost", type=float, default=300.00, help="Weekly operational cost")
-    sim_stats_parser.add_argument("--growth", type=float, default=0.1, help="Growth rate")
-    sim_stats_parser.add_argument("--churn", type=float, default=0.05, help="Churn rate")
-    sim_stats_parser.add_argument("--seasonal", type=float, default=1.0, help="Seasonal factor")
-    sim_stats_parser.add_argument("--competitors", type=int, default=5, help="Number of competitors")
-    sim_stats_parser.add_argument("--saturation", type=float, default=0.3, help="Market saturation")
-    sim_stats_parser.add_argument("--conversion", type=float, default=0.02, help="Conversion rate")
-    sim_stats_parser.add_argument("--engagement", type=float, default=0.75, help="Engagement score")
-    sim_stats_parser.add_argument("--sponsor_fill", type=float, default=0.8, help="Sponsor fill rate")
-    sim_stats_parser.add_argument("--refund", type=float, default=0.01, help="Refund rate")
-    sim_stats_parser.add_argument("--tax", type=float, default=0.25, help="Tax rate")
-    sim_stats_parser.add_argument("--discount", type=float, default=0.1, help="Discount rate")
+    stats_parser = sim_subparsers.add_parser("stats", help="Run simulation and print statistics")
+    _add_common_args(stats_parser)
     
     # Sim export subcommand
-    sim_export_parser = sim_subparsers.add_parser("export", help="Export simulation results")
-    sim_export_parser.add_argument("--weeks", type=int, default=52, help="Number of weeks to simulate")
-    sim_export_parser.add_argument("--subscribers", type=int, default=1000, help="Initial subscriber count")
-    sim_export_parser.add_argument("--cpc", type=float, default=2.50, help="Cost per click for acquisition")
-    sim_export_parser.add_argument("--retention", type=float, default=0.95, help="Subscriber retention rate")
-    sim_export_parser.add_argument("--arpu", type=float, default=5.00, help="Average revenue per user")
-    sim_export_parser.add_argument("--ad_rate", type=float, default=0.50, help="Revenue per subscriber from ads")
-    sim_export_parser.add_argument("--sponsor_rate", type=float, default=100.00, help="Revenue per subscriber from sponsors")
-    sim_export_parser.add_argument("--content_cost", type=float, default=500.00, help="Weekly content creation cost")
-    sim_export_parser.add_argument("--operational_cost", type=float, default=300.00, help="Weekly operational cost")
-    sim_export_parser.add_argument("--growth", type=float, default=0.1, help="Growth rate")
-    sim_export_parser.add_argument("--churn", type=float, default=0.05, help="Churn rate")
-    sim_export_parser.add_argument("--seasonal", type=float, default=1.0, help="Seasonal factor")
-    sim_export_parser.add_argument("--competitors", type=int, default=5, help="Number of competitors")
-    sim_export_parser.add_argument("--saturation", type=float, default=0.3, help="Market saturation")
-    sim_export_parser.add_argument("--conversion", type=float, default=0.02, help="Conversion rate")
-    sim_export_parser.add_argument("--engagement", type=float, default=0.75, help="Engagement score")
-    sim_export_parser.add_argument("--sponsor_fill", type=float, default=0.8, help="Sponsor fill rate")
-    sim_export_parser.add_argument("--refund", type=float, default=0.01, help="Refund rate")
-    sim_export_parser.add_argument("--tax", type=float, default=0.25, help="Tax rate")
-    sim_export_parser.add_argument("--discount", type=float, default=0.1, help="Discount rate")
-    sim_export_parser.add_argument("--output", type=str, required=True, help="Output file path")
-    sim_export_parser.add_argument("--format", type=str, default="json", choices=["json", "csv"], help="Output format")
+    export_parser = sim_subparsers.add_parser("export", help="Run simulation and export results")
+    _add_common_args(export_parser)
+    export_parser.add_argument("--output", "-o", type=str, help="Output file path")
+    export_parser.add_argument("--format", "-f", type=str, default="json", choices=["json", "csv"],
+                               help="Output format (json or csv)")
     
     return parser
 
 
-def run_simulation(args: argparse.Namespace) -> int:
-    """Execute the run command.
+def _add_common_args(parser: argparse.ArgumentParser):
+    """Add common simulation arguments to a parser.
     
     Args:
-        args: Parsed command line arguments
-        
-    Returns:
-        Exit code (0 for success, 1 for failure)
+        parser: ArgumentParser to add arguments to.
     """
-    try:
-        config = SimConfig(
-            subscriber_count=args.subscribers,
-            retention_rate=args.retention,
-            growth_rate=args.growth,
-            churn_rate=args.churn,
-            arpu=args.arpu,
-            ad_rate=args.ad_rate,
-            sponsor_rate=args.sponsor_rate,
-            content_cost=args.content_cost,
-            operational_cost=args.operational_cost,
-            cpc=args.cpc,
-            seasonal_factor=args.seasonal,
-            competitor_count=args.competitors,
-            market_saturation=args.saturation,
-            conversion_rate=args.conversion,
-            engagement_rate=args.engagement,
-            sponsorship_fill_rate=args.sponsor_fill,
-            refund_rate=args.refund,
-            tax_rate=args.tax,
-            discount_rate=args.discount
-        )
-        
-        simulator = NewsletterSimulator(config)
-        history = simulator.run_simulation(args.weeks)
-        
-        stats = history.get_statistics()
-        print("Simulation Results:")
-        print(f"  Total Revenue: ${stats['total_revenue']:,.2f}")
-        print(f"  Total Costs: ${stats['total_costs']:,.2f}")
-        print(f"  Net Profit: ${stats['net_profit']:,.2f}")
-        print(f"  Average Subscribers: {stats['avg_subscribers']:,.0f}")
-        print(f"  Final Subscribers: {stats['final_subscribers']:,}")
-        print(f"  Final Cumulative Profit: ${stats['final_cumulative_profit']:,.2f}")
-        print(f"  Average Churn Rate: {stats['avg_churn_rate']:.2%}")
-        print(f"  Total Acquired: {stats['total_acquired']:,}")
-        
-        return 0
-        
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+    parser.add_argument("--weeks", "-w", type=int, default=52, help="Number of weeks to simulate")
+    parser.add_argument("--subscribers", "-s", type=int, default=1000, help="Initial subscriber count")
+    parser.add_argument("--cpc", type=float, default=2.50, help="Cost per click for acquisition")
+    parser.add_argument("--retention", type=float, default=0.95, help="Weekly retention rate")
+    parser.add_argument("--arpu", type=float, default=5.00, help="Average revenue per user")
+    parser.add_argument("--ad-rate", type=float, default=0.50, help="Revenue per subscriber from ads")
+    parser.add_argument("--sponsor-rate", type=float, default=100.00, help="Revenue per sponsor")
+    parser.add_argument("--content-cost", type=float, default=500.00, help="Weekly content production cost")
+    parser.add_argument("--operational-cost", type=float, default=300.00, help="Weekly operational cost")
+    parser.add_argument("--growth", type=float, default=0.1, help="Weekly growth rate")
+    parser.add_argument("--churn", type=float, default=0.05, help="Weekly churn rate")
+    parser.add_argument("--seasonal", type=float, default=1.0, help="Seasonal factor")
+    parser.add_argument("--competitors", type=int, default=5, help="Number of competitors")
+    parser.add_argument("--saturation", type=float, default=0.3, help="Market saturation")
+    parser.add_argument("--conversion", type=float, default=0.02, help="Conversion rate")
+    parser.add_argument("--engagement", type=float, default=0.75, help="Engagement rate")
+    parser.add_argument("--sponsor-fill", type=float, default=0.8, help="Sponsorship fill rate")
+    parser.add_argument("--refund", type=float, default=0.01, help="Refund rate")
+    parser.add_argument("--tax", type=float, default=0.25, help="Tax rate")
+    parser.add_argument("--discount", type=float, default=0.1, help="Discount rate")
 
 
-def run_stats(args: argparse.Namespace) -> int:
-    """Execute the stats command.
+def run_simulation(args) -> List[dict]:
+    """Run a simulation with the given arguments.
     
     Args:
-        args: Parsed command line arguments
+        args: Parsed command-line arguments.
         
     Returns:
-        Exit code (0 for success, 1 for failure)
+        List of dictionaries containing weekly results.
     """
-    try:
-        config = SimConfig(
-            subscriber_count=args.subscribers,
-            retention_rate=args.retention,
-            growth_rate=args.growth,
-            churn_rate=args.churn,
-            arpu=args.arpu,
-            ad_rate=args.ad_rate,
-            sponsor_rate=args.sponsor_rate,
-            content_cost=args.content_cost,
-            operational_cost=args.operational_cost,
-            cpc=args.cpc,
-            seasonal_factor=args.seasonal,
-            competitor_count=args.competitors,
-            market_saturation=args.saturation,
-            conversion_rate=args.conversion,
-            engagement_rate=args.engagement,
-            sponsorship_fill_rate=args.sponsor_fill,
-            refund_rate=args.refund,
-            tax_rate=args.tax,
-            discount_rate=args.discount
-        )
-        
-        simulator = NewsletterSimulator(config)
-        history = simulator.run_simulation(args.weeks)
-        
-        stats = history.get_statistics()
-        print("Simulation Statistics:")
-        print(f"  Total Revenue: ${stats['total_revenue']:,.2f}")
-        print(f"  Total Costs: ${stats['total_costs']:,.2f}")
-        print(f"  Net Profit: ${stats['net_profit']:,.2f}")
-        print(f"  Average Subscribers: {stats['avg_subscribers']:,.0f}")
-        print(f"  Final Subscribers: {stats['final_subscribers']:,}")
-        print(f"  Final Cumulative Profit: ${stats['final_cumulative_profit']:,.2f}")
-        print(f"  Average Churn Rate: {stats['avg_churn_rate']:.2%}")
-        print(f"  Total Acquired: {stats['total_acquired']:,}")
-        
-        return 0
-        
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
+    config = SimConfig(
+        subscriber_count=args.subscribers,
+        retention_rate=args.retention,
+        churn_rate=args.churn,
+        growth_rate=args.growth,
+        cpc=args.cpc,
+        arpu=args.arpu,
+        ad_rate=args.ad_rate,
+        sponsor_rate=args.sponsor_rate,
+        content_cost=args.content_cost,
+        operational_cost=args.operational_cost,
+        seasonal_factor=args.seasonal,
+        competitor_count=args.competitors,
+        market_saturation=args.saturation,
+        conversion_rate=args.conversion,
+        engagement_rate=args.engagement,
+        sponsorship_fill_rate=args.sponsor_fill,
+        refund_rate=args.refund,
+        tax_rate=args.tax,
+        discount_rate=args.discount,
+    )
+    
+    simulator = NewsletterSimulator(config=config)
+    results = simulator.run_simulation(weeks=args.weeks)
+    
+    return results
 
 
-def run_export(args: argparse.Namespace) -> int:
-    """Execute the export command.
+def run_stats(args):
+    """Run a simulation and print statistics.
     
     Args:
-        args: Parsed command line arguments
-        
-    Returns:
-        Exit code (0 for success, 1 for failure)
+        args: Parsed command-line arguments.
     """
-    try:
-        # Validate format
-        if args.format not in ["json", "csv"]:
-            print(f"Error: Invalid format '{args.format}'. Must be 'json' or 'csv'", file=sys.stderr)
+    results = run_simulation(args)
+    
+    if not results:
+        print("No results to display.")
+        return
+    
+    # Calculate summary statistics
+    total_revenue = sum(r["revenue"] for r in results)
+    total_costs = sum(r["costs"] for r in results)
+    total_profit = sum(r["profit"] for r in results)
+    avg_weekly_revenue = total_revenue / len(results)
+    avg_weekly_profit = total_profit / len(results)
+    final_subscribers = results[-1]["subscribers"]
+    total_churned = sum(r["churned"] for r in results)
+    total_acquired = sum(r["acquired"] for r in results)
+    
+    print(f"Simulation Results ({args.weeks} weeks):")
+    print(f"  Final Subscribers: {final_subscribers}")
+    print(f"  Total Revenue: ${total_revenue:,.2f}")
+    print(f"  Total Costs: ${total_costs:,.2f}")
+    print(f"  Total Profit: ${total_profit:,.2f}")
+    print(f"  Avg Weekly Revenue: ${avg_weekly_revenue:,.2f}")
+    print(f"  Avg Weekly Profit: ${avg_weekly_profit:,.2f}")
+    print(f"  Total Churned: {total_churned}")
+    print(f"  Total Acquired: {total_acquired}")
+
+
+def run_export(args):
+    """Run a simulation and export results.
+    
+    Args:
+        args: Parsed command-line arguments.
+    """
+    if not args.output:
+        print("Error: --output is required for export command", file=sys.stderr)
+        sys.exit(1)
+    
+    results = run_simulation(args)
+    
+    if not results:
+        print("No results to export.", file=sys.stderr)
+        sys.exit(1)
+    
+    if args.format == "json":
+        with open(args.output, "w") as f:
+            json.dump(results, f, indent=2)
+    elif args.format == "csv":
+        with open(args.output, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+    
+    print(f"Results exported to {args.output}")
+
+
+def main():
+    """Main entry point for the CLI."""
+    parser = create_parser()
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
+    
+    if args.command == "sim":
+        if not hasattr(args, "sim_command") or not args.sim_command:
+            parser.parse_args(["sim", "--help"])
             sys.exit(1)
         
-        config = SimConfig(
-            subscriber_count=args.subscribers,
-            retention_rate=args.retention,
-            growth_rate=args.growth,
-            churn_rate=args.churn,
-            arpu=args.arpu,
-            ad_rate=args.ad_rate,
-            sponsor_rate=args.sponsor_rate,
-            content_cost=args.content_cost,
-            operational_cost=args.operational_cost,
-            cpc=args.cpc,
-            seasonal_factor=args.seasonal,
-            competitor_count=args.competitors,
-            market_saturation=args.saturation,
-            conversion_rate=args.conversion,
-            engagement_rate=args.engagement,
-            sponsorship_fill_rate=args.sponsor_fill,
-            refund_rate=args.refund,
-            tax_rate=args.tax,
-            discount_rate=args.discount
-        )
-        
-        simulator = NewsletterSimulator(config)
-        history = simulator.run_simulation(args.weeks)
-        
-        weekly_data = history.get_weekly_data()
-        
-        if args.format == "json":
-            with open(args.output, "w") as f:
-                json.dump(weekly_data, f, indent=2)
-        elif args.format == "csv":
-            if weekly_data:
-                fieldnames = weekly_data[0].keys()
-                with open(args.output, "w", newline="") as f:
-                    writer = csv.DictWriter(f, fieldnames=fieldnames)
-                    writer.writeheader()
-                    writer.writerows(weekly_data)
-        
-        print(f"Results exported to {args.output}")
-        return 0
-        
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-
-
-def main(args: Optional[list[str]] = None) -> int:
-    """Main entry point for the CLI.
-    
-    Args:
-        args: Command line arguments (defaults to sys.argv[1:])
-        
-    Returns:
-        Exit code (0 for success, 1 for failure)
-    """
-    parser = create_parser()
-    parsed_args = parser.parse_args(args)
-    
-    if parsed_args.command is None:
-        parser.print_help()
-        return 1
-    
-    if parsed_args.command == "sim":
-        if parsed_args.sim_command is None:
-            parser.parse_args(["sim", "-h"])
-            return 1
-        
-        if parsed_args.sim_command == "run":
-            return run_simulation(parsed_args)
-        elif parsed_args.sim_command == "stats":
-            return run_stats(parsed_args)
-        elif parsed_args.sim_command == "export":
-            return run_export(parsed_args)
+        if args.sim_command == "run":
+            run_simulation(args)
+        elif args.sim_command == "stats":
+            run_stats(args)
+        elif args.sim_command == "export":
+            run_export(args)
         else:
-            parser.parse_args(["sim", "-h"])
-            return 1
+            parser.parse_args(["sim", args.sim_command, "--help"])
+            sys.exit(1)
     else:
         parser.print_help()
-        return 1
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

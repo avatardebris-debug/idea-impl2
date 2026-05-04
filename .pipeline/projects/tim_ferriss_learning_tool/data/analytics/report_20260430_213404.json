@@ -1,0 +1,737 @@
+{
+  "report_id": "report_20260430_213404",
+  "report_type": "comprehensive",
+  "generated_at": "2026-04-30T21:34:04.470034",
+  "period": {
+    "start": null,
+    "end": null
+  },
+  "sections": {
+    "executive_summary": {
+      "overview": "Learning analytics summary",
+      "key_metrics": {},
+      "highlights": [],
+      "concerns": []
+    },
+    "progress_analysis": {
+      "activities_tracked": 0,
+      "completion_rates": {},
+      "progress_trends": [],
+      "milestone_achievements": []
+    },
+    "metrics_analysis": {
+      "practice_metrics": {},
+      "assessment_metrics": {},
+      "retention_metrics": {},
+      "engagement_metrics": {}
+    },
+    "trends_analysis": {
+      "trending_up": [],
+      "trending_down": [],
+      "stable": [],
+      "anomalies": []
+    },
+    "recommendations": [
+      {
+        "priority": "high",
+        "category": "practice",
+        "recommendation": "Increase practice frequency",
+        "expected_impact": "improved_retention"
+      }
+    ],
+    "progress_data": {
+      "total_activities": 19,
+      "completed_activities": 3,
+      "active_activities": 16,
+      "average_progress": 34.21052631578947,
+      "total_practice_sessions": 3,
+      "total_hours_spent": 2.0,
+      "metrics_insights": {
+        "test_metric": {
+          "statistics": {
+            "count": 44,
+            "mean": 7.318181818181818,
+            "median": 6.0,
+            "min": 1.0,
+            "max": 42.0,
+            "std_dev": 7.388780707144203
+          },
+          "trend": {
+            "trend": "decreasing",
+            "slope": -0.18083157152924595,
+            "direction": "decreasing",
+            "strength": 0.18083157152924595
+          },
+          "last_value": 10.0,
+          "last_updated": "2026-04-30T21:34:04.319682"
+        },
+        "practice_duration": {
+          "statistics": {
+            "count": 2,
+            "mean": 30.0,
+            "median": 30.0,
+            "min": 30,
+            "max": 30,
+            "std_dev": 0.0
+          },
+          "trend": {
+            "trend": "stable",
+            "slope": 0.0,
+            "direction": "stable",
+            "strength": 0.0
+          },
+          "last_value": 30,
+          "last_updated": "2026-04-30T21:34:04.403267"
+        },
+        "assessment_scores": {
+          "statistics": {
+            "count": 2,
+            "mean": 85.0,
+            "median": 85.0,
+            "min": 85.0,
+            "max": 85.0,
+            "std_dev": 0.0
+          },
+          "trend": {
+            "trend": "stable",
+            "slope": 0.0,
+            "direction": "stable",
+            "strength": 0.0
+          },
+          "last_value": 85.0,
+          "last_updated": "2026-04-30T21:34:04.420213"
+        },
+        "completion_rate": {
+          "statistics": {
+            "count": 13,
+            "mean": 25.0,
+            "median": 0.0,
+            "min": 0.0,
+            "max": 100.0,
+            "std_dev": 35.35533905932738
+          },
+          "trend": {
+            "trend": "increasing",
+            "slope": 0.8241758241758241,
+            "direction": "increasing",
+            "strength": 0.8241758241758241
+          },
+          "last_value": 0.0,
+          "last_updated": "2026-04-30T21:34:04.451923"
+        }
+      }
+    },
+    "activities_data": {
+      "activities": [
+        {
+          "activity_id": "activity_40ffbcfc",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.105344",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_e38099fa",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 75.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.122225",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_e1fb6d56",
+          "name": "Test Activity",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.125972",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_8025ae4a",
+          "name": "Test Activity",
+          "current_progress": 100.0,
+          "target_completion": 100.0,
+          "status": "completed",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.129416",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_075fba5b",
+          "name": "Test Activity",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.133169",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_191fc9ea",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 1,
+          "actual_hours_spent": 0.5,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.137227",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_90d7c956",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 85.0,
+          "retention_rate": 85.0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.153038",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_fe409633",
+          "name": "Test Activity",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 1,
+          "actual_hours_spent": 1.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 85.0,
+          "retention_rate": 85.0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.170676",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_586fbcdc",
+          "name": "Activity 1",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.188850",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_4d405c84",
+          "name": "Activity 2",
+          "current_progress": 100.0,
+          "target_completion": 100.0,
+          "status": "completed",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.189811",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_3044799c",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.204594",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_8f9b7717",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.390187",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_a453e35b",
+          "name": "Test Activity",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.396065",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_1f8d6644",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 1,
+          "actual_hours_spent": 0.5,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.401895",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_495093f7",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 85.0,
+          "retention_rate": 85.0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.419048",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_5c1c907e",
+          "name": "Test Activity",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.425591",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_54fba2ba",
+          "name": "Activity 1",
+          "current_progress": 50.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.434078",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_9aa45dbc",
+          "name": "Activity 2",
+          "current_progress": 100.0,
+          "target_completion": 100.0,
+          "status": "completed",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.436217",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        },
+        {
+          "activity_id": "activity_827a5c29",
+          "name": "Test Activity",
+          "current_progress": 0.0,
+          "target_completion": 100.0,
+          "status": "active",
+          "practice_sessions": 0,
+          "actual_hours_spent": 0.0,
+          "estimated_duration_hours": 10.0,
+          "average_assessment_score": 0,
+          "retention_rate": 0,
+          "practice_frequency": 0,
+          "last_updated": "2026-04-30T21:34:04.450738",
+          "metrics": {
+            "statistics": {
+              "count": 13,
+              "mean": 25.0,
+              "median": 0.0,
+              "min": 0.0,
+              "max": 100.0,
+              "std_dev": 35.35533905932738
+            },
+            "trend": {
+              "trend": "increasing",
+              "slope": 0.8241758241758241,
+              "direction": "increasing",
+              "strength": 0.8241758241758241
+            },
+            "last_value": 0.0,
+            "last_updated": "2026-04-30T21:34:04.451923"
+          }
+        }
+      ]
+    }
+  }
+}

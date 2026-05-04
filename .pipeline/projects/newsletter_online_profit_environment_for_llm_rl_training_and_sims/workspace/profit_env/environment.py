@@ -1,167 +1,212 @@
 """Environment module for the Newsletter Online Profit Environment."""
 
+import gymnasium as gym
 import numpy as np
-from typing import Dict, Any, Tuple, Optional
-
+from typing import Dict, Tuple, Any, Optional
 from .config import SimConfig
-from .state import NewsletterState, SimulationHistory, SimulationRecord
+from .state import NewsletterState
 from .simulator import NewsletterSimulator
-from .observation import Observation
 
 
-class NewsletterEnv:
-    """Newsletter Online Profit Environment.
+class NewsletterEnv(gym.Env):
+    """Gymnasium environment for the newsletter business simulation.
     
-    A simulation environment for training RL agents to manage a newsletter business.
-    The agent controls marketing, content, pricing, and retention strategies.
+    This environment wraps the NewsletterSimulator and provides a standard
+    Gymnasium interface for reinforcement learning training.
     """
     
-    def __init__(self, config: Optional[SimConfig] = None):
+    metadata = {"render_modes": ["human"], "render_fps": 1}
+    
+    def __init__(
+        self,
+        config: Optional[SimConfig] = None,
+        max_steps: int = 52,
+        render_mode: Optional[str] = None,
+    ):
         """Initialize the environment.
         
         Args:
             config: Simulation configuration. Uses default if None.
+            max_steps: Maximum number of steps per episode.
+            render_mode: Rendering mode for visualization.
         """
+        super().__init__()
+        
         self.config = config or SimConfig()
-        self.simulator = NewsletterSimulator(self.config, env=self)
-        self.action_space = 4  # [marketing, content, pricing, retention]
-        self.observation_space = 10  # 10 observation features
-        self._rng = np.random.default_rng()
+        self.max_steps = max_steps
+        self.render_mode = render_mode
+        
+        # Action space: [content_quality, marketing_spend, pricing_tier, engagement]
+        self.action_space = gym.spaces.Box(
+            low=0.0,
+            high=1.0,
+            shape=(4,),
+            dtype=np.float32,
+        )
+        
+        # Observation space
+        self.observation_space = gym.spaces.Dict({
+            "subscriber_count": gym.spaces.Box(low=0.0, high=1e6, dtype=np.float32),
+            "churn_rate": gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32),
+            "acquisition_rate": gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32),
+            "revenue": gym.spaces.Box(low=0.0, high=1e6, dtype=np.float32),
+            "costs": gym.spaces.Box(low=0.0, high=1e6, dtype=np.float32),
+            "profit": gym.spaces.Box(low=-1e6, high=1e6, dtype=np.float32),
+            "engagement_score": gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32),
+            "week_number": gym.spaces.Box(low=0.0, high=52.0, dtype=np.float32),
+            "seasonal_factor": gym.spaces.Box(low=0.0, high=2.0, dtype=np.float32),
+            "competitor_pressure": gym.spaces.Box(low=0.0, high=1.0, dtype=np.float32),
+        })
+        
+        self.simulator = NewsletterSimulator(self.config)
+        self.current_step = 0
+        self._last_obs = None
     
-    def reset(self) -> Observation:
+    def reset(
+        self,
+        seed: Optional[int] = None,
+        options: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[Dict[str, float], Dict[str, Any]]:
         """Reset the environment to initial state.
         
+        Args:
+            seed: Random seed for reproducibility.
+            options: Additional reset options.
+            
         Returns:
-            Initial observation
+            Tuple of (observation, info).
         """
+        if seed is not None:
+            np.random.seed(seed)
+        
         self.simulator.reset()
-        return self._create_observation()
+        self.current_step = 0
+        
+        # Initial observation
+        obs = self._get_observation()
+        info = {
+            "initial_subscribers": self.config.subscriber_count,
+            "week": 0,
+            "subscribers": self.config.subscriber_count,
+            "revenue": 0.0,
+            "costs": 0.0,
+            "profit": 0.0,
+            "churned": 0,
+            "acquired": 0,
+        }
+        
+        self._last_obs = obs
+        return obs, info
     
-    def step(self, action: np.ndarray) -> Tuple[Observation, float, bool, Dict[str, Any]]:
+    def step(self, action: np.ndarray) -> Tuple[Dict[str, float], float, bool, bool, Dict[str, Any]]:
         """Execute one step in the environment.
         
         Args:
-            action: Action array of shape (4,) with values in [0, 1]
+            action: Action vector [content_quality, marketing_spend, pricing_tier, engagement].
             
         Returns:
-            Tuple of (observation, reward, terminated, info)
+            Tuple of (observation, reward, terminated, truncated, info).
         """
-        # Validate action
-        if len(action) != self.action_space:
-            raise ValueError(f"Action must have {self.action_space} elements")
+        # Clamp action values to [0, 1]
+        action = np.clip(action, 0.0, 1.0)
         
-        # Execute step
-        state, info = self.simulator.step(action)
+        # Apply action effects to config
+        content_quality = action[0]
+        marketing_spend = action[1]
+        pricing_tier = action[2]
+        engagement_action = action[3]
         
-        # Create observation
-        observation = self._create_observation()
+        # Calculate seasonal factor based on week
+        seasonal_factor = 1.0 + 0.2 * np.sin(2 * np.pi * self.current_step / 52)
         
-        # Calculate reward
-        reward = self._calculate_reward(info)
+        # Calculate competitor pressure
+        competitor_pressure = self.config.competitor_count / 10.0
         
-        # Check termination
-        terminated = state.week >= self.config.max_steps
+        # Update config with action effects
+        effective_growth = self.config.growth_rate * (1 + marketing_spend)
+        effective_churn = self.config.churn_rate * (1 - engagement_action * 0.5)
+        effective_arpu = self.config.arpu * (1 + pricing_tier * 0.5)
         
-        return observation, reward, terminated, info
+        # Run simulation week
+        self.simulator.run_week()
+        
+        # Apply action-modified parameters
+        self.simulator.state.subscribers = max(
+            0,
+            self.simulator.state.subscribers + 
+            int(self.simulator.state.subscribers * marketing_spend * 0.1) -
+            int(self.simulator.state.subscribers * effective_churn * 0.1)
+        )
+        
+        # Update current step
+        self.current_step += 1
+        
+        # Calculate reward (scaled profit)
+        reward = self.simulator.state.profit / 1000.0
+        
+        # Check termination conditions
+        terminated = False
+        if self.simulator.state.subscribers <= 0:
+            terminated = True
+        if self.current_step >= self.max_steps:
+            terminated = True
+        
+        # Get observation
+        obs = self._get_observation()
+        
+        # Build info dict
+        info = {
+            "week": self.simulator.state.week,
+            "subscribers": self.simulator.state.subscribers,
+            "revenue": self.simulator.state.revenue,
+            "costs": self.simulator.state.costs,
+            "profit": self.simulator.state.profit,
+            "churned": self.simulator.state.churned,
+            "acquired": self.simulator.state.acquired,
+            "seasonal_factor": seasonal_factor,
+            "competitor_pressure": competitor_pressure,
+        }
+        
+        truncated = False
+        
+        return obs, reward, terminated, truncated, info
     
-    def _create_observation(self) -> Observation:
-        """Create observation from current state.
-        
-        Returns:
-            Observation object with current state features
-        """
+    def _get_observation(self) -> Dict[str, float]:
+        """Get current observation from the simulator state."""
         state = self.simulator.state
         
-        # Normalize values for observation
-        subscribers_norm = min(state.subscribers / 10000.0, 1.0)
-        revenue_norm = min(state.revenue / 10000.0, 1.0)
-        profit_norm = min(state.profit / 1000.0, 1.0)
-        engagement_norm = state.engagement_score
-        
-        return Observation(
-            subscribers=subscribers_norm,
-            revenue=revenue_norm,
-            profit=profit_norm,
-            engagement=engagement_norm,
-            week=state.week / self.config.max_steps,
-            cumulative_profit=state.cumulative_profit / 10000.0,
-            churn_rate=state.churn_rate,
-            growth_rate=state.growth_rate,
-            sponsor_revenue=state.sponsor_revenue / 10000.0,
-            ad_revenue=state.ad_revenue / 10000.0
-        )
+        return {
+            "subscriber_count": float(state.subscribers),
+            "churn_rate": float(self.config.churn_rate),
+            "acquisition_rate": float(self.config.growth_rate),
+            "revenue": float(state.revenue),
+            "costs": float(state.costs),
+            "profit": float(state.profit),
+            "engagement_score": float(state.engagement_score),
+            "week_number": float(state.week),
+            "seasonal_factor": float(self.config.seasonal_factor),
+            "competitor_pressure": float(self.config.competitor_count / 10.0),
+        }
     
-    def _calculate_reward(self, info: Dict) -> float:
-        """Calculate reward for the current step.
+    def render(self) -> Optional[str]:
+        """Render the current state of the environment."""
+        if self.render_mode != "human":
+            return None
         
-        Args:
-            info: Dictionary containing simulation info
-            
-        Returns:
-            Reward value
-        """
-        # Primary reward: profit
-        profit = info.get("profit", 0.0)
+        state = self.simulator.state
+        output = f"Week {state.week}: {state.subscribers} subscribers, "
+        output += f"${state.revenue:.2f} revenue, ${state.costs:.2f} costs, "
+        output += f"${state.profit:.2f} profit"
         
-        # Secondary rewards
-        subscriber_growth = info.get("acquired", 0) - info.get("churned", 0)
-        engagement_bonus = info.get("engagement", 0.5) * 10
+        if self.render_mode == "human":
+            print(output)
         
-        # Combine rewards
-        reward = profit * 0.7 + subscriber_growth * 0.2 + engagement_bonus * 0.1
-        
-        return reward
-    
-    def get_state(self) -> NewsletterState:
-        """Get current simulation state.
-        
-        Returns:
-            Current NewsletterState object
-        """
-        return self.simulator.state
-    
-    def get_history(self) -> SimulationHistory:
-        """Get simulation history.
-        
-        Returns:
-            SimulationHistory object with all recorded data
-        """
-        return self.simulator.history
+        return output
     
     def get_statistics(self) -> Dict[str, Any]:
-        """Get simulation statistics.
-        
-        Returns:
-            Dictionary containing aggregated statistics
-        """
+        """Get simulation statistics."""
         return self.simulator.get_statistics()
     
-    def run_simulation(self, weeks: int) -> SimulationHistory:
-        """Run simulation for specified number of weeks.
-        
-        Args:
-            weeks: Number of weeks to simulate
-            
-        Returns:
-            SimulationHistory object with results
-        """
-        self.simulator.run_simulation(weeks)
-        return self.simulator.history
-    
-    def set_config(self, config: SimConfig):
-        """Update simulation configuration.
-        
-        Args:
-            config: New configuration to use
-        """
-        self.config = config
-        self.simulator = NewsletterSimulator(config)
-    
-    def set_seed(self, seed: int):
-        """Set random seed for reproducibility.
-        
-        Args:
-            seed: Random seed value
-        """
-        self._rng = np.random.default_rng(seed)
-        self.simulator.set_seed(seed)
+    def close(self) -> None:
+        """Clean up the environment."""
+        pass

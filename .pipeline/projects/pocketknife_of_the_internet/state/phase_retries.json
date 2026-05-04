@@ -4,6 +4,5 @@
   "validator_phase_2_prev_failures": 999,
   "validator_phase_2_no_progress": 1,
   "validator_phase_6_prev_failures": 0,
-  "validator_phase_6_no_progress": 0,
-  "phase_8": 1
+  "validator_phase_6_no_progress": 0
 }

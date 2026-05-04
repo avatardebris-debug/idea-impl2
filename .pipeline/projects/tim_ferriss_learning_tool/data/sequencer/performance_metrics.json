@@ -1,0 +1,268 @@
+{
+  "metrics": [
+    {
+      "concept_id": "concept_1",
+      "total_attempts": 27,
+      "successful_attempts": 18,
+      "average_score": 72.96296296296298,
+      "time_spent_minutes": 610.0,
+      "last_attempt_date": "2026-04-30T21:38:25.405157",
+      "performance_trend": [
+        80,
+        90,
+        50,
+        50,
+        85
+      ],
+      "difficulty_rating": 5.0
+    },
+    {
+      "concept_id": "concept_2",
+      "total_attempts": 7,
+      "successful_attempts": 7,
+      "average_score": 85.0,
+      "time_spent_minutes": 180.0,
+      "last_attempt_date": "2026-04-30T21:38:25.398859",
+      "performance_trend": [
+        85.0,
+        90,
+        90,
+        90,
+        90
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "concept_3",
+      "total_attempts": 10,
+      "successful_attempts": 10,
+      "average_score": 76.0,
+      "time_spent_minutes": 140.0,
+      "last_attempt_date": "2026-04-30T21:38:25.401250",
+      "performance_trend": [
+        85,
+        90,
+        95,
+        70,
+        70
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "concept_4",
+      "total_attempts": 1,
+      "successful_attempts": 1,
+      "average_score": 75.0,
+      "time_spent_minutes": 20.0,
+      "last_attempt_date": "2026-04-30T21:34:02.451537",
+      "performance_trend": [
+        75.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "excellent_concept",
+      "total_attempts": 10,
+      "successful_attempts": 10,
+      "average_score": 95.0,
+      "time_spent_minutes": 100.0,
+      "last_attempt_date": "2026-04-30T21:34:02.694804",
+      "performance_trend": [
+        95.0,
+        95.0,
+        95.0,
+        95.0,
+        95.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "good_concept",
+      "total_attempts": 5,
+      "successful_attempts": 5,
+      "average_score": 80.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:02.523362",
+      "performance_trend": [
+        80.0,
+        80.0,
+        80.0,
+        80.0,
+        80.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "average_concept",
+      "total_attempts": 5,
+      "successful_attempts": 5,
+      "average_score": 70.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:02.557666",
+      "performance_trend": [
+        70.0,
+        70.0,
+        70.0,
+        70.0,
+        70.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "needs_improvement_concept",
+      "total_attempts": 10,
+      "successful_attempts": 0,
+      "average_score": 45.0,
+      "time_spent_minutes": 100.0,
+      "last_attempt_date": "2026-04-30T21:34:02.729568",
+      "performance_trend": [
+        45.0,
+        45.0,
+        45.0,
+        45.0,
+        45.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "struggling_concept",
+      "total_attempts": 5,
+      "successful_attempts": 0,
+      "average_score": 30.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:02.632782",
+      "performance_trend": [
+        30.0,
+        30.0,
+        30.0,
+        30.0,
+        30.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "summary_concept",
+      "total_attempts": 5,
+      "successful_attempts": 5,
+      "average_score": 80.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:03.053790",
+      "performance_trend": [
+        70,
+        75,
+        80,
+        85,
+        90
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "improving_concept",
+      "total_attempts": 5,
+      "successful_attempts": 5,
+      "average_score": 80.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:03.123963",
+      "performance_trend": [
+        60,
+        70,
+        80,
+        90,
+        100
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "declining_concept",
+      "total_attempts": 5,
+      "successful_attempts": 4,
+      "average_score": 70.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:03.137108",
+      "performance_trend": [
+        90,
+        80,
+        70,
+        60,
+        50
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "stable_concept",
+      "total_attempts": 5,
+      "successful_attempts": 5,
+      "average_score": 75.0,
+      "time_spent_minutes": 50.0,
+      "last_attempt_date": "2026-04-30T21:34:03.150515",
+      "performance_trend": [
+        75,
+        75,
+        75,
+        75,
+        75
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "concept_with_special_chars_123!@#",
+      "total_attempts": 1,
+      "successful_attempts": 1,
+      "average_score": 75.0,
+      "time_spent_minutes": 20.0,
+      "last_attempt_date": "2026-04-30T21:34:03.221419",
+      "performance_trend": [
+        75.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "high_score_concept",
+      "total_attempts": 1,
+      "successful_attempts": 1,
+      "average_score": 100.0,
+      "time_spent_minutes": 10.0,
+      "last_attempt_date": "2026-04-30T21:34:03.228882",
+      "performance_trend": [
+        100.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "low_score_concept",
+      "total_attempts": 1,
+      "successful_attempts": 0,
+      "average_score": 0.0,
+      "time_spent_minutes": 10.0,
+      "last_attempt_date": "2026-04-30T21:34:03.233495",
+      "performance_trend": [
+        0.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "negative_time_concept",
+      "total_attempts": 1,
+      "successful_attempts": 1,
+      "average_score": 75.0,
+      "time_spent_minutes": -10.0,
+      "last_attempt_date": "2026-04-30T21:34:03.237979",
+      "performance_trend": [
+        75.0
+      ],
+      "difficulty_rating": 0.0
+    },
+    {
+      "concept_id": "above_100_concept",
+      "total_attempts": 1,
+      "successful_attempts": 1,
+      "average_score": 150.0,
+      "time_spent_minutes": 10.0,
+      "last_attempt_date": "2026-04-30T21:34:03.242684",
+      "performance_trend": [
+        150.0
+      ],
+      "difficulty_rating": 0.0
+    }
+  ]
+}

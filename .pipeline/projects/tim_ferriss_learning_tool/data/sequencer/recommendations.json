@@ -1,0 +1,124 @@
+{
+  "recommendations": [
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "struggling_concept",
+      "concept_name": "struggling_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.623248"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "struggling_concept",
+      "concept_name": "struggling_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.625726"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "struggling_concept",
+      "concept_name": "struggling_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.628043"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "struggling_concept",
+      "concept_name": "struggling_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.630308"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "struggling_concept",
+      "concept_name": "struggling_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.632802"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "low_score_concept",
+      "concept_name": "low_score_concept",
+      "recommended_action": "Break down and simplify",
+      "priority": 10.0,
+      "reasoning": "Struggling with concept. Break down into smaller components.",
+      "confidence_score": 7.0,
+      "suggested_duration_minutes": 45,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:03.233505"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "needs_improvement_concept",
+      "concept_name": "needs_improvement_concept",
+      "recommended_action": "Focus on fundamentals",
+      "priority": 9.0,
+      "reasoning": "Needs improvement. Focus on foundational concepts and basics.",
+      "confidence_score": 7.5,
+      "suggested_duration_minutes": 30,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.583907"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "needs_improvement_concept",
+      "concept_name": "needs_improvement_concept",
+      "recommended_action": "Focus on fundamentals",
+      "priority": 9.0,
+      "reasoning": "Needs improvement. Focus on foundational concepts and basics.",
+      "confidence_score": 7.5,
+      "suggested_duration_minutes": 30,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.586233"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "needs_improvement_concept",
+      "concept_name": "needs_improvement_concept",
+      "recommended_action": "Focus on fundamentals",
+      "priority": 9.0,
+      "reasoning": "Needs improvement. Focus on foundational concepts and basics.",
+      "confidence_score": 7.5,
+      "suggested_duration_minutes": 30,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.588542"
+    },
+    {
+      "recommendation_id": "rec_11",
+      "concept_id": "needs_improvement_concept",
+      "concept_name": "needs_improvement_concept",
+      "recommended_action": "Focus on fundamentals",
+      "priority": 9.0,
+      "reasoning": "Needs improvement. Focus on foundational concepts and basics.",
+      "confidence_score": 7.5,
+      "suggested_duration_minutes": 30,
+      "optimal_time_of_day": "evening",
+      "created_date": "2026-04-30T21:34:02.590761"
+    }
+  ]
+}

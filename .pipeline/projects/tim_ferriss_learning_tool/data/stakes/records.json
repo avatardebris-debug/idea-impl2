@@ -1,0 +1,148 @@
+{
+  "records": [
+    {
+      "record_id": "record_1",
+      "timestamp": "2026-04-30T21:34:03.581982",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Learn Python",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_2",
+      "timestamp": "2026-04-30T21:34:03.584011",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_3",
+      "timestamp": "2026-04-30T21:34:03.586735",
+      "stakes_type": "accountability_partner",
+      "action_taken": "Added accountability partner John Doe",
+      "outcome": "Partner added successfully",
+      "effectiveness_score": 8.5,
+      "notes": ""
+    },
+    {
+      "record_id": "record_4",
+      "timestamp": "2026-04-30T21:34:03.589133",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_5",
+      "timestamp": "2026-04-30T21:34:03.589991",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_6",
+      "timestamp": "2026-04-30T21:34:03.602390",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_7",
+      "timestamp": "2026-04-30T21:34:03.603412",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_8",
+      "timestamp": "2026-04-30T21:34:03.707615",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test goal",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_9",
+      "timestamp": "2026-04-30T21:38:25.314168",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Learn Python",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_10",
+      "timestamp": "2026-04-30T21:38:25.316443",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_11",
+      "timestamp": "2026-04-30T21:38:25.318747",
+      "stakes_type": "accountability_partner",
+      "action_taken": "Added accountability partner John Doe",
+      "outcome": "Partner added successfully",
+      "effectiveness_score": 8.5,
+      "notes": ""
+    },
+    {
+      "record_id": "record_12",
+      "timestamp": "2026-04-30T21:38:25.321099",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_13",
+      "timestamp": "2026-04-30T21:38:25.322126",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_14",
+      "timestamp": "2026-04-30T21:38:25.333704",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_15",
+      "timestamp": "2026-04-30T21:38:25.334729",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_16",
+      "timestamp": "2026-04-30T21:38:25.431407",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test goal",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    }
+  ]
+}
