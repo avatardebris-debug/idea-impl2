@@ -168,6 +168,23 @@ def _check_ollama_model(model: str) -> None:
     except Exception:
         pass  # Non-critical
 
+    # Evict any other models installed on this instance.
+    # Vast.ai and RunPod templates often pre-load qwen3.5 or other models.
+    # Removing them frees VRAM and prevents background processes from
+    # accidentally triggering a load (which shows as "modified" in ollama list).
+    try:
+        resp = urllib.request.urlopen(f"{base_url}/api/tags", timeout=5)
+        tags = json.loads(resp.read()).get("models", [])
+        model_base = model.split(":")[0].lower()
+        for m in tags:
+            name = m.get("name", "")
+            if name.lower() != model.lower() and name.split(":")[0].lower() != model_base:
+                print(f"  Removing unintended model: {name}")
+                import subprocess
+                subprocess.run(["ollama", "rm", name], capture_output=True)
+    except Exception:
+        pass  # Non-critical — best effort cleanup
+
     return model  # Return canonical model name for caller to use
 
 

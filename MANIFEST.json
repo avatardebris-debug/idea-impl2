@@ -1,0 +1,288 @@
+{
+  "extracted_at": "2026-04-29T07:51:19.940235",
+  "workspace_only": false,
+  "files_included": 1659,
+  "resume_instructions": "1. git pull on new instance\n2. unzip this file into /workspace/idea\\ impl/\n3. python pipeline/runner.py --from-list --provider ollama --model qwen3.5:35b\n   Runner will auto-detect in-progress projects and re-queue them.",
+  "projects": [
+    {
+      "slug": "advantage_player_cardgame_simulator_training",
+      "title": "[advantage player cardgame simulator training]",
+      "status": "budget_exceeded",
+      "total_phases": 6,
+      "phases_built": 1,
+      "workspace_files": 48
+    },
+    {
+      "slug": "ai_author_suite",
+      "title": "[ai author suite]",
+      "status": "complete",
+      "total_phases": 6,
+      "phases_built": 6,
+      "workspace_files": 47
+    },
+    {
+      "slug": "csv_analyzer",
+      "title": "CSV Analyzer",
+      "status": "complete",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 14
+    },
+    {
+      "slug": "drop_servicing_tool",
+      "title": "[drop servicing tool]",
+      "status": "complete",
+      "total_phases": 3,
+      "phases_built": 3,
+      "workspace_files": 545
+    },
+    {
+      "slug": "dropshipserviceecommerce_autoseo_autometa",
+      "title": "[dropship/service/ecommerce. autoSEO autometa]",
+      "status": "budget_exceeded",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 14
+    },
+    {
+      "slug": "email_tool",
+      "title": "[email tool]",
+      "status": "budget_exceeded",
+      "total_phases": 6,
+      "phases_built": 6,
+      "workspace_files": 211
+    },
+    {
+      "slug": "file_deduplicator",
+      "title": "File Deduplicator",
+      "status": "complete",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 25
+    },
+    {
+      "slug": "fiverr_job_automation_tool",
+      "title": "[fiverr job automation tool]",
+      "status": "phase_1_reviewed",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 30
+    },
+    {
+      "slug": "gameagent",
+      "title": "[game/agent]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 18
+    },
+    {
+      "slug": "job_automation_tool",
+      "title": "[job automation tool]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 14
+    },
+    {
+      "slug": "json_diff_tool",
+      "title": "JSON Diff Tool",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 0
+    },
+    {
+      "slug": "markdown_to_html_converter",
+      "title": "Markdown to HTML Converter",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 0
+    },
+    {
+      "slug": "memory_system",
+      "title": "[memory system]",
+      "status": "phase_2_validating",
+      "total_phases": 6,
+      "phases_built": 2,
+      "workspace_files": 71
+    },
+    {
+      "slug": "mobile_access_to_pc",
+      "title": "[mobile access to pc]",
+      "status": "phase_1_executing",
+      "total_phases": 5,
+      "phases_built": 1,
+      "workspace_files": 34
+    },
+    {
+      "slug": "newsletter_online_profit_environment_for_llm_rl_training_and_sims",
+      "title": "[newsletter /online profit environment for LLM RL training and sims.]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 13
+    },
+    {
+      "slug": "pocketknife_of_the_internet",
+      "title": "[pocketknife of the internet]",
+      "status": "phase_1_executing",
+      "total_phases": 9,
+      "phases_built": 1,
+      "workspace_files": 1
+    },
+    {
+      "slug": "scott_adams_botllm_fine_tuning",
+      "title": "[scott adams bot/llm fine tuning]",
+      "status": "phase_1_executing",
+      "total_phases": 5,
+      "phases_built": 1,
+      "workspace_files": 0
+    },
+    {
+      "slug": "seo_tool",
+      "title": "[SEO tool]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 25
+    },
+    {
+      "slug": "shuffler_tracker_teacher",
+      "title": "[shuffler tracker teacher]",
+      "status": "phase_1_executing",
+      "total_phases": 6,
+      "phases_built": 1,
+      "workspace_files": 16
+    },
+    {
+      "slug": "social_media_managementetc",
+      "title": "[social media management/etc]",
+      "status": "phase_1_validating",
+      "total_phases": 5,
+      "phases_built": 1,
+      "workspace_files": 51
+    },
+    {
+      "slug": "state",
+      "title": "state",
+      "status": "?",
+      "total_phases": "?",
+      "phases_built": 0,
+      "workspace_files": 0
+    },
+    {
+      "slug": "summarizer-tool",
+      "title": "summarizer-tool",
+      "status": "?",
+      "total_phases": "?",
+      "phases_built": 0,
+      "workspace_files": 0
+    },
+    {
+      "slug": "summarizer_tool",
+      "title": "[summarizer tool]",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 0
+    },
+    {
+      "slug": "thronglets_as_a_game",
+      "title": "[thronglets as a game]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 15
+    },
+    {
+      "slug": "tim_ferriss_learning_tool",
+      "title": "[tim ferriss learning tool]",
+      "status": "phase_1_executing",
+      "total_phases": 6,
+      "phases_built": 1,
+      "workspace_files": 1
+    },
+    {
+      "slug": "transcript_extractor",
+      "title": "[transcript extractor]",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 31
+    },
+    {
+      "slug": "udemy_training_tool",
+      "title": "[udemy training tool]",
+      "status": "phase_1_validating",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 11
+    },
+    {
+      "slug": "url_health_checker",
+      "title": "URL Health Checker",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 0
+    },
+    {
+      "slug": "video_management",
+      "title": "[video management]",
+      "status": "phase_1_executing",
+      "total_phases": 5,
+      "phases_built": 5,
+      "workspace_files": 29
+    },
+    {
+      "slug": "vr_practice_mode",
+      "title": "[VR practice mode.]",
+      "status": "phase_2_executing",
+      "total_phases": 5,
+      "phases_built": 2,
+      "workspace_files": 12
+    },
+    {
+      "slug": "vr_room_for_stock_ticker_scanning",
+      "title": "[VR room for stock ticker scanning.]",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 22
+    },
+    {
+      "slug": "workspace",
+      "title": "workspace",
+      "status": "?",
+      "total_phases": "?",
+      "phases_built": 0,
+      "workspace_files": 0
+    },
+    {
+      "slug": "youtube_studio",
+      "title": "[Youtube studio]",
+      "status": "phase_1_executing",
+      "total_phases": 10,
+      "phases_built": 1,
+      "workspace_files": 39
+    },
+    {
+      "slug": "youtube_workflow_tool",
+      "title": "[youtube workflow tool.]",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 10
+    },
+    {
+      "slug": "zillow",
+      "title": "[Zillow]",
+      "status": "phase_1_executing",
+      "total_phases": 1,
+      "phases_built": 1,
+      "workspace_files": 0
+    }
+  ]
+}

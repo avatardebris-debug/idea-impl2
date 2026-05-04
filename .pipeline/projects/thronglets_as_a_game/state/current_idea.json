@@ -1,9 +1,12 @@
 {
   "title": "[thronglets as a game]",
   "description": "[each thronglet is an agent, each agent has a 2d world and you can prompt it and it can visualize interactions with the others. Turn system management into a game where the interactions of the game map to realworld usefulness and gamifies system buildling]",
-  "status": "phase_1_validating",
-  "total_phases": 1,
-  "tasks_done": 2,
+  "status": "budget_exceeded",
+  "total_phases": 5,
+  "tasks_done": 1,
   "tasks_total": 6,
-  "phase": 1
+  "phase": 1,
+  "started_at": "2026-05-04T09:26:31.850950+00:00",
+  "_slug": "thronglets_as_a_game",
+  "budget_note": "Force-completed after 150 min (budget: 150 min for 5-phase project)"
 }

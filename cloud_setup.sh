@@ -50,6 +50,16 @@ else
     exit 1
 fi
 
+# Remove any pre-installed models that aren't what we want.
+# Vast.ai instance templates often pre-load qwen3.5 — remove it so it
+# can't be accidentally used or loaded by background processes.
+echo "  Removing pre-installed models that aren't qwen3.6..."
+ollama list | awk 'NR>1 {print $1}' | grep -v "qwen3.6" | while read -r model; do
+    echo "    Removing: ${model}"
+    ollama rm "${model}" 2>/dev/null || true
+done
+echo "  ✓ Model cleanup done"
+
 # --- 4. Pull the model ---
 echo "[4/6] Pulling Qwen3 model (this takes a few minutes on first run)..."
 
