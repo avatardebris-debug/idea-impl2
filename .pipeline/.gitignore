@@ -15,3 +15,7 @@
 # Logs (large, not needed for resume)
 logs/
 *.log
+
+# Runtime-generated timestamped data files (e.g. report_20260430_123456.json)
+# These are produced by tools running during validation — not source code
+**/data/analytics/report_*.json
