@@ -323,7 +323,7 @@ internal_drives:
 affirmation:
   enabled: true
   refresh_interval: "every_n_tasks"
-  refresh_count: 7
+  refresh_count: 8
 
   statements:
     - "I write clean, complete, working code. No placeholders."
@@ -333,7 +333,7 @@ affirmation:
     - "Every piece of code I write has tests. Untested code is unfinished code."
 
   constitution_refresh: true
-  constitution_refresh_interval: 14
+  constitution_refresh_interval: 16
 
 # ============================================================
 # AMYGDALA GATE
