@@ -714,13 +714,15 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         if status in ("", "complete", "budget_exceeded"):
             continue
 
-        # --- Budget enforcement: reset started_at to NOW ---
-        # Budget measures per-SESSION time, not total project lifetime.
-        # On a cold restart, every project's old started_at would be hours
-        # old, causing everything to get budget_exceeded immediately.
-        # Reset the clock so budget enforcement works correctly during THIS
-        # session's health-check loop.
-        state["started_at"] = datetime.now(timezone.utc).isoformat()
+        # --- Budget enforcement: stamp session_started_at on first requeue ---
+        # Do NOT overwrite started_at (the original project creation time) —
+        # resetting it every 11 min defeats the budget timer entirely.
+        # Instead, use session_started_at which is set once per runner session.
+        if not state.get("session_started_at"):
+            state["session_started_at"] = datetime.now(timezone.utc).isoformat()
+        # Also set started_at if missing (legacy projects)
+        if not state.get("started_at"):
+            state["started_at"] = state["session_started_at"]
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
         # Skip projects whose validator has already hit the stall limit —
@@ -1376,9 +1378,11 @@ def run_pipeline(
         last_orphan_requeue = 0.0   # rate-limit orphan re-queues to once per 5 min
         ORPHAN_REQUEUE_COOLDOWN = 660  # 11 min — must exceed workspace recency guard (10 min)
         IDEATION_TIMEOUT = 35 * 60    # 35 min — retry if ideator hasn't written ideas yet
+        ZERO_TASK_PHASE_KILL = 75 * 60  # 75 min in _executing with 0 tasks = stuck, skip it
         _status_count = 0  # for throttling non-interactive log output
         ideation_in_progress = False  # True while waiting for Ideator to generate new ideas
         ideation_requested_at = 0.0   # timestamp of last _request_ideation() call
+        _zero_progress_since: dict[str, float] = {}  # (slug:phase) -> timestamp first seen 0 tasks
 
         while not stop_requested:
             # Time limit check
@@ -1410,7 +1414,8 @@ def run_pipeline(
                 # If the active project has been running longer than
                 # PROJECT_TIME_BUDGET, force-complete it so we move on.
                 _active_slug = idea_state.get("_slug", "")
-                _active_started = idea_state.get("started_at", "")
+                _active_started = idea_state.get("session_started_at",
+                                                  idea_state.get("started_at", ""))
                 if _active_slug and _active_started and idea_state.get("status", "") not in ("", "complete", "budget_exceeded"):
                     try:
                         _start = datetime.fromisoformat(_active_started)
@@ -1521,6 +1526,41 @@ def run_pipeline(
                     print(status_line, flush=True)
                 _status_count += 1
 
+                # --- Zero-task-progress phase kill ---
+                # If the executor has been in *_executing phase for ZERO_TASK_PHASE_KILL
+                # with 0/N tasks done, the project is genuinely stuck (e.g. external API
+                # unavailable, impossible task). Mark budget_exceeded and move on.
+                _zpk = f"{_active_slug}:{idea_state.get('phase', 1)}"
+                if (tasks_total > 0 and tasks_done == 0
+                        and "executing" in idea_state.get("status", "")
+                        and _active_slug
+                        and idea_state.get("status", "") not in ("complete", "budget_exceeded")):
+                    if _zpk not in _zero_progress_since:
+                        _zero_progress_since[_zpk] = time.time()
+                    elif time.time() - _zero_progress_since[_zpk] > ZERO_TASK_PHASE_KILL:
+                        _proj_file = (PIPELINE_DIR / "projects" / _active_slug
+                                      / "state" / "current_idea.json")
+                        try:
+                            _st = json.loads(_proj_file.read_text(encoding="utf-8"))
+                            if _st.get("status", "") not in ("complete", "budget_exceeded"):
+                                _st["status"] = "budget_exceeded"
+                                _st["budget_note"] = (
+                                    f"Phase {idea_state.get('phase',1)} stuck: "
+                                    f"0/{tasks_total} tasks after {ZERO_TASK_PHASE_KILL//60}m"
+                                )
+                                _proj_file.write_text(json.dumps(_st, indent=2), encoding="utf-8")
+                                print(
+                                    f"  ⏰ Zero-task timeout: '{idea_state.get('title', _active_slug)}' "
+                                    f"phase {idea_state.get('phase',1)} — "
+                                    f"0/{tasks_total} tasks in {ZERO_TASK_PHASE_KILL//60}m → budget_exceeded"
+                                )
+                                for _role in AGENT_ROLES:
+                                    bus.clear_queue(_role)
+                        except Exception:
+                            pass
+                        _zero_progress_since.pop(_zpk, None)
+                else:
+                    _zero_progress_since.pop(_zpk, None)  # reset when tasks progress or phase changes
 
                 if all_empty and not from_list:
                     # Single idea mode — might be done
