@@ -440,6 +440,76 @@ class AgentSupervisor:
 
 
 # ---------------------------------------------------------------------------
+# Dep-aware stale-reset purge
+# ---------------------------------------------------------------------------
+
+def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
+    """After reset_stale_processing(), drop pending messages for projects
+    whose dependencies are not yet satisfied.
+
+    Without this, a project that was already started (pending message in
+    queue, dep still running) bypasses every dep check and gets picked up
+    by agents immediately after restart.
+
+    Returns the number of messages purged.
+    """
+    DONE_STATUSES = ("complete", "budget_exceeded")
+    projects_dir = PIPELINE_DIR / "projects"
+    purged = 0
+
+    for role in AGENT_ROLES:
+        msgs = bus.peek(role)
+        for msg in msgs:
+            slug = (msg.payload.get("idea_slug")
+                    or msg.payload.get("slug")
+                    or "")
+            if not slug:
+                continue
+
+            state_file = projects_dir / slug / "state" / "current_idea.json"
+            if not state_file.exists():
+                continue
+
+            try:
+                state = json.loads(state_file.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+
+            deps = state.get("depends_on", [])
+            if not deps:
+                continue
+
+            blocking = []
+            for dep_slug in deps:
+                dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+                if not dep_file.exists():
+                    blocking.append(f"{dep_slug} (not started)")
+                    continue
+                try:
+                    dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
+                    if dep_st.get("status") not in DONE_STATUSES:
+                        blocking.append(f"{dep_slug} ({dep_st.get('status', '?')})")
+                except Exception:
+                    blocking.append(f"{dep_slug} (unreadable)")
+
+            if blocking:
+                q_path = bus._queue_path(role)
+                try:
+                    lines = q_path.read_text(encoding="utf-8").splitlines()
+                    kept = [l for l in lines if msg.id not in l]
+                    if len(kept) < len(lines):
+                        q_path.write_text("\n".join(kept) + ("\n" if kept else ""),
+                                          encoding="utf-8")
+                        print(f"  \U0001f6ab Purged dep-blocked message for '{slug}' "
+                              f"(waiting for: {', '.join(blocking)})")
+                        purged += 1
+                except Exception:
+                    pass
+
+    return purged
+
+
+# ---------------------------------------------------------------------------
 # Seed the pipeline with the first idea
 # ---------------------------------------------------------------------------
 
@@ -1328,6 +1398,10 @@ def run_pipeline(
     stale = bus.reset_stale_processing()
     if stale:
         print(f"  🔄 Reset {stale} stale message(s) from previous run")
+        # Drop any reset messages that belong to dep-blocked projects
+        purged = _purge_dep_blocked_messages(bus)
+        if purged:
+            print(f"  🚫 Purged {purged} dep-blocked message(s) — will re-queue when deps complete")
 
     if resume:
         # Resume always acts like --from-list: keep running until ALL projects
