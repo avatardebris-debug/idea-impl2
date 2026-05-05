@@ -462,6 +462,19 @@ def seed_idea(bus: MessageBus, title: str, description: str, deps: list | None =
             if ws.exists():
                 dep_workspaces[dep_slug] = str(ws)
 
+    # Write a stub current_idea.json NOW so deps survive runner restarts.
+    # idea_planner will overwrite this with full state once it processes the idea.
+    stub_state_file = PIPELINE_DIR / "projects" / idea_slug / "state" / "current_idea.json"
+    if not stub_state_file.exists():
+        stub_state_file.parent.mkdir(parents=True, exist_ok=True)
+        stub_state_file.write_text(json.dumps({
+            "title": title,
+            "slug": idea_slug,
+            "status": "phase_1_planning",
+            "depends_on": deps or [],
+            "started_at": datetime.now(timezone.utc).isoformat(),
+        }, indent=2), encoding="utf-8")
+
     msg = Message.create(
         from_agent="runner",
         to_agent="idea_planner",
@@ -747,7 +760,28 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
             except Exception:
                 pass
 
-        # Detect which phase and step we were on
+        # --- Dependency check: don't re-queue if deps aren't done yet ---
+        depends_on = state.get("depends_on", [])
+        if depends_on:
+            dep_blocked = []
+            DONE_STATUSES = ("complete", "budget_exceeded")
+            for dep_slug in depends_on:
+                dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+                if not dep_file.exists():
+                    dep_blocked.append(f"{dep_slug} (not started)")
+                    continue
+                try:
+                    dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
+                    if dep_st.get("status") not in DONE_STATUSES:
+                        dep_blocked.append(f"{dep_slug} ({dep_st.get('status','?')})")
+                except Exception:
+                    dep_blocked.append(f"{dep_slug} (unreadable)")
+            if dep_blocked:
+                logger.debug(
+                    "_rebuild: skipping '%s' — deps not done: %s", title, dep_blocked
+                )
+                continue  # don't re-queue until deps are finished
+
         phase_match = re.match(r"phase_(\d+)_(\w+)", status)
         if phase_match:
             phase_num  = int(phase_match.group(1))
@@ -1449,17 +1483,13 @@ def run_pipeline(
                         pass
 
                 # If active project is budget_exceeded, advance to next project.
-                # Check has_active_work() not all_empty — all_empty only counts
-                # If active project is budget_exceeded, advance to next project.
-                # NOTE: Do NOT gate this on has_active_work() — other projects may
-                # be running in parallel and would keep this permanently stuck.
                 if idea_state.get("status") == "budget_exceeded":
                     slug = idea_state.get("_slug", "")
                     orphaned = _rebuild_queues_from_state(bus)
                     if orphaned:
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
-                    elif from_list and not bus.has_active_work():
-                        # Only seed/ideate when the bus is truly idle (no other projects)
+                    if from_list and not bus.has_active_work():
+                        # Queues are empty — seed the next idea (may now be unblocked)
                         seeded = seed_from_master_list(bus, silent=ideation_in_progress)
                         if seeded:
                             ideation_in_progress = False
@@ -1472,6 +1502,9 @@ def run_pipeline(
                             print("  ⏰ Ideation timed out — retrying...")
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
+                    elif from_list and not orphaned:
+                        # No orphans but queues have work — still try to seed newly unblocked ideas
+                        seed_from_master_list(bus, silent=True)
 
                 running_agents = sum(1 for s in health.values() if s == "running")
 
