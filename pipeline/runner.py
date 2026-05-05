@@ -500,7 +500,15 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
                     if len(kept) < len(lines):
                         q_path.write_text("\n".join(kept) + ("\n" if kept else ""),
                                           encoding="utf-8")
-                        print(f"  \U0001f6ab Purged dep-blocked message for '{slug}' "
+                        # Mark the project as dep_waiting so _rebuild skips it
+                        try:
+                            st = json.loads(state_file.read_text(encoding="utf-8"))
+                            if st.get("status") not in ("complete", "budget_exceeded", "dep_waiting"):
+                                st["status"] = "dep_waiting"
+                                state_file.write_text(json.dumps(st, indent=2), encoding="utf-8")
+                        except Exception:
+                            pass
+                        print(f"  \U0001f6ab Purged dep-blocked queue for '{slug}' "
                               f"(waiting for: {', '.join(blocking)})")
                         purged += 1
                 except Exception:
@@ -685,10 +693,52 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
                 if status in ("complete", "budget_exceeded"):
                     _seeded_this_session.add(title)
                     continue
-                else:
-                    print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
+
+                # --- Dep check for already-in-progress projects ---
+                # If this project has deps that aren't done, put it in dep_waiting
+                # and purge its queue messages so it doesn't run until deps finish.
+                in_progress_deps = state.get("depends_on", [])
+                if not in_progress_deps:
+                    # Also try parsing from master_ideas line (for legacy projects
+                    # seeded before stub-writing existed)
+                    raw_desc = match.group(2).strip()
+                    _dm = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', raw_desc, re.IGNORECASE)
+                    if _dm:
+                        in_progress_deps = [d.strip() for d in re.split(r'[,;]+', _dm.group(1)) if d.strip()]
+
+                if in_progress_deps:
+                    _blocking = []
+                    DONE = ("complete", "budget_exceeded")
+                    for _dep in in_progress_deps:
+                        _df = PIPELINE_DIR / "projects" / _dep / "state" / "current_idea.json"
+                        if not _df.exists():
+                            _blocking.append(f"{_dep} (not started)")
+                            continue
+                        try:
+                            _ds = json.loads(_df.read_text(encoding="utf-8"))
+                            if _ds.get("status") not in DONE:
+                                _blocking.append(f"{_dep} ({_ds.get('status','?')})")
+                        except Exception:
+                            _blocking.append(f"{_dep} (unreadable)")
+                    if _blocking:
+                        if status not in ("dep_waiting",):
+                            state["pre_dep_status"] = status
+                            state["status"] = "dep_waiting"
+                            state["depends_on"] = in_progress_deps
+                            project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                        print(f"  ⏸  '{title}' dep_waiting — blocked by: {', '.join(_blocking)}")
+                        _seeded_this_session.add(title)
+                        blocked_count += 1
+                        continue
+
+                if status == "dep_waiting":
+                    # Deps just became satisfied (handled above) — skip, rebuild will queue it
                     _seeded_this_session.add(title)
                     continue
+
+                print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
+                _seeded_this_session.add(title)
+                continue
             except Exception:
                 pass  # Can't read state — seed it fresh
 
@@ -802,6 +852,26 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
 
         if status in ("", "complete", "budget_exceeded"):
             continue
+
+        # dep_waiting: project is blocked on a dependency — re-check and re-queue
+        # only if all deps are now done.
+        if status == "dep_waiting":
+            deps = state.get("depends_on", [])
+            DONE = ("complete", "budget_exceeded")
+            still_blocked = [
+                d for d in deps
+                if not (projects_dir / d / "state" / "current_idea.json").exists()
+                or json.loads((projects_dir / d / "state" / "current_idea.json")
+                              .read_text(encoding="utf-8")).get("status") not in DONE
+                if (projects_dir / d / "state" / "current_idea.json").exists()
+            ]
+            if still_blocked:
+                continue  # still waiting
+            # All deps done — restore last real phase status so rebuild re-queues it
+            status = state.get("pre_dep_status", "phase_1_executing")
+            state["status"] = status
+            state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            print(f"  ✅ '{title}' deps satisfied — resuming from {status}")
 
         # --- Budget enforcement: stamp session_started_at on first requeue ---
         # Do NOT overwrite started_at (the original project creation time) —
@@ -1398,10 +1468,11 @@ def run_pipeline(
     stale = bus.reset_stale_processing()
     if stale:
         print(f"  🔄 Reset {stale} stale message(s) from previous run")
-        # Drop any reset messages that belong to dep-blocked projects
-        purged = _purge_dep_blocked_messages(bus)
-        if purged:
-            print(f"  🚫 Purged {purged} dep-blocked message(s) — will re-queue when deps complete")
+    # Always purge dep-blocked messages — catches both stale-reset AND
+    # pre-existing pending messages from previous runs.
+    purged = _purge_dep_blocked_messages(bus)
+    if purged:
+        print(f"  🚫 Purged {purged} dep-blocked queue(s) — will resume when deps complete")
 
     if resume:
         # Resume always acts like --from-list: keep running until ALL projects
