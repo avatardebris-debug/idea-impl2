@@ -446,7 +446,8 @@ class AgentSupervisor:
 _seeded_this_session: set[str] = set()  # titles seeded in this runner invocation
 
 
-def seed_idea(bus: MessageBus, title: str, description: str, deps: list | None = None) -> None:
+def seed_idea(bus: MessageBus, title: str, description: str,
+              deps: list | None = None, locked: bool = False) -> None:
     """Send the initial idea to the Idea Planner to kick off the pipeline."""
     if title in _seeded_this_session:
         return  # already seeded this run — don't duplicate
@@ -472,6 +473,7 @@ def seed_idea(bus: MessageBus, title: str, description: str, deps: list | None =
             "slug": idea_slug,
             "status": "phase_1_planning",
             "depends_on": deps or [],
+            "budget_lock": locked,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }, indent=2), encoding="utf-8")
 
@@ -625,15 +627,19 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
         if description_raw.startswith("[") and description_raw.endswith("]"):
             description_raw = description_raw[1:-1].strip()
 
+        # --- Parse '[lock]' tag — prevents budget_exceeded from ever firing ---
+        locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
+
         # --- Parse 'requires: slug1, slug2' dependency declarations ---
         # Handles trailing ] from markdown format e.g. [desc. requires: slug]
         dep_match = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', description_raw, re.IGNORECASE)
         deps: list = []
-        description = description_raw
+        description = re.sub(r'\s*\[lock\]', '', description_raw, flags=re.IGNORECASE).strip()
         if dep_match:
             raw_deps = dep_match.group(1)
             deps = [d.strip() for d in re.split(r'[,;]+', raw_deps) if d.strip()]
-            description = description_raw[:dep_match.start()].strip().rstrip('.')
+            description = description[:dep_match.start()].strip().rstrip('.')
+            description = re.sub(r'\s*\[lock\]', '', description, flags=re.IGNORECASE).strip()
 
         # --- Check all dependencies are complete before seeding ---
         if deps:
@@ -654,7 +660,7 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
                 print(f"  [blocked]  '{title}' blocked - waiting for: {', '.join(blocking)}")
                 continue  # try the next idea in the list
 
-        seed_idea(bus, title, description, deps=deps or None)
+        seed_idea(bus, title, description, deps=deps or None, locked=locked)
         return True
 
     if blocked_count > 0:
@@ -746,12 +752,14 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
             try:
                 retries = json.loads(retries_file.read_text(encoding="utf-8"))
                 # Check for any no_progress streak >= 4 (our stall limit)
+                # BUT respect budget_lock: locked projects are never force-completed
+                _is_locked = state.get("budget_lock", False)
                 for k, v in retries.items():
-                    if "no_progress" in k and isinstance(v, int) and v >= 4:
+                    if "no_progress" in k and isinstance(v, int) and v >= 4 and not _is_locked:
                         # Force-mark as complete so it never comes back
                         state["status"] = "complete"
                         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                        print(f"  ⏭  Force-completed stalled project '{title}' (stuck {v} cycles)")
+                        print(f"  ⏭️  Force-completed stalled project '{title}' (stuck {v} cycles)")
                         break
                 else:
                     retries = None  # didn't break — not stalled
@@ -1451,6 +1459,7 @@ def run_pipeline(
                 _active_started = idea_state.get("session_started_at",
                                                   idea_state.get("started_at", ""))
                 if _active_slug and _active_started and idea_state.get("status", "") not in ("", "complete", "budget_exceeded"):
+                    _is_locked = idea_state.get("budget_lock", False)
                     try:
                         _start = datetime.fromisoformat(_active_started)
                         _elapsed = (datetime.now(timezone.utc) - _start).total_seconds() / 60
@@ -1468,7 +1477,7 @@ def run_pipeline(
                         if _on_final_phase:
                             _phase_budget = int(_phase_budget * 1.5)
 
-                        if _elapsed > _phase_budget:
+                        if _elapsed > _phase_budget and not _is_locked:
                             _proj_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
                             idea_state["status"] = "budget_exceeded"
                             idea_state["budget_note"] = f"Force-completed after {_elapsed:.0f} min (budget: {_phase_budget} min for {_total_phases}-phase project)"
@@ -1479,6 +1488,9 @@ def run_pipeline(
                                 cleared += bus.clear_queue(_role)
                             if cleared:
                                 print(f"  Cleared {cleared} queued message(s) for budget-exceeded project")
+                        elif _elapsed > _phase_budget and _is_locked:
+                            if int(_elapsed) % 30 < 2:  # warn once every 30 min
+                                print(f"  🔒 [LOCKED] '{idea_state.get('title', _active_slug)}' over budget ({_elapsed:.0f}m) but lock prevents skip")
                     except Exception:
                         pass
 
@@ -1564,9 +1576,11 @@ def run_pipeline(
                 # with 0/N tasks done, the project is genuinely stuck (e.g. external API
                 # unavailable, impossible task). Mark budget_exceeded and move on.
                 _zpk = f"{_active_slug}:{idea_state.get('phase', 1)}"
+                _is_locked = idea_state.get("budget_lock", False)
                 if (tasks_total > 0 and tasks_done == 0
                         and "executing" in idea_state.get("status", "")
                         and _active_slug
+                        and not _is_locked
                         and idea_state.get("status", "") not in ("complete", "budget_exceeded")):
                     if _zpk not in _zero_progress_since:
                         _zero_progress_since[_zpk] = time.time()
