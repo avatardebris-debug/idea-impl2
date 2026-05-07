@@ -61,10 +61,13 @@ AGENT_ROLES = [
 ]
 
 
-# Maximum wall-clock time per project before force-completing (minutes).
-# 90 min = enough for 3 phases × ~25 min each.  Prevents any single project
-# from monopolizing an unattended pipeline run.
-PROJECT_TIME_BUDGET = 90   # minutes per project — SCALES with total_phases (see budget enforcement)
+# Default budget values (can be overridden via CLI --base-budget / --phase-budget)
+DEFAULT_BASE_BUDGET = 90    # minimum minutes per project (floor)
+DEFAULT_PHASE_BUDGET = 30   # minutes per phase (scales with total_phases)
+# Actual budget = max(base_budget, total_phases * phase_budget)
+# Override via CLI for different GPU sizes:
+#   --base-budget 60 --phase-budget 20   (smaller GPU, faster timeouts)
+#   --base-budget 180 --phase-budget 45  (big GPU, more time per phase)
 
 # ---------------------------------------------------------------------------
 # Ollama health checks
@@ -1453,6 +1456,8 @@ def run_pipeline(
     provider: str = "ollama",
     model: str = os.environ.get("PIPELINE_MODEL", "qwen3.5:35b"),
     time_limit_minutes: float = 0,
+    base_budget: int = DEFAULT_BASE_BUDGET,
+    phase_budget: int = DEFAULT_PHASE_BUDGET,
 ) -> None:
     """Main pipeline orchestrator."""
     init_pipeline_dirs()
@@ -1468,6 +1473,7 @@ def run_pipeline(
     else:
         print(f"  Time:     unlimited")
     print(f"  Agents:   {len(AGENT_ROLES)}")
+    print(f"  Budget:   {base_budget}min base, {phase_budget}min/phase")
 
     # Determine what to work on
     has_work = False
@@ -1620,9 +1626,9 @@ def run_pipeline(
                         _start = datetime.fromisoformat(_active_started)
                         _elapsed = (datetime.now(timezone.utc) - _start).total_seconds() / 60
 
-                        # Budget scales with complexity: 30 min per phase, min 90 min
+                        # Budget scales with complexity: phase_budget min per phase, min base_budget
                         _total_phases = idea_state.get("total_phases", 3)
-                        _phase_budget = max(PROJECT_TIME_BUDGET, int(_total_phases) * 30)
+                        _phase_budget = max(base_budget, int(_total_phases) * phase_budget)
 
                         # Grace: don't kill a project on its FINAL phase — let it finish
                         _current_phase = idea_state.get("phase", 1)
@@ -1892,6 +1898,12 @@ def main():
                         help="LLM model (default: qwen3.5:35b, or $PIPELINE_MODEL env var)")
     parser.add_argument("--time-limit", type=float, default=0,
                         help="Time limit in minutes (0 = unlimited)")
+    parser.add_argument("--base-budget", type=int, default=DEFAULT_BASE_BUDGET,
+                        help=f"Minimum minutes per project (default: {DEFAULT_BASE_BUDGET}). "
+                             f"Lower for smaller GPUs, higher for bigger ones.")
+    parser.add_argument("--phase-budget", type=int, default=DEFAULT_PHASE_BUDGET,
+                        help=f"Minutes per phase (default: {DEFAULT_PHASE_BUDGET}). "
+                             f"Total budget = max(base-budget, phases * phase-budget).")
 
     args = parser.parse_args()
 
@@ -1907,6 +1919,8 @@ def main():
         provider=args.provider,
         model=args.model,
         time_limit_minutes=args.time_limit,
+        base_budget=args.base_budget,
+        phase_budget=args.phase_budget,
     )
 
 
