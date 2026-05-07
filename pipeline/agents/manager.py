@@ -37,6 +37,9 @@ class ManagerAgent(AgentProcess):
 
         if source == "ideator" or msg.from_agent == "ideator":
             outgoing = self._handle_ideator_result(msg)
+        elif msg.payload.get("signal") == "FIX_ANALYSIS_NEEDED":
+            # Validator sends this as type="task" when retry count >= 3
+            outgoing = self._handle_pipeline_signal(msg)
         elif msg.from_agent == "reviewer":
             # Review routing is now handled deterministically by the runner's
             # _tick_project() function.  Log and drop.
@@ -94,7 +97,9 @@ class ManagerAgent(AgentProcess):
 
     def _handle_pipeline_signal(self, msg: Message) -> list[Message]:
         sig = msg.payload.get("signal", "")
-        if sig == "PHASE_STUCK":
+        if sig == "FIX_ANALYSIS_NEEDED":
+            return self._handle_fix_analysis(msg)
+        elif sig == "PHASE_STUCK":
             phase      = msg.payload.get("phase", 0)
             idea_slug  = msg.payload.get("idea_slug", "")
             reason     = msg.payload.get("reason", "unknown")
@@ -103,7 +108,6 @@ class ManagerAgent(AgentProcess):
 
             # Force-advance: write 'phase_N_reviewed' with 0 blocking bugs so
             # the runner's next _tick_project() call will advance to phase N+1.
-            # The runner checks for 'reviewed' state and routes via _tick_project().
             if idea_slug:
                 proj_dir   = pathlib.Path(".pipeline") / "projects" / idea_slug
                 state_file = proj_dir / "state" / "current_idea.json"
@@ -119,7 +123,6 @@ class ManagerAgent(AgentProcess):
                         "review_path": f"phases/phase_{phase}/review.md",
                     }
                     state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                    # Clear retry counters for this phase so next phase starts fresh
                     if retry_file.exists():
                         retries = json.loads(retry_file.read_text(encoding="utf-8"))
                         for key in list(retries.keys()):
@@ -134,6 +137,144 @@ class ManagerAgent(AgentProcess):
             phase = msg.payload.get("phase", 0)
             self._log_decision(msg, [], note=f"PHASE_COMPLETE phase={phase} — runner handles advancement")
         return []
+
+    def _handle_fix_analysis(self, msg: Message) -> list[Message]:
+        """Manager LLM analyzes persistent failures and decides path forward.
+
+        Called on retry 3+ when the executor has failed to fix issues twice.
+        The manager reads the full fix_report.md, diagnoses the root cause,
+        and decides: retry with a specific strategy, or force-advance.
+        """
+        phase_num = msg.payload.get("phase", 1)
+        idea_slug = msg.payload.get("idea_slug", "")
+        fix_report_path = msg.payload.get("fix_report_path", "")
+        retry_count = msg.payload.get("retry_count", 3)
+        current_failures = msg.payload.get("current_failures", 0)
+        made_progress = msg.payload.get("made_progress", False)
+        workspace_path = msg.payload.get("workspace_path", "")
+        tasks_path = msg.payload.get("tasks_path", "")
+
+        # Read the full fix report
+        fix_report_content = ""
+        if fix_report_path and idea_slug:
+            proj_dir = pathlib.Path(".pipeline") / "projects" / idea_slug
+            fr_full = proj_dir / fix_report_path
+            if fr_full.exists():
+                fix_report_content = fr_full.read_text(encoding="utf-8")
+
+        # Ask manager LLM to analyze
+        task_prompt = (
+            f"You are the Manager analyzing a STUCK project.\n\n"
+            f"## Situation\n"
+            f"Project '{idea_slug}' phase {phase_num} has FAILED validation {retry_count} times.\n"
+            f"Current failures: {current_failures}\n"
+            f"Making progress: {'yes' if made_progress else 'NO — same failures each attempt'}\n\n"
+            f"## Fix Report (full history of all attempts)\n"
+            f"{fix_report_content[:8000]}\n\n"
+            f"## Your Job\n"
+            f"1. Read the fix report carefully.\n"
+            f"2. Identify the ROOT CAUSE pattern — why do fixes keep failing?\n"
+            f"   Common patterns:\n"
+            f"   - File path issues (files in wrong directory)\n"
+            f"   - Missing dependencies (imports that can't resolve)\n"
+            f"   - Test environment issues (tests assume something unavailable)\n"
+            f"   - Fundamental design mistake (wrong approach entirely)\n"
+            f"3. Write your analysis to `.pipeline/state/manager_decisions.md`.\n"
+            f"4. Make ONE of these decisions:\n\n"
+            f"   **DECISION A — RETRY WITH STRATEGY**: If you can identify a specific,\n"
+            f"   different approach that hasn't been tried. Write a clear strategy the\n"
+            f"   executor should follow.\n\n"
+            f"   **DECISION B — FORCE ADVANCE**: If the failures are unfixable within\n"
+            f"   the current phase scope (e.g., test environment issues, external\n"
+            f"   dependencies). Skip remaining test failures and move to next phase.\n\n"
+            f"5. Say DONE and clearly state: 'DECISION: A' or 'DECISION: B'\n"
+            f"   If DECISION A, also state the specific strategy in one paragraph.\n"
+        )
+
+        result = self.call_agent(task=task_prompt, verbose=False)
+
+        # Parse the LLM's decision
+        answer = result.answer if result.answer else ""
+        decision_a = "DECISION: A" in answer.upper() or "DECISION A" in answer.upper()
+
+        if decision_a and current_failures < 10:
+            # Retry with manager's strategy
+            strategy = ""
+            # Extract strategy text after "DECISION: A" or "strategy:" keyword
+            for marker in ["DECISION: A", "DECISION A", "strategy:"]:
+                idx = answer.upper().find(marker.upper())
+                if idx >= 0:
+                    strategy = answer[idx + len(marker):].strip()[:2000]
+                    break
+            if not strategy:
+                strategy = answer[-1000:]  # fallback: use end of response
+
+            self._log_decision(msg, [], note=(
+                f"FIX_ANALYSIS phase={phase_num} retry={retry_count}: "
+                f"RETRY with manager strategy — {strategy[:200]}"
+            ))
+
+            return [Message.create(
+                from_agent=self.role,
+                to_agent="executor",
+                type="task",
+                payload={
+                    "phase": phase_num,
+                    "tasks_path": tasks_path,
+                    "workspace_path": workspace_path,
+                    "fix_required": True,
+                    "fix_report_path": fix_report_path,
+                    "fix_instructions": (
+                        f"MANAGER ANALYSIS (retry {retry_count}): {strategy[:3000]}\n\n"
+                        f"The previous {retry_count - 1} fix attempts all failed. "
+                        f"The manager has analyzed the pattern and recommends the "
+                        f"strategy above. Try this SPECIFIC approach — do NOT repeat "
+                        f"previous fixes."
+                    ),
+                    "idea_slug": idea_slug,
+                    "retry_count": retry_count,
+                },
+            )]
+        else:
+            # Force-advance past this phase
+            self._log_decision(msg, [], note=(
+                f"FIX_ANALYSIS phase={phase_num} retry={retry_count}: "
+                f"FORCE ADVANCE — {current_failures} failures deemed unfixable"
+            ))
+
+            if idea_slug:
+                proj_dir = pathlib.Path(".pipeline") / "projects" / idea_slug
+                state_file = proj_dir / "state" / "current_idea.json"
+                retry_file = proj_dir / "state" / "phase_retries.json"
+                try:
+                    state = json.loads(state_file.read_text(encoding="utf-8"))
+                    state["status"] = f"phase_{phase_num}_reviewed"
+                    state["review_result"] = {
+                        "blocking_bugs": 0,
+                        "non_blocking_notes": (
+                            f"Manager force-advanced: {current_failures} failures "
+                            f"after {retry_count} attempts. {answer[:500]}"
+                        ),
+                        "tasks_path": tasks_path,
+                        "workspace_path": workspace_path,
+                        "review_path": f"phases/phase_{phase_num}/review.md",
+                    }
+                    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                    # Clear retry counters
+                    if retry_file.exists():
+                        retries = json.loads(retry_file.read_text(encoding="utf-8"))
+                        for key in list(retries.keys()):
+                            if f"phase_{phase_num}" in key:
+                                retries.pop(key)
+                        retry_file.write_text(json.dumps(retries, indent=2), encoding="utf-8")
+                    logger.info(
+                        "[manager] Force-advanced '%s' past phase %d after %d retries",
+                        idea_slug, phase_num, retry_count,
+                    )
+                except Exception as e:
+                    logger.error("[manager] Failed to force-advance '%s': %s", idea_slug, e)
+
+            return []
 
     def _handle_generic(self, msg: Message) -> list[Message]:
         """Fallback handler for unexpected message types."""

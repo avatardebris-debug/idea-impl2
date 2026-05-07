@@ -906,14 +906,15 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
                 _is_locked = state.get("budget_lock", False)
                 for k, v in retries.items():
                     if "no_progress" in k and isinstance(v, int) and v >= 4 and not _is_locked:
-                        # Force-mark as complete so it never comes back
-                        state["status"] = "complete"
+                        # Force-mark as budget_exceeded (NOT complete) so [lock] can recover it
+                        state["status"] = "budget_exceeded"
+                        state["budget_note"] = f"Stalled: no_progress streak {v} cycles on {k}"
                         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                        print(f"  ⏭️  Force-completed stalled project '{title}' (stuck {v} cycles)")
+                        print(f"  ⏭️  Stall-stopped project '{title}' (stuck {v} cycles) → budget_exceeded")
                         break
                 else:
                     retries = None  # didn't break — not stalled
-                if state.get("status") == "complete":
+                if state.get("status") == "budget_exceeded":
                     continue
             except Exception:
                 pass

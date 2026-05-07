@@ -114,47 +114,107 @@ class ReviewerAgent(AgentProcess):
         non_blocking_notes = ""
         if non_blocking_section:
             raw = non_blocking_section.group().strip()
-            # Only capture if there are actual bullet items (not just the heading)
             if re.search(r'^[-*]\s+', raw, re.MULTILINE):
                 non_blocking_notes = raw
 
-        # --- Write review verdict to state (deterministic routing by runner) ---
-        # Instead of sending to the manager LLM, we write structured review data
-        # directly to current_idea.json. The runner's _tick_project() reads this
-        # and makes the routing decision deterministically.
-        try:
-            idea_state = self.read_json_state("state/current_idea.json")
+        # --- Determine review mode: pre-validation or post-validation ---
+        # Pre-validation: reviewer comes from executor BEFORE tests run
+        # Post-validation: reviewer comes from validator AFTER tests pass
+        validation_report_content = self.read_state_file(validation_path)
+        is_post_validation = (
+            validation_report_content
+            and "Verdict: PASS" in validation_report_content
+        )
 
-            # Guard: don't overwrite terminal states — the runner may have
-            # force-completed this project while the reviewer was still running
-            if idea_state.get("status") in ("complete", "stalled", "budget_exceeded"):
-                return AgentOutput(
-                    success=True, answer=result.answer, outgoing=[],
-                    tokens_used=result.tokens_used, steps_used=result.steps_used,
+        if is_post_validation:
+            # --- POST-VALIDATION: Deep review → write verdict to state for runner ---
+            try:
+                idea_state = self.read_json_state("state/current_idea.json")
+
+                if idea_state.get("status") in ("complete", "stalled", "budget_exceeded"):
+                    return AgentOutput(
+                        success=True, answer=result.answer, outgoing=[],
+                        tokens_used=result.tokens_used, steps_used=result.steps_used,
+                    )
+
+                idea_state["review_result"] = {
+                    "blocking_bugs": blocking_count,
+                    "review_path": review_path,
+                    "tasks_path": tasks_path,
+                    "workspace_path": workspace_path,
+                    "files_written": files_written,
+                    "non_blocking_notes": non_blocking_notes[:1500],
+                    "review_content_preview": review_content[:1500],
+                }
+                idea_state["status"] = f"phase_{phase_num}_reviewed"
+                self.write_json_state("state/current_idea.json", idea_state)
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error("[reviewer] Failed to write review verdict: %s", e)
+
+            return AgentOutput(
+                success=True,
+                answer=result.answer,
+                outgoing=[],  # No outgoing messages — runner handles routing
+                tokens_used=result.tokens_used,
+                steps_used=result.steps_used,
+            )
+        else:
+            # --- PRE-VALIDATION: Structural review → route to validator or back to executor ---
+            if blocking_count > 0:
+                # Structural issues found — send back to executor, skip validation
+                import logging as _log
+                _log.getLogger(__name__).info(
+                    "[reviewer] Pre-validation: %d blocking bugs → executor (skipping tests)",
+                    blocking_count,
+                )
+                retry_count = msg.payload.get("retry_count", 0)
+                out_msg = Message.create(
+                    from_agent=self.role,
+                    to_agent="executor",
+                    type="task",
+                    payload={
+                        "phase": phase_num,
+                        "tasks_path": tasks_path,
+                        "workspace_path": workspace_path,
+                        "fix_required": True,
+                        "review_path": review_path,
+                        "fix_instructions": (
+                            f"Reviewer found {blocking_count} blocking bugs BEFORE validation. "
+                            f"Read `{review_full_path}` for details. Fix these structural "
+                            f"issues first — tests have NOT been run yet."
+                        ),
+                        "idea_slug": idea_slug,
+                        "retry_count": retry_count,
+                    },
+                )
+                # Update status to reflect we're in fix mode
+                self._update_idea_status(f"phase_{phase_num}_executing")
+            else:
+                # Clean structure — forward to validator for test execution
+                out_msg = Message.create(
+                    from_agent=self.role,
+                    to_agent="validator",
+                    type="task",
+                    payload={
+                        "phase": phase_num,
+                        "tasks_path": tasks_path,
+                        "workspace_path": workspace_path,
+                        "files_written": files_written,
+                        "validation_report_path": validation_path,
+                        "review_path": review_path,
+                        "idea_slug": idea_slug,
+                        "retry_count": msg.payload.get("retry_count", 0),
+                    },
                 )
 
-            idea_state["review_result"] = {
-                "blocking_bugs": blocking_count,
-                "review_path": review_path,
-                "tasks_path": tasks_path,
-                "workspace_path": workspace_path,
-                "files_written": files_written,
-                "non_blocking_notes": non_blocking_notes[:1500],
-                "review_content_preview": review_content[:1500],
-            }
-            idea_state["status"] = f"phase_{phase_num}_reviewed"
-            self.write_json_state("state/current_idea.json", idea_state)
-        except Exception as e:
-            import logging
-            logging.getLogger(__name__).error("[reviewer] Failed to write review verdict: %s", e)
-
-        return AgentOutput(
-            success=True,
-            answer=result.answer,
-            outgoing=[],  # No outgoing messages — runner handles routing
-            tokens_used=result.tokens_used,
-            steps_used=result.steps_used,
-        )
+            return AgentOutput(
+                success=True,
+                answer=result.answer,
+                outgoing=[out_msg],
+                tokens_used=result.tokens_used,
+                steps_used=result.steps_used,
+            )
 
 
 def main():

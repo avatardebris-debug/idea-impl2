@@ -505,24 +505,74 @@ class ValidatorAgent(AgentProcess):
                 )
             else:
                 progress_note = "↓ improving" if made_progress else "→ stalled"
-                out_msg = Message.create(
-                    from_agent=self.role,
-                    to_agent="executor",
-                    type="task",
-                    payload={
-                        "phase": phase_num,
-                        "tasks_path": tasks_path,
-                        "workspace_path": workspace_path,
-                        "fix_required": True,
-                        "validation_report": report_content[:3000],
-                        "error_summary": (
-                            f"Validation FAILED — attempt {retry_count}, "
-                            f"{current_failures} failures remaining ({progress_note}). "
-                            f"Fix the specific errors listed above."
-                        ),
-                        "idea_slug": idea_slug,
-                    },
+
+                # --- Write persistent fix_report.md with full context ---
+                fix_report_path = f"phases/phase_{phase_num}/fix_report.md"
+                fix_report_full = pathlib.Path(self._project_path(fix_report_path))
+                fix_report_full.parent.mkdir(parents=True, exist_ok=True)
+
+                attempt_entry = (
+                    f"### Attempt {retry_count}\n"
+                    f"- **Failures**: {current_failures} ({progress_note})\n"
+                    f"- **Previous failures**: {prev_failures}\n\n"
+                    f"#### Test Output\n```\n{report_content[:6000]}\n```\n\n"
                 )
+
+                if fix_report_full.exists():
+                    existing = fix_report_full.read_text(encoding="utf-8")
+                    updated = existing + "\n" + attempt_entry
+                else:
+                    updated = (
+                        f"# Fix Report — Phase {phase_num}\n\n"
+                        f"## Current Issues\n"
+                        f"{report_content[:4000]}\n\n"
+                        f"## Attempt History\n\n"
+                        + attempt_entry
+                    )
+                fix_report_full.write_text(updated, encoding="utf-8")
+
+                # Retry 3+ → manager for analysis; retries 1-2 → executor directly
+                MANAGER_THRESHOLD = 3
+                if retry_count >= MANAGER_THRESHOLD:
+                    out_msg = Message.create(
+                        from_agent=self.role,
+                        to_agent="manager",
+                        type="task",
+                        payload={
+                            "phase": phase_num,
+                            "signal": "FIX_ANALYSIS_NEEDED",
+                            "tasks_path": tasks_path,
+                            "workspace_path": workspace_path,
+                            "fix_report_path": fix_report_path,
+                            "retry_count": retry_count,
+                            "current_failures": current_failures,
+                            "made_progress": made_progress,
+                            "idea_slug": idea_slug,
+                        },
+                    )
+                    logger.info(
+                        "[validator] Phase %d retry %d → manager for analysis (%d failures)",
+                        phase_num, retry_count, current_failures,
+                    )
+                else:
+                    out_msg = Message.create(
+                        from_agent=self.role,
+                        to_agent="executor",
+                        type="task",
+                        payload={
+                            "phase": phase_num,
+                            "tasks_path": tasks_path,
+                            "workspace_path": workspace_path,
+                            "fix_required": True,
+                            "fix_report_path": fix_report_path,
+                            "error_summary": (
+                                f"Validation FAILED — attempt {retry_count}, "
+                                f"{current_failures} failures ({progress_note}). "
+                                f"Read fix_report.md for full details + previous attempts."
+                            ),
+                            "idea_slug": idea_slug,
+                        },
+                    )
 
 
         return AgentOutput(

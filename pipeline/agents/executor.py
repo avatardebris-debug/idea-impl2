@@ -62,8 +62,6 @@ class ExecutorAgent(AgentProcess):
         idea_slug = msg.payload.get("idea_slug", self._current_slug)
         tasks_path = msg.payload.get("tasks_path", f"phases/phase_{phase_num}/tasks.md")
         fix_required = msg.payload.get("fix_required", False)
-        fix_context = (msg.payload.get("validation_report", "")
-                       or msg.payload.get("fix_instructions", ""))
         review_path = msg.payload.get("review_path", "")
 
         # Always read these upfront — scoped to current phase only
@@ -82,19 +80,31 @@ class ExecutorAgent(AgentProcess):
         )
 
         if fix_required:
-            # Targeted fix prompt — agent knows exactly what failed
+            # Read the persistent fix report (full history of all attempts)
+            fix_report_path = msg.payload.get("fix_report_path", "")
+            fix_report_content = ""
+            if fix_report_path:
+                fix_report_content = self.read_state_file(fix_report_path)
+            if not fix_report_content:
+                # Fallback to inline context (legacy messages)
+                fix_report_content = (msg.payload.get("validation_report", "")
+                                      or msg.payload.get("fix_instructions", ""))
+
             review_content = self.read_state_file(review_path) if review_path else ""
             task_prompt = (
                 f"You are fixing Phase {phase_num} code that failed validation/review.\n\n"
                 f"## Workspace\n{workspace}\n\n"
-                f"## What Failed\n{fix_context[:2000]}\n\n"
+                f"## Fix Report (read ALL previous attempts before making changes)\n"
+                f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
                 + "## Instructions\n"
-                  "1. Read the failure report above carefully.\n"
-                f"2. Use `list_tree` then `read_file` on each relevant source file.\n"
-                  "3. Fix ONLY the blocking issues described. Don't rewrite working code.\n"
-                f"4. Update tasks file at `{tasks_full_path}` if any task status changes.\n"
-                  "5. Say DONE and list every file you changed.\n"
+                  "1. Read the Fix Report above carefully — especially Previous Attempts.\n"
+                  "2. Do NOT repeat a fix that was already tried and failed.\n"
+                  f"3. Use `list_tree` then `read_file` on each relevant source file.\n"
+                  "4. Fix ONLY the blocking issues described. Don't rewrite working code.\n"
+                  "5. If the report mentions file path issues, verify your workspace path first.\n"
+                  f"6. Update tasks file at `{tasks_full_path}` if any task status changes.\n"
+                  "7. Say DONE and list every file you changed.\n"
             )
         elif not tasks_content:
             return AgentOutput(
@@ -212,9 +222,19 @@ class ExecutorAgent(AgentProcess):
         except Exception:
             pass  # Non-critical — validator will catch real failures
 
+        # Route: reviewer on first execution + even retries, validator on odd retries
+        # This gives structural review coverage every other pass:
+        #   1st execution → reviewer → validator
+        #   retry 1 → validator (fast, no review overhead)
+        #   retry 2 → reviewer → validator
+        #   retry 3 → validator (fast)
+        retry_count = msg.payload.get("retry_count", 0)
+        use_reviewer = not fix_required or (retry_count % 2 == 0)
+        next_agent = "reviewer" if use_reviewer else "validator"
+
         out_msg = Message.create(
             from_agent=self.role,
-            to_agent="validator",
+            to_agent=next_agent,
             type="task",
             payload={
                 "phase": phase_num,
@@ -223,6 +243,7 @@ class ExecutorAgent(AgentProcess):
                 "files_written": files_written,
                 "validation_report_path": f"phases/phase_{phase_num}/validation_report.md",
                 "idea_slug": idea_slug,
+                "retry_count": retry_count,
             },
         )
 
