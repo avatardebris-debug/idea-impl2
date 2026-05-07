@@ -1,0 +1,68 @@
+# Phase 2 Tasks
+
+- [ ] Task 1: Database schema, Pydantic models, and configuration
+  - What: Define the SQLite schema (Company, Filing, FilingItem tables) and implement Pydantic models for data validation. Add a YAML configuration file for database path, rate limits, and other settings.
+  - Files:
+    - `src/sec_importer/schema.py` — SQLite schema DDL (CREATE TABLE statements), init_db() function
+    - `src/sec_importer/models.py` — Pydantic models: CompanyModel, FilingModel, FilingItemModel
+    - `src/sec_importer/config.py` — Config class loading from YAML config file
+    - `config.yaml` — Default configuration (db_path, rate_limit_delay, max_retries, log_level)
+  - Done when:
+    - `init_db()` creates a SQLite database with Company, Filing, and FilingItem tables and correct columns/indexes
+    - Pydantic models validate correct data and reject invalid data
+    - `config.yaml` is loaded and defaults are applied when keys are missing
+    - Unit tests for schema creation, model validation, and config loading pass
+
+- [ ] Task 2: Database ORM layer with deduplication and rate limiter
+  - What: Implement a database repository layer that wraps raw SQL operations for CRUD on Company, Filing, and FilingItem. Implement deduplication by accession number (INSERT OR IGNORE / ON CONFLICT). Improve the rate limiter to support configurable delays and exponential backoff for retries.
+  - Files:
+    - `src/sec_importer/repository.py` — DBRepository class with methods: upsert_company(), get_or_upsert_company(), upsert_filing(), upsert_filing_items(), get_existing_accession_numbers(), get_filing_by_accession()
+    - `src/sec_importer/rate_limiter.py` — RateLimiter class with configurable requests-per-second, token-bucket or sliding-window algorithm, and exponential backoff for transient errors
+  - Done when:
+    - `upsert_company()` inserts or updates a company by CIK without duplicates
+    - `upsert_filing()` inserts a filing only if the accession number does not already exist (deduplication)
+    - `get_existing_accession_numbers()` returns a set of all stored accession numbers for pre-check dedup
+    - `RateLimiter` enforces configurable request rate (default 10 req/sec) and supports retry with backoff
+    - Integration tests verify deduplication (re-running inserts no duplicates) and rate limiting (timing checks)
+
+- [ ] Task 3: Batch import pipeline and sync script
+  - What: Extend the fetcher to support batch imports across multiple companies and filing types. Build the core pipeline: resolve tickers → fetch filing indices → download text → parse → store. Create a sync script/CLI with --companies, --types, --date-range flags. Add structured logging and progress reporting throughout.
+  - Files:
+    - `src/sec_importer/import_pipeline.py` — ImportPipeline class with methods: resolve_tickers(), fetch_filing_indices(), download_and_parse(), store_results(), run() for the full batch pipeline
+    - `src/sec_importer/sync.py` — SyncJob class that orchestrates one-shot or periodic sync runs
+    - `src/sec_importer/parser.py` — Filing parser (extract company name, filing date, items, summary from text content)
+    - `src/sec_importer/cli.py` — Updated CLI with new subcommands: `sync`, `import`, `query` and flags: --companies (comma-separated tickers), --types (comma-separated filing types), --date-range (start,end), --output, --batch-size
+  - Done when:
+    - `ImportPipeline.run()` can import filings for 10+ companies in a single run
+    - `--companies AAPL,MSFT,GOOGL --types 10-K,10-Q` imports all requested filing types for all companies
+    - `--date-range 2024-01-01,2024-12-31` filters filings to a date range
+    - Progress reporting shows company/filing counts and status (imported, skipped, failed)
+    - Structured logging captures all pipeline events with log levels
+    - Failed filings are logged with error details and the pipeline continues with remaining filings
+
+- [ ] Task 4: Query API
+  - What: Implement a query API that supports filtering filings by company (CIK or ticker), filing type, and date range. Add query methods to the repository layer and expose them via the CLI.
+  - Files:
+    - `src/sec_importer/query.py` — QueryEngine class with methods: query_by_company(cik/ticker), query_by_type(filing_type), query_by_date_range(start_date, end_date), query_all()
+    - `src/sec_importer/repository.py` — Add query methods: get_filings_by_cik(), get_filings_by_type(), get_filings_by_date_range(), get_companies()
+    - `src/sec_importer/cli.py` — Add `query` subcommand with flags: --company, --type, --date-range, --output
+  - Done when:
+    - Query "all 10-K filings for AAPL in 2024" returns correct results
+    - Query "all 8-K filings in the last 7 days across all imported companies" returns correct results
+    - Query results can be output as JSON to stdout or a file
+    - Integration tests verify query correctness against known test data
+
+- [ ] Task 5: Integration tests, requirements update, and documentation
+  - What: Write comprehensive integration tests for the full pipeline (DB operations, batch import, query, deduplication). Update requirements.txt with new dependencies (pydantic, pyyaml). Update README with Phase 2 usage examples and documentation.
+  - Files:
+    - `tests/test_repository.py` — Integration tests for DB operations (upsert, dedup, queries)
+    - `tests/test_import_pipeline.py` — Integration tests for batch import with mocked SEC API
+    - `tests/test_query.py` — Integration tests for query API
+    - `tests/test_sync.py` — Integration tests for sync script
+    - `requirements.txt` — Add `pydantic`, `pyyaml`
+    - `README.md` — Update with Phase 2 usage, architecture, and examples
+  - Done when:
+    - All integration tests pass
+    - `requirements.txt` includes pydantic and pyyaml
+    - README documents Phase 2 CLI commands, configuration, and architecture
+    - Batch import of 50 companies completes in under 5 minutes (with mocked/sec-compliant rate limiting)

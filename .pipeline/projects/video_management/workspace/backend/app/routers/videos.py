@@ -15,7 +15,7 @@ from ..schemas import (
     VideoListResponse,
 )
 
-router = APIRouter(prefix="/api/videos", tags=["videos"])
+router = APIRouter(tags=["videos"])
 
 
 def _get_default_table(db: Session) -> TableMetadata:
@@ -143,78 +143,35 @@ def delete_video(video_id: str, db: Session = Depends(get_db)):
     video = db.query(Video).filter(Video.id == video_id).first()
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
+
     db.delete(video)
     db.commit()
+    return None
 
 
 def _validate_field_value(field_def, value):
-    """Validate a value against a field definition's type."""
-    from ..models import FieldTypeId
-
-    if value is None:
-        return
-
-    ftype = field_def.field_type
-
-    if ftype == FieldTypeId.TEXT:
-        if not isinstance(value, str):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field_def.name}' expects text, got {type(value).__name__}",
-            )
-
-    elif ftype == FieldTypeId.DATE:
-        if isinstance(value, str):
-            try:
-                from datetime import datetime
-                datetime.fromisoformat(value)
-            except (ValueError, TypeError):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Field '{field_def.name}' expects a valid date string",
-                )
-        elif not isinstance(value, str):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field_def.name}' expects a date string",
-            )
-
-    elif ftype == FieldTypeId.SELECT:
-        if field_def.options and value not in field_def.options:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field_def.name}' value '{value}' not in options {field_def.options}",
-            )
-
-    elif ftype == FieldTypeId.CHECKBOX:
-        if not isinstance(value, bool):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field_def.name}' expects a boolean",
-            )
-
-    elif ftype == FieldTypeId.NUMBER:
-        if not isinstance(value, (int, float)):
+    """Validate a value against a field definition."""
+    if field_def.field_type == "number" and value is not None:
+        try:
+            float(value)
+        except (ValueError, TypeError):
             raise HTTPException(
                 status_code=400,
                 detail=f"Field '{field_def.name}' expects a number",
             )
-
-    elif ftype == FieldTypeId.URL:
-        if not isinstance(value, str):
+    elif field_def.field_type == "date" and value is not None:
+        try:
+            from datetime import datetime
+            if isinstance(value, str):
+                datetime.fromisoformat(value)
+        except ValueError:
             raise HTTPException(
                 status_code=400,
-                detail=f"Field '{field_def.name}' expects a URL string",
+                detail=f"Field '{field_def.name}' expects a valid date",
             )
-        if not (value.startswith("http://") or value.startswith("https://")):
+    elif field_def.field_type == "url" and value is not None:
+        if not value.startswith(("http://", "https://")):
             raise HTTPException(
                 status_code=400,
-                detail=f"Field '{field_def.name}' value must be a valid URL",
-            )
-
-    elif ftype == FieldTypeId.TAGS:
-        if not isinstance(value, list):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Field '{field_def.name}' expects a list of tags",
+                detail=f"Field '{field_def.name}' expects a valid URL",
             )

@@ -47,7 +47,7 @@ class VideoCreate(BaseModel):
     status: VideoStatus = VideoStatus.DRAFT
     tags: List[str] = []
     publish_date: Optional[datetime] = None
-    thumbnail_url: str = ""
+    thumbnail_url: Optional[str] = None
     youtube_video_id: Optional[str] = None
     custom_fields: dict[str, Any] = {}
 
@@ -75,7 +75,7 @@ class VideoResponse(BaseModel):
     status: VideoStatus
     tags: List[str]
     publish_date: Optional[datetime]
-    thumbnail_url: str
+    thumbnail_url: Optional[str]
     youtube_video_id: Optional[str]
     custom_fields: dict[str, Any]
     created_at: datetime

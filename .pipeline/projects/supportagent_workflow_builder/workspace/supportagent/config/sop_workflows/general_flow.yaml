@@ -1,0 +1,52 @@
+# General workflow — handles all other tickets
+name: general_flow
+version: "1.0"
+description: "Default workflow for general support tickets"
+
+steps:
+  - id: step_1
+    type: action
+    action: classify_ticket
+    description: "Classify the ticket"
+
+  - id: step_2
+    type: condition
+    condition:
+      field: category
+      operator: "=="
+      value: general
+    then: step_3
+    else: step_4
+
+  - id: step_3
+    type: action
+    action: assign_team
+    description: "Assign to general team"
+    params:
+      team: general_team
+
+  - id: step_4
+    type: action
+    action: assign_team
+    description: "Fallback to general team"
+    params:
+      team: general_team
+
+  - id: step_5
+    type: action
+    action: generate_draft
+    description: "Generate a draft response"
+    params:
+      template: general_response
+      tone: professional
+
+  - id: step_6
+    type: gate
+    gate_type: human_approval
+    description: "Await human approval"
+    auto_approve_after_hours: 72
+
+  - id: step_7
+    type: action
+    action: send_response
+    description: "Send the approved response"

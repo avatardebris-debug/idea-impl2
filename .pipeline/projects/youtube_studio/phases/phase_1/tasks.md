@@ -1,6 +1,6 @@
 # Phase 1 Tasks — YouTube Studio
 
-## Task 1: Create Core Project Structure
+- [ ] Task 1: Create Core Project Structure
 - **What to build**: Directory structure and configuration files for the YouTube Studio project
 - **Files**: 
   - `.pipeline/projects/youtube_studio/phases/phase_1/` (directory)
@@ -11,7 +11,7 @@
   - config.py contains configurable settings for video formats (mp4, avi, mov), template paths, and API endpoints
   - constants.py defines at least 5 constants (e.g., MAX_TITLE_LENGTH=100, MAX_THUMBNAIL_SIZE=2MB, etc.)
 
-## Task 2: Build Video Format Handler
+- [ ] Task 2: Build Video Format Handler
 - **What to build**: A module to handle different video format conversions and validations
 - **Files**:
   - `video_formats.py` - Class for detecting, validating, and converting video formats
@@ -25,7 +25,7 @@
   - Conversion method exists for each format type
   - Unit tests pass for format detection and validation
 
-## Task 3: Implement Title and Thumbnail Generator
+- [ ] Task 3: Implement Title and Thumbnail Generator
 - **What to build**: Core generation logic for YouTube titles and thumbnails
 - **Files**:
   - `title_generator.py` - Class for generating optimized video titles
@@ -37,7 +37,7 @@
   - Both generators can accept input text and produce optimized output
   - Title length is automatically adjusted to stay under 100 characters
 
-## Task 4: Create Keyword Generator Module
+- [ ] Task 4: Create Keyword Generator Module
 - **What to build**: System for generating relevant YouTube keywords/tags
 - **Files**:
   - `keyword_generator.py` - Class for extracting and generating keywords from content
@@ -49,7 +49,7 @@
   - Keywords are validated against YouTube's tag limits (500 chars max)
   - Can prioritize keywords based on relevance scoring
 
-## Task 5: Build Transcript Builder Tool
+- [ ] Task 5: Build Transcript Builder Tool
 - **What to build**: Utility for building and managing video transcripts
 - **Files**:
   - `transcript_builder.py` - Class for creating structured transcripts
@@ -61,7 +61,7 @@
   - Can add timestamps to transcript sections
   - Transcript can be exported in any supported format
 
-## Task 6: Implement Template Developer Interface
+- [ ] Task 6: Implement Template Developer Interface
 - **What to build**: Framework for creating and managing video templates
 - **Files**:
   - `template_manager.py` - Class for loading, saving, and managing templates
@@ -74,7 +74,7 @@
   - Can save custom templates to disk
   - Default template provides a working example structure
 
-## Task 7: Create Main Studio Orchestrator
+- [ ] Task 7: Create Main Studio Orchestrator
 - **What to build**: Central orchestrator that ties all components together
 - **Files**:
   - `studio_orchestrator.py` - Main class to coordinate all YouTube Studio features
@@ -85,7 +85,7 @@
   - Can process input content through the full pipeline
   - Returns structured output with all generated elements
 
-## Task 8: Write Integration Tests
+- [ ] Task 8: Write Integration Tests
 - **What to build**: Test suite to verify all Phase 1 components work together
 - **Files**:
   - `test_video_formats.py` - Tests for video format handling

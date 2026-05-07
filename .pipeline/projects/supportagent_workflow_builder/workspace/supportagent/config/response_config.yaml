@@ -1,0 +1,146 @@
+# Response generator configuration
+# Contains templates and tone styles for draft responses.
+
+templates:
+  billing_response: |
+    {greeting} {customer_name},
+
+    Thank you for reaching out regarding your billing inquiry. I've reviewed your account and here's what I found:
+
+    Subject: {subject}
+
+    {body}
+
+    Our billing team is working to resolve this. You can expect an update within 24 hours.
+
+    {closing},
+    {agent_name}
+
+  technical_response: |
+    {greeting} {customer_name},
+
+    Thanks for contacting technical support. I've looked into your issue:
+
+    Ticket ID: {ticket_id}
+    Subject: {subject}
+
+    {body}
+
+    Our technical team is investigating. We'll provide an update within 4 hours.
+
+    {closing},
+    {agent_name}
+
+  account_response: |
+    {greeting} {customer_name},
+
+    Thank you for contacting account support. I've reviewed your account details:
+
+    Subject: {subject}
+
+    {body}
+
+    I'm working on resolving this for you. You'll hear from us within 24 hours.
+
+    {closing},
+    {agent_name}
+
+  general_response: |
+    {greeting} {customer_name},
+
+    Thank you for reaching out. I've received your inquiry:
+
+    Subject: {subject}
+
+    {body}
+
+    I'm looking into this and will get back to you shortly.
+
+    {closing},
+    {agent_name}
+
+tone_styles:
+  billing_team:
+    enterprise:
+      tone: "formal"
+      greeting: "Dear"
+      closing: "Sincerely"
+      language: "en"
+    startup:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+    default:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+
+  technical_team:
+    enterprise:
+      tone: "formal"
+      greeting: "Dear"
+      closing: "Sincerely"
+      language: "en"
+    startup:
+      tone: "casual"
+      greeting: "Hi"
+      closing: "Best"
+      language: "en"
+    default:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+
+  account_team:
+    enterprise:
+      tone: "formal"
+      greeting: "Dear"
+      closing: "Sincerely"
+      language: "en"
+    startup:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+    default:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+
+  escalation_team:
+    enterprise:
+      tone: "formal"
+      greeting: "Dear"
+      closing: "Sincerely"
+      language: "en"
+    startup:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+    default:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"
+
+  general_team:
+    enterprise:
+      tone: "formal"
+      greeting: "Dear"
+      closing: "Sincerely"
+      language: "en"
+    startup:
+      tone: "casual"
+      greeting: "Hi"
+      closing: "Best"
+      language: "en"
+    default:
+      tone: "professional"
+      greeting: "Hello"
+      closing: "Best regards"
+      language: "en"

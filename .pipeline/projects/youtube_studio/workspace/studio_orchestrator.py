@@ -10,14 +10,14 @@ from dataclasses import dataclass
 from datetime import datetime
 import os
 
-from .title_generator import TitleGenerator, TitleGenerationResult
-from .thumbnail_generator import ThumbnailGenerator, ThumbnailStyle, ThumbnailMetadata
-from .keyword_generator import KeywordGenerator, KeywordResult, KeywordPriority
-from .transcript_builder import TranscriptBuilder, TranscriptSection
-from .templates.template_manager import TemplateManager
-from .templates.template_engine import TemplateEngine
-from .config import get_config
-from .constants import (
+from title_generator import TitleGenerator, TitleGenerationResult
+from thumbnail_generator import ThumbnailGenerator, ThumbnailStyle, ThumbnailMetadata
+from keyword_generator import KeywordGenerator, KeywordResult, KeywordPriority
+from transcript_builder import TranscriptBuilder, TranscriptSection
+from templates.template_manager import TemplateManager
+from templates.template_engine import TemplateEngine
+from config import get_config
+from constants import (
     MAX_TITLE_LENGTH,
     MAX_KEYWORDS_PER_TAG,
     MAX_NUMBER_OF_KEYWORDS,

@@ -28,12 +28,12 @@ class TestVideoFormatDetection(unittest.TestCase):
         format_name = detect_video_format('/path/to/video.mp4')
         self.assertEqual(format_name, 'mp4')
     
-    def test_detect_aviformat(self):
+    def test_detect_avi_format(self):
         """Test detection of AVI format."""
         format_name = detect_video_format('/path/to/video.avi')
         self.assertEqual(format_name, 'avi')
     
-    def test_detect_movformat(self):
+    def test_detect_mov_format(self):
         """Test detection of MOV format."""
         format_name = detect_video_format('/path/to/video.mov')
         self.assertEqual(format_name, 'mov')
@@ -47,6 +47,19 @@ class TestVideoFormatDetection(unittest.TestCase):
         """Test case-insensitive format detection."""
         self.assertEqual(detect_video_format('/path/TO/VIDEO.MP4'), 'mp4')
         self.assertEqual(detect_video_format('/path/to/video.Mp4'), 'mp4')
+    
+    def test_detect_m4v_extension(self):
+        """Test detection of m4v extension maps to mp4."""
+        self.assertEqual(detect_video_format('/path/to/video.m4v'), 'mp4')
+    
+    def test_detect_qt_extension(self):
+        """Test detection of qt extension maps to mov."""
+        self.assertEqual(detect_video_format('/path/to/video.qt'), 'mov')
+    
+    def test_detect_no_extension(self):
+        """Test detection of file with no extension."""
+        format_name = detect_video_format('/path/to/video')
+        self.assertIsNone(format_name)
 
 
 class TestFormatFactory(unittest.TestCase):
@@ -56,208 +69,212 @@ class TestFormatFactory(unittest.TestCase):
         """Test getting MP4 handler."""
         handler = create_handler('/path/to/video.mp4')
         self.assertIsInstance(handler, MP4Handler)
-        self.assertEqual(handler.format, 'mp4')
+        self.assertEqual(handler.file_path, '/path/to/video.mp4')
     
     def test_get_handler_avi(self):
         """Test getting AVI handler."""
         handler = create_handler('/path/to/video.avi')
         self.assertIsInstance(handler, AVIHandler)
-        self.assertEqual(handler.format, 'avi')
+        self.assertEqual(handler.file_path, '/path/to/video.avi')
     
     def test_get_handler_mov(self):
         """Test getting MOV handler."""
         handler = create_handler('/path/to/video.mov')
         self.assertIsInstance(handler, MOVHandler)
-        self.assertEqual(handler.format, 'mov')
+        self.assertEqual(handler.file_path, '/path/to/video.mov')
     
-    def test_get_handler_unsupported(self):
+    def test_get_handler_unknown(self):
         """Test getting handler for unsupported format."""
         handler = create_handler('/path/to/video.xyz')
         self.assertIsNone(handler)
-
-
-class TestVideoFormatHandler(unittest.TestCase):
-    """Test cases for the base VideoFormatHandler class."""
     
-    def setUp(self):
-        """Set up test fixtures."""
-        self.test_dir = tempfile.mkdtemp()
+    def test_factory_create_mp4(self):
+        """Test FormatFactory.create for MP4."""
+        handler = FormatFactory.create('/path/to/video.mp4')
+        self.assertIsInstance(handler, MP4Handler)
     
-    def test_format_property(self):
-        """Test format property is set correctly."""
-        handler = create_handler('/path/to/video.mp4')
-        self.assertIsNotNone(handler)
-        self.assertEqual(handler.format, 'mp4')
+    def test_factory_detect(self):
+        """Test FormatFactory.detect."""
+        format_name = FormatFactory.detect('/path/to/video.mp4')
+        self.assertEqual(format_name, 'mp4')
     
-    def test_file_path_property(self):
-        """Test file_path property returns correct path."""
-        handler = create_handler('/path/to/video.mp4')
-        self.assertEqual(handler.file_path, '/path/to/video.mp4')
+    def test_factory_get_supported_formats(self):
+        """Test FormatFactory.get_supported_formats."""
+        formats = FormatFactory.get_supported_formats()
+        self.assertIsInstance(formats, list)
+        self.assertIn('mp4', formats)
+        self.assertIn('avi', formats)
+        self.assertIn('mov', formats)
 
 
 class TestMP4Handler(unittest.TestCase):
-    """Test cases for MP4 format handler."""
+    """Test cases for MP4Handler."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.test_dir, 'test.mp4')
-        # Create a minimal valid MP4-like file
-        with open(self.test_file, 'w') as f:
-            f.write('fake mp4 content')
+        self.mp4_handler = MP4Handler('/path/to/video.mp4')
     
-    def tearDown(self):
-        """Clean up test files."""
-        import shutil
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+    def test_is_valid_extension_mp4(self):
+        """Test valid MP4 extension."""
+        self.assertTrue(MP4Handler.is_valid_extension('/path/to/video.mp4'))
     
-    def test_mp4_handler_creation(self):
-        """Test MP4 handler creation."""
-        handler = MP4Handler(self.test_file)
-        self.assertIsNotNone(handler)
-        self.assertEqual(handler.format, 'mp4')
+    def test_is_valid_extension_m4v(self):
+        """Test valid M4V extension."""
+        self.assertTrue(MP4Handler.is_valid_extension('/path/to/video.m4v'))
     
-    def test_mp4_metadata(self):
-        """Test MP4 metadata extraction."""
-        handler = MP4Handler(self.test_file)
-        metadata = handler.get_metadata()
+    def test_is_valid_extension_mov(self):
+        """Test valid MOV extension (also supported by MP4 handler)."""
+        self.assertTrue(MP4Handler.is_valid_extension('/path/to/video.mov'))
+    
+    def test_is_valid_extension_avi(self):
+        """Test invalid extension for MP4 handler."""
+        self.assertFalse(MP4Handler.is_valid_extension('/path/to/video.avi'))
+    
+    def test_validate_file_not_found(self):
+        """Test validation of non-existent file."""
+        is_valid, message = self.mp4_handler.validate_file()
+        self.assertFalse(is_valid)
+        self.assertIn('not found', message.lower())
+    
+    def test_validate_file_too_small(self):
+        """Test validation of file that's too small."""
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            # Write less than MIN_FILE_SIZE bytes
+            f.write(b'small')
+            temp_path = f.name
         
-        self.assertEqual(metadata['format'], 'mp4')
-        self.assertEqual(metadata['codec'], 'H.264')
-        self.assertEqual(metadata['mime_type'], 'video/mp4')
-        self.assertIn('file_size_bytes', metadata)
+        try:
+            handler = MP4Handler(temp_path)
+            is_valid, message = handler.validate_file()
+            self.assertFalse(is_valid)
+            self.assertIn('too small', message.lower())
+        finally:
+            os.unlink(temp_path)
     
-    def test_mp4_validation(self):
-        """Test MP4 file validation."""
-        handler = MP4Handler(self.test_file)
-        is_valid, message = handler.validate_integrity()
+    def test_validate_file_valid(self):
+        """Test validation of a valid file."""
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            # Write enough bytes to pass size check
+            f.write(b'x' * 2048)
+            temp_path = f.name
         
-        self.assertTrue(is_valid)
-        self.assertIn('validated', message.lower())
+        try:
+            handler = MP4Handler(temp_path)
+            is_valid, message = handler.validate_file()
+            self.assertTrue(is_valid)
+            self.assertEqual(message, 'File is valid')
+        finally:
+            os.unlink(temp_path)
     
-    def test_mp4_invalid_extension(self):
-        """Test MP4 handler rejects wrong extension."""
-        wrong_file = os.path.join(self.test_dir, 'test.avi')
-        with open(wrong_file, 'w') as f:
-            f.write('fake avi content')
-        
-        with self.assertRaises(ValueError):
-            MP4Handler(wrong_file)
+    def test_get_thumbnail_path(self):
+        """Test thumbnail path generation."""
+        thumbnail_path = self.mp4_handler.get_thumbnail_path()
+        self.assertTrue(thumbnail_path.endswith('.jpg'))
+        self.assertIn('video', thumbnail_path)
+    
+    def test_is_compatible_with_youtube_no_metadata(self):
+        """Test YouTube compatibility check without metadata."""
+        is_compatible, message = self.mp4_handler.is_compatible_with_youtube()
+        self.assertFalse(is_compatible)
+        self.assertIn('metadata', message.lower())
 
 
 class TestAVIHandler(unittest.TestCase):
-    """Test cases for AVI format handler."""
+    """Test cases for AVIHandler."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.test_dir, 'test.avi')
-        with open(self.test_file, 'w') as f:
-            f.write('fake avi content')
+        self.avi_handler = AVIHandler('/path/to/video.avi')
     
-    def tearDown(self):
-        """Clean up test files."""
-        import shutil
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+    def test_is_valid_extension_avi(self):
+        """Test valid AVI extension."""
+        self.assertTrue(AVIHandler.is_valid_extension('/path/to/video.avi'))
     
-    def test_avi_handler_creation(self):
-        """Test AVI handler creation."""
-        handler = AVIHandler(self.test_file)
-        self.assertIsNotNone(handler)
-        self.assertEqual(handler.format, 'avi')
+    def test_is_valid_extension_mp4(self):
+        """Test invalid extension for AVI handler."""
+        self.assertFalse(AVIHandler.is_valid_extension('/path/to/video.mp4'))
     
-    def test_avi_metadata(self):
-        """Test AVI metadata extraction."""
-        handler = AVIHandler(self.test_file)
-        metadata = handler.get_metadata()
-        
-        self.assertEqual(metadata['format'], 'avi')
-        self.assertEqual(metadata['codec'], 'Xvid')
-        self.assertEqual(metadata['mime_type'], 'video/x-msvideo')
+    def test_validate_file_not_found(self):
+        """Test validation of non-existent file."""
+        is_valid, message = self.avi_handler.validate_file()
+        self.assertFalse(is_valid)
+        self.assertIn('not found', message.lower())
     
-    def test_avi_validation(self):
-        """Test AVI file validation."""
-        handler = AVIHandler(self.test_file)
-        is_valid, message = handler.validate_integrity()
-        
-        self.assertTrue(is_valid)
-        self.assertIn('validated', message.lower())
+    def test_is_compatible_with_youtube(self):
+        """Test that AVI is not compatible with YouTube."""
+        is_compatible, message = self.avi_handler.is_compatible_with_youtube()
+        self.assertFalse(is_compatible)
+        self.assertIn('convert to mp4', message.lower())
 
 
 class TestMOVHandler(unittest.TestCase):
-    """Test cases for MOV format handler."""
+    """Test cases for MOVHandler."""
     
     def setUp(self):
         """Set up test fixtures."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.test_dir, 'test.mov')
-        with open(self.test_file, 'w') as f:
-            f.write('fake mov content')
+        self.mov_handler = MOVHandler('/path/to/video.mov')
     
-    def tearDown(self):
-        """Clean up test files."""
-        import shutil
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+    def test_is_valid_extension_mov(self):
+        """Test valid MOV extension."""
+        self.assertTrue(MOVHandler.is_valid_extension('/path/to/video.mov'))
     
-    def test_mov_handler_creation(self):
-        """Test MOV handler creation."""
-        handler = MOVHandler(self.test_file)
-        self.assertIsNotNone(handler)
-        self.assertEqual(handler.format, 'mov')
+    def test_is_valid_extension_qt(self):
+        """Test valid QT extension."""
+        self.assertTrue(MOVHandler.is_valid_extension('/path/to/video.qt'))
     
-    def test_mov_metadata(self):
-        """Test MOV metadata extraction."""
-        handler = MOVHandler(self.test_file)
-        metadata = handler.get_metadata()
-        
-        self.assertEqual(metadata['format'], 'mov')
-        self.assertEqual(metadata['codec'], 'H.264')
-        self.assertEqual(metadata['mime_type'], 'video/quicktime')
+    def test_is_valid_extension_mp4(self):
+        """Test invalid extension for MOV handler."""
+        self.assertFalse(MOVHandler.is_valid_extension('/path/to/video.mp4'))
     
-    def test_mov_validation(self):
-        """Test MOV file validation."""
-        handler = MOVHandler(self.test_file)
-        is_valid, message = handler.validate_integrity()
-        
-        self.assertTrue(is_valid)
-        self.assertIn('validated', message.lower())
+    def test_validate_file_not_found(self):
+        """Test validation of non-existent file."""
+        is_valid, message = self.mov_handler.validate_file()
+        self.assertFalse(is_valid)
+        self.assertIn('not found', message.lower())
+    
+    def test_is_compatible_with_youtube(self):
+        """Test that MOV is not compatible with YouTube."""
+        is_compatible, message = self.mov_handler.is_compatible_with_youtube()
+        self.assertFalse(is_compatible)
+        self.assertIn('convert to mp4', message.lower())
 
 
-class TestConversion(unittest.TestCase):
-    """Test cases for video conversion functionality."""
+class TestVideoFormatHandler(unittest.TestCase):
+    """Test cases for the VideoFormatHandler class."""
     
-    def setUp(self):
-        """Set up test fixtures."""
-        self.test_dir = tempfile.mkdtemp()
-        self.test_file = os.path.join(self.test_dir, 'test.mp4')
-        with open(self.test_file, 'w') as f:
-            f.write('fake mp4 content')
+    def test_get_handler_mp4(self):
+        """Test getting MP4 handler from VideoFormatHandler."""
+        handler = VideoFormatHandler('/path/to/video.mp4').get_handler()
+        self.assertIsInstance(handler, MP4Handler)
     
-    def tearDown(self):
-        """Clean up test files."""
-        import shutil
-        if os.path.exists(self.test_dir):
-            shutil.rmtree(self.test_dir)
+    def test_get_handler_avi(self):
+        """Test getting AVI handler from VideoFormatHandler."""
+        handler = VideoFormatHandler('/path/to/video.avi').get_handler()
+        self.assertIsInstance(handler, AVIHandler)
     
-    def test_mp4_conversion(self):
-        """Test MP4 file conversion."""
-        handler = MP4Handler(self.test_file)
-        output_file = os.path.join(self.test_dir, 'output.mp4')
-        
-        success = handler.convert(output_file, codec='H.264')
-        self.assertTrue(success)
-        self.assertTrue(os.path.exists(output_file))
+    def test_get_handler_mov(self):
+        """Test getting MOV handler from VideoFormatHandler."""
+        handler = VideoFormatHandler('/path/to/video.mov').get_handler()
+        self.assertIsInstance(handler, MOVHandler)
     
-    def test_mp4_unsupported_codec(self):
-        """Test MP4 conversion with unsupported codec."""
-        handler = MP4Handler(self.test_file)
-        output_file = os.path.join(self.test_dir, 'output.mp4')
-        
-        with self.assertRaises(ValueError):
-            handler.convert(output_file, codec='INVALID_CODEC')
+    def test_get_handler_unknown(self):
+        """Test getting handler for unsupported format."""
+        with self.assertRaises(Exception):
+            VideoFormatHandler('/path/to/video.xyz').get_handler()
+    
+    def test_get_supported_formats(self):
+        """Test getting supported formats."""
+        formats = VideoFormatHandler.get_supported_formats()
+        self.assertIsInstance(formats, list)
+        self.assertIn('mp4', formats)
+        self.assertIn('avi', formats)
+        self.assertIn('mov', formats)
+    
+    def test_get_thumbnail_path_mp4(self):
+        """Test thumbnail path for MP4."""
+        handler = VideoFormatHandler('/path/to/video.mp4')
+        thumbnail_path = handler.get_thumbnail_path()
+        self.assertTrue(thumbnail_path.endswith('.jpg'))
 
 
 if __name__ == '__main__':

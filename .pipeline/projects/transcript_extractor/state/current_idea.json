@@ -1,9 +1,13 @@
 {
   "title": "[transcript extractor]",
   "description": "[transcript extractor from video and audio + summary tool. use fast whisperer or faster whisperer github or something.]",
-  "status": "phase_1_executing",
+  "status": "budget_exceeded",
   "total_phases": 1,
   "tasks_done": 0,
-  "tasks_total": 39,
-  "phase": 1
+  "tasks_total": 8,
+  "phase": 1,
+  "session_started_at": "2026-05-05T05:11:21.659790+00:00",
+  "started_at": "2026-05-05T09:29:12.386393+00:00",
+  "_slug": "transcript_extractor",
+  "budget_note": "Force-completed after 259 min (budget: 135 min for 1-phase project)"
 }

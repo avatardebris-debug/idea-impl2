@@ -1,0 +1,67 @@
+# Escalation workflow — handles escalated tickets
+name: escalation_flow
+version: "1.0"
+description: "Workflow for escalated tickets requiring executive attention"
+
+steps:
+  - id: step_1
+    type: action
+    action: classify_ticket
+    description: "Re-classify the escalated ticket"
+
+  - id: step_2
+    type: condition
+    condition:
+      field: priority_score
+      operator: ">="
+      value: 9
+    then: step_3a
+    else: step_3b
+
+  - id: step_3a
+    type: action
+    action: notify
+    description: "Notify executive team immediately"
+    params:
+      channels:
+        - slack
+        - email
+      recipients:
+        - escalation@company.com
+        - exec@company.com
+
+  - id: step_3b
+    type: action
+    action: notify
+    description: "Notify escalation team"
+    params:
+      channels:
+        - slack
+      recipients:
+        - escalation@company.com
+
+  - id: step_4
+    type: action
+    action: assign_team
+    description: "Assign to escalation team"
+    params:
+      team: escalation_team
+
+  - id: step_5
+    type: action
+    action: generate_draft
+    description: "Generate an executive-level draft response"
+    params:
+      template: escalation_response
+      tone: formal
+
+  - id: step_6
+    type: gate
+    gate_type: human_approval
+    description: "Executive approval required"
+    auto_approve_after_hours: 2
+
+  - id: step_7
+    type: action
+    action: send_response
+    description: "Send the approved response"

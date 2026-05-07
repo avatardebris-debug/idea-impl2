@@ -1,0 +1,14 @@
+{
+  "title": "[JSON Schema Profiler]",
+  "description": "Develop a CLI tool that scans JSON or Parquet datasets, infers schemas, detects anomalies, and outputs standardized validation rules.",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-06T01:49:53.738294+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6,
+  "session_started_at": "2026-05-05T23:02:45.644560+00:00",
+  "_slug": "json_schema_profiler",
+  "budget_note": "Force-completed after 168 min (budget: 90 min for 3-phase project)"
+}

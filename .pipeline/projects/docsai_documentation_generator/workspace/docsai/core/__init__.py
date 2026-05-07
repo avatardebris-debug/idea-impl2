@@ -1,0 +1,1 @@
+"""DocsAI core module."""

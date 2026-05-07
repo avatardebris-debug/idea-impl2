@@ -1,0 +1,21 @@
+# Market Strategy Backtester — Default Configuration
+
+data:
+  path: "examples/sample_data/sample_ohlcv.csv"
+  format: "ohlcv"
+
+strategy:
+  name: "sma_crossover"
+  params:
+    fast_window: 10
+    slow_window: 30
+
+monte_carlo:
+  n_simulations: 1000
+  seed: 42
+  method: "bootstrap"
+
+output:
+  results_dir: "results"
+  csv_export: true
+  text_report: true

@@ -1,0 +1,13 @@
+{
+  "name": "test",
+  "status": "active",
+  "priority": "high",
+  "category": "engineering",
+  "region": "us-east",
+  "level": "senior",
+  "department": "platform",
+  "team": "backend",
+  "role": "developer",
+  "level2": "staff",
+  "level3": "principal"
+}

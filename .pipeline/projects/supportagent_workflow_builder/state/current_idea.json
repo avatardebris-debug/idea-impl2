@@ -1,0 +1,14 @@
+{
+  "title": "[SupportAgent Workflow Builder]",
+  "description": "Design an agentic SOP execution system for automated customer support ticket routing, triage, and draft response generation.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-06T00:56:51.144668+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "session_started_at": "2026-05-06T00:19:49.447771+00:00",
+  "_slug": "supportagent_workflow_builder",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

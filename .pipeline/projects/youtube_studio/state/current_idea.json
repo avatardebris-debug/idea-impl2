@@ -1,9 +1,13 @@
 {
   "title": "[Youtube studio]",
   "description": "[multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]",
-  "status": "phase_1_executing",
+  "status": "budget_exceeded",
   "total_phases": 10,
   "tasks_done": 0,
-  "tasks_total": 0,
-  "phase": 1
+  "tasks_total": 8,
+  "phase": 1,
+  "session_started_at": "2026-05-05T14:15:24.649530+00:00",
+  "started_at": "2026-05-05T19:04:33.982820+00:00",
+  "_slug": "youtube_studio",
+  "budget_note": "Force-completed after 300 min (budget: 300 min for 10-phase project)"
 }

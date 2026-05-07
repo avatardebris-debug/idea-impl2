@@ -96,6 +96,18 @@ class OutputConfig:
     transcript_line_width: int = 80
 
 
+@dataclass
+class SEOConfig:
+    """Configuration for SEO-related settings"""
+    max_title_length: int = 100
+    max_description_length: int = 5000
+    max_tags: int = 15
+    max_tag_length: int = 500
+    default_priority: str = 'medium'
+    min_relevance_score: float = 0.5
+    keyword_density_target: float = 0.02
+
+
 class YouTubeStudioConfig:
     """
     Main configuration class for YouTube Studio.

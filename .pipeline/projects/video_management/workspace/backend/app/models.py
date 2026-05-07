@@ -30,6 +30,7 @@ class FieldTypeId(str, PyEnum):
     NUMBER = "number"
     URL = "url"
     TAGS = "tags"
+    OBJECT = "object"
 
 
 class VideoStatus(str, PyEnum):

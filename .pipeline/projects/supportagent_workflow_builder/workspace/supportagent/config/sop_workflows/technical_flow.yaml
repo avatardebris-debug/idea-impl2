@@ -1,0 +1,54 @@
+# Technical workflow — handles technical support tickets
+name: technical_flow
+version: "1.0"
+description: "Standard workflow for technical support tickets"
+
+steps:
+  - id: step_1
+    type: action
+    action: classify_ticket
+    description: "Classify the ticket"
+
+  - id: step_2
+    type: condition
+    condition:
+      field: category
+      operator: "=="
+      value: urgent
+    then: step_3a
+    else: step_3b
+
+  - id: step_3a
+    type: action
+    action: escalate
+    description: "Immediately escalate critical technical issues"
+    params:
+      target_team: escalation_team
+      reason: "critical_technical_issue"
+      notify_slack: true
+
+  - id: step_3b
+    type: action
+    action: assign_team
+    description: "Assign to technical team"
+    params:
+      team: technical_team
+
+  - id: step_4
+    type: action
+    action: generate_draft
+    description: "Generate a technical draft response"
+    params:
+      template: technical_response
+      tone: professional
+
+  - id: step_5
+    type: gate
+    gate_type: human_approval
+    description: "Technical review before sending"
+    auto_approve_after_hours: 12
+
+  - id: step_6
+    type: action
+    action: send_response
+    description: "Send the response"

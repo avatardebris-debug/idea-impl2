@@ -23,6 +23,41 @@ class TickerPanel:
     _background_color: Optional[tuple] = None
     _text_color: Optional[tuple] = None
 
+    def __init__(
+        self,
+        ticker: Ticker,
+        position: tuple = (0.0, 0.0, 0.0),
+        size: tuple = (1.0, 0.6, 0.05),
+        rotation: tuple = (0.0, 0.0, 0.0),
+        is_selected: bool = False,
+        is_highlighted: bool = False,
+        color: Optional[tuple] = None,
+        background_color: Optional[tuple] = None,
+        text_color: Optional[tuple] = None,
+    ) -> None:
+        """Initialize a ticker panel.
+
+        Args:
+            ticker: The ticker to display.
+            position: 3D position (x, y, z).
+            size: Panel dimensions (width, height, depth).
+            rotation: Rotation in degrees (x, y, z).
+            is_selected: Whether the panel is selected.
+            is_highlighted: Whether the panel is highlighted.
+            color: Custom display color (overrides ticker-based color).
+            background_color: Custom background color.
+            text_color: Custom text color.
+        """
+        self.ticker = ticker
+        self.position = position
+        self.size = size
+        self.rotation = rotation
+        self.is_selected = is_selected
+        self.is_highlighted = is_highlighted
+        self._color = color
+        self._background_color = background_color
+        self._text_color = text_color
+
     @property
     def color(self) -> tuple:
         """Get the display color for this panel."""

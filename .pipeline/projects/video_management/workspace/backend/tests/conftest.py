@@ -32,13 +32,18 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
-client = TestClient(app)
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────
 
+@pytest.fixture(scope="session")
+def test_client():
+    """Return the test client."""
+    with TestClient(app) as tc:
+        yield tc
+
+
 @pytest.fixture(autouse=True)
-def setup_and_teardown():
+def setup_and_teardown(test_client):
     """Create tables before each test and drop them after."""
     Base.metadata.create_all(bind=test_engine)
     yield
@@ -46,15 +51,8 @@ def setup_and_teardown():
 
 
 @pytest.fixture
-def test_client():
-    """Return the test client."""
-    return client
-
-
-@pytest.fixture
 def sample_table(test_client):
     """Create a default table via the API and return its table_id."""
-    # Create a test table
     response = test_client.post(
         "/api/tables",
         json={

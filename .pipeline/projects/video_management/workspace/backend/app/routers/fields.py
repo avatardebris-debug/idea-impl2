@@ -1,6 +1,8 @@
 """Custom field management API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -18,8 +20,13 @@ def _get_table(db: Session, table_id: str) -> TableMetadata:
     return table
 
 
-@router.get("/{table_id}/fields", response_model=list[FieldResponse])
-def list_fields(table_id: str, db: Session = Depends(get_db)):
+@router.get("/{table_id}/fields")
+def list_fields(
+    table_id: str,
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    db: Session = Depends(get_db),
+):
     """List all fields (built-in + custom) for a table."""
     table = _get_table(db, table_id)
 
@@ -133,7 +140,20 @@ def list_fields(table_id: str, db: Session = Depends(get_db)):
         if not f.is_deleted
     ]
 
-    return builtin_fields + custom_fields
+    all_fields = builtin_fields + custom_fields
+    total = len(all_fields)
+
+    # Apply pagination
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_items = all_fields[start:end]
+
+    return {
+        "items": paginated_items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
 
 
 @router.post("/{table_id}/fields", response_model=FieldResponse, status_code=201)
@@ -148,7 +168,7 @@ def add_field(table_id: str, field_data: FieldCreate, db: Session = Depends(get_
     ]
     if existing:
         raise HTTPException(
-            status_code=400,
+            status_code=409,
             detail=f"Field '{field_data.name}' already exists",
         )
 
@@ -167,10 +187,16 @@ def add_field(table_id: str, field_data: FieldCreate, db: Session = Depends(get_
 
 @router.delete("/{table_id}/fields/{field_id}", status_code=204)
 def remove_field(table_id: str, field_id: str, db: Session = Depends(get_db)):
-    """Soft-delete a custom field (data preserved, column hidden)."""
-    field = db.query(TableField).filter(TableField.id == field_id).first()
+    """Soft-delete a custom field."""
+    table = _get_table(db, table_id)
+
+    field = next((f for f in table.fields if f.id == field_id), None)
     if not field:
         raise HTTPException(status_code=404, detail="Field not found")
 
+    if field.name in ("id", "title", "description", "status", "tags", "publish_date", "thumbnail_url", "youtube_video_id", "custom_fields", "created_at", "updated_at"):
+        raise HTTPException(status_code=400, detail="Cannot delete built-in fields")
+
     field.is_deleted = True
     db.commit()
+    return None

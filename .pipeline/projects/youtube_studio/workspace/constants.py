@@ -70,6 +70,12 @@ DEFAULT_TEMPLATE_PATH = 'templates/default_template.json'
 TEMPLATE_VERSION = '1.0.0'
 """Current version of the template system"""
 
+TEMPLATE_EXTENSION = '.json'
+"""File extension for template files"""
+
+TEMPLATE_REQUIRED_FIELDS = ['title', 'description', 'tags']
+"""Required fields that every template must have"""
+
 TEMPLATE_VARIABLE_PREFIX = '{{'
 """Prefix for template variables (e.g., {{title}})"""
 
@@ -88,7 +94,7 @@ SEO_KEYWORD_WEIGHT = 0.7
 """Weight given to SEO keywords in title generation"""
 
 ENGAGEMENT_KEYWORD_WEIGHT = 0.3
-"""Weight given to engagement-focused keywords in title generation"
+"""Weight given to engagement-focused keywords in title generation"""
 
 # ==================== EXPORT CONSTANTS ====================
 

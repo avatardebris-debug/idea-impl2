@@ -691,8 +691,18 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
                 state = json.loads(project_state.read_text(encoding="utf-8"))
                 status = state.get("status", "?")
                 if status in ("complete", "budget_exceeded"):
-                    _seeded_this_session.add(title)
-                    continue
+                    # Locked projects with budget_exceeded get auto-reset and re-seeded
+                    if status == "budget_exceeded" and state.get("budget_lock"):
+                        resume_status = state.get("pre_budget_status", "phase_1_executing")
+                        state["status"] = resume_status
+                        state["budget_note"] = ""
+                        state["session_started_at"] = ""  # reset timer
+                        project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                        print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
+                        # Fall through to dep check + re-queue below
+                    else:
+                        _seeded_this_session.add(title)
+                        continue
 
                 # --- Dep check for already-in-progress projects ---
                 # If this project has deps that aren't done, put it in dep_waiting
@@ -1624,6 +1634,7 @@ def run_pipeline(
 
                         if _elapsed > _phase_budget and not _is_locked:
                             _proj_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
+                            idea_state["pre_budget_status"] = idea_state.get("status", "phase_1_executing")
                             idea_state["status"] = "budget_exceeded"
                             idea_state["budget_note"] = f"Force-completed after {_elapsed:.0f} min (budget: {_phase_budget} min for {_total_phases}-phase project)"
                             _proj_file.write_text(json.dumps(idea_state, indent=2), encoding="utf-8")

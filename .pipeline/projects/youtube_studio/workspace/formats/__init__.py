@@ -3,13 +3,9 @@
 from .mp4_handler import MP4Handler
 from .avi_handler import AVIHandler
 from .mov_handler import MOVHandler
-from .video_formats import VideoFormatHandler, VideoFormatError, FormatDetectionError
 
 __all__ = [
     'MP4Handler',
     'AVIHandler',
     'MOVHandler',
-    'VideoFormatHandler',
-    'VideoFormatError',
-    'FormatDetectionError',
 ]

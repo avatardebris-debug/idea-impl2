@@ -1,0 +1,9 @@
+{
+  "name": "Bob",
+  "address": {
+    "street": "123 Main St",
+    "city": "Springfield",
+    "zip": "62704"
+  },
+  "tags": ["admin", "user"]
+}

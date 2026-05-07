@@ -223,12 +223,7 @@ class MOVHandler:
         Returns:
             Tuple of (is_compatible, message)
         """
-        metadata = self.get_metadata()
-        
-        if not metadata:
-            return False, "Unable to extract metadata"
-        
-        # MOV is not directly supported by YouTube
+        # MOV is not directly supported by YouTube regardless of metadata
         return False, "MOV format is not directly supported by YouTube. Please convert to MP4 first."
     
     def get_thumbnail_path(self) -> str:

@@ -5,11 +5,11 @@ This module provides examples demonstrating how to use the YouTube Studio
 components for generating video metadata, transcripts, and templates.
 """
 
-from .title_generator import TitleGenerator
-from .thumbnail_generator import ThumbnailGenerator, ThumbnailStyle
-from .keyword_generator import KeywordGenerator, KeywordPriority
-from .transcript_builder import TranscriptBuilder, TranscriptFormat
-from .studio_orchestrator import StudioOrchestrator
+from title_generator import TitleGenerator
+from thumbnail_generator import ThumbnailGenerator, ThumbnailStyle
+from keyword_generator import KeywordGenerator, KeywordPriority
+from transcript_builder import TranscriptBuilder, TranscriptFormat
+from studio_orchestrator import StudioOrchestrator
 
 
 def example_title_generator():

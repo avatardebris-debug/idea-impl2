@@ -1,0 +1,6 @@
+# DocsAI Configuration
+output_format: yaml
+languages:
+  - python
+  - typescript
+output_path: ./docsai_output/api_spec.yaml

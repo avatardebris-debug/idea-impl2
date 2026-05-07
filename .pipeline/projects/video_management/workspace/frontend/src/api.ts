@@ -101,13 +101,20 @@ export const api = {
       page_size?: number;
       status?: string;
       search?: string;
-    }): Promise<PaginatedResponse<Video>> =>
-      request('/videos', {
+    }): Promise<PaginatedResponse<Video>> => {
+      const searchParams = new URLSearchParams();
+      if (params?.page) searchParams.set('page', String(params.page));
+      if (params?.page_size) searchParams.set('page_size', String(params.page_size));
+      if (params?.status) searchParams.set('status', params.status);
+      if (params?.search) searchParams.set('search', params.search);
+      const queryString = searchParams.toString();
+      return request(`/videos${queryString ? `?${queryString}` : ''}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-      }),
+      });
+    },
 
     get: (id: string): Promise<Video> =>
       request(`/videos/${id}`),

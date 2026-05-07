@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market_strategy_backtester"
+version = "0.1.0"
+description = "Monte Carlo backtesting engine for algorithmic trading strategies"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pyyaml",
+    "scipy",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+market-strategy-backtester = "market_strategy_backtester.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["market_strategy_backtester*"]

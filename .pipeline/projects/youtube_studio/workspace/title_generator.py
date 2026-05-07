@@ -10,7 +10,7 @@ from typing import List, Optional, Tuple, Dict
 from dataclasses import dataclass
 from datetime import datetime
 
-from .constants import (
+from constants import (
     MAX_TITLE_LENGTH,
     MIN_TITLE_LENGTH,
     SEO_KEYWORD_WEIGHT,

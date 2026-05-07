@@ -11,9 +11,9 @@ from typing import Dict, List, Optional, Tuple, Union
 from dataclasses import dataclass
 from enum import Enum
 
-from .formats.mp4_handler import MP4Handler, MP4Metadata
-from .formats.avi_handler import AVIHandler, AVIMetadata
-from .formats.mov_handler import MOVHandler, MOVMetadata
+from formats.mp4_handler import MP4Handler, MP4Metadata
+from formats.avi_handler import AVIHandler, AVIMetadata
+from formats.mov_handler import MOVHandler, MOVMetadata
 
 
 class VideoFormat(Enum):
@@ -267,14 +267,15 @@ class VideoFormatHandler:
         except Exception as e:
             return False, f"Compatibility check error: {str(e)}"
     
-    def get_supported_formats(self) -> List[str]:
+    @classmethod
+    def get_supported_formats(cls) -> List[str]:
         """
         Get list of supported video format extensions.
         
         Returns:
             List of supported format extensions
         """
-        return self.SUPPORTED_FORMATS.copy()
+        return cls.SUPPORTED_FORMATS.copy()
     
     def can_convert(self) -> bool:
         """
@@ -307,3 +308,89 @@ class VideoFormatHandler:
                 os.path.dirname(self.file_path) or '.',
                 f"{base_name}.jpg"
             )
+
+
+# ==== Convenience functions and factory ====
+
+
+def detect_video_format(file_path: str) -> Optional[str]:
+    """
+    Detect the video format from a file path.
+    
+    Args:
+        file_path: Path to the video file
+        
+    Returns:
+        Format string (e.g., 'mp4', 'avi', 'mov') or None if unsupported
+    """
+    ext = os.path.splitext(file_path)[1].lower().lstrip('.')
+    if ext in VideoFormatHandler.SUPPORTED_EXTENSIONS:
+        # Map aliases to canonical format names
+        if ext == 'm4v' or ext == 'm4a':
+            return 'mp4'
+        elif ext == 'qt':
+            return 'mov'
+        return ext
+    return None
+
+
+def create_handler(file_path: str) -> Optional[Union[MP4Handler, AVIHandler, MOVHandler]]:
+    """
+    Factory function to create the appropriate handler for a video file.
+    
+    Args:
+        file_path: Path to the video file
+        
+    Returns:
+        Handler instance or None if format is unsupported
+    """
+    ext = os.path.splitext(file_path)[1].lower().lstrip('.')
+    handler_class = VideoFormatHandler._FORMAT_HANDLERS.get(ext)
+    if handler_class:
+        return handler_class(file_path)
+    return None
+
+
+class FormatFactory:
+    """
+    Factory class for creating video format handlers.
+    
+    Provides a class-based factory interface for creating handlers
+    for different video formats.
+    """
+    
+    @staticmethod
+    def create(file_path: str) -> Optional[Union[MP4Handler, AVIHandler, MOVHandler]]:
+        """
+        Create a handler for the given file path.
+        
+        Args:
+            file_path: Path to the video file
+            
+        Returns:
+            Handler instance or None if format is unsupported
+        """
+        return create_handler(file_path)
+    
+    @staticmethod
+    def detect(file_path: str) -> Optional[str]:
+        """
+        Detect the format of a video file.
+        
+        Args:
+            file_path: Path to the video file
+            
+        Returns:
+            Format string or None if unsupported
+        """
+        return detect_video_format(file_path)
+    
+    @staticmethod
+    def get_supported_formats() -> List[str]:
+        """
+        Get list of supported video format extensions.
+        
+        Returns:
+            List of supported format extensions
+        """
+        return VideoFormatHandler.SUPPORTED_FORMATS.copy()

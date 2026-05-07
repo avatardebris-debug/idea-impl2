@@ -1,0 +1,114 @@
+# ML category prototypes for cosine similarity classification
+# Each category has a set of representative keywords.
+
+categories:
+  urgent:
+    keywords:
+      - down
+      - outage
+      - emergency
+      - critical
+      - urgent
+      - immediate
+      - production
+      - live
+      - service
+      - unavailable
+      - error
+      - crash
+      - fail
+      - broken
+      - stop
+      - halt
+      - blocked
+      - cannot
+      - unable
+      - urgent
+  billing:
+    keywords:
+      - charge
+      - payment
+      - invoice
+      - receipt
+      - refund
+      - subscription
+      - billing
+      - credit
+      - card
+      - bank
+      - amount
+      - fee
+      - cost
+      - price
+      - overcharge
+      - duplicate
+      - missing
+      - incorrect
+      - dispute
+      - transaction
+  technical:
+    keywords:
+      - bug
+      - error
+      - issue
+      - problem
+      - fix
+      - solution
+      - code
+      - api
+      - integration
+      - setup
+      - configuration
+      - install
+      - deploy
+      - server
+      - database
+      - network
+      - performance
+      - slow
+      - timeout
+      - exception
+  account:
+    keywords:
+      - account
+      - login
+      - password
+      - reset
+      - profile
+      - settings
+      - permissions
+      - access
+      - user
+      - admin
+      - role
+      - privilege
+      - security
+      - verification
+      - two-factor
+      - mfa
+      - authentication
+      - authorization
+      - credential
+      - token
+  general:
+    keywords:
+      - question
+      - inquiry
+      - information
+      - help
+      - support
+      - guide
+      - tutorial
+      - how
+      - what
+      - when
+      - where
+      - who
+      - why
+      - can
+      - could
+      - would
+      - please
+      - thank
+      - appreciate
+      - feedback

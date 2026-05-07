@@ -1,0 +1,5 @@
+sec_importer
+pydantic
+pyyaml
+requests
+beautifulsoup4

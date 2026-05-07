@@ -1,0 +1,76 @@
+# SOP router configuration
+# Maps categories to teams, escalation rules, and SLA targets.
+
+teams:
+  billing_team:
+    label: "Billing & Payments"
+    email: "billing@company.com"
+    slack_channel: "#billing-support"
+    categories:
+      - billing
+
+  technical_team:
+    label: "Technical Support"
+    email: "tech@company.com"
+    slack_channel: "#tech-support"
+    categories:
+      - technical
+
+  account_team:
+    label: "Account Management"
+    email: "accounts@company.com"
+    slack_channel: "#account-support"
+    categories:
+      - account
+
+  escalation_team:
+    label: "Escalation & Executive"
+    email: "escalation@company.com"
+    slack_channel: "#escalations"
+    categories:
+      - urgent
+
+  general_team:
+    label: "General Support"
+    email: "general@company.com"
+    slack_channel: "#general-support"
+    categories:
+      - general
+
+escalation_rules:
+  - priority_threshold: 8
+    action: "notify_escalation_team"
+    notify_slack: true
+    notify_email: true
+    target: "escalation_team"
+
+  - priority_threshold: 5
+    categories:
+      - urgent
+    action: "notify_team_lead"
+    notify_slack: true
+    target: "technical_team"
+
+sla:
+  urgent:
+    - priority_max: 10
+      sla_hours: 1
+    - priority_max: 5
+      sla_hours: 4
+  high:
+    - priority_max: 10
+      sla_hours: 4
+  medium:
+    - priority_max: 10
+      sla_hours: 24
+  low:
+    - priority_max: 10
+      sla_hours: 72
+
+routing:
+  priority_routing:
+    9-10: "escalation_team"
+    7-8: "technical_team"
+    5-6: "billing_team"
+    3-4: "general_team"
+    1-2: "general_team"
