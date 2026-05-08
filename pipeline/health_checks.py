@@ -35,8 +35,11 @@ _INFRA_FILES = {
 _INFRA_DIRS = {
     "pipeline", ".pipeline", "_archive", "extras", ".git",
     "master ideas backup sort", "__pycache__", ".ipynb_checkpoints",
-    "node_modules", ".pytest_cache",
+    "node_modules", ".pytest_cache", "build", "dist",
 }
+
+# Build artifacts that should be deleted (not rescued) when found at project root
+_BUILD_ARTIFACT_PATTERNS = {".egg-info", ".dist-info"}
 
 
 class HealthCheckResult:
@@ -174,7 +177,21 @@ def check_stray_files(
             continue
         if d.name.startswith("."):
             continue
-        # Check if this dir name matches any project slug
+
+        # Pattern F1: build artifacts (.egg-info, .dist-info) — just delete them
+        if any(d.name.endswith(pat) for pat in _BUILD_ARTIFACT_PATTERNS):
+            try:
+                shutil.rmtree(str(d))
+                results.append(HealthCheckResult(
+                    "build_artifact", "info",
+                    f"Removed stray build artifact {d.name}/ from project root",
+                    auto_fixed=True,
+                ))
+            except OSError:
+                pass
+            continue
+
+        # Pattern F2: check if dir name matches any project slug
         potential_proj = pipeline_dir / "projects" / d.name
         if potential_proj.exists():
             ws = potential_proj / "workspace"
