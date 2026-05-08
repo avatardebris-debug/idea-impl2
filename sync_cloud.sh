@@ -105,6 +105,54 @@ else
 fi
 
 echo ""
+echo "=== Rescuing stray src/ and tests/ from project root ==="
+# The LLM frequently writes to /workspace/idea impl/src/ instead of
+# .pipeline/projects/<slug>/workspace/src/. Find the active project
+# and move files there.
+cd "$PROJ_ROOT"
+for stray_name in src tests test; do
+    stray_dir="$PROJ_ROOT/$stray_name"
+    [ -d "$stray_dir" ] || continue
+
+    # Find the most recently modified project to assign these files to
+    active_slug=""
+    active_mtime=0
+    for proj in "$PIPELINE_DIR"/projects/*/state/current_idea.json; do
+        [ -f "$proj" ] || continue
+        slug=$(basename "$(dirname "$(dirname "$proj")")")
+        st=$(python3 -c "import json; print(json.load(open('$proj')).get('status',''))" 2>/dev/null)
+        case "$st" in
+            phase_*) ;;  # active — check mtime
+            *) continue ;;
+        esac
+        mtime=$(stat -c %Y "$proj" 2>/dev/null || echo 0)
+        if [ "$mtime" -gt "$active_mtime" ]; then
+            active_mtime=$mtime
+            active_slug=$slug
+        fi
+    done
+
+    if [ -z "$active_slug" ]; then
+        echo "  ⚠  Stray $stray_name/ found but no active project to assign it to"
+        continue
+    fi
+
+    target_ws="$PIPELINE_DIR/projects/$active_slug/workspace/$stray_name"
+    mkdir -p "$target_ws"
+    moved=0
+    while IFS= read -r f; do
+        rel="${f#"$stray_dir/"}"
+        dst="$target_ws/$rel"
+        mkdir -p "$(dirname "$dst")"
+        if [ ! -f "$dst" ]; then
+            cp "$f" "$dst"
+            moved=$((moved + 1))
+        fi
+    done < <(find "$stray_dir" -type f ! -path "*/__pycache__/*" ! -path "*/.pytest_cache/*")
+    echo "  Rescued $moved file(s) from $stray_name/ → $active_slug"
+    rm -rf "$stray_dir"
+done
+echo ""
 echo "=== Clearing queue messages ==="
 cd "$PROJ_ROOT"
 python -c "

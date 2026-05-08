@@ -143,31 +143,80 @@ class ExecutorAgent(AgentProcess):
         result = self.call_agent(task=task_prompt, verbose=False)
 
         # --- Post-run stray file rescue ---
-        # On cloud instances the root dir is /workspace/, so the LLM may create
-        # files at /workspace/workspace/<project>/ instead of the correct
-        # .pipeline/projects/<slug>/workspace/<project>/.
-        # Detect and move these files into the real workspace before reporting.
+        # The LLM frequently writes files to wrong locations. We rescue them
+        # into the correct workspace BEFORE reporting results to the validator.
         import shutil as _shutil
-        _stray_ws = workspace / "workspace"  # double-nesting: ws/workspace/
-        if _stray_ws.exists() and _stray_ws.is_dir():
-            _moved = 0
-            for _src in list(_stray_ws.rglob("*")):
-                if _src.is_file():
-                    _rel = _src.relative_to(_stray_ws)
-                    _dst = workspace / _rel
-                    _dst.parent.mkdir(parents=True, exist_ok=True)
-                    if not _dst.exists():
-                        _shutil.copy2(str(_src), str(_dst))
-                        _moved += 1
-            try:
-                _shutil.rmtree(str(_stray_ws))
-            except OSError:
-                pass
-            if _moved:
+        _rescued_total = 0
+
+        def _rescue_dir(src_dir: pathlib.Path, dest_base: pathlib.Path, label: str) -> int:
+            """Move files from src_dir into dest_base, preserving relative paths."""
+            if not src_dir.exists() or not src_dir.is_dir():
+                return 0
+            moved = 0
+            for f in list(src_dir.rglob("*")):
+                if f.is_file() and not f.name.startswith("."):
+                    rel = f.relative_to(src_dir)
+                    dst = dest_base / rel
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    if not dst.exists():
+                        _shutil.copy2(str(f), str(dst))
+                        moved += 1
+                    elif f.stat().st_mtime > dst.stat().st_mtime:
+                        _shutil.copy2(str(f), str(dst))
+                        moved += 1
+            if moved:
+                try:
+                    _shutil.rmtree(str(src_dir))
+                except OSError:
+                    pass
                 import logging as _log
                 _log.getLogger(__name__).warning(
-                    "[executor] Rescued %d file(s) from workspace/workspace/ double-nesting", _moved
+                    "[executor] Rescued %d file(s) from %s", moved, label
                 )
+            return moved
+
+        # Pattern 1: workspace/workspace/ double-nesting
+        _rescued_total += _rescue_dir(workspace / "workspace", workspace, "workspace/workspace/")
+
+        # Pattern 2: src/ and tests/ at project root (very common LLM mistake)
+        _project_root = self._run_dir
+        for _stray_name in ("src", "tests", "test"):
+            _stray_dir = _project_root / _stray_name
+            if _stray_dir.exists() and _stray_dir.is_dir():
+                # Only rescue if files appeared DURING this run (check mtime)
+                _recent = any(
+                    f.stat().st_mtime > (result.started_at if hasattr(result, 'started_at') else 0)
+                    for f in _stray_dir.rglob("*") if f.is_file()
+                ) if hasattr(result, 'started_at') else True
+                if _recent:
+                    _rescued_total += _rescue_dir(_stray_dir, workspace / _stray_name, f"root {_stray_name}/")
+
+        # Pattern 3: slug-named directory at project root
+        _slug_at_root = _project_root / idea_slug
+        if _slug_at_root.exists() and _slug_at_root.is_dir():
+            _rescued_total += _rescue_dir(_slug_at_root, workspace, f"root {idea_slug}/")
+
+        # Pattern 4: loose .py files at project root (not part of pipeline infra)
+        _infra_files = {
+            "agent.py", "extract.py", "fix_indent.py", "fix_missing_plans.py",
+            "fix_stuck_tasks.py", "governance.py", "setup.py",
+        }
+        for _f in _project_root.glob("*.py"):
+            if _f.name not in _infra_files and _f.name not in before_files:
+                _dst = workspace / _f.name
+                if not _dst.exists():
+                    _dst.parent.mkdir(parents=True, exist_ok=True)
+                    _shutil.copy2(str(_f), str(_dst))
+                    _rescued_total += 1
+                    import logging as _log
+                    _log.getLogger(__name__).warning(
+                        "[executor] Rescued loose file %s from project root", _f.name
+                    )
+
+        # Pattern 5: /workspace/workspace/<slug>/ (cloud double-nesting)
+        _cloud_stray = pathlib.Path("/workspace/workspace") / idea_slug
+        if _cloud_stray.exists() and _cloud_stray.is_dir():
+            _rescued_total += _rescue_dir(_cloud_stray, workspace, f"/workspace/workspace/{idea_slug}/")
 
         # Only report files created/changed during THIS call
         after_files = (
