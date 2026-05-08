@@ -66,8 +66,8 @@ class PhasePlannerAgent(AgentProcess):
         # --- Validate tasks.md was written ---
         tasks_content = self.read_state_file(tasks_path)
 
-        # Guardrail: cap at MAX_TASKS_PER_PHASE
         MAX_TASKS_PER_PHASE = 8
+        MIN_TASKS_PER_PHASE = 2
         import re as _re
         import logging
         logger = logging.getLogger(__name__)
@@ -75,16 +75,110 @@ class PhasePlannerAgent(AgentProcess):
         if tasks_content:
             lines = tasks_content.split("\n")
             task_indices = [i for i, l in enumerate(lines) if l.strip().startswith("- [ ]")]
-            if len(task_indices) > MAX_TASKS_PER_PHASE:
+
+            # --- Single-task guard (Change D) ---
+            # <2 tasks is almost always a formatting error (LLM output the
+            # whole phase as one giant task). Re-prompt with specific correction.
+            if len(task_indices) < MIN_TASKS_PER_PHASE:
                 logger.warning(
-                    "[phase_planner] Phase %d has %d tasks (limit %d) — truncating",
+                    "[phase_planner] Phase %d has only %d task(s) — likely formatting error, re-prompting",
+                    phase_num, len(task_indices),
+                )
+                retry_result = self.call_agent(
+                    task=(
+                        f"Your task list only has {len(task_indices)} task(s). "
+                        f"This is almost certainly a formatting error.\n\n"
+                        f"Re-read the phase spec below and write 3-8 DISCRETE tasks.\n"
+                        f"Each task MUST start with `- [ ] Task N:` on its own line.\n\n"
+                        f"## Phase Spec\n{phase_spec[:2000]}\n\n"
+                        f"Write ALL tasks to `{tasks_full_path}`. Say DONE when written."
+                    ),
+                    verbose=False,
+                )
+                tasks_content = self.read_state_file(tasks_path)
+                if tasks_content:
+                    lines = tasks_content.split("\n")
+                    task_indices = [i for i, l in enumerate(lines) if l.strip().startswith("- [ ]")]
+                # If still <2, fallback generator will handle it below
+
+            # --- Overflow handling (Change A) ---
+            # Instead of silently trimming, ask the planner to choose how to handle >8 tasks.
+            if len(task_indices) > MAX_TASKS_PER_PHASE:
+                logger.info(
+                    "[phase_planner] Phase %d has %d tasks (limit %d) — asking planner to choose",
                     phase_num, len(task_indices), MAX_TASKS_PER_PHASE,
                 )
-                cut_at = task_indices[MAX_TASKS_PER_PHASE]
-                truncated = "\n".join(lines[:cut_at])
-                truncated += f"\n\n<!-- {len(task_indices) - MAX_TASKS_PER_PHASE} tasks removed by guardrail (max {MAX_TASKS_PER_PHASE} per phase) -->\n"
-                self.write_state_file(tasks_path, truncated)
-                tasks_content = truncated
+                overflow_result = self.call_agent(
+                    task=(
+                        f"You planned {len(task_indices)} tasks but the executor handles "
+                        f"max {MAX_TASKS_PER_PHASE} per batch.\n\n"
+                        f"Choose ONE approach:\n"
+                        f"  A) RESTRUCTURE — Rewrite as <={MAX_TASKS_PER_PHASE} tasks by merging related work\n"
+                        f"  B) SPLIT — First {MAX_TASKS_PER_PHASE} = batch 1, rest = batch 2 "
+                        f"(each batch must be independently validatable)\n"
+                        f"  D) TRIM — Tasks {MAX_TASKS_PER_PHASE + 1}+ are nice-to-haves; drop them\n\n"
+                        f"Reply with JUST the letter (A, B, or D) on the first line, "
+                        f"then a brief reason.\n"
+                        f"If you choose A, rewrite the task list to `{tasks_full_path}` "
+                        f"with <={MAX_TASKS_PER_PHASE} tasks and say DONE."
+                    ),
+                    verbose=False,
+                )
+
+                # Parse the planner's choice
+                choice = "B"  # default to split
+                answer = (overflow_result.answer or "").strip()
+                for line in answer.split("\n"):
+                    line = line.strip().upper()
+                    if line and line[0] in ("A", "B", "D"):
+                        choice = line[0]
+                        break
+
+                logger.info("[phase_planner] Planner chose option %s for overflow", choice)
+
+                if choice == "A":
+                    # Planner should have rewritten tasks.md — re-read
+                    tasks_content = self.read_state_file(tasks_path)
+                    if tasks_content:
+                        lines = tasks_content.split("\n")
+                        task_indices = [i for i, l in enumerate(lines) if l.strip().startswith("- [ ]")]
+                        if len(task_indices) > MAX_TASKS_PER_PHASE:
+                            # Restructure didn't reduce enough — fall through to split
+                            logger.warning("[phase_planner] Restructure still has %d tasks — falling back to split", len(task_indices))
+                            choice = "B"
+
+                if choice == "B":
+                    # Split: keep first 8, save rest as overflow
+                    cut_at = task_indices[MAX_TASKS_PER_PHASE]
+                    batch_1 = "\n".join(lines[:cut_at])
+                    overflow_lines = lines[cut_at:]
+                    overflow_count = len(task_indices) - MAX_TASKS_PER_PHASE
+
+                    # Write batch 1 to main tasks.md
+                    batch_1 += f"\n\n<!-- {overflow_count} overflow task(s) saved to phase_{phase_num}_overflow/tasks.md -->\n"
+                    self.write_state_file(tasks_path, batch_1)
+                    tasks_content = batch_1
+
+                    # Write overflow to separate file
+                    overflow_path = f"phases/phase_{phase_num}_overflow/tasks.md"
+                    overflow_header = f"# Phase {phase_num} Overflow Tasks (batch 2)\n\n"
+                    # Re-number tasks starting from 1
+                    overflow_body = "\n".join(overflow_lines).strip()
+                    self.write_state_file(overflow_path, overflow_header + overflow_body)
+
+                    logger.info(
+                        "[phase_planner] Split phase %d: %d tasks in batch 1, %d in overflow",
+                        phase_num, MAX_TASKS_PER_PHASE, overflow_count,
+                    )
+
+                elif choice == "D":
+                    # Explicit trim (same as old behavior, but now intentional)
+                    cut_at = task_indices[MAX_TASKS_PER_PHASE]
+                    trimmed = "\n".join(lines[:cut_at])
+                    trimmed += f"\n\n<!-- {len(task_indices) - MAX_TASKS_PER_PHASE} tasks trimmed by planner choice (option D) -->\n"
+                    self.write_state_file(tasks_path, trimmed)
+                    tasks_content = trimmed
+
         else:
             # LLM failed to write tasks.md — generate fallback from spec
             logger.warning("[phase_planner] LLM did not write tasks.md — generating fallback from spec")
@@ -98,6 +192,7 @@ class PhasePlannerAgent(AgentProcess):
             logger.warning("[phase_planner] No checkboxes in tasks — using nuclear fallback")
             tasks_content = self._generate_fallback_tasks(phase_num, "", "")
             self.write_state_file(tasks_path, tasks_content)
+
 
         # Write phase spec for reference
         self.write_state_file(f"phases/phase_{phase_num}/spec.md", phase_spec or master_plan[:2000])

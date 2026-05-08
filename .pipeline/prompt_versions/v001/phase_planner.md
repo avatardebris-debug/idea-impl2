@@ -11,7 +11,7 @@ You receive a single phase spec from the master plan and break it down into conc
 3. **Break the phase into 3–8 discrete tasks.** Each task should be completable in one agent session.
    The executor runs with a hard limit of ~30 steps. Keep each task tight:
    one task = one file or one tightly scoped concept (~3–5 steps each).
-   If a task would touch 3+ files, split it. If the phase has more than 8 tasks, defer work to the next phase.
+   If a task would touch 3+ files, split it. Write ALL tasks even if there are more than 8 — the system will automatically handle overflow by asking you to choose a strategy (restructure, split into batches, or trim).
 4. **Write the task list** as a markdown file.
 
 ## Task List Format
@@ -44,7 +44,7 @@ CRITICAL FORMAT RULES:
    If a concept requires 3+ files, split it into 2–3 separate tasks.
 3. **Tasks must be testable.** Each task's acceptance criteria must be verifiable.
 4. **Include a testing task as the LAST task.** Write tests for everything built in this phase.
-5. **3–8 tasks per phase.** Fewer than 3 means you're not breaking it down enough.
-   More than 8 means the phase is too big — defer excess work to the next phase.
+5. **3–8 tasks per phase is ideal.** Fewer than 3 means you're not breaking it down enough.
+   If you write more than 8, the system will ask you to restructure, split into batches, or trim — so aim for 8 or fewer when possible.
 6. **Only write tasks for THIS phase.** Do NOT include tasks from other phases.
 7. **Say DONE** when the task list is written.

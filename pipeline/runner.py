@@ -949,26 +949,18 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
             phase_num  = int(phase_match.group(1))
             phase_step = phase_match.group(2)
 
-            # --- Retroactive task guardrail ---
-            # Trim oversized task files for projects created before the guardrail.
-            MAX_TASKS = 8
+            # --- Retroactive format normalization ---
+            # Normalize task formatting for backward compatibility (## Task N: → - [ ] Task N:)
+            # NOTE: no longer trims oversized tasks — the phase_planner handles overflow
+            # with the planner-chooses system (restructure/split/trim).
             tasks_file = project_dir / f"phases/phase_{phase_num}/tasks.md"
             if tasks_file.exists():
                 try:
                     from pipeline.agent_process import AgentProcess
-                    AgentProcess.normalize_tasks_file(tasks_file)  # ## Task N: -> - [ ] Task N:
-                    raw = tasks_file.read_text(encoding="utf-8")
-                    scoped = AgentProcess._extract_phase_tasks(raw, phase_num)
-                    lines = scoped.split("\n")
-                    task_indices = [i for i, l in enumerate(lines) if l.strip().startswith("- [ ]") or l.strip().startswith("- [x]")]
-                    if len(task_indices) > MAX_TASKS:
-                        cut_at = task_indices[MAX_TASKS]
-                        trimmed = "\n".join(lines[:cut_at])
-                        trimmed += f"\n\n<!-- {len(task_indices) - MAX_TASKS} tasks removed by retroactive guardrail -->\n"
-                        tasks_file.write_text(trimmed, encoding="utf-8")
-                        print(f"  ✂️  Trimmed '{title}' phase {phase_num}: {len(task_indices)} → {MAX_TASKS} tasks")
+                    AgentProcess.normalize_tasks_file(tasks_file)
                 except Exception:
                     pass
+
 
         # Always refresh started_at when re-queuing — budget is per-session,
         # not total project lifetime. Without this, a manually-reset project
@@ -1322,7 +1314,48 @@ def _advance_phase(
     completed_phase: int,
     slug: str,
 ) -> bool:
-    """Advance to next phase if one exists. Returns True if advanced."""
+    """Advance to next phase if one exists. Returns True if advanced.
+
+    Checks for overflow tasks first — if phase N had >8 tasks split into
+    batches, the overflow runs before advancing to phase N+1.
+    """
+    # --- Overflow check: run batch 2 before advancing ---
+    overflow_tasks_path = project_dir / f"phases/phase_{completed_phase}_overflow/tasks.md"
+    overflow_done_marker = project_dir / f"phases/phase_{completed_phase}_overflow/.completed"
+    if overflow_tasks_path.exists() and not overflow_done_marker.exists():
+        # Overflow tasks exist and haven't been completed yet — queue them
+        workspace = project_dir / "workspace"
+        state["status"] = f"phase_{completed_phase}_executing"
+        state.pop("review_result", None)
+        _write_state_dict(project_dir, state)
+
+        # Mark that we're in overflow mode so we don't loop
+        overflow_done_marker.parent.mkdir(parents=True, exist_ok=True)
+
+        bus.send(Message.create(
+            from_agent="runner",
+            to_agent="executor",
+            type="task",
+            payload={
+                "phase": completed_phase,
+                "tasks_path": f"phases/phase_{completed_phase}_overflow/tasks.md",
+                "workspace_path": str(workspace),
+                "idea_slug": slug,
+                "is_overflow": True,
+            },
+        ))
+        title = state.get("title", slug)
+        print(f"  📦 '{title}' phase {completed_phase} overflow: queuing batch 2 tasks")
+        return True
+
+    # If overflow was just completed, mark it and continue to next phase
+    if overflow_done_marker.exists():
+        # Mark overflow as done for this phase
+        try:
+            overflow_done_marker.write_text("completed", encoding="utf-8")
+        except Exception:
+            pass
+
     next_phase = completed_phase + 1
 
     # --- Primary check: master_plan.md has a ## Phase N heading ---

@@ -46,9 +46,29 @@ class ReviewerAgent(AgentProcess):
         shared_libs_path = str(self._run_dir / ".pipeline" / "shared_libs")
         reusable_tools_path = str(self._run_dir / ".pipeline" / "state" / "reusable_tools.md")
 
+        # Read broader project context for quality review
+        master_plan = self.read_state_file("state/master_plan.md")
+        phase_spec = self.read_state_file(f"phases/phase_{phase_num}/spec.md")
+        overflow_tasks = self.read_state_file(f"phases/phase_{phase_num}_overflow/tasks.md")
+
+        # Build context sections
+        project_context = ""
+        if master_plan:
+            project_context += f"## Project Master Plan (full vision)\n{master_plan[:1500]}\n\n"
+        if phase_spec:
+            project_context += f"## This Phase's Spec\n{phase_spec[:1000]}\n\n"
+        if overflow_tasks:
+            project_context += (
+                f"## Overflow Tasks (batch 2 — runs after this batch validates)\n"
+                f"{overflow_tasks[:1000]}\n\n"
+                f"⚠️ The current code must work INDEPENDENTLY of these overflow tasks.\n"
+                f"If batch 1 code depends on something only in overflow, flag it as a blocking bug.\n\n"
+            )
+
         task_prompt = (
             f"You are reviewing Phase {phase_num} code.\n\n"
-            f"## Task Spec\n{tasks_content}\n\n"
+            + project_context
+            + f"## Task Spec\n{tasks_content}\n\n"
             f"## Validation Report\n{validation_content[:2000]}\n\n"
             f"## Workspace\n"
             f"Code is in: {workspace_path}\n"
@@ -56,7 +76,9 @@ class ReviewerAgent(AgentProcess):
             f"## Your Job\n"
             f"1. Read EVERY code file in {workspace_path}.\n"
             f"2. Review each file line by line.\n"
-            f"3. Write your structured review to `{review_full_path}` using EXACTLY\n"
+            f"3. Check: does this code align with the master plan's architecture?\n"
+            f"4. If overflow tasks exist: can this batch run and validate WITHOUT them?\n"
+            f"5. Write your structured review to `{review_full_path}` using EXACTLY\n"
             f"   these section headings (in this order):\n\n"
             f"   ### What's Good\n"
             f"   (bullet list of things working correctly)\n\n"
@@ -70,15 +92,16 @@ class ReviewerAgent(AgentProcess):
             f"   reused by other projects — e.g. HTTP client wrapper, PDF parser, auth helper)\n\n"
             f"   ## Verdict\n"
             f"   PASS or FAIL with one-line reason\n\n"
-            f"4. A phase PASSES if '## Blocking Bugs' contains only 'None' or zero bullets.\n"
-            f"5. If the verdict is PASS and '## Reusable Components' lists anything:\n"
+            f"6. A phase PASSES if '## Blocking Bugs' contains only 'None' or zero bullets.\n"
+            f"7. If the verdict is PASS and '## Reusable Components' lists anything:\n"
             f"   a. For each reusable component, copy the relevant file(s) to a subfolder:\n"
             f"      `{shared_libs_path}/<component_name>/`\n"
             f"   b. Append a one-line entry to `{reusable_tools_path}`:\n"
             f"      `- <component_name>: <what it does> (source: {workspace_path})`\n"
             f"   Only copy self-contained, general-purpose code — not project-specific logic.\n"
-            f"6. Say DONE.\n"
+            f"8. Say DONE.\n"
         )
+
 
         result = self.call_agent(task=task_prompt, verbose=False)
 

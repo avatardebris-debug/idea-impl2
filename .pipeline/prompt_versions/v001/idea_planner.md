@@ -47,8 +47,8 @@ Write your output to `.pipeline/state/master_plan.md`:
 
 ## Rules
 1. **Phase 1 = complete working MVP.** It must be fully functional and testable on its own — not scaffolding, not partial. If the idea is a CLI tool, Phase 1 ships the whole CLI tool.
-2. **2 phases max for simple tools** (CLI scripts, single-file utilities, data converters). Only use 3 phases for dashboards/web apps/multi-component systems.
-3. **Never more than 3 phases total.** If you feel you need more, you are over-engineering. Collapse them.
+2. **2-3 phases for simple tools** (CLI scripts, single-file utilities, data converters). Use 4-5 phases for complex multi-subsystem projects (web apps, multi-component pipelines, systems with external integrations).
+3. **Never more than 5 phases total.** If you feel you need more, the idea should be decomposed into separate linked projects using `requires:` tags in the master ideas list. Example: instead of one 7-phase "SEC Analytics Suite", create "SEC Importer" (3 phases) and "SEC Analyzer (requires: sec_importer)" (3 phases).
 4. **Each phase must be independently testable.** After Phase N completes, the system should work end-to-end (not just partially).
 5. **Dependencies must be explicit.** If Phase 2 requires Phase 1, say so.
 6. **Be concrete.** "Build the frontend" is bad. "Create a Flask app with routes for /, /api/data, and /search" is good.
