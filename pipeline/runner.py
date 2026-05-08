@@ -1609,6 +1609,29 @@ def run_pipeline(
                     if compacted > 0:
                         print(f"  🧹 Compacted {compacted} stale messages from queues")
 
+                # --- Deterministic self-healing checks (every 5th cycle ≈ 5 min) ---
+                # Pure Python, no LLM calls. Catches and auto-fixes:
+                #   - stray files (src/, tests/ at root)
+                #   - missing __init__.py
+                #   - state inconsistencies
+                #   - import issues
+                if _status_count > 0 and _status_count % 5 == 0:
+                    try:
+                        from pipeline.health_checks import run_all_checks, write_health_report
+                        _active_for_health = _get_active_idea_state(PIPELINE_DIR)
+                        _health_slug = _active_for_health.get("_slug", "")
+                        hc_results = run_all_checks(
+                            PROJECT_ROOT, PIPELINE_DIR, _health_slug,
+                        )
+                        if hc_results:
+                            fixes = sum(1 for r in hc_results if r.auto_fixed)
+                            issues = len(hc_results) - fixes
+                            if fixes:
+                                print(f"  🩺 Health check: {fixes} auto-fixed, {issues} reported")
+                            write_health_report(hc_results, PIPELINE_DIR)
+                    except Exception as _hc_err:
+                        logger.debug("[health] Check failed: %s", _hc_err)
+
                 # Check if all queues are empty AND all ideas done
                 all_empty = bus.all_queues_empty()
                 # Find the most recently updated project's current_idea.json
