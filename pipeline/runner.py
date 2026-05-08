@@ -751,7 +751,7 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
 
                 print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
                 _seeded_this_session.add(title)
-                continue
+                return True  # Work already exists — do NOT seed another project
             except Exception:
                 pass  # Can't read state — seed it fresh
 
