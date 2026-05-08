@@ -886,12 +886,10 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
             state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
             print(f"  ✅ '{title}' deps satisfied — resuming from {status}")
 
-        # --- Budget enforcement: stamp session_started_at on first requeue ---
-        # Do NOT overwrite started_at (the original project creation time) —
-        # resetting it every 11 min defeats the budget timer entirely.
-        # Instead, use session_started_at which is set once per runner session.
-        if not state.get("session_started_at"):
-            state["session_started_at"] = datetime.now(timezone.utc).isoformat()
+        # --- Budget enforcement: ALWAYS reset session_started_at on requeue ---
+        # This is a NEW runner session — any stale session_started_at from a
+        # previous run would cause instant budget_exceeded (e.g. 5000+ min elapsed).
+        state["session_started_at"] = datetime.now(timezone.utc).isoformat()
         # Also set started_at if missing (legacy projects)
         if not state.get("started_at"):
             state["started_at"] = state["session_started_at"]
@@ -962,10 +960,12 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
                     pass
 
 
-        # Always refresh started_at when re-queuing — budget is per-session,
+        # Always refresh timestamps when re-queuing — budget is per-session,
         # not total project lifetime. Without this, a manually-reset project
         # or one from a previous session fires budget_exceeded immediately.
-        state["started_at"] = datetime.now(timezone.utc).isoformat()
+        _now = datetime.now(timezone.utc).isoformat()
+        state["started_at"] = _now
+        state["session_started_at"] = _now  # MUST also reset this — budget enforcement reads it first
         state.pop("budget_note", None)
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
