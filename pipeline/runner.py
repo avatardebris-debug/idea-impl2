@@ -273,7 +273,7 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
     Falls back to the old global .pipeline/state/current_idea.json for
     backwards compatibility with runs that predate the per-project isolation.
     """
-    TERMINAL = {"complete", "budget_exceeded"}
+    INACTIVE = {"complete", "budget_exceeded", "dep_waiting"}
     projects_dir = pipeline_dir / "projects"
     candidates: list[pathlib.Path] = []
 
@@ -285,7 +285,7 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
         def sort_key(p: pathlib.Path):
             try:
                 state = json.loads(p.read_text(encoding="utf-8"))
-                is_terminal = state.get("status", "") in TERMINAL
+                is_terminal = state.get("status", "") in INACTIVE
                 return (1 if is_terminal else 0, -p.stat().st_mtime)
             except Exception:
                 return (2, 0.0)
