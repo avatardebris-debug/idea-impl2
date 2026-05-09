@@ -869,14 +869,37 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         # dep_waiting: project is blocked on a dependency — re-check and re-queue
         # only if all deps are now done.
         if status == "dep_waiting":
+            # Re-parse deps from master_ideas.md (state may have stale deps from seed time)
             deps = state.get("depends_on", [])
+            mi_path = PROJECT_ROOT / "master_ideas.md"
+            if mi_path.exists():
+                try:
+                    mi_text = mi_path.read_text(encoding="utf-8")
+                    # Find the line for this project's title
+                    _mi_title = state.get("title", "")
+                    if _mi_title:
+                        for mi_line in mi_text.splitlines():
+                            if _mi_title.strip("[]") in mi_line:
+                                _dm = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', mi_line, re.IGNORECASE)
+                                if _dm:
+                                    fresh_deps = [d.strip() for d in re.split(r'[,;]+', _dm.group(1)) if d.strip()]
+                                    if set(fresh_deps) != set(deps):
+                                        print(f"  🔄 Updated deps for '{title}': {deps} → {fresh_deps}")
+                                        deps = fresh_deps
+                                        state["depends_on"] = deps
+                                break
+                except Exception:
+                    pass
+
             DONE = ("complete", "budget_exceeded")
             still_blocked = [
                 d for d in deps
                 if not (projects_dir / d / "state" / "current_idea.json").exists()
-                or json.loads((projects_dir / d / "state" / "current_idea.json")
-                              .read_text(encoding="utf-8")).get("status") not in DONE
-                if (projects_dir / d / "state" / "current_idea.json").exists()
+                or (
+                    (projects_dir / d / "state" / "current_idea.json").exists()
+                    and json.loads((projects_dir / d / "state" / "current_idea.json")
+                                  .read_text(encoding="utf-8")).get("status") not in DONE
+                )
             ]
             if still_blocked:
                 continue  # still waiting
