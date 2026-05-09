@@ -65,8 +65,10 @@ rules:
 
   - id: "workspace-isolation"
     description: >
-      Agents must only write code to .pipeline/workspace/.
-      Never modify files outside the designated output area.
+      Agents must only write code to .pipeline/projects/<slug>/workspace/.
+      Never modify files outside the designated per-project workspace area.
+      State files go in .pipeline/projects/<slug>/state/ and phase files
+      go in .pipeline/projects/<slug>/phases/.
     severity: error
     enforcement: hook
 
