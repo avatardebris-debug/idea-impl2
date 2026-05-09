@@ -838,6 +838,71 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
     if not projects_dir.exists():
         return 0
 
+    # ----------------------------------------------------------------
+    # PRE-PASS: Unblock ALL dep_waiting projects whose deps are done.
+    # This must run before the main requeue loop because the main loop
+    # returns after processing ONE project — if a more-recently-touched
+    # project is first, dep_waiting projects never get evaluated.
+    # ----------------------------------------------------------------
+    for project_dir in projects_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.exists():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if state.get("status") != "dep_waiting":
+            continue
+
+        title = state.get("title", project_dir.name)
+        deps = state.get("depends_on", [])
+
+        # Re-parse deps from master_ideas.md (state may have stale deps from seed time)
+        mi_path = PROJECT_ROOT / "master_ideas.md"
+        if mi_path.exists():
+            try:
+                mi_text = mi_path.read_text(encoding="utf-8")
+                _mi_title = state.get("title", "")
+                if _mi_title:
+                    for mi_line in mi_text.splitlines():
+                        if _mi_title.strip("[]") in mi_line:
+                            _dm = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', mi_line, re.IGNORECASE)
+                            if _dm:
+                                fresh_deps = [d.strip() for d in re.split(r'[,;]+', _dm.group(1)) if d.strip()]
+                                if set(fresh_deps) != set(deps):
+                                    print(f"  🔄 Updated deps for '{title}': {deps} → {fresh_deps}")
+                                    deps = fresh_deps
+                                    state["depends_on"] = deps
+                            break
+            except Exception:
+                pass
+
+        DONE = ("complete", "budget_exceeded")
+        still_blocked = [
+            d for d in deps
+            if not (projects_dir / d / "state" / "current_idea.json").exists()
+            or (
+                (projects_dir / d / "state" / "current_idea.json").exists()
+                and json.loads((projects_dir / d / "state" / "current_idea.json")
+                              .read_text(encoding="utf-8")).get("status") not in DONE
+            )
+        ]
+        if still_blocked:
+            continue  # still waiting
+
+        # All deps done — restore last real phase status
+        new_status = state.get("pre_dep_status", "phase_1_executing")
+        state["status"] = new_status
+        state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        print(f"  ✅ '{title}' deps satisfied — resuming from {new_status}")
+
+    # ----------------------------------------------------------------
+    # MAIN LOOP: Find the most-recently-active incomplete project and
+    # requeue it. Only ONE project at a time.
+    # ----------------------------------------------------------------
     injected = 0
     def _project_recency(d: pathlib.Path) -> float:
         sf = d / "state" / "current_idea.json"
@@ -863,51 +928,8 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         title  = state.get("title", project_dir.name)
         slug   = project_dir.name
 
-        if status in ("", "complete", "budget_exceeded"):
+        if status in ("", "complete", "budget_exceeded", "dep_waiting"):
             continue
-
-        # dep_waiting: project is blocked on a dependency — re-check and re-queue
-        # only if all deps are now done.
-        if status == "dep_waiting":
-            # Re-parse deps from master_ideas.md (state may have stale deps from seed time)
-            deps = state.get("depends_on", [])
-            mi_path = PROJECT_ROOT / "master_ideas.md"
-            if mi_path.exists():
-                try:
-                    mi_text = mi_path.read_text(encoding="utf-8")
-                    # Find the line for this project's title
-                    _mi_title = state.get("title", "")
-                    if _mi_title:
-                        for mi_line in mi_text.splitlines():
-                            if _mi_title.strip("[]") in mi_line:
-                                _dm = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', mi_line, re.IGNORECASE)
-                                if _dm:
-                                    fresh_deps = [d.strip() for d in re.split(r'[,;]+', _dm.group(1)) if d.strip()]
-                                    if set(fresh_deps) != set(deps):
-                                        print(f"  🔄 Updated deps for '{title}': {deps} → {fresh_deps}")
-                                        deps = fresh_deps
-                                        state["depends_on"] = deps
-                                break
-                except Exception:
-                    pass
-
-            DONE = ("complete", "budget_exceeded")
-            still_blocked = [
-                d for d in deps
-                if not (projects_dir / d / "state" / "current_idea.json").exists()
-                or (
-                    (projects_dir / d / "state" / "current_idea.json").exists()
-                    and json.loads((projects_dir / d / "state" / "current_idea.json")
-                                  .read_text(encoding="utf-8")).get("status") not in DONE
-                )
-            ]
-            if still_blocked:
-                continue  # still waiting
-            # All deps done — restore last real phase status so rebuild re-queues it
-            status = state.get("pre_dep_status", "phase_1_executing")
-            state["status"] = status
-            state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-            print(f"  ✅ '{title}' deps satisfied — resuming from {status}")
 
         # --- Budget enforcement: ALWAYS reset session_started_at on requeue ---
         # This is a NEW runner session — any stale session_started_at from a
@@ -917,6 +939,7 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         if not state.get("started_at"):
             state["started_at"] = state["session_started_at"]
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
 
         # Skip projects whose validator has already hit the stall limit —
         # these should have been force-advanced by the manager, but if the
