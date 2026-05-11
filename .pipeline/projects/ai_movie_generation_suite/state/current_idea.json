@@ -1,13 +1,12 @@
 {
   "title": "[AI movie generation suite]",
   "description": "suite that enables save the cat style screenplay writing, prompts for generating images/storyboard, prompts for describing characters, enable import of character into UE5 (or others) and integration with UE5 (or whichever is best) characters for developing movies. Possibly use GOogle Geenie or develop consistent 3d worlds and enable the development of movies from a combination of tools. At minimum should construct the beatsheet, the script, the detailed description of the scene itself, and the d",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 1,
   "total_phases": 3,
   "started_at": "2026-05-07T08:36:52.415621+00:00",
   "depends_on": [],
   "tasks_done": 0,
   "tasks_total": 6,
-  "_slug": "ai_movie_generation_suite",
-  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+  "_slug": "ai_movie_generation_suite"
 }

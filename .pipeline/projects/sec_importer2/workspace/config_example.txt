@@ -1,0 +1,17 @@
+# SEC Importer 2 Configuration
+# Copy this file to .env and modify as needed
+
+# Scheduler Configuration
+SCHEDULER_MODE=apscheduler
+SCHEDULER_SYNC_HOUR=2
+SCHEDULER_SYNC_MINUTE=0
+SCHEDULER_TIMEZONE=UTC
+SCHEDULER_CRON_EXPRESSION=0 2 * * *
+SCHEDULER_RUN_ONCE=false
+
+# Sync Configuration
+SCHEDULER_TICKERS_FILE=sec_importer/tickers.csv
+SCHEDULER_LIMIT_PER_TICKER=100
+
+# Database Configuration
+SCHEDULER_DB_PATH=sec_importer.db

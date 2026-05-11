@@ -9,19 +9,16 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional, Type
 
+from ai_movie_gen_suite.config import AppConfig
 from ai_movie_gen_suite.llm_client import LLMClient
 from ai_movie_gen_suite.models import Project
 from ai_movie_gen_suite.stages.base import BaseStageGenerator
-from ai_movie_gen_suite.stages.concept_generator import ConceptGenerator
-from ai_movie_gen_suite.stages.beat_generator import BeatSheetGenerator
-from ai_movie_gen_suite.stages.character_generator import CharacterGenerator
-from ai_movie_gen_suite.stages.script_generator import ScriptGenerator
-from ai_movie_gen_suite.stages.scene_generator import SceneDescriptionGenerator
-from ai_movie_gen_suite.stages.summary_generator import SummaryGenerator
-from ai_movie_gen_suite.stages.music_generator import MusicGenerator
-from ai_movie_gen_suite.stages.post_production_generator import PostProductionGenerator
-from ai_movie_gen_suite.stages.marketing_generator import MarketingGenerator
-from ai_movie_gen_suite.stages.distribution_generator import DistributionGenerator
+from ai_movie_gen_suite.stages.stage1_beat_sheet import Stage1BeatSheetGenerator
+from ai_movie_gen_suite.stages.stage2_characters import Stage2CharacterGenerator
+from ai_movie_gen_suite.stages.stage3_script import Stage3ScriptWriter
+from ai_movie_gen_suite.stages.stage4_scene_descriptions import Stage4SceneDescriptionGenerator
+from ai_movie_gen_suite.stages.stage5_music import Stage5MusicComposer
+from ai_movie_gen_suite.stages.stage6_post_production import Stage6PostProductionPlanner
 
 logger = logging.getLogger(__name__)
 
@@ -37,83 +34,79 @@ class MoviePipeline:
         self,
         llm_client: Optional[LLMClient] = None,
         stages: Optional[List[Type[BaseStageGenerator]]] = None,
+        config: Optional[AppConfig] = None,
     ):
         """Initialize the pipeline.
 
         Args:
             llm_client: LLM client for generating content. Creates default if None.
             stages: List of stage generator classes to use. Uses default pipeline if None.
+            config: Application configuration. Uses default if None.
         """
-        self.llm_client = llm_client or LLMClient()
+        self.config = config or AppConfig()
+        self.llm_client = llm_client or LLMClient(self.config.llm)
         self.stages: List[BaseStageGenerator] = []
         self._stage_instances: Dict[str, BaseStageGenerator] = {}
 
         # Use custom stages if provided
         if stages:
-            self.stages = [stage(config=self.llm_client.config) for stage in stages]
+            self.stages = [stage(config=self.config) for stage in stages]
         else:
             self.stages = [
-                ConceptGenerator(config=self.llm_client.config),
-                BeatSheetGenerator(config=self.llm_client.config),
-                CharacterGenerator(config=self.llm_client.config),
-                ScriptGenerator(config=self.llm_client.config),
-                SceneDescriptionGenerator(config=self.llm_client.config),
-                SummaryGenerator(config=self.llm_client.config),
-                MusicGenerator(config=self.llm_client.config),
-                PostProductionGenerator(config=self.llm_client.config),
-                MarketingGenerator(config=self.llm_client.config),
-                DistributionGenerator(config=self.llm_client.config),
+                Stage1BeatSheetGenerator(config=self.config),
+                Stage2CharacterGenerator(config=self.config),
+                Stage3ScriptWriter(config=self.config),
+                Stage4SceneDescriptionGenerator(config=self.config),
+                Stage5MusicComposer(config=self.config),
+                Stage6PostProductionPlanner(config=self.config),
             ]
 
-        # Create stage instances for lookup
+        # Register stage instances for lookup
         for stage in self.stages:
             self._stage_instances[stage.__class__.__name__] = stage
 
-    def _register_default_stages(self) -> None:
-        """Register the default stage generators."""
-        pass  # Stages are registered in __init__
-
     def run(self, project: Project) -> Project:
-        """Run the full pipeline on a project.
+        """Execute the full pipeline on a project.
 
         Args:
-            project: Project to process through the pipeline.
+            project: Project with initial concept (title + logline).
 
         Returns:
             Updated project with all stages completed.
         """
-        logger.info(f"Starting pipeline for project: {project.title or 'Untitled'}")
-        project.status = "pipeline_started"
+        logger.info(f"Starting pipeline for '{project.title}'")
 
-        for i, stage in enumerate(self.stages):
-            logger.info(f"Running stage {i + 1}/{len(self.stages)}: {stage.__class__.__name__}")
-            try:
-                project = stage.execute(project)
-                logger.info(f"Stage {stage.__class__.__name__} completed successfully")
-            except Exception as e:
-                logger.error(f"Stage {stage.__class__.__name__} failed: {e}")
-                project.status = f"failed_at_{stage.__class__.__name__.lower()}"
-                raise
+        for stage in self.stages:
+            logger.info(f"Running stage: {stage.__class__.__name__}")
+            project = stage.execute(project)
+            logger.info(f"Stage {stage.__class__.__name__} complete")
 
-        project.status = "pipeline_complete"
-        logger.info("Pipeline completed successfully")
+        logger.info(f"Pipeline complete for '{project.title}'")
         return project
 
-    def get_stage(self, stage_name: str) -> Optional[BaseStageGenerator]:
-        """Get a stage generator by name.
+    def run_stage(self, project: Project, stage_name: str) -> Project:
+        """Run a specific stage by name.
 
         Args:
-            stage_name: Name of the stage to retrieve.
+            project: Current project state.
+            stage_name: Name of the stage to run (class name).
 
         Returns:
-            Stage generator instance or None if not found.
+            Updated project after the stage completes.
         """
-        return self._stage_instances.get(stage_name)
+        if stage_name not in self._stage_instances:
+            raise ValueError(f"Unknown stage: {stage_name}")
 
-    def get_available_stages(self) -> List[str]:
-        """Get list of available stage names.
+        stage = self._stage_instances[stage_name]
+        logger.info(f"Running specific stage: {stage_name}")
+        project = stage.execute(project)
+        logger.info(f"Stage {stage_name} complete")
+        return project
+
+    def get_stage_names(self) -> List[str]:
+        """Get the names of all stages in the pipeline.
 
         Returns:
-            List of stage generator class names.
+            List of stage class names.
         """
         return [stage.__class__.__name__ for stage in self.stages]

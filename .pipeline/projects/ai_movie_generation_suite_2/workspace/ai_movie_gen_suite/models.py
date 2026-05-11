@@ -359,6 +359,11 @@ class Project(BaseModel):
     characters: Optional[Dict[str, Any]] = Field(None, description="Character registry data")
     script: Optional[Dict[str, Any]] = Field(None, description="Script data")
     scene_descriptions: Optional[List[Dict[str, Any]]] = Field(None, description="Scene descriptions")
+    summary: Optional[Dict[str, Any]] = Field(None, description="Project summary")
+    music: Optional[Dict[str, Any]] = Field(None, description="Music composition data")
+    post_production: Optional[Dict[str, Any]] = Field(None, description="Post-production data")
+    marketing: Optional[Dict[str, Any]] = Field(None, description="Marketing plan data")
+    distribution: Optional[Dict[str, Any]] = Field(None, description="Distribution plan data")
 
     @field_validator("title")
     @classmethod
@@ -381,6 +386,11 @@ class Project(BaseModel):
             "characters": self.characters,
             "script": self.script,
             "scene_descriptions": self.scene_descriptions,
+            "summary": self.summary,
+            "music": self.music,
+            "post_production": self.post_production,
+            "marketing": self.marketing,
+            "distribution": self.distribution,
         }
 
     def to_json(self, indent: int = 2) -> str:

@@ -8,7 +8,8 @@
   "depends_on": [],
   "tasks_done": 4,
   "tasks_total": 4,
-  "session_started_at": "2026-05-06T10:36:05.804857+00:00",
   "_slug": "dynamic_pricing_integrator",
-  "budget_note": "Force-completed after 135 min (budget: 135 min for 3-phase project)"
+  "_instance_skip": true,
+  "pre_skip_status": "budget_exceeded",
+  "budget_note": "Skipped \u2014 running on another instance"
 }

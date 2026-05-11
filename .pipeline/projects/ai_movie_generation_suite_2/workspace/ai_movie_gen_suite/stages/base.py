@@ -39,6 +39,15 @@ class BaseStageGenerator(ABC):
         self.client = LLMClient(self.config.llm)
 
     @abstractmethod
+    def get_stage_name(self) -> str:
+        """Get the name of this stage.
+
+        Returns:
+            The human-readable name of the stage.
+        """
+        ...
+
+    @abstractmethod
     def execute(self, project: Project) -> Project:
         """Execute the stage on the given project.
 

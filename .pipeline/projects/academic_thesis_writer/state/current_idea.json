@@ -31,5 +31,7 @@
     "review_content_preview": "# Code Review \u2014 Phase 1\n\n## Blocking Bugs\n- Review could not be completed (LLM did not write review file)\n\n## Non-Blocking Notes\nNone\n\n## Verdict\nFAIL \u2014 review file was not generated\n"
   },
   "_slug": "academic_thesis_writer",
-  "budget_note": "Force-completed after 91 min (budget: 90 min for 3-phase project)"
+  "_instance_skip": true,
+  "pre_skip_status": "budget_exceeded",
+  "budget_note": "Skipped \u2014 running on another instance"
 }

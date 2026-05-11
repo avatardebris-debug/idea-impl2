@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from ai_movie_gen_suite.models import Project
 
@@ -78,85 +78,164 @@ class TextFormatter(BaseFormatter):
         lines.append("=" * 80)
         lines.append("")
 
-        # Synopsis
-        if project.synopsis:
-            lines.append("SYNOPSIS")
-            lines.append("-" * 40)
-            lines.append(project.synopsis)
-            lines.append("")
+        # Synopsis (from beat_sheet if available)
+        beat_sheet = project.beat_sheet
+        if beat_sheet and isinstance(beat_sheet, dict):
+            synopsis = beat_sheet.get("synopsis") or beat_sheet.get("logline")
+            if synopsis:
+                lines.append("SYNOPSIS")
+                lines.append("-" * 40)
+                lines.append(synopsis)
+                lines.append("")
 
         # Characters
-        if project.characters:
-            lines.append("CHARACTERS")
-            lines.append("-" * 40)
-            for char in project.characters:
-                lines.append(f"\n{char['name']}:")
-                if char.get('age'):
-                    lines.append(f"  Age: {char['age']}")
-                if char.get('occupation'):
-                    lines.append(f"  Occupation: {char['occupation']}")
-                if char.get('personality'):
-                    lines.append(f"  Personality: {', '.join(char['personality'])}")
-                if char.get('backstory'):
-                    lines.append(f"  Backstory: {char['backstory']}")
-                if char.get('motivation'):
-                    lines.append(f"  Motivation: {char['motivation']}")
-                if char.get('arc'):
-                    lines.append(f"  Arc: {char['arc']}")
-                if char.get('voice'):
-                    lines.append(f"  Voice: {char['voice']}")
-                if char.get('appearance'):
-                    lines.append(f"  Appearance: {char['appearance']}")
-            lines.append("")
+        characters = project.characters
+        if characters:
+            char_list = characters if isinstance(characters, list) else characters.get("characters", [])
+            if char_list:
+                lines.append("CHARACTERS")
+                lines.append("-" * 40)
+                for char in char_list:
+                    if isinstance(char, dict):
+                        lines.append(f"\n{char.get('name', 'Unknown')}:")
+                        if char.get('age'):
+                            lines.append(f"  Age: {char['age']}")
+                        if char.get('occupation'):
+                            lines.append(f"  Occupation: {char['occupation']}")
+                        if char.get('personality'):
+                            personality = char['personality']
+                            if isinstance(personality, list):
+                                lines.append(f"  Personality: {', '.join(personality)}")
+                            else:
+                                lines.append(f"  Personality: {personality}")
+                        if char.get('backstory'):
+                            lines.append(f"  Backstory: {char['backstory']}")
+                        if char.get('motivation'):
+                            lines.append(f"  Motivation: {char['motivation']}")
+                        if char.get('arc'):
+                            lines.append(f"  Arc: {char['arc']}")
+                        if char.get('voice'):
+                            lines.append(f"  Voice: {char['voice']}")
+                        if char.get('appearance'):
+                            lines.append(f"  Appearance: {char['appearance']}")
+                lines.append("")
 
         # Script
-        if project.script:
+        script = project.script
+        if script:
             lines.append("SCRIPT")
             lines.append("-" * 40)
-            for scene in project.script.get('scenes', []):
-                lines.append(f"\nScene {scene.get('number', '?')}: {scene.get('location', 'Unknown')}")
-                lines.append(f"  Description: {scene.get('description', 'No description')}")
-                for dialogue in scene.get('dialogue', []):
-                    lines.append(f"  {dialogue.get('character', 'Unknown')}:")
-                    lines.append(f"    \"{dialogue.get('text', '')}\"")
-                    if dialogue.get('emotion'):
-                        lines.append(f"    (Emotion: {dialogue['emotion']})")
+            scenes = script.get('scenes', []) if isinstance(script, dict) else []
+            for scene in scenes:
+                if isinstance(scene, dict):
+                    lines.append(f"\nScene {scene.get('number', '?')}: {scene.get('location', 'Unknown')}")
+                    lines.append(f"  Description: {scene.get('description', 'No description')}")
+                    for dialogue in scene.get('dialogue', []):
+                        if isinstance(dialogue, dict):
+                            lines.append(f"  {dialogue.get('character', 'Unknown')}:")
+                            lines.append(f"    \"{dialogue.get('dialogue', dialogue.get('text', ''))}\"")
+                            if dialogue.get('emotion'):
+                                lines.append(f"    (Emotion: {dialogue['emotion']})")
+                            elif dialogue.get('action'):
+                                lines.append(f"    (Action: {dialogue['action']})")
             lines.append("")
 
-        # Scenes
-        if project.scenes:
+        # Scene Descriptions
+        scene_descs = project.scene_descriptions
+        if scene_descs:
             lines.append("SCENES")
             lines.append("-" * 40)
-            for scene in project.scenes:
-                lines.append(f"\nScene {scene.get('scene_number', '?')}: {scene.get('location', 'Unknown')}")
-                if scene.get('visual_description'):
-                    lines.append(f"  Visual Description: {scene['visual_description']}")
-                if scene.get('camera_directions'):
-                    lines.append(f"  Camera Directions: {scene['camera_directions']}")
-                if scene.get('lighting'):
-                    lines.append(f"  Lighting: {scene['lighting']}")
-                if scene.get('color_palette'):
-                    lines.append(f"  Color Palette: {scene['color_palette']}")
-                if scene.get('mood'):
-                    lines.append(f"  Mood: {scene['mood']}")
-                if scene.get('props_and_set_design'):
-                    lines.append(f"  Props/Set Design: {scene['props_and_set_design']}")
+            for scene in scene_descs:
+                if isinstance(scene, dict):
+                    lines.append(f"\nScene {scene.get('scene_number', '?')}: {scene.get('location', 'Unknown')}")
+                    if scene.get('visual_description'):
+                        lines.append(f"  Visual Description: {scene['visual_description']}")
+                    if scene.get('camera_directions'):
+                        lines.append(f"  Camera Directions: {scene['camera_directions']}")
+                    if scene.get('lighting'):
+                        lines.append(f"  Lighting: {scene['lighting']}")
+                    if scene.get('color_palette'):
+                        lines.append(f"  Color Palette: {scene['color_palette']}")
+                    if scene.get('mood'):
+                        lines.append(f"  Mood: {scene['mood']}")
+                    if scene.get('props_and_set_design'):
+                        lines.append(f"  Props/Set Design: {scene['props_and_set_design']}")
             lines.append("")
 
-        # Beats
-        if project.beats:
-            lines.append("BEATS")
+        # Beats (from beat_sheet)
+        if beat_sheet and isinstance(beat_sheet, dict):
+            beats = beat_sheet.get("beats", [])
+            if beats:
+                lines.append("BEATS")
+                lines.append("-" * 40)
+                for beat in beats:
+                    if isinstance(beat, dict):
+                        lines.append(f"\nBeat {beat.get('number', beat.get('beat_number', '?'))}: {beat.get('name', '')}")
+                        if beat.get('description'):
+                            lines.append(f"  Description: {beat['description']}")
+                        if beat.get('action'):
+                            lines.append(f"  Action: {beat['action']}")
+                        if beat.get('dialogue'):
+                            lines.append(f"  Dialogue: {beat['dialogue']}")
+                        if beat.get('emotion'):
+                            lines.append(f"  Emotion: {beat['emotion']}")
+                        if beat.get('camera_directions'):
+                            lines.append(f"  Camera Directions: {beat['camera_directions']}")
+                lines.append("")
+
+        # Summary
+        if project.summary:
+            lines.append("SUMMARY")
             lines.append("-" * 40)
-            for beat in project.beats:
-                lines.append(f"\nBeat {beat.get('beat_number', '?')}:")
-                if beat.get('action'):
-                    lines.append(f"  Action: {beat['action']}")
-                if beat.get('dialogue'):
-                    lines.append(f"  Dialogue: {beat['dialogue']}")
-                if beat.get('emotion'):
-                    lines.append(f"  Emotion: {beat['emotion']}")
-                if beat.get('camera_directions'):
-                    lines.append(f"  Camera Directions: {beat['camera_directions']}")
+            if isinstance(project.summary, dict):
+                for key, value in project.summary.items():
+                    lines.append(f"  {key}: {value}")
+            else:
+                lines.append(str(project.summary))
+            lines.append("")
+
+        # Music
+        if project.music:
+            lines.append("MUSIC")
+            lines.append("-" * 40)
+            if isinstance(project.music, dict):
+                for key, value in project.music.items():
+                    lines.append(f"  {key}: {value}")
+            else:
+                lines.append(str(project.music))
+            lines.append("")
+
+        # Post Production
+        if project.post_production:
+            lines.append("POST-PRODUCTION")
+            lines.append("-" * 40)
+            if isinstance(project.post_production, dict):
+                for key, value in project.post_production.items():
+                    lines.append(f"  {key}: {value}")
+            else:
+                lines.append(str(project.post_production))
+            lines.append("")
+
+        # Marketing
+        if project.marketing:
+            lines.append("MARKETING")
+            lines.append("-" * 40)
+            if isinstance(project.marketing, dict):
+                for key, value in project.marketing.items():
+                    lines.append(f"  {key}: {value}")
+            else:
+                lines.append(str(project.marketing))
+            lines.append("")
+
+        # Distribution
+        if project.distribution:
+            lines.append("DISTRIBUTION")
+            lines.append("-" * 40)
+            if isinstance(project.distribution, dict):
+                for key, value in project.distribution.items():
+                    lines.append(f"  {key}: {value}")
+            else:
+                lines.append(str(project.distribution))
             lines.append("")
 
         return "\n".join(lines)
@@ -198,11 +277,15 @@ class JSONFormatter(BaseFormatter):
             "genre": project.genre,
             "tone": project.tone,
             "logline": project.logline,
-            "synopsis": project.synopsis,
+            "beat_sheet": project.beat_sheet,
             "characters": project.characters,
             "script": project.script,
-            "scenes": project.scenes,
-            "beats": project.beats,
+            "scene_descriptions": project.scene_descriptions,
+            "summary": project.summary,
+            "music": project.music,
+            "post_production": project.post_production,
+            "marketing": project.marketing,
+            "distribution": project.distribution,
         }
         return json.dumps(data, indent=2, ensure_ascii=False)
 
@@ -248,92 +331,171 @@ class MarkdownFormatter(BaseFormatter):
         lines.append(f"**Logline:** {project.logline}")
         lines.append("")
 
-        # Synopsis
-        if project.synopsis:
-            lines.append("## Synopsis")
-            lines.append("")
-            lines.append(project.synopsis)
-            lines.append("")
+        # Synopsis (from beat_sheet)
+        beat_sheet = project.beat_sheet
+        if beat_sheet and isinstance(beat_sheet, dict):
+            synopsis = beat_sheet.get("synopsis") or beat_sheet.get("logline")
+            if synopsis:
+                lines.append("## Synopsis")
+                lines.append("")
+                lines.append(synopsis)
+                lines.append("")
 
         # Characters
-        if project.characters:
-            lines.append("## Characters")
-            lines.append("")
-            for char in project.characters:
-                lines.append(f"### {char['name']}")
+        characters = project.characters
+        if characters:
+            char_list = characters if isinstance(characters, list) else characters.get("characters", [])
+            if char_list:
+                lines.append("## Characters")
                 lines.append("")
-                if char.get('age'):
-                    lines.append(f"- **Age:** {char['age']}")
-                if char.get('occupation'):
-                    lines.append(f"- **Occupation:** {char['occupation']}")
-                if char.get('personality'):
-                    lines.append(f"- **Personality:** {', '.join(char['personality'])}")
-                if char.get('backstory'):
-                    lines.append(f"- **Backstory:** {char['backstory']}")
-                if char.get('motivation'):
-                    lines.append(f"- **Motivation:** {char['motivation']}")
-                if char.get('arc'):
-                    lines.append(f"- **Arc:** {char['arc']}")
-                if char.get('voice'):
-                    lines.append(f"- **Voice:** {char['voice']}")
-                if char.get('appearance'):
-                    lines.append(f"- **Appearance:** {char['appearance']}")
-                lines.append("")
+                for char in char_list:
+                    if isinstance(char, dict):
+                        lines.append(f"### {char.get('name', 'Unknown')}")
+                        lines.append("")
+                        if char.get('age'):
+                            lines.append(f"- **Age:** {char['age']}")
+                        if char.get('occupation'):
+                            lines.append(f"- **Occupation:** {char['occupation']}")
+                        if char.get('personality'):
+                            personality = char['personality']
+                            if isinstance(personality, list):
+                                lines.append(f"- **Personality:** {', '.join(personality)}")
+                            else:
+                                lines.append(f"- **Personality:** {personality}")
+                        if char.get('backstory'):
+                            lines.append(f"- **Backstory:** {char['backstory']}")
+                        if char.get('motivation'):
+                            lines.append(f"- **Motivation:** {char['motivation']}")
+                        if char.get('arc'):
+                            lines.append(f"- **Arc:** {char['arc']}")
+                        if char.get('voice'):
+                            lines.append(f"- **Voice:** {char['voice']}")
+                        if char.get('appearance'):
+                            lines.append(f"- **Appearance:** {char['appearance']}")
+                        lines.append("")
 
         # Script
-        if project.script:
+        script = project.script
+        if script:
             lines.append("## Script")
             lines.append("")
-            for scene in project.script.get('scenes', []):
-                lines.append(f"### Scene {scene.get('number', '?')}: {scene.get('location', 'Unknown')}")
-                lines.append("")
-                lines.append(f"{scene.get('description', 'No description')}")
-                lines.append("")
-                for dialogue in scene.get('dialogue', []):
-                    lines.append(f"**{dialogue.get('character', 'Unknown')}**")
+            scenes = script.get('scenes', []) if isinstance(script, dict) else []
+            for scene in scenes:
+                if isinstance(scene, dict):
+                    lines.append(f"### Scene {scene.get('number', '?')}: {scene.get('location', 'Unknown')}")
                     lines.append("")
-                    lines.append(f"> {dialogue.get('text', '')}")
-                    if dialogue.get('emotion'):
-                        lines.append(f"> *({dialogue['emotion']})*")
+                    lines.append(f"{scene.get('description', 'No description')}")
+                    lines.append("")
+                    for dialogue in scene.get('dialogue', []):
+                        if isinstance(dialogue, dict):
+                            lines.append(f"**{dialogue.get('character', 'Unknown')}**")
+                            lines.append("")
+                            lines.append(f"> {dialogue.get('dialogue', dialogue.get('text', ''))}")
+                            if dialogue.get('emotion'):
+                                lines.append(f"> *({dialogue['emotion']})*")
+                            elif dialogue.get('action'):
+                                lines.append(f"> *({dialogue['action']})*")
+                            lines.append("")
+
+        # Scene Descriptions
+        scene_descs = project.scene_descriptions
+        if scene_descs:
+            lines.append("## Scene Descriptions")
+            lines.append("")
+            for scene in scene_descs:
+                if isinstance(scene, dict):
+                    lines.append(f"### Scene {scene.get('scene_number', '?')}: {scene.get('location', 'Unknown')}")
+                    lines.append("")
+                    if scene.get('visual_description'):
+                        lines.append(f"**Visual Description:** {scene['visual_description']}")
+                    if scene.get('camera_directions'):
+                        lines.append(f"**Camera Directions:** {scene['camera_directions']}")
+                    if scene.get('lighting'):
+                        lines.append(f"**Lighting:** {scene['lighting']}")
+                    if scene.get('color_palette'):
+                        lines.append(f"**Color Palette:** {scene['color_palette']}")
+                    if scene.get('mood'):
+                        lines.append(f"**Mood:** {scene['mood']}")
+                    if scene.get('props_and_set_design'):
+                        lines.append(f"**Props/Set Design:** {scene['props_and_set_design']}")
                     lines.append("")
 
-        # Scenes
-        if project.scenes:
-            lines.append("## Scenes")
-            lines.append("")
-            for scene in project.scenes:
-                lines.append(f"### Scene {scene.get('scene_number', '?')}: {scene.get('location', 'Unknown')}")
+        # Beats (from beat_sheet)
+        if beat_sheet and isinstance(beat_sheet, dict):
+            beats = beat_sheet.get("beats", [])
+            if beats:
+                lines.append("## Beats")
                 lines.append("")
-                if scene.get('visual_description'):
-                    lines.append(f"**Visual Description:** {scene['visual_description']}")
-                if scene.get('camera_directions'):
-                    lines.append(f"**Camera Directions:** {scene['camera_directions']}")
-                if scene.get('lighting'):
-                    lines.append(f"**Lighting:** {scene['lighting']}")
-                if scene.get('color_palette'):
-                    lines.append(f"**Color Palette:** {scene['color_palette']}")
-                if scene.get('mood'):
-                    lines.append(f"**Mood:** {scene['mood']}")
-                if scene.get('props_and_set_design'):
-                    lines.append(f"**Props/Set Design:** {scene['props_and_set_design']}")
-                lines.append("")
+                for beat in beats:
+                    if isinstance(beat, dict):
+                        lines.append(f"### Beat {beat.get('number', beat.get('beat_number', '?'))}: {beat.get('name', '')}")
+                        lines.append("")
+                        if beat.get('description'):
+                            lines.append(f"**Description:** {beat['description']}")
+                        if beat.get('action'):
+                            lines.append(f"**Action:** {beat['action']}")
+                        if beat.get('dialogue'):
+                            lines.append(f"**Dialogue:** {beat['dialogue']}")
+                        if beat.get('emotion'):
+                            lines.append(f"**Emotion:** {beat['emotion']}")
+                        if beat.get('camera_directions'):
+                            lines.append(f"**Camera Directions:** {beat['camera_directions']}")
+                        lines.append("")
 
-        # Beats
-        if project.beats:
-            lines.append("## Beats")
+        # Summary
+        if project.summary:
+            lines.append("## Summary")
             lines.append("")
-            for beat in project.beats:
-                lines.append(f"### Beat {beat.get('beat_number', '?')}")
-                lines.append("")
-                if beat.get('action'):
-                    lines.append(f"**Action:** {beat['action']}")
-                if beat.get('dialogue'):
-                    lines.append(f"**Dialogue:** {beat['dialogue']}")
-                if beat.get('emotion'):
-                    lines.append(f"**Emotion:** {beat['emotion']}")
-                if beat.get('camera_directions'):
-                    lines.append(f"**Camera Directions:** {beat['camera_directions']}")
-                lines.append("")
+            if isinstance(project.summary, dict):
+                for key, value in project.summary.items():
+                    lines.append(f"- **{key}:** {value}")
+            else:
+                lines.append(str(project.summary))
+            lines.append("")
+
+        # Music
+        if project.music:
+            lines.append("## Music")
+            lines.append("")
+            if isinstance(project.music, dict):
+                for key, value in project.music.items():
+                    lines.append(f"- **{key}:** {value}")
+            else:
+                lines.append(str(project.music))
+            lines.append("")
+
+        # Post Production
+        if project.post_production:
+            lines.append("## Post-Production")
+            lines.append("")
+            if isinstance(project.post_production, dict):
+                for key, value in project.post_production.items():
+                    lines.append(f"- **{key}:** {value}")
+            else:
+                lines.append(str(project.post_production))
+            lines.append("")
+
+        # Marketing
+        if project.marketing:
+            lines.append("## Marketing")
+            lines.append("")
+            if isinstance(project.marketing, dict):
+                for key, value in project.marketing.items():
+                    lines.append(f"- **{key}:** {value}")
+            else:
+                lines.append(str(project.marketing))
+            lines.append("")
+
+        # Distribution
+        if project.distribution:
+            lines.append("## Distribution")
+            lines.append("")
+            if isinstance(project.distribution, dict):
+                for key, value in project.distribution.items():
+                    lines.append(f"- **{key}:** {value}")
+            else:
+                lines.append(str(project.distribution))
+            lines.append("")
 
         return "\n".join(lines)
 

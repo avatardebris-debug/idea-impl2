@@ -1,7 +1,7 @@
 {
   "title": "[Chronovision2]",
   "description": "Using software that can create full fidelity 3d worlds like Google Genie and others and use some kind of tracking tech and IOT and RL to produce measurements about the actual world, create worlds second in advance of real worlds and make predictions about the world and measure prediction surprise and minimize it over time using RL. Potentially make 100s or thousands using various methods and hypothesis and continually update prediction methods and means. After prediction reaches 99% or higher be",
-  "status": "budget_exceeded",
+  "status": "phase_1_reviewed",
   "phase": 1,
   "total_phases": 3,
   "started_at": "2026-05-10T11:57:33.497535+00:00",
@@ -46,5 +46,5 @@
   },
   "_slug": "chronovision2",
   "pre_budget_status": "phase_1_reviewed",
-  "budget_note": "Force-completed after 225 min (budget: 225 min for 3-phase project)"
+  "session_started_at": "2026-05-11T16:14:56.711159+00:00"
 }

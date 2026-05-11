@@ -1,0 +1,11 @@
+step1_output:
+  raw: Step output for step (mock output)
+  step_name: mock
+  tokens_used: 0
+raw: '{"raw": "Step output for step (mock output)", "step_name": "mock", "tokens_used":
+  0}'
+_sop_name: test_sop
+_execution_log:
+- step: step1
+  duration: 0.0001780986785888672
+  error: null

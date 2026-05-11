@@ -249,6 +249,24 @@ class LLMClient:
 
         raise last_exception  # type: ignore[misc]
 
+    def generate(
+        self,
+        messages: List[LLMMessage],
+        retries: int = 3,
+        retry_delay: float = 1.0,
+    ) -> LLMResponse:
+        """Generate a response from the LLM (alias for chat).
+
+        Args:
+            messages: List of messages to send.
+            retries: Number of retry attempts.
+            retry_delay: Delay between retries in seconds.
+
+        Returns:
+            LLMResponse object.
+        """
+        return self.chat(messages, retries, retry_delay)
+
     def chat_with_json(
         self,
         messages: List[LLMMessage],

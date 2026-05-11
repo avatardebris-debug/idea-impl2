@@ -1,7 +1,7 @@
 {
   "title": "[AutomatedClientOps Manager]",
   "description": "Combine the drop-servicing SOP executor with the email tool to handle client communication, file delivery, and invoice generation autonomously.",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 2,
   "total_phases": 3,
   "started_at": "2026-05-07T05:24:16.009393+00:00",
@@ -9,7 +9,6 @@
   "depends_on": [],
   "tasks_done": 0,
   "tasks_total": 1,
-  "session_started_at": "2026-05-07T05:24:16.007919+00:00",
   "review_result": {
     "blocking_bugs": 13,
     "review_path": "phases/phase_1/review.md",
@@ -44,6 +43,5 @@
     "non_blocking_notes": "",
     "review_content_preview": "# Phase 1 Review \u2014 AutomatedClientOps Manager\n\n### What's Good\n- Clean, well-documented dataclasses (`Client`, `Invoice`, `InvoiceItem`, `SOP`, `SOPStep`, `ExecutionResult`, `EmailMessage`) with `to_dict`/`from_dict` serialization for persistence.\n- `EmailSender` class is a self-contained SMTP wrapper with TLS support, attachment handling, and helper methods (`compose_invoice_email`, `compose_file_delivery_email`).\n- `SOPExecutor` implements a clean action-handler dispatch pattern (`send_email`, `generate_invoice`, `deliver_file`, `log`, `set_context`) with proper error handling per step.\n- `ClientOpsManager` provides a cohesive orchestrator API: client CRUD, invoice management, email operations, SOP execution, state save/load, and a `run_standard_onboarding` convenience method.\n- Comprehensive test suite (`test_workspace.py`) with 43 tests covering all modules: models, email, SOP executor, manager, and integration tests \u2014 all passing.\n- YAML SOP definitions are well-structured and reusable as templates.\n- Jinja2 prompt template (`client_ops.jinja2`) is clean and parameterized.\n- `conftest.py` and `__init__.py` properly handle import paths and package metadata.\n- `Invoice` correctly computes `subtotal` and `total` from line items; `InvoiceItem.total` property is correct.\n- `Client.__post_init__` validates non-empty `client_id` and `email`.\n\n## Blocking Bugs\n- **email_tool.py:68** \u2014 `encoders.encode_base64(part)` is called but its return value is not used. The method mutates `"
   },
-  "_slug": "automatedclientops_manager",
-  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+  "_slug": "automatedclientops_manager"
 }

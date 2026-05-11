@@ -1,11 +1,14 @@
 {
   "title": "[Sports Betting Strategy Simulator]",
   "description": "Monte Carlo engine for training optimal betting strategies across sports markets.",
-  "status": "phase_1_executing",
+  "status": "budget_exceeded",
   "phase": 1,
   "total_phases": 3,
-  "started_at": "2026-05-10T15:49:55.124950+00:00",
+  "started_at": "2026-05-11T03:44:18.662526+00:00",
   "depends_on": [],
   "tasks_done": 0,
-  "tasks_total": 6
+  "tasks_total": 6,
+  "_instance_skip": true,
+  "pre_skip_status": "budget_exceeded",
+  "budget_note": "Skipped \u2014 running on another instance"
 }

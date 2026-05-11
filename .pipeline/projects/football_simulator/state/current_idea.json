@@ -1,14 +1,12 @@
 {
   "title": "[Football simulator]",
   "description": "--nfl/highschool/college regulation field size physics engine. reinforcement learning to optimize success rate vs standard NFL play calls and adversarial self play.",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 2,
   "total_phases": 3,
   "started_at": "2026-05-07T05:28:02.201086+00:00",
   "depends_on": [],
   "tasks_done": 0,
   "tasks_total": 3,
-  "session_started_at": "2026-05-07T04:01:59.649928+00:00",
-  "_slug": "football_simulator",
-  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+  "_slug": "football_simulator"
 }

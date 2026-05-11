@@ -8,7 +8,8 @@
   "depends_on": [],
   "tasks_done": 0,
   "tasks_total": 6,
-  "session_started_at": "2026-05-07T00:10:52.644289+00:00",
   "_slug": "manuscriptdata_analyzer_system",
-  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+  "_instance_skip": true,
+  "pre_skip_status": "budget_exceeded",
+  "budget_note": "Skipped \u2014 running on another instance"
 }

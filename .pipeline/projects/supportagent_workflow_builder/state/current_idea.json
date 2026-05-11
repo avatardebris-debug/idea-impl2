@@ -1,43 +1,15 @@
 {
   "title": "[SupportAgent Workflow Builder]",
   "description": "Design an agentic SOP execution system for automated customer support ticket routing, triage, and draft response generation.",
-  "status": "phase_1_reviewed",
+  "status": "budget_exceeded",
   "phase": 2,
   "total_phases": 3,
-  "started_at": "2026-05-10T12:43:56.714014+00:00",
+  "started_at": "2026-05-11T03:44:18.663327+00:00",
   "depends_on": [],
   "tasks_done": 5,
   "tasks_total": 5,
   "_slug": "supportagent_workflow_builder",
-  "session_started_at": "2026-05-10T12:43:56.714014+00:00",
-  "review_result": {
-    "blocking_bugs": 0,
-    "review_path": "phases/phase_1/review.md",
-    "tasks_path": "phases/phase_1/tasks.md",
-    "workspace_path": "/workspace/idea impl/.pipeline/projects/supportagent_workflow_builder/workspace",
-    "files_written": [
-      "supportagent/__pycache__/classifier.cpython-312.pyc",
-      "tests/__pycache__/test_models.cpython-312-pytest-9.0.3.pyc",
-      "llm_interface.py",
-      "import_cloud_zip.py",
-      "tests/__pycache__/__init__.cpython-312.pyc",
-      "tests/__pycache__/test_ingest.cpython-312-pytest-9.0.3.pyc",
-      ".pytest_cache/README.md",
-      "tools.py",
-      "test_harness_capabilities.py",
-      "tests/__pycache__/test_classifier.cpython-312-pytest-9.0.3.pyc",
-      "test_dependency_system.py",
-      ".pytest_cache/v/cache/lastfailed",
-      "supportagent/__pycache__/ingest.cpython-312.pyc",
-      "import_zip.py",
-      "supportagent/__pycache__/__init__.cpython-312.pyc",
-      ".pytest_cache/CACHEDIR.TAG",
-      "__pycache__/conftest.cpython-312-pytest-9.0.3.pyc",
-      "supportagent/__pycache__/models.cpython-312.pyc",
-      ".pytest_cache/v/cache/nodeids",
-      "tests/__init__.py"
-    ],
-    "non_blocking_notes": "## Non-Blocking Notes\n- **Decorative separator comments**: Files like `models.py` and `ingest.py` use excessive `# ------` separator lines (e.g., `# ---------------------------------------------------------------------------`). These add noise without value.\n- **`SRouter` class naming**: The class is named `SRouter` (likely a typo for `Router`). Consider renaming to `Router` for clarity.\n- **`classifier.py:65` \u2014 Priority formula**: `best_priority = min(best_priority + best_score, 10)` mixes the base priority with raw keyword count. A clearer formula might be `best_priority = min(rule.priority_base + best_score, 10)` to separate base from boost.\n- **`ingest.py` \u2014 `from urllib.parse import unquote_plus`**: Should be at the top of the file with other imports.\n- **`classifier.py` \u2014 Keyword matching is substring-based**: `combined_text.count(kw)` does substring matching, so keyword \"bill\" would match \"billing\" and \"billed\". This may cause false positives. Consider using word-boundary regex (`\\b`) for more precise matching.\n- **`router.py` \u2014 No validation of YAML config**: If the YAML is malformed or missing expected keys, `self.config[\"teams\"]` or `self.config[\"routing\"]` will raise `KeyError`. Consider adding validation or default fallbacks.\n- **`classifier.py` \u2014 `best_score` starts at 0**: If no keywords match, `best_category` stays as \"general\" with score 0, which is correct. But the `best_score` variable is never used after the loop \u2014 it could be removed.\n- **`pyproject.toml` ",
-    "review_content_preview": "# Phase 1 Review \u2014 SupportAgent Workflow Builder\n\n### What's Good\n- **Clean data model design**: `Ticket` and `PipelineResult` dataclasses are well-structured with clear serialization/deserialization helpers (`to_dict`, `to_json`, `from_dict`, `from_json`).\n- **Flexible ingestion**: `Ingestor` handles three input formats (JSON, MIME email, web form URL-encoded) with graceful fallback for missing keys and auto-generated UUIDs.\n- **Email MIME parsing**: Properly handles multipart emails, charset decoding, and header preservation \u2014 a non-trivial task done correctly.\n- **Keyword-based classifier**: Simple but effective scoring mechanism with configurable YAML rules; handles urgency boosting and priority capping.\n- **Config-driven routing**: `SRouter` uses YAML for team/category mapping, priority-based routing, and SLA breach detection \u2014 easy to modify without code changes.\n- **Comprehensive test coverage**: 35 tests covering construction, serialization, ingestion (all 3 formats), classification (all categories, edge cases), and pipeline result mapping.\n- **Good use of `dataclasses` and `Enum` types**: Type safety with `str, Enum` mixins for serialization compatibility.\n- **`from_ticket` factory on `PipelineResult`**: Clean bridge between internal `Ticket` state and external API output.\n- **`conftest.py` path injection**: Ensures local imports work in pytest without requiring installed package.\n\n## Blocking Bugs\n- **`supportagent/router.py:1` \u2014 Missing `from __future__ import anno"
-  }
+  "_instance_skip": true,
+  "pre_skip_status": "budget_exceeded",
+  "budget_note": "Skipped \u2014 running on another instance"
 }
