@@ -656,7 +656,7 @@ def _request_ideation(bus: MessageBus) -> None:
     print("\n  🧠 master_ideas.md exhausted — queued Ideator to generate 30 new ideas...")
 
 
-def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
+def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pathlib.Path | None = None) -> bool:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
     Dependency syntax (append to description):
@@ -668,9 +668,9 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False) -> bool:
     Blocked ideas (deps not yet complete) are skipped with a status message.
     They unblock automatically once their dependencies reach 'complete'.
     """
-    mi_path = PROJECT_ROOT.resolve() / "master_ideas.md"
+    mi_path = ideas_path if ideas_path else PROJECT_ROOT.resolve() / "master_ideas.md"
     if not mi_path.exists():
-        print("  ✗ master_ideas.md not found")
+        print(f"  ✗ {mi_path.name} not found")
         return False
 
     import re
@@ -818,7 +818,7 @@ def check_resume(bus: MessageBus) -> bool:
 
     return False
 
-def _rebuild_queues_from_state(bus: MessageBus) -> int:
+def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None = None) -> int:
     """Re-inject a queue message for ONE in-progress project that has no queued work.
 
     Called at startup and during the health-check loop when queues appear empty.
@@ -861,7 +861,7 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
         deps = state.get("depends_on", [])
 
         # Re-parse deps from master_ideas.md (state may have stale deps from seed time)
-        mi_path = PROJECT_ROOT / "master_ideas.md"
+        mi_path = ideas_path if ideas_path else PROJECT_ROOT / "master_ideas.md"
         if mi_path.exists():
             try:
                 mi_text = mi_path.read_text(encoding="utf-8")
@@ -1458,14 +1458,14 @@ def _advance_phase(
     return True
 
 
-def _mark_complete(project_dir: pathlib.Path, state: dict, title: str) -> None:
+def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_path: pathlib.Path | None = None) -> None:
     """Mark a project as complete in both state file and master_ideas.md."""
     state["status"] = "complete"
     state.pop("review_result", None)
     _write_state_dict(project_dir, state)
 
     # Mark in master_ideas.md
-    mi_path = PROJECT_ROOT / "master_ideas.md"
+    mi_path = ideas_path if ideas_path else PROJECT_ROOT / "master_ideas.md"
     if mi_path.exists() and title:
         content = mi_path.read_text(encoding="utf-8")
         # Handle both [title] and title formats
@@ -1536,8 +1536,14 @@ def run_pipeline(
     time_limit_minutes: float = 0,
     base_budget: int = DEFAULT_BASE_BUDGET,
     phase_budget: int = DEFAULT_PHASE_BUDGET,
+    ideas_file: str | None = None,
 ) -> None:
     """Main pipeline orchestrator."""
+    # Override master ideas path if --ideas-file was given
+    global PROJECT_ROOT
+    _ideas_path = pathlib.Path(ideas_file).resolve() if ideas_file else PROJECT_ROOT.resolve() / "master_ideas.md"
+    if ideas_file:
+        print(f"  Ideas:    {_ideas_path}")
     init_pipeline_dirs()
     bus = MessageBus()
 
@@ -1591,12 +1597,12 @@ def run_pipeline(
 
     if not has_work and from_list:
         # First try to rebuild any in-progress projects from saved state
-        rebuilt = _rebuild_queues_from_state(bus)
+        rebuilt = _rebuild_queues_from_state(bus, ideas_path=_ideas_path)
         if rebuilt:
             print(f"  🔄 Rebuilt queues for {rebuilt} project(s) from saved state")
             has_work = True
         else:
-            has_work = seed_from_master_list(bus)
+            has_work = seed_from_master_list(bus, ideas_path=_ideas_path)
 
     # Final safety net: if queues have pending messages (from stale-reset or
     # a previous run), there IS work — just start the agents and let them process.
@@ -2005,6 +2011,9 @@ def main():
     parser.add_argument("--phase-budget", type=int, default=DEFAULT_PHASE_BUDGET,
                         help=f"Minutes per phase (default: {DEFAULT_PHASE_BUDGET}). "
                              f"Total budget = max(base-budget, phases * phase-budget).")
+    parser.add_argument("--ideas-file", default=None,
+                        help="Path to a specific master ideas file (default: master_ideas.md). "
+                             "Use this to run separate instances on different idea lists.")
 
     args = parser.parse_args()
 
@@ -2022,6 +2031,7 @@ def main():
         time_limit_minutes=args.time_limit,
         base_budget=args.base_budget,
         phase_budget=args.phase_budget,
+        ideas_file=args.ideas_file,
     )
 
 
