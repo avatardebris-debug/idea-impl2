@@ -1419,10 +1419,11 @@ def _advance_phase(
         except Exception:
             pass
 
-    # --- Fallback: trust total_phases field in state ---
-    total_phases = state.get("total_phases", 0)
-    if not phase_found_in_plan and total_phases > 0 and next_phase <= total_phases:
-        phase_found_in_plan = True  # plan says more phases exist
+    # --- REMOVED: total_phases fallback ---
+    # Previously we trusted state["total_phases"] as a fallback when the master
+    # plan didn't have a ## Phase N heading. This caused phantom phases (7-9)
+    # with generic boilerplate tasks when total_phases > actual plan headings.
+    # Now only master_plan.md headings determine available phases.
 
     if not phase_found_in_plan:
         return False  # No more phases
