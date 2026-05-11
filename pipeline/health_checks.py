@@ -74,6 +74,7 @@ def run_all_checks(
     results.extend(check_workspace_imports(pipeline_dir, active_slug))
     results.extend(check_state_consistency(pipeline_dir, active_slug))
     results.extend(check_workspace_file_paths(pipeline_dir, active_slug))
+    results.extend(check_stale_reviews(pipeline_dir))
 
     # Log findings
     for r in results:
@@ -83,6 +84,40 @@ def run_all_checks(
             logger.warning("[health] %s", r)
 
     return results
+
+
+def check_stale_reviews(pipeline_dir: pathlib.Path) -> list[HealthCheckResult]:
+    """Delete boilerplate review files that cause infinite execute/review loops.
+
+    When the reviewer LLM fails to produce output, the reviewer writes a
+    conservative FAIL boilerplate containing 'review file was not generated'.
+    This always has 1 blocking bug, which sends the project back to the
+    executor, creating an infinite loop. Auto-deleting these lets the next
+    review attempt start fresh.
+    """
+    results: list[HealthCheckResult] = []
+    projects_dir = pipeline_dir / "projects"
+    if not projects_dir.exists():
+        return results
+
+    for review_file in projects_dir.rglob("review.md"):
+        try:
+            content = review_file.read_text(encoding="utf-8")
+            if "review file was not generated" in content:
+                review_file.unlink()
+                slug = review_file.relative_to(projects_dir).parts[0]
+                phase = review_file.parent.name
+                results.append(HealthCheckResult(
+                    "stale_review", "warning",
+                    f"Deleted boilerplate review: {slug}/{phase}/review.md",
+                    auto_fixed=True,
+                    fix_detail="Reviewer LLM didn't produce output — removed to prevent infinite loop",
+                ))
+        except Exception:
+            pass
+
+    return results
+
 
 
 # ---------------------------------------------------------------------------
