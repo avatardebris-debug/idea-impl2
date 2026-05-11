@@ -1537,6 +1537,7 @@ def run_pipeline(
     base_budget: int = DEFAULT_BASE_BUDGET,
     phase_budget: int = DEFAULT_PHASE_BUDGET,
     ideas_file: str | None = None,
+    fresh_list_only: bool = False,
 ) -> None:
     """Main pipeline orchestrator."""
     # Override master ideas path if --ideas-file was given
@@ -1558,6 +1559,8 @@ def run_pipeline(
         print(f"  Time:     unlimited")
     print(f"  Agents:   {len(AGENT_ROLES)}")
     print(f"  Budget:   {base_budget}min base, {phase_budget}min/phase")
+    if fresh_list_only:
+        print(f"  Mode:     FRESH LIST ONLY — skipping all stray/in-progress projects")
 
     # Determine what to work on
     has_work = False
@@ -1574,6 +1577,14 @@ def run_pipeline(
     purged = _purge_dep_blocked_messages(bus)
     if purged:
         print(f"  🚫 Purged {purged} dep-blocked queue(s) — will resume when deps complete")
+
+    if fresh_list_only:
+        # Clear ALL existing queues — don't resume stray projects
+        cleared_total = 0
+        for _role in AGENT_ROLES:
+            cleared_total += bus.clear_queue(_role)
+        if cleared_total:
+            print(f"  🧹 Cleared {cleared_total} stale queue message(s) (fresh-list-only mode)")
 
     if resume:
         # Resume always acts like --from-list: keep running until ALL projects
@@ -1596,17 +1607,18 @@ def run_pipeline(
         has_work = True
 
     if not has_work and from_list:
-        # First try to rebuild any in-progress projects from saved state
-        rebuilt = _rebuild_queues_from_state(bus, ideas_path=_ideas_path)
-        if rebuilt:
-            print(f"  🔄 Rebuilt queues for {rebuilt} project(s) from saved state")
-            has_work = True
-        else:
+        # --fresh-list-only: never rebuild stray projects, go straight to ideas file
+        if not fresh_list_only:
+            rebuilt = _rebuild_queues_from_state(bus, ideas_path=_ideas_path)
+            if rebuilt:
+                print(f"  🔄 Rebuilt queues for {rebuilt} project(s) from saved state")
+                has_work = True
+        if not has_work:
             has_work = seed_from_master_list(bus, ideas_path=_ideas_path)
 
     # Final safety net: if queues have pending messages (from stale-reset or
     # a previous run), there IS work — just start the agents and let them process.
-    if not has_work and bus.has_active_work():
+    if not has_work and not fresh_list_only and bus.has_active_work():
         pending_total = sum(bus.queue_depth(r) for r in AGENT_ROLES)
         print(f"  🔄 Found {pending_total} pending queue message(s) — starting agents")
         has_work = True
@@ -1771,8 +1783,7 @@ def run_pipeline(
                     if orphaned:
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
                     if from_list and not bus.has_active_work():
-                        # Queues are empty — seed the next idea (may now be unblocked)
-                        seeded = seed_from_master_list(bus, silent=ideation_in_progress)
+                        seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
                         if seeded:
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
@@ -1785,8 +1796,7 @@ def run_pipeline(
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
                     elif from_list and not orphaned:
-                        # No orphans but queues have work — still try to seed newly unblocked ideas
-                        seed_from_master_list(bus, silent=True)
+                        seed_from_master_list(bus, silent=True, ideas_path=_ideas_path)
 
                 running_agents = sum(1 for s in health.values() if s == "running")
 
@@ -1890,12 +1900,12 @@ def run_pipeline(
                     if not bus.has_active_work():
                         now = time.time()
                         if now - last_orphan_requeue >= ORPHAN_REQUEUE_COOLDOWN:
-                            orphaned = _rebuild_queues_from_state(bus)
+                            orphaned = 0 if fresh_list_only else _rebuild_queues_from_state(bus)
                             if orphaned:
                                 last_orphan_requeue = now
                                 print(f"  🔁 Re-queued {orphaned} orphaned project(s) — not seeding new ideas yet")
                             else:
-                                seeded = seed_from_master_list(bus, silent=ideation_in_progress)
+                                seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
                                 if seeded:
                                     ideation_in_progress = False
                                     ideation_requested_at = 0.0
@@ -2014,6 +2024,9 @@ def main():
     parser.add_argument("--ideas-file", default=None,
                         help="Path to a specific master ideas file (default: master_ideas.md). "
                              "Use this to run separate instances on different idea lists.")
+    parser.add_argument("--fresh-list-only", action="store_true",
+                        help="Skip all stray/in-progress projects. Only work from --ideas-file "
+                             "(or master_ideas.md). Use for a clean second instance.")
 
     args = parser.parse_args()
 
@@ -2032,6 +2045,7 @@ def main():
         base_budget=args.base_budget,
         phase_budget=args.phase_budget,
         ideas_file=args.ideas_file,
+        fresh_list_only=args.fresh_list_only,
     )
 
 
