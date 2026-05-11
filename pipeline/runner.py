@@ -662,7 +662,12 @@ _SEED_BLOCKED = "blocked"  # ideas exist but all deps pending — wait, don't id
 _SEED_EMPTY   = "empty"    # list truly exhausted — safe to trigger ideation
 
 
-def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pathlib.Path | None = None) -> str:
+def seed_from_master_list(
+    bus: MessageBus,
+    silent: bool = False,
+    ideas_path: pathlib.Path | None = None,
+    resume_inprogress: bool = False,
+) -> str:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
     Dependency syntax (append to description):
@@ -755,6 +760,15 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pat
                     _seeded_this_session.add(title)
                     continue
 
+                if resume_inprogress and status not in ("dep_waiting",):
+                    # --fresh-list-only: queues were cleared, so re-queue this project
+                    # by running a targeted rebuild for just this slug.
+                    requeued = _rebuild_single_project(bus, slug, state, project_state.parent.parent)
+                    if requeued:
+                        print(f"  🔄 Re-queued '{title}' from list ({status})")
+                        return _SEED_SEEDED
+                    # If rebuild couldn't queue it (dep_waiting, etc.), fall through
+
                 print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
                 _seeded_this_session.add(title)
                 return _SEED_SEEDED  # Work already exists — do NOT seed another project
@@ -824,6 +838,99 @@ def check_resume(bus: MessageBus) -> bool:
             return True
 
     return False
+
+def _rebuild_single_project(bus: MessageBus, slug: str, state: dict, project_dir: pathlib.Path) -> bool:
+    """Re-queue one specific in-progress project. Returns True if queued."""
+    status = state.get("status", "")
+    title  = state.get("title", slug)
+
+    if status in ("", "complete", "budget_exceeded", "dep_waiting"):
+        return False
+
+    # Reset session budget timer
+    _now = datetime.now(timezone.utc).isoformat()
+    state["session_started_at"] = _now
+    state.pop("budget_note", None)
+    state_file = project_dir / "state" / "current_idea.json"
+    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    if status == "planning":
+        bus.send(Message.create(from_agent="runner", to_agent="idea_planner", type="task",
+            payload={"title": title, "idea": state.get("description", title), "idea_slug": slug}))
+        return True
+
+    if not status.startswith("phase_"):
+        return False
+
+    phase_match = re.match(r"phase_(\d+)_(\w+)", status)
+    if not phase_match:
+        return False
+    phase_num  = int(phase_match.group(1))
+    phase_step = phase_match.group(2)
+
+    tasks_path     = f"phases/phase_{phase_num}/tasks.md"
+    workspace_path = str(project_dir / "workspace")
+    report_path    = f"phases/phase_{phase_num}/validation_report.md"
+    review_path    = f"phases/phase_{phase_num}/review.md"
+
+    if phase_step == "planning":
+        master_plan_file = project_dir / "state" / "master_plan.md"
+        phase_spec = f"Resume phase {phase_num} of {title}"
+        if master_plan_file.exists():
+            try:
+                mp = master_plan_file.read_text(encoding="utf-8")
+                m = re.search(rf"## Phase {phase_num}\b[^\n]*\n.*?(?=## Phase \d|$)", mp, re.DOTALL | re.IGNORECASE)
+                if m:
+                    phase_spec = m.group(0)[:3000]
+            except Exception:
+                pass
+        bus.send(Message.create(from_agent="runner", to_agent="phase_planner", type="task",
+            payload={"phase": phase_num, "phase_spec": phase_spec, "idea_slug": slug}))
+    elif phase_step == "executing":
+        tasks_file_path = project_dir / tasks_path
+        if not tasks_file_path.exists():
+            ph_spec = f"Phase {phase_num} of project {slug}"
+            mp_file = project_dir / "state" / "master_plan.md"
+            if mp_file.exists():
+                try:
+                    mp_txt = mp_file.read_text(encoding="utf-8")
+                    pm = re.search(rf"## Phase {phase_num}\b.*?(?=## Phase \d|$)", mp_txt, re.DOTALL | re.IGNORECASE)
+                    if pm:
+                        ph_spec = pm.group(0)
+                except Exception:
+                    pass
+            _write_state(project_dir, state, f"phase_{phase_num}_planning")
+            bus.send(Message.create(from_agent="runner", to_agent="phase_planner", type="task",
+                payload={"phase": phase_num, "phase_spec": ph_spec[:3000], "idea_slug": slug}))
+        else:
+            bus.send(Message.create(from_agent="runner", to_agent="executor", type="task",
+                payload={"phase": phase_num, "tasks_path": tasks_path,
+                         "workspace_path": workspace_path, "idea_slug": slug}))
+    elif phase_step == "validating":
+        existing_report = ""
+        report_file = project_dir / report_path
+        if report_file.exists():
+            try:
+                existing_report = report_file.read_text(encoding="utf-8")[:3000]
+            except Exception:
+                pass
+        has_failures = existing_report and "Verdict: PASS" not in existing_report
+        bus.send(Message.create(from_agent="runner", to_agent="validator", type="task",
+            payload={"phase": phase_num, "tasks_path": tasks_path, "workspace_path": workspace_path,
+                     "validation_report_path": report_path, "idea_slug": slug,
+                     "fix_required": has_failures, "validation_report": existing_report if has_failures else "",
+                     "error_summary": "Re-queued by runner — continue fixing failures." if has_failures else ""}))
+    elif phase_step == "reviewing":
+        bus.send(Message.create(from_agent="runner", to_agent="reviewer", type="task",
+            payload={"phase": phase_num, "tasks_path": tasks_path, "workspace_path": workspace_path,
+                     "validation_report_path": report_path, "review_path": review_path, "idea_slug": slug}))
+    elif phase_step == "reviewed":
+        return bool(_tick_project(bus, project_dir, state, phase_num, slug))
+    else:
+        return False
+
+    return True
+
 
 def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None = None) -> int:
     """Re-inject a queue message for ONE in-progress project that has no queued work.
@@ -1621,7 +1728,8 @@ def run_pipeline(
                 print(f"  🔄 Rebuilt queues for {rebuilt} project(s) from saved state")
                 has_work = True
         if not has_work:
-            seed_result = seed_from_master_list(bus, ideas_path=_ideas_path)
+            seed_result = seed_from_master_list(bus, ideas_path=_ideas_path,
+                                                resume_inprogress=fresh_list_only)
             has_work = seed_result in (_SEED_SEEDED, _SEED_BLOCKED)
 
     # Final safety net: if queues have pending messages (from stale-reset or
