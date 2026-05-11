@@ -656,7 +656,13 @@ def _request_ideation(bus: MessageBus) -> None:
     print("\n  🧠 master_ideas.md exhausted — queued Ideator to generate 30 new ideas...")
 
 
-def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pathlib.Path | None = None) -> bool:
+# Return values for seed_from_master_list
+_SEED_SEEDED  = "seeded"   # started a new project
+_SEED_BLOCKED = "blocked"  # ideas exist but all deps pending — wait, don't ideate
+_SEED_EMPTY   = "empty"    # list truly exhausted — safe to trigger ideation
+
+
+def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pathlib.Path | None = None) -> str:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
     Dependency syntax (append to description):
@@ -751,7 +757,7 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pat
 
                 print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
                 _seeded_this_session.add(title)
-                return True  # Work already exists — do NOT seed another project
+                return _SEED_SEEDED  # Work already exists — do NOT seed another project
             except Exception:
                 pass  # Can't read state — seed it fresh
 
@@ -794,13 +800,14 @@ def seed_from_master_list(bus: MessageBus, silent: bool = False, ideas_path: pat
                 continue  # try the next idea in the list
 
         seed_idea(bus, title, description, deps=deps or None, locked=locked)
-        return True
+        return _SEED_SEEDED
 
     if blocked_count > 0:
         print(f"  [BLOCKED] {blocked_count} idea(s) blocked on dependencies -- will retry next tick")
+        return _SEED_BLOCKED  # don't trigger ideation — deps will resolve
     elif not silent:
         print("  ✗ No unchecked ideas found in master_ideas.md")
-    return False
+    return _SEED_EMPTY
 
 
 def check_resume(bus: MessageBus) -> bool:
@@ -1614,7 +1621,8 @@ def run_pipeline(
                 print(f"  🔄 Rebuilt queues for {rebuilt} project(s) from saved state")
                 has_work = True
         if not has_work:
-            has_work = seed_from_master_list(bus, ideas_path=_ideas_path)
+            seed_result = seed_from_master_list(bus, ideas_path=_ideas_path)
+            has_work = seed_result in (_SEED_SEEDED, _SEED_BLOCKED)
 
     # Final safety net: if queues have pending messages (from stale-reset or
     # a previous run), there IS work — just start the agents and let them process.
@@ -1784,17 +1792,18 @@ def run_pipeline(
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
                     if from_list and not bus.has_active_work():
                         seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
-                        if seeded:
+                        if seeded == _SEED_SEEDED:
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
-                        elif not ideation_in_progress:
+                        elif seeded == _SEED_EMPTY and not ideation_in_progress:
                             _request_ideation(bus)
                             ideation_in_progress = True
                             ideation_requested_at = time.time()
-                        elif time.time() - ideation_requested_at > IDEATION_TIMEOUT:
+                        elif seeded == _SEED_EMPTY and time.time() - ideation_requested_at > IDEATION_TIMEOUT:
                             print("  ⏰ Ideation timed out — retrying...")
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
+                        # _SEED_BLOCKED — deps pending, just wait
                     elif from_list and not orphaned:
                         seed_from_master_list(bus, silent=True, ideas_path=_ideas_path)
 
@@ -1906,17 +1915,18 @@ def run_pipeline(
                                 print(f"  🔁 Re-queued {orphaned} orphaned project(s) — not seeding new ideas yet")
                             else:
                                 seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
-                                if seeded:
+                                if seeded == _SEED_SEEDED:
                                     ideation_in_progress = False
                                     ideation_requested_at = 0.0
-                                elif not ideation_in_progress:
+                                elif seeded == _SEED_EMPTY and not ideation_in_progress:
                                     _request_ideation(bus)
                                     ideation_in_progress = True
                                     ideation_requested_at = time.time()
-                                elif time.time() - ideation_requested_at > IDEATION_TIMEOUT:
+                                elif seeded == _SEED_EMPTY and time.time() - ideation_requested_at > IDEATION_TIMEOUT:
                                     print("  ⏰ Ideation timed out — retrying...")
                                     ideation_in_progress = False
                                     ideation_requested_at = 0.0
+                                # _SEED_BLOCKED — deps pending, just wait
 
                 # --- Collect per-project metrics from state files ---
                 try:
