@@ -184,14 +184,20 @@ class ReviewerAgent(AgentProcess):
             )
         else:
             # --- PRE-VALIDATION: Structural review → route to validator or back to executor ---
-            if blocking_count > 0:
+            retry_count = msg.payload.get("retry_count", 0)
+            MAX_PRE_VALIDATION_RETRIES = 3
+
+            # If the reviewer LLM failed to produce output, don't blame the executor —
+            # just forward to validator and let the post-validation path handle it.
+            review_was_generated = "review file was not generated" not in review_content
+
+            if blocking_count > 0 and review_was_generated and retry_count < MAX_PRE_VALIDATION_RETRIES:
                 # Structural issues found — send back to executor, skip validation
                 import logging as _log
                 _log.getLogger(__name__).info(
-                    "[reviewer] Pre-validation: %d blocking bugs → executor (skipping tests)",
-                    blocking_count,
+                    "[reviewer] Pre-validation: %d blocking bugs → executor (attempt %d/%d)",
+                    blocking_count, retry_count + 1, MAX_PRE_VALIDATION_RETRIES,
                 )
-                retry_count = msg.payload.get("retry_count", 0)
                 out_msg = Message.create(
                     from_agent=self.role,
                     to_agent="executor",
@@ -208,7 +214,7 @@ class ReviewerAgent(AgentProcess):
                             f"issues first — tests have NOT been run yet."
                         ),
                         "idea_slug": idea_slug,
-                        "retry_count": retry_count,
+                        "retry_count": retry_count + 1,
                     },
                 )
                 # Update status to reflect we're in fix mode
