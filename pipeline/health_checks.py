@@ -324,7 +324,7 @@ def check_workspace_imports(
     for mod in sorted(missing_imports):
         try:
             __import__(mod)
-        except ImportError:
+        except (ImportError, SyntaxError, Exception):
             results.append(HealthCheckResult(
                 "missing_import", "warning",
                 f"Module '{mod}' imported but not installed or in workspace",

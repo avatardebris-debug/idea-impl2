@@ -1842,7 +1842,7 @@ def run_pipeline(
                                 print(f"  🩺 Health check: {fixes} auto-fixed, {issues} reported")
                             write_health_report(hc_results, PIPELINE_DIR)
                     except Exception as _hc_err:
-                        logger.debug("[health] Check failed: %s", _hc_err)
+                        print(f"  [health] Check failed: {_hc_err}")
 
                 # Check if all queues are empty AND all ideas done
                 all_empty = bus.all_queues_empty()
