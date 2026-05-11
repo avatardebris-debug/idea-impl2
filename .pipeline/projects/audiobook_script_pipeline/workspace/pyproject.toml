@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "audiobook-script-pipeline"
+version = "0.1.0"
+description = "Convert manuscripts into formatted audio scripts with pacing markers for TTS consumption."
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "Audiobook Pipeline Team"}
+]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Text Processing :: General",
+]
+
+[project.scripts]
+audiobook-pipeline = "audiobook_script_pipeline.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["audiobook_script_pipeline*"]

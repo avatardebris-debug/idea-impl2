@@ -1,0 +1,16 @@
+{
+  "title": "Financial Portfolio Simulator",
+  "description": "Monte Carlo risk analysis and strategy training for stock and crypto portfolios using proven simulation math",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-07T09:25:47.365469+00:00",
+  "depends_on": [
+    "csv_analyzer"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "session_started_at": "2026-05-07T08:03:44.778817+00:00",
+  "_slug": "financial_portfolio_simulator",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

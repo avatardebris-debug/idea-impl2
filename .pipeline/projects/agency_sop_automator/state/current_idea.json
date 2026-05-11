@@ -1,0 +1,10 @@
+{
+  "title": "Agency SOP Automator",
+  "slug": "agency_sop_automator",
+  "status": "phase_1_planning",
+  "depends_on": [
+    "drop_servicing_tool"
+  ],
+  "budget_lock": false,
+  "started_at": "2026-05-07T12:11:45.471465+00:00"
+}

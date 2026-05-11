@@ -52,6 +52,10 @@ class TranscriptParser:
 
     def _detect_format(self, path: str) -> str:
         """Detect format — public alias for detect_format."""
+        p = Path(path)
+        ext = p.suffix.lower()
+        if ext not in self.SUPPORTED_EXTENSIONS:
+            raise ValueError(f"Unsupported format for: {path}")
         fmt = self.detect_format(path)
         if fmt == "unknown":
             raise ValueError(f"Unsupported format for: {path}")
@@ -82,12 +86,14 @@ class TranscriptParser:
 
     def _clean_text(self, text: str) -> str:
         """Clean text by removing speaker labels, music tags, and normalizing whitespace."""
-        # Remove speaker labels
-        text = re.sub(r"^(host|guest|narrator|announcer|moderator)\s*:\s*", "", text, flags=re.IGNORECASE)
+        # Remove speaker labels (use MULTILINE to match at start of each line)
+        text = re.sub(r"^(host|guest|narrator|announcer|moderator)\s*:\s*", "", text, flags=re.IGNORECASE | re.MULTILINE)
+        # Remove inline speaker labels (e.g., "Guest: Hi" in middle of text)
+        text = re.sub(r"\b(host|guest|narrator|announcer|moderator)\s*:\s*", "", text, flags=re.IGNORECASE)
         # Remove music tags
         text = re.sub(r"\[Music\]", "", text, flags=re.IGNORECASE)
         # Remove apostrophes (e.g., "It's" -> "Its")
-        text = re.sub(r"'s\b", "", text)
+        text = re.sub(r"'s\b", "s", text)
         # Normalize whitespace
         text = re.sub(r"\n\s*\n", " ", text)
         text = re.sub(r"\s+", " ", text)

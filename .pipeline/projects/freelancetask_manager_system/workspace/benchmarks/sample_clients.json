@@ -1,0 +1,77 @@
+[
+  {
+    "name": "Acme Corp",
+    "email": "contact@acmecorp.com",
+    "industry": "Technology",
+    "company_size": "50-200 employees",
+    "budget_range": "$5000-$15000",
+    "needs": [
+      "Modernize legacy website",
+      "Improve mobile experience",
+      "Increase organic traffic by 40%"
+    ],
+    "pain_points": [
+      "Outdated design not reflecting brand",
+      "Poor mobile responsiveness",
+      "Slow page load times"
+    ],
+    "goals": [
+      "Increase lead generation by 25%",
+      "Improve brand perception",
+      "Reduce bounce rate by 30%"
+    ],
+    "decision_maker": "Sarah Johnson, CMO",
+    "timeline_preference": "4-6 weeks",
+    "notes": "Interested in SEO as part of redesign. Has internal marketing team for ongoing support."
+  },
+  {
+    "name": "GreenLeaf Organics",
+    "email": "hello@greenleaforganics.com",
+    "industry": "Food & Beverage",
+    "company_size": "10-50 employees",
+    "budget_range": "$3000-$8000",
+    "needs": [
+      "E-commerce store for organic products",
+      "Subscription box functionality",
+      "Brand-aligned design"
+    ],
+    "pain_points": [
+      "No online sales channel",
+      "Manual order processing",
+      "Limited brand visibility"
+    ],
+    "goals": [
+      "Launch online store within 2 months",
+      "Achieve $10K monthly revenue in first quarter",
+      "Build email list of 5000 subscribers"
+    ],
+    "decision_maker": "Mike Chen, Founder",
+    "timeline_preference": "6-8 weeks",
+    "notes": "Bootstrapped startup. Needs cost-effective solution. Prefers Shopify over custom build."
+  },
+  {
+    "name": "TechStart Inc",
+    "email": "founder@techstart.io",
+    "industry": "SaaS",
+    "company_size": "5-10 employees",
+    "budget_range": "$10000-$25000",
+    "needs": [
+      "Landing page for new product launch",
+      "SEO strategy for B2B keywords",
+      "Content marketing framework"
+    ],
+    "pain_points": [
+      "Low conversion rate on current site",
+      "No clear SEO strategy",
+      "Inconsistent brand messaging"
+    ],
+    "goals": [
+      "Generate 100 qualified leads per month",
+      "Rank on page 1 for 5 key terms",
+      "Establish thought leadership in niche"
+    ],
+    "decision_maker": "Alex Rivera, CEO",
+    "timeline_preference": "2-4 weeks for landing page, ongoing for SEO",
+    "notes": "Series A funded. Looking for long-term SEO partner. Has existing brand guidelines."
+  }
+]

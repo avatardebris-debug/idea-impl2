@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "manuscriptdata-analyzer"
+version = "0.1.0"
+description = "CLI tool for ingesting CSV book sales data and generating performance analytics"
+requires-python = ">=3.9"
+dependencies = [
+    "click>=8.0",
+]
+
+[project.scripts]
+manuscriptdata-analyzer = "manuscriptdata_analyzer.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["manuscriptdata_analyzer*"]

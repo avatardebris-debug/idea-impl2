@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CharacterRegistry",
+  "description": "Registry of all characters in the screenplay.",
+  "type": "object",
+  "properties": {
+    "characters": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "role", "physical_description"],
+        "properties": {
+          "id": {"type": "string"},
+          "name": {"type": "string"},
+          "role": {"type": "string", "enum": ["protagonist", "antagonist", "mentor", "ally", "sidekick", "deus_ex_machina", "supporting"]},
+          "physical_description": {"type": "string"},
+          "personality_traits": {"type": "array", "items": {"type": "string"}},
+          "voice_notes": {"type": "string"},
+          "costume_notes": {"type": "string"},
+          "visual_anchor": {"type": "string"},
+          "backstory": {"type": "string"},
+          "arc_summary": {"type": "string"}
+        }
+      }
+    }
+  }
+}

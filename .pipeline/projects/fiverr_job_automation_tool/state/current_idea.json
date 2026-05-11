@@ -1,7 +1,7 @@
 {
   "title": "[fiverr job automation tool]",
   "description": "[create automated tasks on fiverr.]",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "total_phases": 3,
   "started_at": "2026-05-01T04:21:22.501664+00:00",
   "tasks_done": 0,
@@ -11,6 +11,5 @@
     "blocking_bugs": 0,
     "non_blocking_notes": "Force-advanced: scorer.py return-None bugs noted for polish"
   },
-  "_slug": "fiverr_job_automation_tool",
-  "budget_note": "Force-completed after 90 min (budget: 90 min)"
+  "_slug": "fiverr_job_automation_tool"
 }

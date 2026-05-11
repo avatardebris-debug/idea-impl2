@@ -1,0 +1,14 @@
+{
+  "title": "[DependencyVuln Code Scanner]",
+  "description": "Create a CLI utility that audits project dependency trees, cross-references CVE databases, and outputs prioritized remediation reports.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-07T02:39:01.315300+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6,
+  "session_started_at": "2026-05-07T01:40:57.985336+00:00",
+  "_slug": "dependencyvuln_code_scanner",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

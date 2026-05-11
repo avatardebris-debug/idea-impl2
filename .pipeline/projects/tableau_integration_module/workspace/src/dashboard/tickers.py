@@ -1,93 +1,99 @@
-"""DashboardTicker class extending src.ticker.Ticker.
-
-Provides a ticker that carries all three dashboard metric types
-and exposes price_color-style visual hints based on win rate sign.
-"""
-
-from __future__ import annotations
+"""Dashboard ticker that extends Ticker with dashboard-specific metrics."""
 
 import time
-from dataclasses import dataclass, field
-from typing import Any, Dict
-
 from src.ticker import Ticker
-
 from src.dashboard.models import (
-    BankrollCurvePoint,
-    DashboardState,
-    NashEquilibriumShift,
     WinRateMetric,
+    BankrollCurvePoint,
+    NashEquilibriumShift,
+    DashboardState,
 )
 
 
-@dataclass
 class DashboardTicker(Ticker):
-    """Ticker that carries card-game simulation metrics.
+    """A ticker that tracks dashboard-specific metrics."""
 
-    Extends the base ``Ticker`` with three metric-specific fields:
-      - current_win_rate:  WinRateMetric
-      - bankroll_history:  BankrollCurvePoint
-      - nash_distance:     NashEquilibriumShift
-
-    The ``price_color`` property is overridden to return:
-      - 'green'  when win rate > 0.5 (positive)
-      - 'red'    when win rate < 0.5 (negative)
-      - 'white'  when win rate == 0.5 (neutral)
-    """
-
-    current_win_rate: WinRateMetric = field(default_factory=WinRateMetric)
-    bankroll_history: BankrollCurvePoint = field(default_factory=BankrollCurvePoint)
-    nash_distance: NashEquilibriumShift = field(default_factory=NashEquilibriumShift)
+    def __init__(
+        self,
+        symbol: str = "",
+        current_win_rate: float | WinRateMetric = 0.0,
+        bankroll_history: float | BankrollCurvePoint = 0.0,
+        nash_distance: float | NashEquilibriumShift = 0.0,
+    ):
+        super().__init__(symbol=symbol)
+        # Accept floats and convert to objects
+        if isinstance(current_win_rate, (int, float)):
+            self.current_win_rate = WinRateMetric(value=float(current_win_rate))
+        else:
+            self.current_win_rate = current_win_rate or WinRateMetric()
+        if isinstance(bankroll_history, (int, float)):
+            self.bankroll_history = BankrollCurvePoint(bankroll=float(bankroll_history))
+        else:
+            self.bankroll_history = bankroll_history or BankrollCurvePoint()
+        if isinstance(nash_distance, (int, float)):
+            self.nash_distance = NashEquilibriumShift(distance=float(nash_distance))
+        else:
+            self.nash_distance = nash_distance or NashEquilibriumShift()
 
     @property
     def price_color(self) -> str:
-        """Return a color hint based on win rate relative to 0.5.
-
-        - 'green'  if win rate > 0.5 (positive)
-        - 'red'    if win rate < 0.5 (negative)
-        - 'white'  if win rate == 0.5 (neutral)
-        """
-        wr = self.current_win_rate.value
-        if wr > 0.5:
+        """Return color based on win rate."""
+        if self.current_win_rate.value > 0.5:
             return "green"
-        elif wr < 0.5:
+        elif self.current_win_rate.value < 0.5:
             return "red"
-        return "white"
+        else:
+            return "white"
 
     def update_from_state(self, state: DashboardState) -> None:
-        """Update all metric fields from a DashboardState snapshot."""
+        """Update ticker from a DashboardState."""
         self.current_win_rate = state.win_rate
         self.bankroll_history = state.bankroll
-        self.nash_distance = state.nash_shift
+        self.nash_distance = state.nash_distance
         self.price = state.win_rate.value
         self.timestamp = state.timestamp
-        # Update price/previous_price without overwriting timestamp
-        self.previous_price = self.price
-        self.price = self.price
 
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize the full dashboard ticker to a plain dict."""
-        base = super().to_dict()
-        base.update({
+    def update_price(self, new_price: float) -> None:
+        """Update the price and record the previous price."""
+        self.previous_price = self.price
+        self.price = new_price
+        self.timestamp = time.time()
+
+    @property
+    def price_change(self) -> float:
+        """Return the absolute price change."""
+        return self.price - self.previous_price
+
+    @property
+    def price_change_percent(self) -> float:
+        """Return the price change as a percentage.
+
+        Returns 0.0 when the previous price is zero to avoid division by zero.
+        """
+        if self.previous_price == 0:
+            return 0.0
+        return (self.price - self.previous_price) / self.previous_price * 100
+
+    def to_dict(self) -> dict:
+        """Serialize to dictionary."""
+        return {
+            "symbol": self.symbol,
+            "price": self.price,
+            "timestamp": self.timestamp,
+            "previous_price": self.previous_price,
             "current_win_rate": self.current_win_rate.to_dict(),
             "bankroll_history": self.bankroll_history.to_dict(),
             "nash_distance": self.nash_distance.to_dict(),
-        })
-        return base
+        }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "DashboardTicker":
-        """Deserialize a DashboardTicker from a plain dict."""
-        t = cls(
-            symbol=data.get("symbol", "DASHBOARD"),
-            price=float(data.get("price", 0.0)),
-            timestamp=float(data.get("timestamp", time.time())),
-            previous_price=float(data.get("previous_price", 0.0)),
-        )
-        if "current_win_rate" in data:
-            t.current_win_rate = WinRateMetric.from_dict(data["current_win_rate"])
-        if "bankroll_history" in data:
-            t.bankroll_history = BankrollCurvePoint.from_dict(data["bankroll_history"])
-        if "nash_distance" in data:
-            t.nash_distance = NashEquilibriumShift.from_dict(data["nash_distance"])
-        return t
+    def from_dict(cls, data: dict) -> "DashboardTicker":
+        """Deserialize from dictionary."""
+        dt = cls(symbol=data.get("symbol", ""))
+        dt.price = data.get("price", 0.0)
+        dt.timestamp = data.get("timestamp", time.time())
+        dt.previous_price = data.get("previous_price", 0.0)
+        dt.current_win_rate = WinRateMetric.from_dict(data.get("current_win_rate", {}))
+        dt.bankroll_history = BankrollCurvePoint.from_dict(data.get("bankroll_history", {}))
+        dt.nash_distance = NashEquilibriumShift.from_dict(data.get("nash_distance", {}))
+        return dt

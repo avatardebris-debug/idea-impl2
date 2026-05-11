@@ -87,12 +87,12 @@ class Classifier:
 
         if not scores:
             category = "general"
-            urgency = Urgency.LOW
+            urgency = "low"
             priority_score = 1
         else:
             category = max(scores, key=scores.get)
             rule = self.rules[category]
-            urgency = Urgency(rule["base_urgency"])
+            urgency = rule["base_urgency"]
             priority_score = rule["priority_base"]
 
             # Boost priority for urgent keywords
@@ -111,6 +111,21 @@ class Classifier:
             "urgency": urgency,
             "priority_score": priority_score,
         }
+
+    def classify_ticket(self, ticket: Ticket) -> Dict[str, Any]:
+        """Classify a ticket and mutate it in place.
+
+        Args:
+            ticket: The ticket to classify.
+
+        Returns:
+            The classification result dict.
+        """
+        result = self.classify(ticket)
+        ticket.category = result["category"]
+        ticket.urgency = Urgency(result["urgency"])
+        ticket.priority_score = result["priority_score"]
+        return result
 
     def add_rule(self, category: str, keywords: List[str], base_urgency: str = "low", priority_base: int = 1) -> None:
         """Add or update a classification rule.

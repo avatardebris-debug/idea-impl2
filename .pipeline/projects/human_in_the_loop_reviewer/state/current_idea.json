@@ -1,0 +1,12 @@
+{
+  "title": "[Human-in-the-Loop Reviewer]",
+  "description": "Integrate a manual approval checkpoint into the drop-servicing SOP executor, allowing agents to pause execution until a human validates outputs.",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-06T10:05:04.017342+00:00",
+  "depends_on": [],
+  "tasks_done": 5,
+  "tasks_total": 5,
+  "session_started_at": "2026-05-06T08:32:58.887027+00:00"
+}

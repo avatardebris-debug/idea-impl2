@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Project",
+  "description": "Top-level project container for the AI Movie Generation Suite",
+  "type": "object",
+  "required": ["project_id", "title", "logline"],
+  "properties": {
+    "project_id": { "type": "string" },
+    "title": { "type": "string" },
+    "logline": { "type": "string" },
+    "genre": { "type": "string", "enum": ["action","adventure","animation","comedy","crime","documentary","drama","fantasy","horror","mystery","romance","sci_fi","thriller","western"] },
+    "tone": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "beats": { "$ref": "#/definitions/BeatSheet" },
+    "characters": { "$ref": "#/definitions/CharacterRegistry" },
+    "script": { "$ref": "#/definitions/Script" }
+  },
+  "definitions": {
+    "BeatSheet": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "logline": { "type": "string" },
+        "beats": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Beat" }
+        }
+      }
+    },
+    "Beat": {
+      "type": "object",
+      "required": ["beat_number", "beat_name", "summary", "description"],
+      "properties": {
+        "beat_number": { "type": "integer", "minimum": 1, "maximum": 15 },
+        "beat_name": { "type": "string" },
+        "summary": { "type": "string" },
+        "description": { "type": "string" },
+        "characters_involved": { "type": "array", "items": { "type": "string" } },
+        "estimated_page_range": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "CharacterRegistry": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "characters": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Character" }
+        }
+      }
+    },
+    "Character": {
+      "type": "object",
+      "required": ["id", "name", "role"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["protagonist","antagonist","mentor","sidekick","deuteragonist","supporting","extra"] },
+        "physical_description": { "type": "string" },
+        "personality_traits": { "type": "array", "items": { "type": "string" } },
+        "voice_notes": { "type": "string" },
+        "costume_notes": { "type": "string" },
+        "backstory": { "type": "string" },
+        "visual_anchor": { "type": "string" },
+        "arc_summary": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "Script": {
+      "type": "object",
+      "properties": {
+        "project_id": { "type": "string" },
+        "logline": { "type": "string" },
+        "scenes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Scene" }
+        }
+      }
+    },
+    "Scene": {
+      "type": "object",
+      "required": ["scene_id", "scene_heading"],
+      "properties": {
+        "scene_id": { "type": "string" },
+        "scene_heading": { "type": "string" },
+        "action": { "type": "string" },
+        "characters_present": { "type": "array", "items": { "type": "string" } },
+        "dialogue_lines": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/DialogueLine" }
+        },
+        "estimated_page_range": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    },
+    "DialogueLine": {
+      "type": "object",
+      "required": ["character_id", "character_name", "text"],
+      "properties": {
+        "character_id": { "type": "string" },
+        "character_name": { "type": "string" },
+        "text": { "type": "string" },
+        "parenthetical": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

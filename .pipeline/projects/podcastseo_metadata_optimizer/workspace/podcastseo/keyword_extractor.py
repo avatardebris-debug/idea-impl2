@@ -98,9 +98,8 @@ class KeywordExtractor:
 
         return sw
 
-    def _get_entities(self, text: str) -> Dict[str, str]:
-        """Extract NER entities and their categories from text."""
-        doc = self.nlp(text)
+    def _get_entities(self, doc: spacy.tokens.Doc) -> Dict[str, str]:
+        """Extract NER entities and their categories from a spaCy doc."""
         entities: Dict[str, str] = {}
         for ent in doc.ents:
             key = ent.text.lower()
@@ -110,8 +109,8 @@ class KeywordExtractor:
         return entities
 
     def _count_occurrences(self, text: str, keyword: str) -> int:
-        """Count case-insensitive occurrences of a keyword in text."""
-        return len(re.findall(re.escape(keyword), text, re.IGNORECASE))
+        """Count case-insensitive occurrences of a keyword in text using simple string counting."""
+        return text.lower().count(keyword.lower())
 
     def _extract_bigrams_trigrams(self, text: str) -> List[str]:
         """Extract bigrams and trigrams from tokenized text."""
@@ -156,11 +155,11 @@ class KeywordExtractor:
 
         # Check against predefined keyword lists
         for tech_kw in self.TECH_KEYWORDS:
-            if tech_kw in kw_lower:
+            if tech_kw in kw_lower or kw_lower in tech_kw:
                 return "technical"
 
         for brand_kw in self.BRAND_KEYWORDS:
-            if brand_kw in kw_lower:
+            if brand_kw in kw_lower or kw_lower in brand_kw:
                 return "brand"
 
         # Health-related keywords
@@ -212,27 +211,53 @@ class KeywordExtractor:
         if top_n is None:
             top_n = self.top_n
 
-        # Handle single word
-        if len(text.split()) == 1:
-            word = text.strip().lower()
-            if word in self.stopwords:
-                return []
-            return [{
-                "keyword": word,
-                "score": 1.0,
-                "category": "topic",
-                "occurrences": 1,
-            }]
+        # Handle single word or very short input (1-2 words)
+        words = text.strip().split()
+        if len(words) <= 2:
+            # For very short inputs, return the first non-stopword as the keyword
+            for word in words:
+                w = word.strip().lower()
+                if w and w not in self.stopwords:
+                    return [{
+                        "keyword": w,
+                        "score": 1.0,
+                        "category": "general",
+                        "occurrences": 1,
+                    }]
+            return []
+
+        # Run spaCy once and reuse the doc
+        doc = self.nlp(text)
 
         # Get NER entities for boosting
-        ner_entities = self._get_entities(text)
+        ner_entities = self._get_entities(doc)
 
-        # Extract phrases (bigrams/trigrams)
-        phrases = self._extract_bigrams_trigrams(text)
+        # Extract phrases (bigrams/trigrams) from the doc
+        phrases: List[str] = []
+
+        # Extract noun phrases and multi-word tokens
+        for chunk in doc.noun_chunks:
+            phrase = chunk.text.strip().lower()
+            if phrase and len(phrase) > 2 and phrase not in self.stopwords:
+                phrases.append(phrase)
+
+        # Also extract consecutive noun/adjective sequences
+        for i in range(len(doc) - 1):
+            if doc[i].pos_ in ("NOUN", "PROPN", "ADJ") and doc[i + 1].pos_ in ("NOUN", "PROPN"):
+                bigram = f"{doc[i].text.lower()} {doc[i + 1].text.lower()}"
+                if bigram not in self.stopwords and len(bigram) > 3:
+                    phrases.append(bigram)
+
+        for i in range(len(doc) - 2):
+            if (doc[i].pos_ in ("NOUN", "PROPN", "ADJ") and
+                    doc[i + 1].pos_ in ("NOUN", "PROPN", "ADJ") and
+                    doc[i + 2].pos_ in ("NOUN", "PROPN")):
+                trigram = f"{doc[i].text.lower()} {doc[i + 1].text.lower()} {doc[i + 2].text.lower()}"
+                if trigram not in self.stopwords and len(trigram) > 4:
+                    phrases.append(trigram)
 
         # Combine single words and phrases for TF-IDF
         # Single words: tokens that are nouns, proper nouns, or adjectives
-        doc = self.nlp(text)
         single_words: List[str] = []
         for token in doc:
             if (token.pos_ in ("NOUN", "PROPN", "ADJ") and
@@ -262,7 +287,7 @@ class KeywordExtractor:
                 score = float(scores[i])
                 if score > 0:
                     category = self._classify_keyword(phrase, ner_entities)
-                    occurrences = self._count_occurrences(text, phrase)
+                    occurrences = text.lower().count(phrase.lower())
                     candidates.append((phrase, score, category, occurrences))
 
         # TF-IDF on single words
@@ -279,13 +304,13 @@ class KeywordExtractor:
                 score = float(scores[i])
                 if score > 0:
                     category = self._classify_keyword(word, ner_entities)
-                    occurrences = self._count_occurrences(text, word)
+                    occurrences = text.lower().count(word.lower())
                     candidates.append((word, score, category, occurrences))
 
         # Boost NER entities
         for entity, category in ner_entities.items():
             if entity not in [c[0] for c in candidates]:
-                occurrences = self._count_occurrences(text, entity)
+                occurrences = text.lower().count(entity.lower())
                 if occurrences > 0:
                     candidates.append((entity, 0.5, category, occurrences))
 

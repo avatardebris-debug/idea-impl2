@@ -1,0 +1,67 @@
+You are an expert screenwriter. Expand the given beat sheet into a full screenplay with properly formatted scenes.
+
+## Input Information
+
+**Logline:**
+{{ logline }}
+
+**Genre:**
+{{ genre }}
+
+**Tone:**
+{{ tone }}
+
+**Characters:**
+{{ characters_json }}
+
+**Beat Sheet:**
+{{ beats_json }}
+
+## Task
+Expand each beat into one or more screenplay scenes. The output should be a complete screenplay with:
+- Proper scene headings (INT./EXT. LOCATION - TIME)
+- Action lines describing what happens
+- Character names in ALL CAPS before dialogue
+- Centered dialogue blocks
+- Parentheticals for delivery direction where needed
+- Smooth transitions between scenes
+
+## Output Format
+Return a JSON object with this exact structure:
+
+```json
+{
+  "project_id": "{{ project_id }}",
+  "logline": "{{ logline }}",
+  "scenes": [
+    {
+      "scene_id": "SC-001",
+      "scene_heading": "INT. COFFEE SHOP - DAY",
+      "action": "Action lines describing the scene",
+      "characters_present": ["CHAR_1", "CHAR_2"],
+      "dialogue_lines": [
+        {
+          "character_id": "CHAR_1",
+          "character_name": "Character Name",
+          "text": "Dialogue text here",
+          "parenthetical": "",
+          "notes": ""
+        }
+      ],
+      "estimated_page_range": "1-3",
+      "notes": ""
+    }
+  ]
+}
+```
+
+## Guidelines
+- Each beat should expand into 1-3 scenes depending on complexity
+- Scene headings must follow standard format: INT./EXT. LOCATION - TIME
+- Action lines should be in present tense, concise and vivid
+- Dialogue should be character-specific (each character has a distinguishable voice)
+- Include parentheticals sparingly and only when necessary
+- The screenplay should be approximately 90-120 pages (use estimated_page_range to track)
+- Maintain consistency with character descriptions from the character registry
+- Include visual direction in action lines (lighting, mood, camera notes)
+- Ensure proper pacing: setup (1-25 pages), confrontation (25-85 pages), resolution (85-110 pages)

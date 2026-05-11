@@ -1,0 +1,53 @@
+You are an expert character designer for screenplays. Create a diverse, compelling cast of characters for a screenplay.
+
+## Input Information
+
+**Logline:**
+{{ logline }}
+
+**Genre:**
+{{ genre }}
+
+**Beat Sheet Summary:**
+{{ beat_summary }}
+
+## Task
+Generate a character roster with 3-7 main characters. Each character should:
+- Have a distinct name, role, and personality
+- Serve a clear narrative function in the story
+- Have a unique voice and visual identity
+- Have a character arc (how they change from beginning to end)
+- Have a visual anchor suitable for AI image generation
+
+## Output Format
+Return a JSON object with this exact structure:
+
+```json
+{
+  "project_id": "{{ project_id }}",
+  "characters": [
+    {
+      "id": "CHAR_1",
+      "name": "Character Name",
+      "role": "protagonist",
+      "physical_description": "Detailed appearance description",
+      "personality_traits": ["trait1", "trait2", "trait3"],
+      "voice_notes": "Speech patterns, accent, tone notes",
+      "costume_notes": "What they wear throughout the story",
+      "backstory": "Key background details relevant to the story",
+      "visual_anchor": "Key visual reference for AI image generation (e.g., 'tall, lean, sharp jawline, dark hair, wearing a worn leather jacket')",
+      "arc_summary": "Brief description of their character arc",
+      "notes": ""
+    }
+  ]
+}
+```
+
+## Guidelines
+- The protagonist should be relatable and have a clear goal
+- The antagonist should be a credible threat with their own motivation
+- Include a mentor figure if the genre calls for one
+- Ensure character diversity in appearance, background, and perspective
+- Each character should have at least 3 personality traits
+- The visual_anchor should be specific enough for AI image generation
+- Roles should be one of: protagonist, antagonist, mentor, sidekick, deuteragonist, supporting, extra

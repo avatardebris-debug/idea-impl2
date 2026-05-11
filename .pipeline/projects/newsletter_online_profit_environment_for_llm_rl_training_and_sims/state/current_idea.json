@@ -1,12 +1,11 @@
 {
   "title": "[newsletter /online profit environment for LLM RL training and sims.]",
   "description": "[newsletter /online profit environment for LLM RL training and sims.]",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "total_phases": 1,
   "tasks_done": 0,
   "tasks_total": 5,
   "phase": 1,
   "started_at": "2026-05-04T04:56:06.009334+00:00",
-  "_slug": "newsletter_online_profit_environment_for_llm_rl_training_and_sims",
-  "budget_note": "Force-completed after 135 min (budget: 135 min for 1-phase project)"
+  "_slug": "newsletter_online_profit_environment_for_llm_rl_training_and_sims"
 }

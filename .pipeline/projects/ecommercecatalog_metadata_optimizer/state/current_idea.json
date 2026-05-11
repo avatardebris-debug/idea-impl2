@@ -1,0 +1,29 @@
+{
+  "title": "[EcommerceCatalog Metadata Optimizer]",
+  "description": "Merge the autoSEO tool with the CSV Analyzer to automatically audit product catalogs, optimize metadata, and export enriched spreadsheets.",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-07T03:53:29.243933+00:00",
+  "depends_on": [],
+  "tasks_done": 1,
+  "tasks_total": 1,
+  "review_result": {
+    "blocking_bugs": 3,
+    "review_path": "phases/phase_1/review.md",
+    "tasks_path": "phases/phase_1/tasks.md",
+    "workspace_path": "/workspace/idea impl/.pipeline/projects/ecommercecatalog_metadata_optimizer/workspace",
+    "files_written": [
+      "ecommercecatalog_optimizer/__pycache__/metadata_optimizer.cpython-312.pyc",
+      "ecommercecatalog_optimizer/__pycache__/catalog_analyzer.cpython-312.pyc",
+      "ecommercecatalog_optimizer/__pycache__/exporter.cpython-312.pyc",
+      "ecommercecatalog_optimizer/exporter.py",
+      "ecommercecatalog_optimizer/__pycache__/__init__.cpython-312.pyc",
+      "ecommercecatalog_optimizer/metadata_optimizer.py"
+    ],
+    "non_blocking_notes": "## Non-Blocking Notes\n- `catalog_analyzer.py`: The `COLUMN_ALIASES` dict is very large (~60 entries). Consider loading from a YAML/JSON config file for easier maintenance.\n- `catalog_analyzer.py`: `_normalise_header` and `_map_header` are module-level functions that could be private (`_normalise_header` is already private; `_map_header` is not).\n- `exporter.py`: `OUTPUT_COLUMNS` is a module-level constant \u2014 good, but consider making it configurable per-export if different output schemas are needed.\n- `metadata_optimizer.py`: `STOP_WORDS` is a module-level set \u2014 good, but consider making it configurable so users can add domain-specific stop words.\n- `metadata_optimizer.py`: `_build_description_from_fields` hardcodes \"kg\" for weight \u2014 this is US-centric. Consider making the unit configurable or detecting from context.\n- `metadata_optimizer.py:190`: `_truncate_word_safe` returns `truncated.strip() + \"..\"` when no space is found past `max_length // 2` \u2014 the `\"..\"` suffix is unusual; standard truncation uses `\"...\"`.\n- `catalog_analyzer.py`: The `quality_score` calculation is simple (completeness minus penalty) \u2014 could be enhanced with weighted field importance (e.g., missing `product_id` should hurt more than missing `color`).\n- `__init__.py`: `__version__` is set but not used anywhere \u2014 consider using `importlib.metadata.version()` or removing it.",
+    "review_content_preview": "### What's Good\n- Clean package structure with proper `__init__.py` exposing all public classes via `__all__`.\n- `conftest.py` correctly injects the workspace path into `sys.path` for local imports during testing.\n- `COLUMN_ALIASES` in `catalog_analyzer.py` is comprehensive \u2014 handles many common CSV header variations (e.g. \"productname\", \"product_name\", \"item_id\" all mapping to canonical names).\n- `CatalogRecord` dataclass is well-designed with typed optional fields and a `raw` dict for unmapped columns.\n- `MetadataOptimizer` correctly handles the case where metadata already exists (generates and compares, only flags \"optimized\" when different).\n- `_truncate_word_safe` is a clean utility that truncates text at word boundaries without cutting words in half.\n- `CatalogExporter` has a nice `export_enriched` convenience method and proper float formatting (removes trailing zeros).\n- `STOP_WORDS` set in `metadata_optimizer.py` is well-curated for English SEO keyword extraction.\n- All dataclasses use `field(default_factory=list)` to avoid mutable-default pitfalls.\n- `CatalogAnalyzer.load()` returns `self` for fluent chaining.\n\n## Blocking Bugs\n- `catalog_analyzer.py:50`: Duplicate key `\"item_id\": \"product_id\"` in `COLUMN_ALIASES` dict literal \u2014 the second occurrence silently overwrites the first. No crash, but the alias is redundant and could mask a typo if the intent was different mappings.\n- `catalog_analyzer.py:185`: `_set_field` uses `setattr` on a `dataclass` instance for field"
+  },
+  "_slug": "ecommercecatalog_metadata_optimizer",
+  "budget_note": "Force-completed after 91 min (budget: 90 min for 3-phase project)"
+}

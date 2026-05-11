@@ -1,0 +1,13 @@
+{
+  "title": "[BudgetFlow Tracker System]",
+  "description": "Develop a local-first personal finance app that categorizes bank transactions, forecasts cash flow, and alerts on budget deviations.",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-06T19:55:24.018066+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "_slug": "budgetflow_tracker_system",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

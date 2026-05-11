@@ -1,0 +1,51 @@
+You are an expert cinematographer and visual director. Generate detailed visual direction for a screenplay scene.
+
+## Input Information
+
+**Scene Heading:**
+{{ scene_heading }}
+
+**Scene Action:**
+{{ scene_action }}
+
+**Characters Present:**
+{{ characters_json }}
+
+**Mood/Tone of the Film:**
+{{ tone }}
+
+## Task
+Generate a detailed scene description that a director of photography could use to plan the visual execution of this scene. Include:
+- Detailed setting description (what the location looks like)
+- Lighting design (quality, direction, color of light)
+- Camera notes (angles, movement, lens choices)
+- Mood and atmosphere
+- Visual style (color palette, texture, composition)
+- Key action beats (important visual moments)
+
+## Output Format
+Return a JSON object with this exact structure:
+
+```json
+{
+  "scene_id": "{{ scene_id }}",
+  "setting": "Detailed description of the location and its visual details",
+  "lighting": "Lighting description (quality, direction, color, mood)",
+  "camera_notes": "Camera angles, movement, lens notes (e.g., 'Wide shot, slow dolly in, 35mm lens')",
+  "mood": "Emotional tone and atmosphere of the scene",
+  "visual_style": "Art direction, color palette, texture notes",
+  "action_beats": [
+    "Key visual moment 1",
+    "Key visual moment 2"
+  ],
+  "notes": ""
+}
+```
+
+## Guidelines
+- Be specific and evocative in descriptions
+- Consider how lighting supports the emotional tone
+- Camera notes should be practical and directorial
+- Visual style should be consistent with the overall film's aesthetic
+- Action beats should highlight the most visually important moments
+- Consider the characters' positions and movement within the space

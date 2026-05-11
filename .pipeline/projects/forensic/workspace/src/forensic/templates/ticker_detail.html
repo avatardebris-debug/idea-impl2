@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}{{ ticker }} - Forensic Suite{% endblock %}
+{% block content %}
+<div class="ticker-detail-page">
+    <h2>Ticker: {{ ticker }}</h2>
+
+    {% if company %}
+    <div class="company-info">
+        <h3>Company Information</h3>
+        <table class="data-table">
+            <tr><th>Name</th><td>{{ company.name }}</td></tr>
+            <tr><th>CIK</th><td>{{ company.cik }}</td></tr>
+            <tr><th>SIC</th><td>{{ company.sic }}</td></tr>
+            <tr><th>Industry</th><td>{{ company.industry }}</td></tr>
+            <tr><th>State</th><td>{{ company.state }}</td></tr>
+        </table>
+    </div>
+    {% endif %}
+
+    <div class="chart-card">
+        <h3>Fraud Scores</h3>
+        {% if scores %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Score</th><th>Risk Level</th><th>Filing Date</th><th>Accession No</th></tr>
+            </thead>
+            <tbody>
+                {% for score in scores %}
+                <tr>
+                    <td>{{ "%.1f"|format(score.fraud_score) }}</td>
+                    <td><span class="severity-badge severity-{{ score.risk_level }}">{{ score.risk_level }}</span></td>
+                    <td>{{ score.filing_date }}</td>
+                    <td>{{ score.accession_no }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No fraud scores available.</p>
+        {% endif %}
+    </div>
+
+    <div class="chart-card">
+        <h3>Red Flags</h3>
+        {% if flags %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Category</th><th>Severity</th><th>Description</th><th>Filing Date</th></tr>
+            </thead>
+            <tbody>
+                {% for flag in flags %}
+                <tr>
+                    <td>{{ flag.category }}</td>
+                    <td><span class="severity-badge severity-{{ flag.severity }}">{{ flag.severity }}</span></td>
+                    <td>{{ flag.description[:100] }}{% if flag.description|length > 100 %}...{% endif %}</td>
+                    <td>{{ flag.filing_date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No red flags available.</p>
+        {% endif %}
+    </div>
+
+    <div class="chart-card">
+        <h3>Capital Flows</h3>
+        {% if flows %}
+        <table class="data-table">
+            <thead>
+                <tr><th>Period</th><th>Operating CF</th><th>Investing CF</th><th>Financing CF</th><th>Net Change</th><th>Free CF</th></tr>
+            </thead>
+            <tbody>
+                {% for flow in flows %}
+                <tr>
+                    <td>{{ flow.period_label }}</td>
+                    <td>{{ "%.2f"|format(flow.operating_cash_flow or 0) }}</td>
+                    <td>{{ "%.2f"|format(flow.investing_cash_flow or 0) }}</td>
+                    <td>{{ "%.2f"|format(flow.financing_cash_flow or 0) }}</td>
+                    <td>{{ "%.2f"|format(flow.net_change_in_cash or 0) }}</td>
+                    <td>{{ "%.2f"|format(flow.free_cash_flow or 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p>No capital flows available.</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

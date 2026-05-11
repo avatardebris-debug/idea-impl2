@@ -1,0 +1,13 @@
+{
+  "title": "[PantryChef Meal Planner]",
+  "description": "Design a meal planning tool that ingests pantry inventory, suggests recipes, generates shopping lists, and tracks nutritional macros.",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-06T21:28:33.524804+00:00",
+  "depends_on": [],
+  "tasks_done": 6,
+  "tasks_total": 6,
+  "_slug": "pantrychef_meal_planner",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

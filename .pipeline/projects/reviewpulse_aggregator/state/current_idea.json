@@ -1,0 +1,14 @@
+{
+  "title": "[ReviewPulse Aggregator]",
+  "description": "Build a service that monitors local business reviews across platforms, analyzes sentiment, and auto-generates response drafts for owners.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-06T18:52:39.557487+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6,
+  "session_started_at": "2026-05-06T18:19:37.394082+00:00",
+  "_slug": "reviewpulse_aggregator",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

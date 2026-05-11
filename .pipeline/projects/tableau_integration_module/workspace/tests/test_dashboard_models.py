@@ -1,203 +1,350 @@
-"""Tests for dashboard data model classes.
-
-Covers:
-  - WinRateMetric creation and serialization
-  - BankrollCurvePoint creation and serialization
-  - NashEquilibriumShift creation and serialization
-  - DashboardState creation and serialization
-  - Round-trip serialization (to_dict → from_dict)
-"""
+"""Tests for src.dashboard.models."""
 
 import time
-
 import pytest
-
 from src.dashboard.models import (
-    BankrollCurvePoint,
-    DashboardState,
-    NashEquilibriumShift,
     WinRateMetric,
+    BankrollCurvePoint,
+    NashEquilibriumShift,
+    DashboardState,
 )
 
 
 # ===== WinRateMetric =====
 
-class TestWinRateMetric:
+class TestWinRateMetricInit:
     def test_default_values(self):
-        m = WinRateMetric()
-        assert m.value == 0.0
-        assert m.total_games == 0
-        assert m.wins == 0
-        assert m.losses == 0
-        assert isinstance(m.timestamp, float)
+        wr = WinRateMetric()
+        assert wr.value == 0.0
+        assert wr.total_games == 0
+        assert wr.wins == 0
+        assert wr.losses == 0
+        assert isinstance(wr.timestamp, float)
 
     def test_custom_values(self):
-        m = WinRateMetric(value=0.75, total_games=100, wins=75, losses=25)
-        assert m.value == 0.75
-        assert m.total_games == 100
-        assert m.wins == 75
-        assert m.losses == 25
+        wr = WinRateMetric(value=0.75, total_games=100, wins=75, losses=25, timestamp=1234.0)
+        assert wr.value == 0.75
+        assert wr.total_games == 100
+        assert wr.wins == 75
+        assert wr.losses == 25
+        assert wr.timestamp == 1234.0
 
-    def test_to_dict_roundtrip(self):
-        m = WinRateMetric(value=0.6, total_games=50, wins=30, losses=20, timestamp=1234567.89)
-        d = m.to_dict()
-        m2 = WinRateMetric.from_dict(d)
-        assert m2.value == m.value
-        assert m2.total_games == m.total_games
-        assert m2.wins == m.wins
-        assert m2.losses == m.losses
-        assert m2.timestamp == m.timestamp
 
-    def test_from_dict_missing_timestamp(self):
-        d = {"value": 0.5, "total_games": 10, "wins": 5, "losses": 5}
-        m = WinRateMetric.from_dict(d)
-        assert m.value == 0.5
-        assert isinstance(m.timestamp, float)
+class TestWinRateMetricToDict:
+    def test_to_dict_default(self):
+        wr = WinRateMetric()
+        d = wr.to_dict()
+        assert d["value"] == 0.0
+        assert d["total_games"] == 0
+        assert d["wins"] == 0
+        assert d["losses"] == 0
+        assert isinstance(d["timestamp"], float)
 
-    def test_from_dict_type_coercion(self):
-        d = {"value": "0.8", "total_games": "20", "wins": "16", "losses": "4", "timestamp": "100.0"}
-        m = WinRateMetric.from_dict(d)
-        assert m.value == 0.8
-        assert m.total_games == 20
-        assert m.wins == 16
-        assert m.losses == 4
-        assert m.timestamp == 100.0
+    def test_to_dict_custom(self):
+        wr = WinRateMetric(value=0.8, total_games=50, wins=40, losses=10, timestamp=999.0)
+        d = wr.to_dict()
+        assert d["value"] == 0.8
+        assert d["total_games"] == 50
+        assert d["wins"] == 40
+        assert d["losses"] == 10
+        assert d["timestamp"] == 999.0
+
+
+class TestWinRateMetricFromDict:
+    def test_from_dict_default(self):
+        d = {}
+        wr = WinRateMetric.from_dict(d)
+        assert wr.value == 0.0
+        assert wr.total_games == 0
+        assert wr.wins == 0
+        assert wr.losses == 0
+        assert isinstance(wr.timestamp, float)
+
+    def test_from_dict_custom(self):
+        d = {
+            "value": 0.9,
+            "total_games": 200,
+            "wins": 180,
+            "losses": 20,
+            "timestamp": 5000.0,
+        }
+        wr = WinRateMetric.from_dict(d)
+        assert wr.value == 0.9
+        assert wr.total_games == 200
+        assert wr.wins == 180
+        assert wr.losses == 20
+        assert wr.timestamp == 5000.0
+
+    def test_from_dict_partial(self):
+        d = {"value": 0.5}
+        wr = WinRateMetric.from_dict(d)
+        assert wr.value == 0.5
+        assert wr.total_games == 0
+        assert wr.wins == 0
+        assert wr.losses == 0
+
+    def test_roundtrip(self):
+        wr = WinRateMetric(value=0.65, total_games=30, wins=20, losses=10, timestamp=777.0)
+        d = wr.to_dict()
+        wr2 = WinRateMetric.from_dict(d)
+        assert wr2.value == wr.value
+        assert wr2.total_games == wr.total_games
+        assert wr2.wins == wr.wins
+        assert wr2.losses == wr.losses
+        assert wr2.timestamp == wr.timestamp
 
 
 # ===== BankrollCurvePoint =====
 
-class TestBankrollCurvePoint:
+class TestBankrollCurvePointInit:
     def test_default_values(self):
-        p = BankrollCurvePoint()
-        assert p.step == 0
-        assert p.bankroll == 0.0
-        assert p.peak_bankroll == 0.0
-        assert p.drawdown == 0.0
-        assert isinstance(p.timestamp, float)
+        bp = BankrollCurvePoint()
+        assert bp.step == 0
+        assert bp.bankroll == 0.0
+        assert bp.peak_bankroll == 0.0
+        assert bp.drawdown == 0.0
+        assert bp.history == []
+        assert isinstance(bp.timestamp, float)
 
     def test_custom_values(self):
-        p = BankrollCurvePoint(step=5, bankroll=1100.0, peak_bankroll=1200.0, drawdown=-0.0833)
-        assert p.step == 5
-        assert p.bankroll == 1100.0
-        assert p.peak_bankroll == 1200.0
-        assert p.drawdown == -0.0833
+        bp = BankrollCurvePoint(step=5, bankroll=1500.0, peak_bankroll=2000.0, drawdown=-500.0, history=[1000, 1200, 1500], timestamp=888.0)
+        assert bp.step == 5
+        assert bp.bankroll == 1500.0
+        assert bp.peak_bankroll == 2000.0
+        assert bp.drawdown == -500.0
+        assert bp.history == [1000, 1200, 1500]
+        assert bp.timestamp == 888.0
 
-    def test_to_dict_roundtrip(self):
-        p = BankrollCurvePoint(step=10, bankroll=950.0, peak_bankroll=1000.0, drawdown=-0.05, timestamp=999999.0)
-        d = p.to_dict()
-        p2 = BankrollCurvePoint.from_dict(d)
-        assert p2.step == p.step
-        assert p2.bankroll == p.bankroll
-        assert p2.peak_bankroll == p.peak_bankroll
-        assert p2.drawdown == p.drawdown
-        assert p2.timestamp == p.timestamp
 
-    def test_from_dict_missing_timestamp(self):
-        d = {"step": 1, "bankroll": 100.0, "peak_bankroll": 100.0, "drawdown": 0.0}
-        p = BankrollCurvePoint.from_dict(d)
-        assert p.step == 1
-        assert isinstance(p.timestamp, float)
+class TestBankrollCurvePointToDict:
+    def test_to_dict_default(self):
+        bp = BankrollCurvePoint()
+        d = bp.to_dict()
+        assert d["step"] == 0
+        assert d["bankroll"] == 0.0
+        assert d["peak_bankroll"] == 0.0
+        assert d["drawdown"] == 0.0
+        assert d["history"] == []
+        assert isinstance(d["timestamp"], float)
+
+    def test_to_dict_custom(self):
+        bp = BankrollCurvePoint(step=10, bankroll=2000.0, peak_bankroll=2500.0, drawdown=-500.0, history=[1000, 1500, 2000], timestamp=100.0)
+        d = bp.to_dict()
+        assert d["step"] == 10
+        assert d["bankroll"] == 2000.0
+        assert d["peak_bankroll"] == 2500.0
+        assert d["drawdown"] == -500.0
+        assert d["history"] == [1000, 1500, 2000]
+        assert d["timestamp"] == 100.0
+
+
+class TestBankrollCurvePointFromDict:
+    def test_from_dict_default(self):
+        d = {}
+        bp = BankrollCurvePoint.from_dict(d)
+        assert bp.step == 0
+        assert bp.bankroll == 0.0
+        assert bp.peak_bankroll == 0.0
+        assert bp.drawdown == 0.0
+        assert bp.history == []
+
+    def test_from_dict_custom(self):
+        d = {
+            "step": 7,
+            "bankroll": 1800.0,
+            "peak_bankroll": 2200.0,
+            "drawdown": -400.0,
+            "history": [1000, 1600, 1800],
+            "timestamp": 300.0,
+        }
+        bp = BankrollCurvePoint.from_dict(d)
+        assert bp.step == 7
+        assert bp.bankroll == 1800.0
+        assert bp.peak_bankroll == 2200.0
+        assert bp.drawdown == -400.0
+        assert bp.history == [1000, 1600, 1800]
+        assert bp.timestamp == 300.0
+
+    def test_from_dict_partial(self):
+        d = {"bankroll": 500.0}
+        bp = BankrollCurvePoint.from_dict(d)
+        assert bp.bankroll == 500.0
+        assert bp.step == 0
+        assert bp.peak_bankroll == 0.0
+
+    def test_roundtrip(self):
+        bp = BankrollCurvePoint(step=3, bankroll=1200.0, peak_bankroll=1500.0, drawdown=-300.0, history=[1000, 1100, 1200], timestamp=42.0)
+        d = bp.to_dict()
+        bp2 = BankrollCurvePoint.from_dict(d)
+        assert bp2.step == bp.step
+        assert bp2.bankroll == bp.bankroll
+        assert bp2.peak_bankroll == bp.peak_bankroll
+        assert bp2.drawdown == bp.drawdown
+        assert bp2.history == bp.history
+        assert bp2.timestamp == bp.timestamp
 
 
 # ===== NashEquilibriumShift =====
 
-class TestNashEquilibriumShift:
+class TestNashEquilibriumShiftInit:
     def test_default_values(self):
-        n = NashEquilibriumShift()
-        assert n.distance == 0.0
-        assert n.current_strategy == "unknown"
-        assert n.nash_strategy == "nash_equilibrium"
-        assert isinstance(n.timestamp, float)
+        ne = NashEquilibriumShift()
+        assert ne.distance == 0.0
+        assert ne.current_strategy == "unknown"
+        assert ne.nash_strategy == "nash_equilibrium"
+        assert isinstance(ne.timestamp, float)
 
     def test_custom_values(self):
-        n = NashEquilibriumShift(distance=0.25, current_strategy="greedy", nash_strategy="nash")
-        assert n.distance == 0.25
-        assert n.current_strategy == "greedy"
-        assert n.nash_strategy == "nash"
+        ne = NashEquilibriumShift(distance=0.25, current_strategy="aggressive", nash_strategy="nash_balanced", timestamp=777.0)
+        assert ne.distance == 0.25
+        assert ne.current_strategy == "aggressive"
+        assert ne.nash_strategy == "nash_balanced"
+        assert ne.timestamp == 777.0
 
-    def test_to_dict_roundtrip(self):
-        n = NashEquilibriumShift(distance=0.1, current_strategy="s1", nash_strategy="nash", timestamp=55555.0)
-        d = n.to_dict()
-        n2 = NashEquilibriumShift.from_dict(d)
-        assert n2.distance == n.distance
-        assert n2.current_strategy == n.current_strategy
-        assert n2.nash_strategy == n.nash_strategy
-        assert n2.timestamp == n.timestamp
 
-    def test_from_dict_missing_timestamp(self):
-        d = {"distance": 0.5, "current_strategy": "test", "nash_strategy": "nash"}
-        n = NashEquilibriumShift.from_dict(d)
-        assert n.distance == 0.5
-        assert isinstance(n.timestamp, float)
+class TestNashEquilibriumShiftToDict:
+    def test_to_dict_default(self):
+        ne = NashEquilibriumShift()
+        d = ne.to_dict()
+        assert d["distance"] == 0.0
+        assert d["current_strategy"] == "unknown"
+        assert d["nash_strategy"] == "nash_equilibrium"
+        assert isinstance(d["timestamp"], float)
+
+    def test_to_dict_custom(self):
+        ne = NashEquilibriumShift(distance=0.5, current_strategy="defensive", nash_strategy="nash_optimal", timestamp=100.0)
+        d = ne.to_dict()
+        assert d["distance"] == 0.5
+        assert d["current_strategy"] == "defensive"
+        assert d["nash_strategy"] == "nash_optimal"
+        assert d["timestamp"] == 100.0
+
+
+class TestNashEquilibriumShiftFromDict:
+    def test_from_dict_default(self):
+        d = {}
+        ne = NashEquilibriumShift.from_dict(d)
+        assert ne.distance == 0.0
+        assert ne.current_strategy == "unknown"
+        assert ne.nash_strategy == "nash_equilibrium"
+
+    def test_from_dict_custom(self):
+        d = {
+            "distance": 0.3,
+            "current_strategy": "mixed",
+            "nash_strategy": "nash_core",
+            "timestamp": 200.0,
+        }
+        ne = NashEquilibriumShift.from_dict(d)
+        assert ne.distance == 0.3
+        assert ne.current_strategy == "mixed"
+        assert ne.nash_strategy == "nash_core"
+        assert ne.timestamp == 200.0
+
+    def test_from_dict_partial(self):
+        d = {"distance": 0.1}
+        ne = NashEquilibriumShift.from_dict(d)
+        assert ne.distance == 0.1
+        assert ne.current_strategy == "unknown"
+        assert ne.nash_strategy == "nash_equilibrium"
+
+    def test_roundtrip(self):
+        ne = NashEquilibriumShift(distance=0.4, current_strategy="random", nash_strategy="nash_final", timestamp=555.0)
+        d = ne.to_dict()
+        ne2 = NashEquilibriumShift.from_dict(d)
+        assert ne2.distance == ne.distance
+        assert ne2.current_strategy == ne.current_strategy
+        assert ne2.nash_strategy == ne.nash_strategy
+        assert ne2.timestamp == ne.timestamp
 
 
 # ===== DashboardState =====
 
-class TestDashboardState:
+class TestDashboardStateInit:
     def test_default_values(self):
-        s = DashboardState()
-        assert isinstance(s.win_rate, WinRateMetric)
-        assert isinstance(s.bankroll, BankrollCurvePoint)
-        assert isinstance(s.nash_shift, NashEquilibriumShift)
-        assert isinstance(s.timestamp, float)
+        ds = DashboardState()
+        assert isinstance(ds.win_rate, WinRateMetric)
+        assert isinstance(ds.bankroll, BankrollCurvePoint)
+        assert isinstance(ds.nash_distance, NashEquilibriumShift)
+        assert isinstance(ds.timestamp, float)
 
     def test_custom_values(self):
-        wr = WinRateMetric(value=0.6, total_games=10, wins=6, losses=4)
-        bk = BankrollCurvePoint(step=1, bankroll=1000.0, peak_bankroll=1000.0, drawdown=0.0)
-        ns = NashEquilibriumShift(distance=0.1, current_strategy="s1", nash_strategy="nash")
-        s = DashboardState(win_rate=wr, bankroll=bk, nash_shift=ns, timestamp=77777.0)
-        assert s.win_rate.value == 0.6
-        assert s.bankroll.step == 1
-        assert s.nash_shift.distance == 0.1
-        assert s.timestamp == 77777.0
+        wr = WinRateMetric(value=0.8)
+        bp = BankrollCurvePoint(step=1, bankroll=1000.0)
+        ne = NashEquilibriumShift(distance=0.01)
+        ds = DashboardState(win_rate=wr, bankroll=bp, nash_distance=ne, timestamp=999.0)
+        assert ds.win_rate.value == 0.8
+        assert ds.bankroll.step == 1
+        assert ds.nash_distance.distance == 0.01
+        assert ds.timestamp == 999.0
 
-    def test_to_dict_roundtrip(self):
-        wr = WinRateMetric(value=0.55, total_games=20, wins=11, losses=9, timestamp=11111.0)
-        bk = BankrollCurvePoint(step=2, bankroll=1050.0, peak_bankroll=1050.0, drawdown=0.0, timestamp=11111.0)
-        ns = NashEquilibriumShift(distance=0.15, current_strategy="s2", nash_strategy="nash", timestamp=11111.0)
-        s = DashboardState(win_rate=wr, bankroll=bk, nash_shift=ns, timestamp=22222.0)
-        d = s.to_dict()
-        s2 = DashboardState.from_dict(d)
-        assert s2.win_rate.value == s.win_rate.value
-        assert s2.bankroll.step == s.bankroll.step
-        assert s2.nash_shift.distance == s.nash_shift.distance
-        assert s2.timestamp == s.timestamp
 
-    def test_to_dict_structure(self):
-        s = DashboardState()
-        d = s.to_dict()
+class TestDashboardStateToDict:
+    def test_to_dict_default(self):
+        ds = DashboardState()
+        d = ds.to_dict()
         assert "win_rate" in d
         assert "bankroll" in d
-        assert "nash_shift" in d
+        assert "nash_distance" in d
         assert "timestamp" in d
         assert isinstance(d["win_rate"], dict)
         assert isinstance(d["bankroll"], dict)
-        assert isinstance(d["nash_shift"], dict)
+        assert isinstance(d["nash_distance"], dict)
+        assert isinstance(d["timestamp"], float)
+
+    def test_to_dict_custom(self):
+        ds = DashboardState(
+            win_rate=WinRateMetric(value=0.9, total_games=100, wins=90, losses=10, timestamp=10.0),
+            bankroll=BankrollCurvePoint(step=5, bankroll=2000.0, peak_bankroll=2500.0, drawdown=-500.0, history=[1000, 1500, 2000], timestamp=20.0),
+            nash_distance=NashEquilibriumShift(distance=0.05, current_strategy="test", nash_strategy="nash", timestamp=30.0),
+            timestamp=40.0,
+        )
+        d = ds.to_dict()
+        assert d["win_rate"]["value"] == 0.9
+        assert d["bankroll"]["step"] == 5
+        assert d["nash_distance"]["distance"] == 0.05
+        assert d["timestamp"] == 40.0
 
 
-# ===== Cross-model integration =====
+class TestDashboardStateFromDict:
+    def test_from_dict_default(self):
+        d = {}
+        ds = DashboardState.from_dict(d)
+        assert isinstance(ds.win_rate, WinRateMetric)
+        assert isinstance(ds.bankroll, BankrollCurvePoint)
+        assert isinstance(ds.nash_distance, NashEquilibriumShift)
+        assert isinstance(ds.timestamp, float)
 
-class TestCrossModelIntegration:
-    def test_dashboard_state_from_nested_dict(self):
-        """Ensure DashboardState.from_dict correctly deserializes nested dicts."""
+    def test_from_dict_custom(self):
         d = {
-            "win_rate": {"value": 0.7, "total_games": 100, "wins": 70, "losses": 30, "timestamp": 1000.0},
-            "bankroll": {"step": 50, "bankroll": 1500.0, "peak_bankroll": 1600.0, "drawdown": -0.0625, "timestamp": 1000.0},
-            "nash_shift": {"distance": 0.2, "current_strategy": "test", "nash_strategy": "nash", "timestamp": 1000.0},
-            "timestamp": 2000.0,
+            "win_rate": {"value": 0.7, "total_games": 50, "wins": 35, "losses": 15, "timestamp": 1.0},
+            "bankroll": {"step": 2, "bankroll": 1500.0, "peak_bankroll": 1800.0, "drawdown": -300.0, "history": [1000, 1200, 1500], "timestamp": 2.0},
+            "nash_distance": {"distance": 0.1, "current_strategy": "a", "nash_strategy": "b", "timestamp": 3.0},
+            "timestamp": 4.0,
         }
-        s = DashboardState.from_dict(d)
-        assert s.win_rate.value == 0.7
-        assert s.bankroll.bankroll == 1500.0
-        assert s.nash_shift.distance == 0.2
-        assert s.timestamp == 2000.0
+        ds = DashboardState.from_dict(d)
+        assert ds.win_rate.value == 0.7
+        assert ds.bankroll.step == 2
+        assert ds.nash_distance.distance == 0.1
+        assert ds.timestamp == 4.0
 
-    def test_all_models_have_to_dict_and_from_dict(self):
-        """All four models must have to_dict and from_dict methods."""
-        for cls in [WinRateMetric, BankrollCurvePoint, NashEquilibriumShift, DashboardState]:
-            assert hasattr(cls, "to_dict")
-            assert hasattr(cls, "from_dict")
-            obj = cls()
-            d = obj.to_dict()
-            obj2 = cls.from_dict(d)
-            assert obj2 is not None
+    def test_from_dict_partial(self):
+        d = {"win_rate": {"value": 0.5}}
+        ds = DashboardState.from_dict(d)
+        assert ds.win_rate.value == 0.5
+        assert ds.bankroll.step == 0
+        assert ds.nash_distance.distance == 0.0
+
+    def test_roundtrip(self):
+        ds = DashboardState(
+            win_rate=WinRateMetric(value=0.85, total_games=60, wins=51, losses=9, timestamp=100.0),
+            bankroll=BankrollCurvePoint(step=10, bankroll=3000.0, peak_bankroll=3500.0, drawdown=-500.0, history=[2000, 2500, 3000], timestamp=200.0),
+            nash_distance=NashEquilibriumShift(distance=0.02, current_strategy="optimal", nash_strategy="nash_eq", timestamp=300.0),
+            timestamp=400.0,
+        )
+        d = ds.to_dict()
+        ds2 = DashboardState.from_dict(d)
+        assert ds2.win_rate.value == ds.win_rate.value
+        assert ds2.bankroll.step == ds.bankroll.step
+        assert ds2.nash_distance.distance == ds.nash_distance.distance
+        assert ds2.timestamp == ds.timestamp

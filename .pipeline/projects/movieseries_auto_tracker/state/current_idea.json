@@ -1,0 +1,12 @@
+{
+  "title": "[Movie/Series auto-tracker]",
+  "description": "Tool with multiple features. 1) enables you to \"continue\" watching and load whatever streaming service. 2)Enables you to search across all streaming platforms. 3)Enables a centralized platform for viewing titles. 4)Affiliate link cookie and link to sign up. 5)Searches free options also.",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-07T07:28:55.127924+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "session_started_at": "2026-05-07T05:48:51.335804+00:00"
+}

@@ -1,0 +1,35 @@
+{
+  "title": "Academic Thesis Writer",
+  "description": "AI-assisted research paper generator with citation management, literature review synthesis, and academic formatting modules.",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-07T09:36:56.970861+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6,
+  "review_result": {
+    "blocking_bugs": 1,
+    "review_path": "phases/phase_1/review.md",
+    "tasks_path": "phases/phase_1/tasks.md",
+    "workspace_path": "/workspace/idea impl/idea impl/.pipeline/projects/academic_thesis_writer/workspace",
+    "files_written": [
+      "frontend/src/components/CitationStyleSelector.tsx",
+      "frontend/src/lib/api.ts",
+      "frontend/src/app/layout.tsx",
+      "frontend/src/components/TopicInput.tsx",
+      "frontend/tsconfig.json",
+      "frontend/src/app/globals.css",
+      "frontend/src/components/SourceList.tsx",
+      "frontend/src/app/page.tsx",
+      "frontend/package.json",
+      "frontend/src/components/DraftPreview.tsx",
+      "frontend/src/components/ExportButtons.tsx",
+      "frontend/next.config.js"
+    ],
+    "non_blocking_notes": "",
+    "review_content_preview": "# Code Review \u2014 Phase 1\n\n## Blocking Bugs\n- Review could not be completed (LLM did not write review file)\n\n## Non-Blocking Notes\nNone\n\n## Verdict\nFAIL \u2014 review file was not generated\n"
+  },
+  "_slug": "academic_thesis_writer",
+  "budget_note": "Force-completed after 91 min (budget: 90 min for 3-phase project)"
+}

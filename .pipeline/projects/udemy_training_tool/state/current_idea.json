@@ -1,7 +1,7 @@
 {
   "title": "[udemy training tool]",
   "description": "[udemy training tool]",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "total_phases": 3,
   "tasks_done": 0,
   "tasks_total": 3,
@@ -30,6 +30,5 @@
     "non_blocking_notes": "",
     "review_content_preview": "# Code Review \u2014 Phase 2\n\n## Blocking Bugs\n- Review could not be completed (LLM did not write review file)\n\n## Non-Blocking Notes\nNone\n\n## Verdict\nFAIL \u2014 review file was not generated\n"
   },
-  "_slug": "udemy_training_tool",
-  "budget_note": "Force-completed after 90 min (budget: 90 min)"
+  "_slug": "udemy_training_tool"
 }

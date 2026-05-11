@@ -1,0 +1,6 @@
+include README.md
+include pyproject.toml
+include sample_financial.csv
+include sample_financial.pdf
+recursive-include financial_document_analyzer *.py
+recursive-include tests *.py

@@ -1,0 +1,12 @@
+## Phase 1: Data Ingestion Engine — Foundation
+- **Description**: Build the core data ingestion pipeline — a CSV parser that handles book sales and demographics data formats, a SQLite schema for storing manuscript analytics, and a CLI interface for importing data and viewing basic summaries. This is a complete, working tool: you can import CSV files and get summary statistics on your own.
+- **Deliverable**: A working CLI tool (`manuscriptdata_analyzer`) with commands for importing CSV files (sales, demographics, content metrics), storing them in SQLite, and displaying basic summary reports.
+- **Dependencies**: none
+- **Success criteria**:
+  - CLI tool installs and runs with `--help` showing available commands
+  - CSV parser auto-detects and imports sales data (columns: Date, Book Title, Units Sold, Revenue, Platform)
+  - CSV parser auto-detects and imports demographics data (columns: Age Group, Gender, Country, Rating, Review Count)
+  - CSV parser auto-detects and imports content metrics (columns: Chapter, Word Count, Read-Through Rate, Completion Rate)
+  - SQLite database stores all imported data with proper schema and indexes
+  - CLI `summary` command outputs formatted summary statistics (total sales, avg revenue, demographic breakdown)
+  - Unit tests with fixture CSV files for all three data types pass

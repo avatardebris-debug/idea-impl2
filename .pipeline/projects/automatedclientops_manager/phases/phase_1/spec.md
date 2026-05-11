@@ -1,0 +1,1 @@
+REWORK REQUIRED — see review at /workspace/idea impl/.pipeline/projects/automatedclientops_manager/phases/phase_1/review.md

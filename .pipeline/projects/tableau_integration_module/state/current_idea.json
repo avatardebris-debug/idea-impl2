@@ -1,11 +1,15 @@
 {
   "title": "[Tableau Integration Module]",
   "description": "Add real-time data visualization dashboards to the card game simulator for tracking win rates, bankroll curves, and Nash equilibrium shifts.",
-  "status": "phase_1_executing",
-  "phase": 1,
+  "status": "budget_exceeded",
+  "phase": 2,
   "total_phases": 3,
-  "started_at": "2026-05-06T03:37:47.246591+00:00",
+  "started_at": "2026-05-10T01:28:32.037409+00:00",
   "depends_on": [],
-  "tasks_done": 0,
-  "tasks_total": 6
+  "tasks_done": 2,
+  "tasks_total": 7,
+  "session_started_at": "2026-05-10T01:28:32.037409+00:00",
+  "_slug": "tableau_integration_module",
+  "pre_budget_status": "phase_2_reviewing",
+  "budget_note": "Force-completed after 225 min (budget: 225 min for 3-phase project)"
 }

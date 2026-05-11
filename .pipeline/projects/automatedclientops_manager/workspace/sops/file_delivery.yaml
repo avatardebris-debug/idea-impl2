@@ -1,0 +1,47 @@
+name: file_delivery
+description: >
+  SOP for delivering files to a client via email.
+inputs:
+  - name: client_email
+    type: string
+    required: true
+    description: Client's email address
+  - name: project_name
+    type: string
+    required: true
+    description: Project/deliverable name
+  - name: files
+    type: array
+    required: true
+    description: List of file paths to deliver
+steps:
+  - name: prepare_files
+    action: deliver_file
+    params:
+      files: "{{ files }}"
+    description: Prepare files for delivery
+  - name: send_delivery_email
+    action: send_email
+    params:
+      to: "{{ client_email }}"
+      subject: "Deliverable Ready: {{ project_name }}"
+      body: |
+        Dear Client,
+
+        Your deliverable for '{{ project_name }}' is ready!
+
+        Attached files:
+        {{ files | join('\n  - ') }}
+
+        Please review and let us know if you need any revisions.
+
+        Best regards,
+        AutomatedClientOps Manager
+      attachments: "{{ files }}"
+    description: Send delivery email with attachments
+  - name: log_delivery
+    action: log
+    params:
+      message: "Delivered {{ files | length }} file(s) to {{ client_email }} for {{ project_name }}"
+      level: info
+    description: Log delivery completion

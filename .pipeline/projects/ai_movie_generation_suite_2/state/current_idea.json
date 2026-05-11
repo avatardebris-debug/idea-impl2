@@ -1,0 +1,12 @@
+{
+  "title": "[AI movie generation suite 2]",
+  "description": "core suite. API surface, data models, file formats for movie generation.",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 6,
+  "started_at": "2026-05-07T12:23:05.551764+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6,
+  "session_started_at": "2026-05-07T11:16:03.175641+00:00"
+}

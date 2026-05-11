@@ -1,0 +1,14 @@
+{
+  "title": "[Rule-Based Triage Engine]",
+  "description": "Extend the email tool with a visual rule builder that auto-filters, tags, and routes incoming messages to specific CRM pipelines based on content analysis.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-06T15:45:28.744229+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "session_started_at": "2026-05-06T15:45:28.742688+00:00",
+  "_slug": "rule_based_triage_engine",
+  "budget_note": "Force-completed after 90 min (budget: 90 min for 3-phase project)"
+}

@@ -1,0 +1,17 @@
+## Phase 1: Core Rule Engine — Parse, Match, Tag
+- **Description**: Build the foundational rule engine that can parse incoming email messages, evaluate them against a set of rules, and apply tags and routing decisions. Rules are defined in a structured JSON format. This phase includes the rule parser, the evaluation engine, and the tagging/routing output layer.
+- **Deliverable**: A standalone Python module `rule_engine/` with:
+  - `Rule` dataclass (fields: `id`, `name`, `conditions`, `actions`, `priority`, `enabled`)
+  - `Condition` dataclass (fields: `field`, `operator`, `value`) — supports fields: `subject`, `from`, `body`, `has_attachment`, `priority_header`
+  - Operators: `contains`, `not_contains`, `equals`, `regex`, `is_empty`, `gt`, `lt`
+  - `Action` dataclass (fields: `type`, `target` — type: `tag`, `route`, `archive`, `flag`)
+  - `RuleEngine` class with method `evaluate(email: dict) -> list[Action]` that returns all matching actions sorted by priority
+  - `RuleStore` class for loading/saving rules from JSON files
+  - Unit tests for all condition operators and rule matching logic
+- **Dependencies**: none
+- **Success criteria**:
+  - [ ] A rule defined in JSON (e.g., `{"conditions": [{"field": "subject", "operator": "contains", "value": "invoice"}], "actions": [{"type": "tag", "target": "billing"}]}`) correctly matches an email dict with "invoice" in the subject
+  - [ ] Multiple rules with different priorities are evaluated in correct order; higher priority rules' actions are applied first
+  - [ ] `RuleStore` can save and reload rules without data loss
+  - [ ] All unit tests pass (minimum 15 test cases covering each operator and edge cases like empty bodies, unicode subjects)
+  - [ ] No rules match → returns empty action list (graceful no-op)

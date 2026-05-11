@@ -1,0 +1,121 @@
+# Phase 3 Tasks
+
+- [ ] Task 1: Fix Phase 2 bugs and harden core modules
+  - What: Fix the critical bugs identified in the Phase 2 review before building on top of them. Fix `SECDatabase.add_filing` to return the existing filing ID on IntegrityError (not None), fix `FilingParser.parse` to accept and propagate `filing_id`/`accession_no`, add proper `__init__` to `RateLimiter` (currently calls `super().__init__()` which is wrong for a dataclass-like class), ensure `config.yaml` is actually loaded, and add proper error handling throughout.
+  - Files:
+    - `src/sec_importer/repository.py` — Fix `add_filing` to SELECT existing row on IntegrityError and return its ID; add `get_or_upsert_company`, `get_or_upsert_filing`, `upsert_filing_items` methods; add query methods (`get_filings_by_cik`, `get_filings_by_type`, `get_filings_by_date_range`, `get_companies`, `get_existing_accession_numbers`)
+    - `src/sec_importer/parser.py` — Fix `FilingParser.parse` to accept `filing_id` and `accession_no` parameters; improve XBRL parsing to extract tag, value, context, unit, label properly
+    - `src/sec_importer/rate_limiter.py` — Remove erroneous `super().__init__()` call; ensure proper initialization
+    - `src/sec_importer/config.py` — Ensure config is loaded on instantiation, not just in `__init__`
+    - `src/sec_importer/models.py` — Add Pydantic `XBRLFactModel` for XBRL data
+  - Done when:
+    - `SECDatabase.add_filing` returns the filing ID whether inserting new or finding existing
+    - `FilingParser.parse(filing_id=1, accession_no="001")` correctly sets those fields on all returned items
+    - `RateLimiter()` instantiates without errors
+    - `Config()` loads `config.yaml` automatically
+    - `XBRLFactModel` validates tag, value, context, unit fields
+
+- [ ] Task 2: Implement XBRL parser with xmldocs library
+  - What: Build a dedicated XBRL parser module that uses the `xmldocs` library (with `xml.etree.ElementTree` fallback) to parse XBRL instance documents from SEC filings. Extract financial statement facts (balance sheet, income statement, cash flow) including tag, value, context (period, entity), unit, and label. Store parsed facts in the new `xbrl_facts` database table.
+  - Files:
+    - `src/sec_importer/xbrl_parser.py` — `XBRLParser` class with methods: `parse_inline_xbrl(text)` to extract facts from inline XBRL (iXBRL) in HTML filings, `parse_xbrl_instance(xml_text)` to parse standalone XBRL XML, `get_financial_statements()` to organize facts by statement type (balance_sheet, income_statement, cash_flow), `get_fact(tag, context, filing_id)` to look up specific facts
+    - `src/sec_importer/schema.py` — Add `CREATE_XBRL_FACTS_TABLE` DDL and update `init_db()` to create it
+    - `src/sec_importer/repository.py` — Add `upsert_xbrl_facts(filing_id, facts)` and `get_xbrl_facts(filing_id)` methods
+  - Done when:
+    - `XBRLParser.parse_inline_xbrl()` extracts 50+ facts from a real 10-K inline XBRL document
+    - `XBRLParser.parse_xbrl_instance()` extracts facts from standalone XBRL XML
+    - Facts include tag, value, context (period, entity), unit, and label
+    - `upsert_xbrl_facts()` stores facts in the `xbrl_facts` table with proper foreign key
+    - `get_xbrl_facts()` retrieves facts by filing_id
+    - Unit tests verify parsing against known XBRL data (mocked XML)
+
+- [ ] Task 3: Build FastAPI application with query endpoints
+  - What: Create a FastAPI-based REST API that exposes endpoints for querying companies, filings, filing items, and XBRL facts. Include OpenAPI/Swagger UI for documentation. Add request validation via Pydantic models and response serialization.
+  - Files:
+    - `src/sec_importer/api.py` — FastAPI app with endpoints: `GET /api/companies` (list all or filter by ticker/CIK), `GET /api/companies/{cik}` (company details), `GET /api/companies/{cik}/filings` (filings for a company), `GET /api/filings/{accession_no}` (filing details with items), `GET /api/filings/{accession_no}/xbrl` (XBRL facts for a filing), `GET /api/health` (health check), `POST /api/sync` (trigger a sync job)
+    - `src/sec_importer/api_models.py` — Pydantic response models for API serialization
+    - `src/sec_importer/api_deps.py` — FastAPI dependency for DB session management
+  - Done when:
+    - `GET /api/companies?ticker=AAPL` returns company data
+    - `GET /api/companies/{cik}/filings?type=10-K&start_date=2024-01-01&end_date=2024-12-31` returns filtered filings
+    - `GET /api/filings/{accession_no}/xbrl` returns XBRL facts for a filing
+    - `GET /api/health` returns `{"status": "ok"}`
+    - Swagger UI is available at `/docs`
+    - Typical queries respond in < 200ms (verified with load test)
+    - API is documented with OpenAPI spec
+
+- [ ] Task 4: Implement scheduled import runner with APScheduler
+  - What: Build a scheduled import system using APScheduler that automatically fetches new filings on a configurable schedule. Add support for daily syncs, company watchlists, and failure reporting. Include a CLI command to trigger manual syncs.
+  - Files:
+    - `src/sec_importer/scheduler.py` — `ImportScheduler` class with methods: `add_company(cik, types, schedule)`, `remove_company(cik)`, `start()`, `stop()`, `run_sync(cik, types)` for individual company syncs
+    - `src/sec_importer/import_pipeline.py` — `ImportPipeline` class with methods: `resolve_tickers()`, `fetch_filing_indices()`, `download_and_parse()`, `store_results()`, `run()` for the full batch pipeline
+    - `src/sec_importer/sync.py` — `SyncJob` class orchestrating one-shot or periodic sync runs
+    - `src/sec_importer/cli.py` — Add `sync` subcommand with flags: `--companies`, `--types`, `--date-range`, `--schedule`, `--once`; add `query` subcommand with flags: `--company`, `--type`, `--date-range`, `--output`
+  - Done when:
+    - `ImportScheduler` can be configured with a daily schedule and runs automatically
+    - `--companies AAPL,MSFT --types 10-K,10-Q --schedule "0 9 * * *"` sets up a cron-style schedule
+    - `--once` flag triggers a single sync run then exits
+    - Failed imports are logged with error details and retried with backoff
+    - `sync` CLI command works: `sec_importer sync --companies AAPL --types 10-K --once`
+    - `query` CLI command works: `sec_importer query --company AAPL --type 10-K --output result.json`
+    - Scheduler persists its state (watchlist, schedules) in the database
+
+- [ ] Task 5: Add health check endpoint and monitoring
+  - What: Implement a health check endpoint that reports database connectivity, scheduler status, and last sync times. Add structured logging with log levels and correlation IDs. Add metrics collection (request count, error rate, sync duration) using Prometheus-compatible metrics.
+  - Files:
+    - `src/sec_importer/health.py` — `HealthCheck` class with methods: `check_db()`, `check_scheduler()`, `check_last_sync()`, `get_status()` returning overall health
+    - `src/sec_importer/logging_config.py` — Structured logging setup with JSON format, log levels, and correlation ID support
+    - `src/sec_importer/metrics.py` — Prometheus metrics: `requests_total`, `request_duration_seconds`, `sync_duration_seconds`, `sync_success_total`, `sync_failure_total`, `db_connections_active`
+    - Update `src/sec_importer/api.py` — Add `/health`, `/metrics` endpoints; add middleware for logging and metrics
+  - Done when:
+    - `GET /health` returns `{"status": "ok", "db": "connected", "scheduler": "running", "last_sync": "2024-01-15T09:00:00Z"}`
+    - `GET /metrics` returns Prometheus-format metrics
+    - All API requests are logged with correlation IDs in JSON format
+    - Sync operations report duration and success/failure metrics
+    - Health check detects DB disconnection and reports `{"status": "degraded", "db": "disconnected"}`
+
+- [ ] Task 6: Create Dockerfile and docker-compose.yml
+  - What: Containerize the application with a multi-stage Dockerfile for the API and scheduler. Create a docker-compose.yml that includes the app, SQLite database (with volume), and optional PostgreSQL for production. Add health checks and resource limits.
+  - Files:
+    - `Dockerfile` — Multi-stage build: builder stage for dependencies, runtime stage with slim Python image, COPY source, EXPOSE 8000, CMD for FastAPI
+    - `docker-compose.yml` — Services: `app` (FastAPI + scheduler), `db` (SQLite volume or PostgreSQL), `nginx` (optional reverse proxy)
+    - `docker-compose.prod.yml` — Production compose with PostgreSQL, health checks, resource limits, and monitoring
+    - `.dockerignore` — Exclude unnecessary files from build context
+  - Done when:
+    - `docker build -t sec_importer .` completes successfully
+    - `docker-compose up` starts the app and scheduler
+    - `docker-compose up -f docker-compose.prod.yml` starts with PostgreSQL and health checks
+    - App is accessible at `http://localhost:8000`
+    - Health check passes via `curl http://localhost:8000/health`
+    - SQLite data persists across container restarts
+    - Build time is < 60 seconds
+
+- [ ] Task 7: Write performance tests and load testing
+  - What: Create performance tests that verify the system meets its SLA targets: query response < 200ms, sync completion < 30s for 10 companies, and API throughput > 100 req/s. Use `pytest-benchmark` for micro-benchmarks and `locust` for load testing.
+  - Files:
+    - `tests/test_performance.py` — `pytest-benchmark` tests for: DB query latency, XBRL parsing speed, API endpoint response time, sync pipeline throughput
+    - `tests/locustfile.py` — Locust load test simulating concurrent API users querying companies, filings, and XBRL data
+    - `tests/test_sync_performance.py` — Tests for sync pipeline: time to sync N companies, memory usage during sync, DB write throughput
+  - Done when:
+    - `pytest --benchmark` shows DB queries < 50ms, API responses < 200ms
+    - `locust` test with 50 concurrent users shows < 500ms p95 response time
+    - Sync of 10 companies completes in < 30 seconds
+    - Memory usage during sync stays under 500MB
+    - All performance tests pass in CI
+
+- [ ] Task 8: Write production deployment guide
+  - What: Document the production deployment process including infrastructure requirements, configuration, database setup, monitoring, backup, and scaling. Include a checklist for going live.
+  - Files:
+    - `docs/deployment.md` — Production deployment guide with sections: prerequisites, infrastructure setup, database configuration, API deployment, scheduler configuration, monitoring setup, backup strategy, scaling guide, troubleshooting
+    - `docs/monitoring.md` — Monitoring guide covering: health checks, metrics interpretation, alerting rules, log analysis, dashboards
+    - `docs/backup.md` — Backup and recovery guide for SQLite and PostgreSQL
+    - `SECURITY.md` — Security considerations: rate limiting, input validation, SQL injection prevention, HTTPS, secrets management
+  - Done when:
+    - Deployment guide covers all steps from infrastructure to monitoring
+    - Monitoring guide explains how to set up alerts and dashboards
+    - Backup guide covers both SQLite and PostgreSQL strategies
+    - Security guide addresses all identified risks
+    - Guide is reviewed and tested by at least one other developer
+
+
+<!-- 2 tasks removed by guardrail (max 8 per phase) -->

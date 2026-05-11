@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  audiobook-pipeline:
+    build: .
+    volumes:
+      - ./manuscripts:/data/manuscripts
+      - ./output:/data/output
+      - ./config:/data/config
+    environment:
+      - DEFAULT_PAUSE=1.5
+    command: /data/manuscripts/manuscript.txt --format json --output /data/output/result.json

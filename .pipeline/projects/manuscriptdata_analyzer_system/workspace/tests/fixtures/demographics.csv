@@ -1,0 +1,16 @@
+Age Group,Gender,Country,Rating,Review Count
+18-24,Male,United States,4.5,120
+18-24,Female,United States,4.2,95
+25-34,Male,United Kingdom,4.7,200
+25-34,Female,Canada,4.3,150
+35-44,Male,United States,4.1,80
+35-44,Female,United Kingdom,4.6,170
+45-54,Male,Canada,3.9,60
+45-54,Female,United States,4.4,130
+55-64,Male,United Kingdom,4.0,45
+55-64,Female,Canada,4.8,90
+65+,Male,United States,3.8,30
+65+,Female,United Kingdom,4.5,75
+18-24,Male,Canada,4.3,110
+25-34,Female,United States,4.6,180
+35-44,Male,United Kingdom,4.2,95

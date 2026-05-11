@@ -1,0 +1,18 @@
+{
+  "title": "[OSINT corp]",
+  "description": "OSINT for corporate tracking. Uses SEC importer and forensic for data. Thi should also have methods to extract and tracking legal public available shipping manifests, procurement data, government contract databases, corporate registry data, public postings of jobs/etc. correlating companies and relevant objects and locations on maps/sattelites to SEC filings, viewing public satellite feeds and routing. Tracking by land, air and sea. Estimating money flows. Estimating customers. using public data",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-10T02:54:22.297642+00:00",
+  "depends_on": [
+    "forensic",
+    "sec_importer"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "session_started_at": "2026-05-10T02:54:22.297642+00:00",
+  "_slug": "osint_corp",
+  "pre_budget_status": "phase_2_executing",
+  "budget_note": "Force-completed after 225 min (budget: 225 min for 3-phase project)"
+}

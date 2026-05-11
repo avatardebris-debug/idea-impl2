@@ -1,0 +1,13 @@
+{
+  "title": "[FreelanceTask Manager System]",
+  "description": "Merge the drop-servicing SOP engine with the job automation tool to streamline proposal generation, client matching, and contract signing.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-07T09:51:32.498687+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "session_started_at": "2026-05-07T09:51:32.497106+00:00",
+  "budget_note": "Phase 2 stuck: 0/3 tasks after 75m"
+}

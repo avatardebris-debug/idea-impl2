@@ -1,0 +1,9 @@
+origin,destination,weight,priority,length,width,height,description
+New York,Chicago,150.0,express,120,80,60,Electronics batch A
+Chicago,Dallas,200.0,standard,100,100,80,Furniture parts
+Dallas,Denver,75.5,overnight,50,40,30,Medical supplies
+Denver,New York,300.0,standard,200,150,100,Construction materials
+Seattle,Portland,50.0,express,30,20,15,Office supplies
+Portland,Seattle,80.0,overnight,60,50,40,Fresh produce
+Miami,Atlanta,120.0,standard,90,70,50,Clothing inventory
+Atlanta,Miami,95.0,express,70,60,45,Pharmaceuticals

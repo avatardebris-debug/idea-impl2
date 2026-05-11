@@ -1,0 +1,1 @@
+# FreelanceTask Manager — Proposal Engine
