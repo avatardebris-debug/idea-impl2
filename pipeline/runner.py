@@ -983,9 +983,7 @@ def _rebuild_queues_from_state(bus: MessageBus) -> int:
                 except Exception:
                     dep_blocked.append(f"{dep_slug} (unreadable)")
             if dep_blocked:
-                logger.debug(
-                    "_rebuild: skipping '%s' — deps not done: %s", title, dep_blocked
-                )
+                print(f"  ⏸  '{title}' dep_waiting — blocked by: {', '.join(dep_blocked)}")
                 continue  # don't re-queue until deps are finished
 
         phase_match = re.match(r"phase_(\d+)_(\w+)", status)
