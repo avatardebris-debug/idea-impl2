@@ -257,14 +257,19 @@ def check_workspace_imports(
         "operator", "secrets", "uuid", "pickle", "shelve", "dbm",
     }
 
+    syntax_errors: list[str] = []
     missing_imports = set()
     for py in workspace.rglob("*.py"):
         try:
             tree = ast.parse(py.read_text(encoding="utf-8", errors="ignore"))
-        except SyntaxError:
+        except SyntaxError as e:
+            rel_path = str(py.relative_to(workspace))
+            detail = f"{rel_path}:{e.lineno}: {e.msg}" if e.lineno else f"{rel_path}: {e.msg}"
+            syntax_errors.append(detail)
             results.append(HealthCheckResult(
                 "syntax_error", "error",
-                f"Syntax error in {py.relative_to(workspace)}",
+                f"Syntax error in {rel_path}",
+                fix_detail=detail,
             ))
             continue
 
@@ -289,6 +294,20 @@ def check_workspace_imports(
                 "missing_import", "warning",
                 f"Module '{mod}' imported but not installed or in workspace",
             ))
+
+    # Write syntax errors to pending_fixes.md so the executor can fix them
+    pending_fixes_path = workspace.parent / "state" / "pending_fixes.md"
+    if syntax_errors:
+        pending_fixes_path.parent.mkdir(parents=True, exist_ok=True)
+        content = "# Pending Fixes (auto-detected by health check)\n\n"
+        content += "These syntax errors must be fixed:\n\n"
+        for err in syntax_errors:
+            content += f"- `{err}`\n"
+        content += "\n<!-- This file is auto-generated. It will be cleared when errors are fixed. -->\n"
+        pending_fixes_path.write_text(content, encoding="utf-8")
+    elif pending_fixes_path.exists():
+        # All syntax errors resolved — clear the file
+        pending_fixes_path.unlink(missing_ok=True)
 
     return results
 

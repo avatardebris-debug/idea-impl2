@@ -68,6 +68,7 @@ class ExecutorAgent(AgentProcess):
         raw_tasks = self.read_state_file(tasks_path)
         tasks_content = self._extract_phase_tasks(raw_tasks, phase_num)
         master_plan = self.read_state_file("state/master_plan.md")
+        pending_fixes = self.read_state_file("state/pending_fixes.md")
         workspace = self.get_workspace_path()
         tasks_full_path = pathlib.Path(self._project_path(tasks_path))
 
@@ -91,10 +92,14 @@ class ExecutorAgent(AgentProcess):
                                       or msg.payload.get("fix_instructions", ""))
 
             review_content = self.read_state_file(review_path) if review_path else ""
+            pending_section = ""
+            if pending_fixes:
+                pending_section = f"## ⚠️ Health Check Findings (fix these FIRST)\n{pending_fixes[:1500]}\n\n"
             task_prompt = (
                 f"You are fixing Phase {phase_num} code that failed validation/review.\n\n"
                 f"## Workspace\n{workspace}\n\n"
-                f"## Fix Report (read ALL previous attempts before making changes)\n"
+                + pending_section
+                + f"## Fix Report (read ALL previous attempts before making changes)\n"
                 f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
                 + "## Instructions\n"
@@ -113,11 +118,18 @@ class ExecutorAgent(AgentProcess):
             )
         else:
             shared_libs_path = str(self._shared_libs_dir)
+            pending_section = ""
+            if pending_fixes:
+                pending_section = (
+                    f"## ⚠️ Health Check Findings (fix these FIRST)\n"
+                    f"{pending_fixes[:1500]}\n\n"
+                )
             task_prompt = (
                 f"You are implementing Phase {phase_num} of a project.\n"
                 f"IMPORTANT: Only implement Phase {phase_num} tasks below. "
                 f"Do NOT implement tasks from other phases.\n\n"
-                f"## Master Plan\n{master_plan[:2000]}\n\n"
+                + pending_section
+                + f"## Master Plan\n{master_plan[:2000]}\n\n"
                 f"## Phase {phase_num} Tasks\n{tasks_content}\n\n"
                 "## Instructions\n"
                 f"0a. CHECK SHARED LIBS FIRST: run `list_tree` on `{shared_libs_path}`.\n"
