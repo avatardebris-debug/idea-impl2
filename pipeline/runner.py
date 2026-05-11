@@ -1899,7 +1899,8 @@ def run_pipeline(
                     if orphaned:
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
                     if from_list and not bus.has_active_work():
-                        seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
+                        seeded = seed_from_master_list(bus, silent=ideation_in_progress,
+                                                        ideas_path=_ideas_path, resume_inprogress=fresh_list_only)
                         if seeded == _SEED_SEEDED:
                             ideation_in_progress = False
                             ideation_requested_at = 0.0
@@ -1913,7 +1914,8 @@ def run_pipeline(
                             ideation_requested_at = 0.0
                         # _SEED_BLOCKED — deps pending, just wait
                     elif from_list and not orphaned:
-                        seed_from_master_list(bus, silent=True, ideas_path=_ideas_path)
+                        seed_from_master_list(bus, silent=True, ideas_path=_ideas_path,
+                                              resume_inprogress=fresh_list_only)
 
                 running_agents = sum(1 for s in health.values() if s == "running")
 
@@ -2022,7 +2024,8 @@ def run_pipeline(
                                 last_orphan_requeue = now
                                 print(f"  🔁 Re-queued {orphaned} orphaned project(s) — not seeding new ideas yet")
                             else:
-                                seeded = seed_from_master_list(bus, silent=ideation_in_progress, ideas_path=_ideas_path)
+                                seeded = seed_from_master_list(bus, silent=ideation_in_progress,
+                                                                ideas_path=_ideas_path, resume_inprogress=fresh_list_only)
                                 if seeded == _SEED_SEEDED:
                                     ideation_in_progress = False
                                     ideation_requested_at = 0.0
