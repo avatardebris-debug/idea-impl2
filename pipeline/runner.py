@@ -1892,6 +1892,27 @@ def run_pipeline(
                     except Exception:
                         pass
 
+                # --- Immediate _reviewed advancement ---
+                # If the active project is at phase_X_reviewed and queues are
+                # empty, advance it NOW. Don't wait for _rebuild_queues_from_state
+                # (which has an 11-min cooldown and multiple preconditions).
+                _active_status = idea_state.get("status", "")
+                if _active_status.endswith("_reviewed") and all_empty and _active_slug:
+                    _rv_match = re.match(r"phase_(\d+)_reviewed", _active_status)
+                    if _rv_match:
+                        _rv_phase = int(_rv_match.group(1))
+                        _rv_proj = PIPELINE_DIR / "projects" / _active_slug
+                        _rv_state_file = _rv_proj / "state" / "current_idea.json"
+                        if _rv_state_file.exists():
+                            try:
+                                _rv_state = json.loads(_rv_state_file.read_text(encoding="utf-8"))
+                                routed = _tick_project(bus, _rv_proj, _rv_state, _rv_phase, _active_slug)
+                                if routed:
+                                    # Re-read idea_state since _tick_project may have changed it
+                                    idea_state = _get_active_idea_state(PIPELINE_DIR)
+                            except Exception as _rv_err:
+                                print(f"  [reviewed] Failed to advance {_active_slug}: {_rv_err}")
+
                 # If active project is budget_exceeded, advance to next project.
                 if idea_state.get("status") == "budget_exceeded":
                     slug = idea_state.get("_slug", "")
