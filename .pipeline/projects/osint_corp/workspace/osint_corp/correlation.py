@@ -102,7 +102,7 @@ def correlate(
         correlated_filings.append({
             "filing": filing,
             "matched_company": matched_company,
-            "confidence": best_score if (best_match and best_score > threshold) else 0.0,
+            "confidence": best_score if (matched_company and best_score > threshold) else 0.0,
         })
 
         # If we found a match, add a relationship

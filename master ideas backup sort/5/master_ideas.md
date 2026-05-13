@@ -11,7 +11,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 - [ ] **[video babbel]** — [[lock] translate video to any language, and then parse dialogue, perform any translation, summarize content and answer questions in any language. requires:video_ingestor_summary]
 - [ ] **[video langfake]** — [[lock] alter the lips and translate the video to any language. deepfake subtle changes to translate video to any language]
 - [ ] **[video scribe]** — [[lock] translate a video to scene description, connecting an LLM to describe the details of every scene, camera tricks, transitns, etc.]
-- [ ] **[video pow]** — [[lock] convert description of video to video. can use or modify existing tools on github.]
+- [ ] **[video pow]** — [[lock] convert description of video to video from the video alone. can use or modify existing tools on github.]
 - [ ] **[video GAN]** — [[lock] GAN and RL training. one determines if the video is real or fake, the other adapts video pow to generate fake from a real video and presents one or the other and both sides improve. requires:video_pow]
 - [ ] **[video recipe]** — [[lock] deconstructs video action to a "recipe" in the sense of describing how to perform a task. For example of the video shows a man lumberjacking and chopping a tree it will contained detailed description that an LLM agent could hopefully train on and learn from or convert the dscription as needed]
 

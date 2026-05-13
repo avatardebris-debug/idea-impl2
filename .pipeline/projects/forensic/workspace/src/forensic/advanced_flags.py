@@ -71,10 +71,21 @@ _BENFORD_EXPECTED: Dict[int, float] = {
 
 
 def _extract_numbers(text: str) -> List[float]:
-    """Extract numeric values from text (integers and floats)."""
+    """Extract numeric values from text (integers and floats).
+
+    Excludes 4-digit numbers that look like years (e.g., 2023, 2024)
+    to avoid skewing Benford's Law analysis.
+    """
     # Match numbers that look like financial figures (at least 1 digit, optional decimal)
     numbers = re.findall(r"\b(\d+(?:\.\d+)?)\b", text)
-    return [float(n) for n in numbers]
+    result: List[float] = []
+    for n_str in numbers:
+        n = float(n_str)
+        # Exclude 4-digit numbers that look like years (1000-2999)
+        if n_str.isdigit() and 1000 <= n <= 2999:
+            continue
+        result.append(n)
+    return result
 
 
 def _leading_digit(n: float) -> int:

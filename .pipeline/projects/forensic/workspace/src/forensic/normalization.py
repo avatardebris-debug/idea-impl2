@@ -168,7 +168,11 @@ def _extract_value(text: str, key: str) -> Optional[float]:
 
     # Replace underscores with a pattern that matches underscore or whitespace
     # so that "cost_of_goods_sold" matches "Cost of goods sold"
-    escaped_key = re.escape(key).replace(r"\_", r"[\s_]+")
+    # We replace underscores BEFORE escaping to handle them specially
+    # First, split on underscores and rejoin with the space-matching pattern
+    parts = key.split("_")
+    escaped_parts = [re.escape(part) for part in parts]
+    escaped_key = r"[\s_]+".join(escaped_parts)
     patterns = [
         # "key  $1,234,567"
         rf"{escaped_key}\s+\$?([\d,]+(?:\.\d+)?)",

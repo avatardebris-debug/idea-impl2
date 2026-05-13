@@ -1,0 +1,14 @@
+{
+  "title": "[player attribute library]",
+  "description": "Integration for the Football tool above with ability to match with player attributes. requir",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-12T20:17:31.069276+00:00",
+  "depends_on": [
+    "football_simulator"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 12,
+  "session_started_at": "2026-05-12T22:34:15.491988+00:00"
+}

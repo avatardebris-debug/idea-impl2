@@ -19,26 +19,24 @@ class TestSECFetcher:
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
             "filings": {
-                "recent": [
-                    {
-                        "type": "10-K",
-                        "filingDate": "2024-01-01",
-                        "accessionNumber": "0001234567-24-000001",
-                    }
-                ]
+                "recent": {
+                    "accessionNumber": ["0001234567-24-000001"],
+                    "filingDate": ["2024-01-01"],
+                    "form": ["10-K"],
+                }
             }
         }
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
 
             fetcher = SECFetcher()
             result = fetcher.fetch_filings("AAPL", limit=10)
 
             assert len(result) == 1
-            assert result[0]["type"] == "10-K"
+            assert result[0]["form"] == "10-K"
             assert result[0]["filingDate"] == "2024-01-01"
 
     def test_fetch_filings_http_error(self):
@@ -57,60 +55,54 @@ class TestSECFetcher:
         """Test getting CIK from ticker successfully."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
-        mock_response.text = '<cik>0001234567</cik>'
+        mock_response.json.return_value = {"cik": 1234567}
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
 
             fetcher = SECFetcher()
             cik = fetcher.get_cik_from_ticker("AAPL")
 
-            assert cik == "0001234567"
+            assert cik == "01234567"
 
     def test_get_cik_from_ticker_http_error(self):
         """Test getting CIK from ticker with HTTP error."""
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.side_effect = httpx.HTTPError("HTTP error")
+            mock_client.request.side_effect = httpx.HTTPError("HTTP error")
 
             fetcher = SECFetcher()
             cik = fetcher.get_cik_from_ticker("AAPL")
 
             assert cik is None
 
-    def test_get_company_name_success(self):
-        """Test getting company name successfully."""
+    def test_fetch_filings_no_cik_found(self):
+        """Test fetching filings when CIK lookup fails."""
+        with patch("httpx.Client") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client.request.side_effect = httpx.HTTPError("HTTP error")
+
+            fetcher = SECFetcher()
+            result = fetcher.fetch_filings("INVALID")
+
+            assert result == []
+
+    def test_fetch_filings_empty_response(self):
+        """Test fetching filings when SEC returns no filings."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
-        mock_response.text = '<name>Test Company Inc.</name>'
+        mock_response.json.return_value = {"filings": {"recent": {}}}
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
             mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.return_value = mock_response
+            mock_client.request.return_value = mock_response
 
             fetcher = SECFetcher()
-            name = fetcher.get_company_name("AAPL")
+            result = fetcher.fetch_filings(cik="12345", limit=10)
 
-            assert name == "Test Company Inc."
-
-    def test_get_company_name_http_error(self):
-        """Test getting company name with HTTP error."""
-        with patch("httpx.Client") as mock_client_class:
-            mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.side_effect = httpx.HTTPError("HTTP error")
-
-            fetcher = SECFetcher()
-            name = fetcher.get_company_name("AAPL")
-
-            assert name is None
-
-    def test_rate_limit(self):
-        """Test rate limiting."""
-        fetcher = SECFetcher(rate_limit_delay=0)
-        # Should not raise any exceptions
-        fetcher._rate_limit()
+            assert result == []

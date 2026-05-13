@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import datetime as dt
-from sqlalchemy import Column, Integer, String, DateTime, Text, UniqueConstraint
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import Column, Integer, String, DateTime, Text, UniqueConstraint, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, relationship
 
 
 class Base(DeclarativeBase):
@@ -45,4 +45,25 @@ class Filing(Base):
         # SQLite does not enforce unique on nullable columns, so we also
         # deduplicate at the application layer in storage.py.
         UniqueConstraint("accession_number", name="uq_accession_number"),
+    )
+
+
+class FilingContent(Base):
+    """Stores parsed content (XBRL facts or HTML sections) for a filing."""
+
+    __tablename__ = "filing_contents"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    filing_id = Column(Integer, ForeignKey("filings.id"), nullable=False, index=True)
+    content_type = Column(String(10), nullable=False)  # 'xbrl' or 'html'
+    content_data = Column(Text, nullable=True)  # JSON-serialized facts/sections
+    parse_status = Column(String(20), nullable=True)  # 'success', 'partial', 'failed'
+    parse_error = Column(Text, nullable=True)
+    parsed_at = Column(DateTime, default=lambda: dt.datetime.now(dt.timezone.utc))
+
+    # Relationship back to Filing
+    filing = relationship("Filing", backref="contents")
+
+    __table_args__ = (
+        UniqueConstraint("filing_id", "content_type", name="uq_filing_content"),
     )

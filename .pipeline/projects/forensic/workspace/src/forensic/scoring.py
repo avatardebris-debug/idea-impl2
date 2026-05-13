@@ -1,14 +1,14 @@
 """Fraud scoring engine for forensic analysis."""
 
 from typing import List
-from forensic.models import RedFlag, RedFlagSeverity, RiskLevel, Report, Recommendation
+from forensic.models import FraudReport, Recommendation, RedFlag, RedFlagSeverity, RiskLevel
 
 
 # Severity weights for scoring
 SEVERITY_WEIGHTS = {
-    RedFlagSeverity.CRITICAL: 15,
-    RedFlagSeverity.WARNING: 5,
-    RedFlagSeverity.INFO: 1,
+    RedFlagSeverity.CRITICAL: 25,
+    RedFlagSeverity.WARNING: 10,
+    RedFlagSeverity.INFO: 2,
 }
 
 
@@ -26,9 +26,9 @@ def get_risk_level(score: float) -> RiskLevel:
     """Map a numeric score to a risk level."""
     if score <= 30:
         return RiskLevel.LOW
-    elif score <= 60:
+    elif score <= 69:
         return RiskLevel.MEDIUM
-    elif score <= 85:
+    elif score <= 89:
         return RiskLevel.HIGH
     else:
         return RiskLevel.CRITICAL
@@ -39,14 +39,14 @@ def generate_report(
     cik: str,
     accession_no: str,
     flags: List[RedFlag],
-) -> Report:
+) -> FraudReport:
     """Generate a fraud risk report from red flags."""
     score = compute_fraud_score(flags)
     risk_level = get_risk_level(score)
 
     recommendations = _generate_recommendations(flags)
 
-    return Report(
+    return FraudReport(
         ticker=ticker,
         cik=cik,
         filing_date=accession_no,

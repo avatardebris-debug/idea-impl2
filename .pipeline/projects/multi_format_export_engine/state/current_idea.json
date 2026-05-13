@@ -1,7 +1,7 @@
 {
   "title": "[Multi-Format Export Engine]",
   "description": "Expand the AI Author Suite to natively export finished manuscripts to EPUB, MOBI, and print-ready PDF with custom typography and margins.",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 2,
   "total_phases": 3,
   "started_at": "2026-05-06T06:22:51.778769+00:00",
@@ -10,6 +10,5 @@
   "tasks_total": 6,
   "_slug": "multi_format_export_engine",
   "_instance_skip": true,
-  "pre_skip_status": "budget_exceeded",
-  "budget_note": "Skipped \u2014 running on another instance"
+  "pre_skip_status": "budget_exceeded"
 }

@@ -36,6 +36,20 @@ class SchedulerConfig:
             db_path=os.getenv("SCHEDULER_DB_PATH", "sec_importer.db"),
         )
 
+    def to_dict(self) -> dict:
+        """Convert configuration to a dictionary."""
+        return {
+            "mode": self.mode,
+            "sync_hour": self.sync_hour,
+            "sync_minute": self.sync_minute,
+            "timezone": self.timezone,
+            "cron_expression": self.cron_expression,
+            "run_once": self.run_once,
+            "tickers_file": self.tickers_file,
+            "limit_per_ticker": self.limit_per_ticker,
+            "db_path": self.db_path,
+        }
+
     def __str__(self) -> str:
         """String representation of the configuration."""
         return (

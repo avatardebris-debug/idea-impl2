@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "beatsheet-generator"
+version = "0.1.0"
+description = "Save-the-Cat 15-beat sheet generator — bridges movie ideas to structured beat sheets."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Beatsheet Generator Contributors"},
+]
+dependencies = [
+    "movie-idea-generator",
+    "ai-movie-gen-suite",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+beatsheet-gen = "beatsheet_generator.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["beatsheet_generator*"]

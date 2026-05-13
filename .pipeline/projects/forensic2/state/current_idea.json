@@ -1,13 +1,15 @@
 {
   "title": "[Forensic2]",
   "description": "Forensic accounting suite for detecting corporate fraud, predicting earnings, understanding capital flows,etc. Ability to comb through data imported from SEC importer and run a variety of methods to detect possible or plausible fraud and rate it using a composite score. Look for all the red flag and anamolies. Provide high level summary plus details. requir",
-  "status": "phase_1_executing",
-  "phase": 1,
+  "status": "complete",
+  "phase": 3,
   "total_phases": 3,
   "started_at": "2026-05-09T02:22:32.144091+00:00",
   "depends_on": [
     "sec_importer"
   ],
   "tasks_done": 0,
-  "tasks_total": 1
+  "tasks_total": 3,
+  "pre_dep_status": "phase_1_executing",
+  "session_started_at": "2026-05-12T16:16:14.646603+00:00"
 }

@@ -66,13 +66,15 @@ def init_db(db_path: str = "sec_importer.db") -> sqlite3.Connection:
         os.makedirs(db_dir, exist_ok=True)
 
     conn = sqlite3.connect(db_path)
-    conn.execute("PRAGMA foreign_keys = OFF;")
+    conn.execute("PRAGMA foreign_keys = ON;")
 
     cursor = conn.cursor()
-    cursor.executescript(CREATE_COMPANIES_TABLE)
-    cursor.executescript(CREATE_FILINGS_TABLE)
-    cursor.executescript(CREATE_FILING_ITEMS_TABLE)
-    cursor.executescript(CREATE_INDEXES)
+    cursor.executescript(
+        CREATE_COMPANIES_TABLE
+        + CREATE_FILINGS_TABLE
+        + CREATE_FILING_ITEMS_TABLE
+        + CREATE_INDEXES
+    )
 
     conn.commit()
     return conn

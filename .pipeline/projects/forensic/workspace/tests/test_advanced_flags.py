@@ -175,7 +175,7 @@ def test_altman_z_score_safe():
         working_capital=500,
         retained_earnings=300,
         ebit=200,
-        market_cap=1000,
+        market_cap=1200,
         total_assets=2000,
         total_liabilities=500,
         sales=1500,

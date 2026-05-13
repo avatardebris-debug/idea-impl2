@@ -1,0 +1,14 @@
+{
+  "title": "[consistent scene developer]",
+  "description": "scene describer integrating characters. require",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-13T03:11:53.650048+00:00",
+  "depends_on": [
+    "ai_movie_generation_suite",
+    "consistent_character_developer"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

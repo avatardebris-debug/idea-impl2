@@ -10,7 +10,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from .fetcher import SECFetcher, TICKER_TO_CIK_URL
+from .fetcher import SECFetcher
 from .parser import parse_filings
 from .storage import (
     init_db,
@@ -118,22 +118,16 @@ def _sync_ticker(
         logger.info(f"No filings returned for {ticker}")
         return result
 
-    # Get CIK and company name from the ticker lookup (available in fetcher)
+    # Get CIK from the ticker lookup (single HTTP call)
     cik = fetcher.get_cik_from_ticker(ticker)
     company_name = None
     if cik:
-        # Fetch the ticker lookup to get company name
-        ticker_url = TICKER_TO_CIK_URL.format(ticker=ticker.upper())
-        try:
-            resp = fetcher._session.get(ticker_url)
-            if resp.status_code == 200:
-                ticker_data = resp.json()
-                company_name = ticker_data.get("companyName")
-        except Exception:
-            pass
+        # The fetcher's get_cik_from_ticker already fetched the company name
+        # from the SEC submissions endpoint, which includes companyName
+        company_name = fetcher._last_company_name
 
-    # Parse filings
-    parsed = parse_filings(raw_filings)
+    # Parse filings (pass ticker since SEC API doesn't include it per-record)
+    parsed = parse_filings(raw_filings, ticker=ticker)
     if not parsed:
         logger.warning(f"No valid filings parsed for {ticker}")
         return result
@@ -159,7 +153,7 @@ def _sync_ticker(
         filing_objects = []
         for record in new_filings:
             filing = Filing(
-                ticker=record.get("ticker", ticker),
+                ticker=ticker,
                 filing_type=record.get("filing_type", ""),
                 filing_date=record.get("filing_date", ""),
                 accession_number=record.get("accession_number", ""),

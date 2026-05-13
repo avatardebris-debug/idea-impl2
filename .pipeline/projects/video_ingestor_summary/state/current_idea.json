@@ -1,0 +1,11 @@
+{
+  "title": "[video ingestor summary]",
+  "description": "upload videos parse dialogue to text recognition, summarize content and answer questions model agnostic LLM harness",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-13T05:03:02.449603+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

@@ -111,12 +111,41 @@ class ForensicPipeline:
             disclosure_text=full_text,
         )
 
+        # Run advanced fraud detection flags (Benford, Beneish, Altman Z)
+        advanced_flags_report = None
+        try:
+            from dataclasses import asdict
+            from forensic.advanced_flags import run_advanced_flags
+            af_report = run_advanced_flags(
+                ticker=ticker,
+                filing_text=full_text,
+                financial_data=financial_data,
+            )
+            advanced_flags_report = asdict(af_report)
+        except Exception as e:
+            logger.warning("Advanced flags analysis failed for %s: %s", ticker, e)
+
+        # Run capital flow analysis
+        capital_flows_report = None
+        try:
+            from dataclasses import asdict
+            from forensic.capital_flow import analyze_capital_flow
+            cf_report = analyze_capital_flow(
+                full_text,
+                ticker=ticker,
+            )
+            capital_flows_report = asdict(cf_report)
+        except Exception as e:
+            logger.warning("Capital flow analysis failed for %s: %s", ticker, e)
+
         return AnalysisResult(
             ticker=ticker,
             cik=filing_data["cik"],
             accession_no=filing_data["accession_no"],
             fraud_risk_score=fraud_score,
             red_flags=red_flags,
+            advanced_flags=advanced_flags_report,
+            capital_flows=capital_flows_report,
         )
 
     def generate_report(self, ticker: str) -> FraudReport:
@@ -137,10 +166,11 @@ class ForensicPipeline:
         return FraudReport(
             ticker=ticker,
             cik=analysis.cik,
+            filing_date=analysis.accession_no,
             risk_score=analysis.fraud_risk_score,
-            overall_risk=overall_risk,
+            overall_risk=overall_risk.value,
             red_flags=analysis.red_flags,
-            recommendations=report_data["recommendations"],
+            recommendations=report_data.recommendations,
         )
 
     def _extract_financial_data(self, items: List[Dict]) -> Dict[str, float]:

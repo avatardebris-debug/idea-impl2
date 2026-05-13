@@ -1,17 +1,22 @@
 """Forensic web application package."""
 
+import os
 from flask import Flask, render_template, jsonify
 from forensic.api import create_api
 
 
 def create_app(db=None):
     """Create and configure the Flask application."""
-    app = Flask(__name__)
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(base_dir)
+    app = Flask(__name__,
+                template_folder=os.path.join(parent_dir, "templates"),
+                static_folder=os.path.join(parent_dir, "static"))
     app.config["SECRET_KEY"] = "forensic-suite-secret-key"
 
     if db is not None:
         # Register API blueprint
-        api_bp = create_api(db)
+        api_bp = create_api(app, db)
         app.register_blueprint(api_bp)
 
     # --- Web routes ---

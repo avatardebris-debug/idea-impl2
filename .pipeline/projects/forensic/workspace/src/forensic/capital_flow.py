@@ -226,8 +226,8 @@ def extract_cash_flow_periods(
                     window = cf_section[start:end]
                     val = _extract_dollar_amount(window)
                     if val is not None:
-                        # Use absolute value for cash flow items (sign is context-dependent)
-                        setattr(period, key, abs(val))
+                        # Preserve sign for cash flow items (direction matters)
+                        setattr(period, key, val)
                         break  # first match wins
 
         # Derive net change in cash if not present
@@ -288,9 +288,10 @@ def _trend(values: List[float]) -> str:
         return "unknown"
     diffs = [values[i] - values[i - 1] for i in range(1, len(values))]
     avg = sum(diffs) / len(diffs)
-    if avg > 0.05 * abs(values[0]) if values[0] else 0:
+    threshold = 0.05 * abs(values[0]) if values[0] else 0
+    if avg > threshold:
         return "increasing"
-    elif avg < -0.05 * abs(values[0]) if values[0] else 0:
+    elif avg < -threshold:
         return "decreasing"
     return "stable"
 

@@ -1,7 +1,7 @@
 {
   "title": "[PodcastSEO Metadata Optimizer]",
   "description": "Build an automation tool that extracts keywords from transcripts, generates show notes, and produces platform-specific metadata for podcasts.",
-  "status": "budget_exceeded",
+  "status": "phase_1_reviewed",
   "phase": 1,
   "total_phases": 3,
   "started_at": "2026-05-10T05:13:40.370245+00:00",
@@ -65,6 +65,5 @@
   },
   "pre_budget_status": "phase_1_reviewed",
   "_instance_skip": true,
-  "pre_skip_status": "budget_exceeded",
-  "budget_note": "Skipped \u2014 running on another instance"
+  "pre_skip_status": "budget_exceeded"
 }

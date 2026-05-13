@@ -1,36 +1,46 @@
 # Validation Report — Phase 3
 ## Summary
-- Tests: 171 passed, 65 failed
+- Tests: 210 passed, 61 failed
 ## Verdict: FAIL
 
-## Details
-Phase 3 code output has significant test failures across multiple modules:
+### Details
+- 271 tests were collected and executed.
+- 210 tests passed successfully.
+- 61 tests failed with various errors including:
+  - `AttributeError` on `ForensicDatabase` (missing `execute`, `get_companies` methods)
+  - `AttributeError` on `IngestResult` (missing `item_count`, `to_json` attributes)
+  - `AssertionError` on capital flow extraction tests (expected non-zero values returned 0.0)
+  - `AttributeError` on CLI tests (module import issues)
+  - `AssertionError` on config tests (env override not working)
+  - `ValidationError` on SEC importer tests (pydantic model issues)
+  - `AttributeError` on capital flow anomaly detection (dict vs object attribute access)
 
-### Failed Tests by Module
-- **test_advanced_flags.py**: 3 failures (test_beneish_manipulator, test_beneish_normal, test_altman_z_score_safe)
-- **test_capital_flow.py**: 8 failures (test_extract_periods_* and test_analyze_capital_flow_one_shot, test_capital_flow_report_defaults)
-- **test_config.py**: 1 failure (test_config_with_none_values)
-- **test_earnings.py**: 1 failure (test_insufficient_data)
-- **test_ingest.py**: 4 failures (IngestResult.__init__ unexpected keyword argument 'accession_no')
-- **test_models.py**: 1 failure (FilingItem object has no attribute 'to_dict')
-- **test_normalization.py**: Multiple failures (extract_cogs, extract_net_income, extract_operating_income, extract_capex, extract_free_cash_flow, extract_cash_flow_ops, extract_cash_and_equivalents, extract_gross_profit, normalized_values, normalized_with_total_assets_fallback, normalized_no_normalizer, multiple_line_items_in_one_text, alias_cost_of_sales, alias_operating_profit, alias_net_earnings)
-- **test_scoring.py**: RedFlag.__init__() missing required positional argument 'evidence'
+### Required Files Present
+All core source files are present under `src/forensic/`:
+- `src/forensic/pipeline.py`
+- `src/forensic/fraud.py`
+- `src/forensic/ingest.py`
+- `src/forensic/advanced_flags.py`
+- `src/forensic/scoring.py`
+- `src/forensic/database.py`
+- `src/forensic/config.py`
+- `src/forensic/models.py`
+- `src/forensic/analyzer.py`
+- `src/forensic/red_flags.py`
+- `src/forensic/reporting.py`
+- `src/forensic/capital_flow.py`
+- `src/forensic/earnings.py`
+- `src/forensic/cli.py`
+- `src/forensic/api.py`
+- `src/forensic/web.py`
+- `src/forensic/compare.py`
+- `src/forensic/normalization.py`
+- `src/forensic/tools.py`
+- `src/forensic/monitor.py`
+- `src/forensic/web/` (web subpackage)
+- `src/forensic/api/` (api subpackage)
+- `src/forensic/templates/` (HTML templates)
+- `src/forensic/static/` (static assets)
 
-### Root Causes
-1. **API mismatches**: `IngestResult.__init__()` does not accept `accession_no` argument
-2. **Missing constructor arguments**: `RedFlag.__init__()` requires `evidence` argument
-3. **Data extraction failures**: Normalization module returns `None` for expected numeric values
-4. **Logic errors**: Capital flow period extraction returns incorrect counts and zero values
-5. **Classification errors**: Altman Z-score returns 'grey' instead of 'safe' for safe cases
-6. **Benish model errors**: Beneish M-score logic produces inverted results
-7. **Division by zero**: Earnings test expects 0.0 but gets inf
-
-### Core Files Present
-- src/forensic/capital_flow.py ✓
-- src/forensic/reporting.py ✓
-- src/forensic/advanced_flags.py ✓
-- tests/test_capital_flow.py ✓
-- tests/test_reporting.py ✓
-- tests/test_advanced_flags.py ✓
-
-Despite core files being present, the high number of test failures (65 out of 236) indicates the Phase 3 implementation is not functionally correct.
+### Conclusion
+Phase 3 has core files present but a significant number of tests (61/271) are failing. The failures indicate incomplete or incorrect implementations in database, CLI, config, capital flow, importer, and ingest modules. The phase does not meet the acceptance criteria of "tests pass with pytest."

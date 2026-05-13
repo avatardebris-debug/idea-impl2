@@ -51,8 +51,6 @@ class SECImporter:
             cik=cik,
             filing_types=filing_types or ["10-K", "10-Q", "8-K"],
             limit=limit,
-            start_date=start_date,
-            end_date=end_date,
         )
 
         # Parse into Filing models

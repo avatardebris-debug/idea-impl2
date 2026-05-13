@@ -172,7 +172,7 @@ class PipelineOrchestrator:
                 step.start_time = time.time()
 
                 try:
-                    risk_assessment = self.risk_analyzer.assess_risks(
+                    risk_assessment = self.risk_analyzer.assess(
                         company,
                         filings,
                         relationships,

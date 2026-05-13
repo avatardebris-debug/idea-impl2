@@ -1,0 +1,14 @@
+{
+  "title": "[Movie idea generator]",
+  "description": "generate simple movie ideas",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-12T12:06:44.617147+00:00",
+  "depends_on": [
+    "ai_movie_generation_suite"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "session_started_at": "2026-05-12T12:06:44.617147+00:00"
+}

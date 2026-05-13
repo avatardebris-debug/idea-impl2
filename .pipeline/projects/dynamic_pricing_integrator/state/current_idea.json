@@ -1,7 +1,7 @@
 {
   "title": "[Dynamic Pricing Integrator]",
   "description": "Add competitive price tracking and automated discount rule engines to the e-commerce SEO tool for real-time inventory and margin optimization.",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 3,
   "total_phases": 3,
   "started_at": "2026-05-06T12:47:13.434043+00:00",
@@ -10,6 +10,5 @@
   "tasks_total": 4,
   "_slug": "dynamic_pricing_integrator",
   "_instance_skip": true,
-  "pre_skip_status": "budget_exceeded",
-  "budget_note": "Skipped \u2014 running on another instance"
+  "pre_skip_status": "budget_exceeded"
 }

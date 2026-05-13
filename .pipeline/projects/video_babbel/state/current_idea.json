@@ -1,0 +1,13 @@
+{
+  "title": "[video babbel]",
+  "description": "translate video to any language, and then parse dialogue, perform any translation, summarize content and answer questions in any language. require",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-13T09:25:36.597759+00:00",
+  "depends_on": [
+    "video_ingestor_summary"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 6
+}

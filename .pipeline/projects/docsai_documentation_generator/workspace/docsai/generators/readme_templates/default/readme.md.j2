@@ -1,0 +1,33 @@
+# {{ project_name }}
+
+{{ project_description }}
+
+## Installation
+
+```bash
+pip install {{ project_name }}
+```
+
+## Usage Examples
+
+{{ usage_examples }}
+
+## API Reference
+
+See the [API Specification](./api_spec.yaml) for detailed API documentation.
+
+## Architecture
+
+{{ architecture_notes }}
+
+## Symbols
+
+{% for symbol in symbols %}
+- **{{ symbol.name }}** (`{{ symbol.kind }}`) — {{ symbol.docstring.split('\n')[0] if symbol.docstring else 'No description' }}
+{% endfor %}
+
+## Metadata
+
+- **Language:** {{ language }}
+- **File Count:** {{ metadata.file_count }}
+- **Total Symbols:** {{ metadata.total_symbols }}

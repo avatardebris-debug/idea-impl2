@@ -1,0 +1,118 @@
+project_name: sample_project
+language: python
+symbols:
+- name: greet
+  kind: function
+  params: []
+  return_type: str
+  docstring: "Greet a person by name.\n\n    Args:\n        name: The person's name.\n\
+    \n    Returns:\n        A greeting string."
+  line_number: 4
+  file: tests/sample_project/sample_python.py
+- name: Calculator
+  kind: class
+  params: []
+  return_type: ''
+  docstring: A simple calculator class.
+  line_number: 16
+  file: tests/sample_project/sample_python.py
+- name: add
+  kind: Calculator.function
+  params: []
+  return_type: float
+  docstring: "Add a number to the current value.\n\n        Args:\n            number:\
+    \ The number to add.\n\n        Returns:\n            The new value after addition."
+  line_number: 27
+  file: tests/sample_project/sample_python.py
+- name: multiply
+  kind: Calculator.function
+  params: []
+  return_type: float
+  docstring: "Multiply the current value by a factor.\n\n        Args:\n         \
+    \   factor: The multiplication factor.\n\n        Returns:\n            The new\
+    \ value after multiplication."
+  line_number: 39
+  file: tests/sample_project/sample_python.py
+- name: compute_sum
+  kind: function
+  params: []
+  return_type: float
+  docstring: "Compute the sum of a list of numbers.\n\n    Args:\n        numbers:\
+    \ A list of numeric values.\n\n    Returns:\n        The sum of all numbers."
+  line_number: 52
+  file: tests/sample_project/sample_python.py
+- name: greet
+  kind: function
+  params: []
+  return_type: ': string'
+  docstring: ''
+  line_number: 10
+  file: tests/sample_project/sample_typescript.ts
+- name: Calculator
+  kind: class
+  params: []
+  return_type: ''
+  docstring: ''
+  line_number: 17
+  file: tests/sample_project/sample_typescript.ts
+- name: value
+  kind: Calculator.field
+  params: []
+  return_type: ': number'
+  docstring: ''
+  line_number: 18
+  file: tests/sample_project/sample_typescript.ts
+- name: constructor
+  kind: Calculator.method
+  params: []
+  return_type: ''
+  docstring: 'Initialize the calculator.
+
+    @param initialValue - The starting value.
+
+    /'
+  line_number: 24
+  file: tests/sample_project/sample_typescript.ts
+- name: add
+  kind: Calculator.method
+  params: []
+  return_type: ': number'
+  docstring: 'Add a number to the current value.
+
+    @param number - The number to add.
+
+    @returns The new value.
+
+    /'
+  line_number: 33
+  file: tests/sample_project/sample_typescript.ts
+- name: multiply
+  kind: Calculator.method
+  params: []
+  return_type: ': number'
+  docstring: 'Multiply the current value by a factor.
+
+    @param factor - The multiplication factor.
+
+    @returns The new value.
+
+    /'
+  line_number: 43
+  file: tests/sample_project/sample_typescript.ts
+- name: computeSum
+  kind: function
+  params: []
+  return_type: ': number'
+  docstring: ''
+  line_number: 54
+  file: tests/sample_project/sample_typescript.ts
+- name: Point
+  kind: interface
+  params: []
+  return_type: ''
+  docstring: ''
+  line_number: 61
+  file: tests/sample_project/sample_typescript.ts
+metadata:
+  file_count: 2
+  total_symbols: 13

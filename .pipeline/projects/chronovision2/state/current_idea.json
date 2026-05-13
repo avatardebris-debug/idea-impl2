@@ -1,50 +1,27 @@
 {
   "title": "[Chronovision2]",
   "description": "Using software that can create full fidelity 3d worlds like Google Genie and others and use some kind of tracking tech and IOT and RL to produce measurements about the actual world, create worlds second in advance of real worlds and make predictions about the world and measure prediction surprise and minimize it over time using RL. Potentially make 100s or thousands using various methods and hypothesis and continually update prediction methods and means. After prediction reaches 99% or higher be",
-  "status": "phase_1_reviewed",
-  "phase": 1,
+  "status": "budget_exceeded",
+  "phase": 2,
   "total_phases": 3,
-  "started_at": "2026-05-10T11:57:33.497535+00:00",
+  "started_at": "2026-05-12T19:23:50.387751+00:00",
   "depends_on": [
-    "osint_corp2",
-    "forensic2",
-    "sec_importer2"
+    "osint_corp",
+    "forensic",
+    "sec_importer"
   ],
-  "tasks_done": 6,
-  "tasks_total": 6,
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "_slug": "chronovision2",
+  "pre_budget_status": "phase_2_reviewed",
+  "session_started_at": "2026-05-12T19:23:50.387751+00:00",
+  "pre_dep_status": "phase_1_reviewed",
   "review_result": {
     "blocking_bugs": 0,
-    "review_path": "phases/phase_1/review.md",
-    "tasks_path": "phases/phase_1/tasks.md",
+    "non_blocking_notes": "Manager force-advanced: 0 failures after 3 attempts. The target directory `/home/user/.local/share/mnemosyne/agent_workspace/` is empty.",
+    "tasks_path": "phases/phase_2/tasks.md",
     "workspace_path": "/workspace/idea impl/.pipeline/projects/chronovision2/workspace",
-    "files_written": [
-      "import_cloud_zip.py",
-      "chronovision2/__pycache__/__init__.cpython-312.pyc",
-      "chronovision2/core/__pycache__/world_simulator.cpython-312.pyc",
-      "chronovision2/core/__pycache__/__init__.cpython-312.pyc",
-      "test_harness_capabilities.py",
-      "chronovision2/core/hypothesis_manager.py",
-      "chronovision2/core/prediction_engine.py",
-      "chronovision2/core/__pycache__/hypothesis_manager.cpython-312.pyc",
-      "chronovision2/core/__pycache__/prediction_engine.cpython-312.pyc",
-      "pyproject.toml",
-      "chronovision2/tasks.md",
-      "llm_interface.py",
-      "chronovision2/core/surprise_meter.py",
-      "chronovision2/config.py",
-      "test_dependency_system.py",
-      "import_zip.py",
-      "chronovision2/core/__pycache__/surprise_meter.cpython-312.pyc",
-      "chronovision2/__init__.py",
-      "tools.py",
-      "review.md",
-      "chronovision2/core/__init__.py",
-      "chronovision2/core/world_simulator.py"
-    ],
-    "non_blocking_notes": "",
-    "review_content_preview": "# Code Review: Chronovision2 \u2014 Phase 1\n\n## Verdict: APPROVED (with minor notes)\n\n## Summary\n\nChronovision2 is a predictive world simulation engine that uses hypothesis-based reinforcement learning. The codebase consists of three core modules:\n\n1. **prediction_engine.py** \u2014 Runs multiple world simulations with different hypotheses and produces composite predictions\n2. **surprise_meter.py** \u2014 Measures prediction error between predicted and actual states\n3. **hypothesis_manager.py** \u2014 Manages hypothesis lifecycle, scoring, and RL-style weight updates\n\n## Architecture Assessment\n\n### Strengths\n\n- **Clean separation of concerns**: Each module has a single, well-defined responsibility. The SurpriseMeter is purely a distance calculator, the PredictionEngine handles simulation orchestration, and the HypothesisManager manages the RL loop.\n- **Good use of dataclasses**: `HypothesisResult`, `PredictionResult`, and `HypothesisRecord` are well-structured with appropriate fields.\n- **Extensible composite methods**: The prediction engine supports multiple composite strategies (weighted_average, median, max_likelihood) via a simple dispatch pattern.\n- **RL reward mechanism is sensible**: Using inverse surprise as reward with exponential moving average for weight updates is a reasonable approach for hypothesis selection.\n- **Type hints throughout**: The codebase uses proper type annotations, making it maintainable and IDE-friendly.\n\n### Design Notes\n\n- The `WorldSimulator` is imported but not"
+    "review_path": "phases/phase_2/review.md"
   },
-  "_slug": "chronovision2",
-  "pre_budget_status": "phase_1_reviewed",
-  "session_started_at": "2026-05-11T16:14:56.711159+00:00"
+  "budget_note": "Force-completed after 552 min (budget: 225 min for 3-phase project)"
 }

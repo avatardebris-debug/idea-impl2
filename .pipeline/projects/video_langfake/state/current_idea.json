@@ -1,0 +1,11 @@
+{
+  "title": "[video langfake]",
+  "description": "alter the lips and translate the video to any language. deepfake subtle changes to translate video to any language",
+  "status": "phase_3_executing",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-13T12:17:32.144336+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

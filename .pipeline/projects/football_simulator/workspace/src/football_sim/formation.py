@@ -127,6 +127,7 @@ def create_defensive_player(
 def create_formation(
     formation_name: str = "i_formation",
     line_of_scrimmage_x: float = 20.0,
+    is_offense: bool = True,
 ) -> Formation:
     """Create a standard formation with 11 offensive and 11 defensive players.
 

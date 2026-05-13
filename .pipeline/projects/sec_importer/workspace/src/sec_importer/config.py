@@ -42,6 +42,9 @@ class Config:
         self._data = {}
         self._load_defaults()
 
+        # Load from environment variables first
+        self._load_from_env()
+
         if config_path is None:
             # Try common locations
             candidates = [
@@ -62,6 +65,18 @@ class Config:
         for section, values in DEFAULTS.items():
             self._data[section] = dict(values)
 
+    def _load_from_env(self):
+        """Load configuration from environment variables."""
+        # Database path
+        env_db_path = os.environ.get("SEC_IMPORTER_DB_PATH")
+        if env_db_path:
+            self._data["database"]["db_path"] = env_db_path
+
+        # Rate limiting
+        env_rps = os.environ.get("SEC_IMPORTER_REQUESTS_PER_SECOND")
+        if env_rps:
+            self._data["rate_limiting"]["requests_per_second"] = int(env_rps)
+
     def _load_file(self, path: str):
         """Load configuration from a YAML file, merging with defaults."""
         with open(path, "r") as f:
@@ -78,10 +93,20 @@ class Config:
         """Get database path."""
         return self._data.get("database", {}).get("db_path", "sec_importer.db")
 
+    @db_path.setter
+    def db_path(self, value: str):
+        """Set database path."""
+        self._data["database"]["db_path"] = value
+
     @property
     def requests_per_second(self) -> int:
         """Get rate limit: requests per second."""
         return self._data.get("rate_limiting", {}).get("requests_per_second", 10)
+
+    @requests_per_second.setter
+    def requests_per_second(self, value: int):
+        """Set rate limit."""
+        self._data["rate_limiting"]["requests_per_second"] = value
 
     @property
     def rate_limit_delay(self) -> float:
@@ -119,6 +144,18 @@ class Config:
     def timeout(self) -> int:
         """Get HTTP timeout in seconds."""
         return self._data.get("importer", {}).get("timeout", 30)
+
+    @classmethod
+    def from_file(cls, config_path: str) -> "Config":
+        """Load configuration from a YAML file.
+
+        Args:
+            config_path: Path to config.yaml.
+
+        Returns:
+            Config instance loaded from the file.
+        """
+        return cls(config_path=config_path)
 
     def to_dict(self) -> dict:
         """Return the full configuration as a dictionary."""

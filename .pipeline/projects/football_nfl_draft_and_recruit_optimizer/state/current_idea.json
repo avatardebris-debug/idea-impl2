@@ -1,0 +1,15 @@
+{
+  "title": "[Football NFL draft and recruit optimizer]",
+  "description": "Integration with the above for NFL draft for same purposes and integration with both free agency and the draft. (or for recruiting) requir",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-13T02:01:55.003827+00:00",
+  "depends_on": [
+    "football_simulator",
+    "ffo"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "session_started_at": "2026-05-13T03:49:22.669155+00:00"
+}

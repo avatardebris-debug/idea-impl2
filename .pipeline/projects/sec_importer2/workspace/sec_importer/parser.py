@@ -32,7 +32,7 @@ FILING_TYPES = {
 }
 
 
-def parse_filings(raw_json_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def parse_filings(raw_json_list: list[dict[str, Any]], ticker: Optional[str] = None) -> list[dict[str, Any]]:
     """Parse raw SEC JSON responses into structured metadata dicts.
 
     Each item in raw_json_list should be a dict with keys like:
@@ -40,6 +40,9 @@ def parse_filings(raw_json_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
     Args:
         raw_json_list: List of raw JSON dicts from the SEC API.
+        ticker: Fallback ticker symbol to use when the raw data
+                doesn't include a ticker (SEC company filings endpoint
+                returns parallel arrays, not per-record tickers).
 
     Returns:
         List of parsed metadata dicts with keys:
@@ -49,7 +52,7 @@ def parse_filings(raw_json_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
     parsed = []
     for i, raw in enumerate(raw_json_list):
         try:
-            record = _parse_single_filing(raw)
+            record = _parse_single_filing(raw, ticker=ticker)
             if record and _is_valid_record(record):
                 record["raw_json"] = raw  # Include raw JSON for storage
                 parsed.append(record)
@@ -60,11 +63,15 @@ def parse_filings(raw_json_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return parsed
 
 
-def _parse_single_filing(raw: dict[str, Any]) -> Optional[dict[str, Any]]:
+def _parse_single_filing(raw: dict[str, Any], ticker: Optional[str] = None) -> Optional[dict[str, Any]]:
     """Parse a single filing record from raw JSON.
 
     Handles the company filings endpoint format where each item in recent
     is a dict with keys like: accessionNumber, form, filingDate, etc.
+
+    Args:
+        raw: Raw filing dict from the SEC API.
+        ticker: Fallback ticker symbol if not present in raw data.
     """
     # Extract accession number (normalize to remove dashes)
     accession = raw.get("accessionNumber") or raw.get("accession_number") or ""
@@ -94,18 +101,22 @@ def _parse_single_filing(raw: dict[str, Any]) -> Optional[dict[str, Any]]:
     form_description = raw.get("primaryDocDescription") or raw.get("documentDescription") or raw.get("formDescription") or ""
     form_description = str(form_description).strip()
 
-    # Get ticker if available (may be None for some filings)
-    ticker = raw.get("ticker") or raw.get("companyName") or ""
+    # Get ticker: prefer raw data, fall back to passed ticker parameter
+    raw_ticker = raw.get("ticker") or raw.get("companyName") or ""
+    resolved_ticker = raw_ticker or ticker or ""
+
+    # Extract fill_url (full submission URL) if available
+    fill_url = raw.get("fullSubmission") or raw.get("fullSubmissionUrl") or None
 
     return {
-        "ticker": ticker,
+        "ticker": resolved_ticker,
         "filing_type": filing_type,
         "filing_date": filing_date,
         "accession_number": accession,
         "document_url": document_url,
         "form_description": form_description,
         "accepted_date": accepted_date,
-        "fill_url": None,
+        "fill_url": fill_url,
     }
 
 

@@ -226,3 +226,218 @@
 
 ```
 
+
+### Attempt 1
+- **Failures**: 0 (↓ improving)
+- **Previous failures**: 1
+
+#### Test Output
+```
+# Validation Report — Phase 2
+## Summary
+- Tests: 129 passed, 16 failed
+- test_models.py: Import error (cannot import XBRLFactModel, FilingSchemaConfig from sec_importer.models)
+## Verdict: FAIL
+
+### Failure Details
+
+#### Import Error
+- `tests/test_models.py` fails at collection: `XBRLFactModel` and `FilingSchemaConfig` are not defined in `src/sec_importer/models.py`
+
+#### 16 Test Failures
+
+**test_config.py (3 failures):**
+- `test_config_from_env` — Config does not load from environment variables (assert 'sec_importer.db' == '/tmp/test.db')
+- `test_config_from_file` — Config class has no `from_file` classmethod
+- `test_config_merge` — Config.db_path property has no setter (cannot merge config)
+
+**test_parser.py (3 failures):**
+- `test_parse_xbrl_filing` — assert False (XBRL parsing not working)
+- `test_parse_xbrl_no_elements` — assert 'full_text' == 'xbrl_full' (XBRL field name mismatch)
+- `test_get_summary_counts` — assert 0 >= 2 (summary counts not populated)
+
+**test_repository_integration.py (2 failures):**
+- `test_full_workflow` — assert 8 == 1 (deduplication not working, 8 duplicates inserted)
+- `test_deduplication_prevents_duplicates` — assert 8 == 1 (same deduplication issue)
+
+**test_repository_rate_limiter.py (8 failures):**
+- `test_upsert_and_get` (FilingRepository) — assert 8 == 1 (deduplication not working)
+- `test_upsert_and_get` (FilingItemRepository) — ValidationError: filing_id expects int, got string
+- `test_bulk_insert` (FilingItemRepository) — same ValidationError
+- `test_mark_and_check_cik` — DeduplicationManager has no `mark_cik_seen` attribute
+- `test_mark_and_check_accession` — DeduplicationManager has no `mark_accession_seen` attribute
+- `test_basic_acquire` — RateLimiter timing check fails (9s vs expected <1s)
+- `test_wait_between` — RateLimiter timing check fails (0s vs expected >=0.4s)
+- `test_reset` — RateLimiter timing check fails (9s vs expected <1s)
+
+### Phase 2 Required Files Status
+All Phase 2 required files are PRESENT:
+- `src/sec_importer/schema.py` ✓
+- `src/sec_importer/models.py` ✓
+- `src/sec_importer/config.py` ✓
+- `config.yaml` ✓
+- `src/sec_importer/repository.py` ✓
+- `src/sec_importer/rate_limiter.py` ✓
+- `src/sec_importer/parser.py` ✓
+- `src/sec_importer/cli.py` ✓
+- `src/sec_importer/database.py` ✓
+- `src/sec_importer/fetcher.py` ✓
+- `src/sec_importer/__init__.py` ✓
+- `src/sec_importer/__main__.py` ✓
+- `src/sec_importer/api.py` ✓
+- `src/sec_importer/context_manager.py` ✓
+- `src/sec_importer/schema.py` ✓
+- `tests/test_repository.py` ✓
+- `tests/test_config.py` ✓
+- `tests/test_fetcher.py` ✓
+- `tests/test_parser.py` ✓
+- `tests/test_models.py` ✓
+- `tests/test_integration.py` ✓
+- `tests/test_repository_integration.py` ✓
+- `tests/test_repository_rate_limiter.py` ✓
+- `tests/test_rate_limiter.py` ✓
+- `tests/test_schema_models_config.py` ✓
+- `requirements.txt` ✓
+- `README.md` ✓
+
+### Root Causes
+1. **Deduplication broken** — `upsert_filing()` does not prevent duplicate inserts (8 duplicates found instead of 1)
+2. **Config class incomplete** — Missing `from_file` classmethod, no env var support, no setter for db_path
+3. **RateLimiter broken** — Timing checks fail; rate limiting not enforced
+4. **DeduplicationManager API mismatch** — Tests expect `mark_cik_seen`/`mark_accession_seen` but class has different method names
+5. **FilingItemModel validation** — `filing_id` field rejects string inputs that tests pass
+6. **XBRL parsing incomplete** — Parser doesn't handle XBRL filings correctly
+7. **Missing model classes** — `XBRLFactModel` and `FilingSchemaConfig` not defined in models.py
+
+```
+
+
+### Attempt 2
+- **Failures**: 0 (→ stalled)
+- **Previous failures**: 0
+
+#### Test Output
+```
+# Validation Report — Phase 2
+## Summary
+- Tests: 129 passed, 16 failed
+- test_models.py: Import error (cannot import XBRLFactModel, FilingSchemaConfig from sec_importer.models)
+## Verdict: FAIL
+
+### Failure Details
+
+#### Import Error
+- `tests/test_models.py` fails at collection: `XBRLFactModel` and `FilingSchemaConfig` are not defined in `src/sec_importer/models.py`
+
+#### 16 Test Failures
+
+**test_config.py (3 failures):**
+- `test_config_from_env` — Config does not load from environment variables (assert 'sec_importer.db' == '/tmp/test.db')
+- `test_config_from_file` — Config class has no `from_file` classmethod
+- `test_config_merge` — Config.db_path property has no setter (cannot merge config)
+
+**test_parser.py (3 failures):**
+- `test_parse_xbrl_filing` — assert False (XBRL parsing not working)
+- `test_parse_xbrl_no_elements` — assert 'full_text' == 'xbrl_full' (XBRL field name mismatch)
+- `test_get_summary_counts` — assert 0 >= 2 (summary counts not populated)
+
+**test_repository_integration.py (2 failures):**
+- `test_full_workflow` — assert 8 == 1 (deduplication not working, 8 duplicates inserted)
+- `test_deduplication_prevents_duplicates` — assert 8 == 1 (same deduplication issue)
+
+**test_repository_rate_limiter.py (8 failures):**
+- `test_upsert_and_get` (FilingRepository) — assert 8 == 1 (deduplication not working)
+- `test_upsert_and_get` (FilingItemRepository) — ValidationError: filing_id expects int, got string
+- `test_bulk_insert` (FilingItemRepository) — same ValidationError
+- `test_mark_and_check_cik` — DeduplicationManager has no `mark_cik_seen` attribute
+- `test_mark_and_check_accession` — DeduplicationManager has no `mark_accession_seen` attribute
+- `test_basic_acquire` — RateLimiter timing check fails (9s vs expected <1s)
+- `test_wait_between` — RateLimiter timing check fails (0s vs expected >=0.4s)
+- `test_reset` — RateLimiter timing check fails (9s vs expected <1s)
+
+### Phase 2 Required Files Status
+All Phase 2 required files are PRESENT:
+- `src/sec_importer/schema.py` ✓
+- `src/sec_importer/models.py` ✓
+- `src/sec_importer/config.py` ✓
+- `config.yaml` ✓
+- `src/sec_importer/repository.py` ✓
+- `src/sec_importer/rate_limiter.py` ✓
+- `src/sec_importer/parser.py` ✓
+- `src/sec_importer/cli.py` ✓
+- `src/sec_importer/database.py` ✓
+- `src/sec_importer/fetcher.py` ✓
+- `src/sec_importer/__init__.py` ✓
+- `src/sec_importer/__main__.py` ✓
+- `src/sec_importer/api.py` ✓
+- `src/sec_importer/context_manager.py` ✓
+- `src/sec_importer/schema.py` ✓
+- `tests/test_repository.py` ✓
+- `tests/test_config.py` ✓
+- `tests/test_fetcher.py` ✓
+- `tests/test_parser.py` ✓
+- `tests/test_models.py` ✓
+- `tests/test_integration.py` ✓
+- `tests/test_repository_integration.py` ✓
+- `tests/test_repository_rate_limiter.py` ✓
+- `tests/test_rate_limiter.py` ✓
+- `tests/test_schema_models_config.py` ✓
+- `requirements.txt` ✓
+- `README.md` ✓
+
+### Root Causes
+1. **Deduplication broken** — `upsert_filing()` does not prevent duplicate inserts (8 duplicates found instead of 1)
+2. **Config class incomplete** — Missing `from_file` classmethod, no env var support, no setter for db_path
+3. **RateLimiter broken** — Timing checks fail; rate limiting not enforced
+4. **DeduplicationManager API mismatch** — Tests expect `mark_cik_seen`/`mark_accession_seen` but class has different method names
+5. **FilingItemModel validation** — `filing_id` field rejects string inputs that tests pass
+6. **XBRL parsing incomplete** — Parser doesn't handle XBRL filings correctly
+7. **Missing model classes** — `XBRLFactModel` and `FilingSchemaConfig` not defined in models.py
+
+```
+
+
+### Attempt 3
+- **Failures**: 0 (→ stalled)
+- **Previous failures**: 0
+
+#### Test Output
+```
+# Validation Report — Phase 2
+## Summary
+- Tests: 129 passed, 16 failed, 1 error (collection error)
+- Errors: test_models.py fails to collect due to missing imports (XBRLFactModel, FilingSchemaConfig not in models.py)
+- Failures: 16 tests across test_config.py (3), test_parser.py (3), test_repository_integration.py (2), test_repository_rate_limiter.py (8)
+
+## Verdict: FAIL
+
+### Reasons for FAIL:
+
+1. **Missing Phase 2 files:**
+   - `src/sec_importer/import_pipeline.py` — required by Task 3, NOT PRESENT
+   - `src/sec_importer/sync.py` — required by Task 3, NOT PRESENT
+   - `src/sec_importer/query.py` — required by Task 4, NOT PRESENT
+
+2. **Missing Pydantic models:**
+   - `XBRLFactModel` — imported by test_models.py but not defined in models.py
+   - `FilingSchemaConfig` — imported by test_models.py but not defined in models.py
+
+3. **Missing dependencies in requirements.txt:**
+   - `pydantic` — NOT listed (required by Phase 2)
+   - `pyyaml` — NOT listed (required by Phase 2)
+
+4. **Test failures (16 total):**
+   - `test_config.py`: 3 failures — Config class lacks `from_file` classmethod, env loading, and property setters
+   - `test_parser.py`: 3 failures — XBRL parsing broken, summary counts incorrect
+   - `test_repository_integration.py`: 2 failures — deduplication not working (returns 8 rows instead of 1)
+   - `test_repository_rate_limiter.py`: 8 failures — FilingItemModel filing_id type mismatch, DeduplicationManager missing methods, RateLimiter tests failing
+   - `test_models.py`: 1 collection error — cannot import missing models
+
+5. **Core functionality gaps:**
+   - Batch import pipeline (Task 3) not implemented
+   - Query API (Task 4) not implemented
+   - Sync script (Task 3) not implemented
+   - Deduplication not functioning correctly in repository layer
+
+```
+

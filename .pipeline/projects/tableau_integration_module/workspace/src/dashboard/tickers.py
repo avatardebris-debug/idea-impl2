@@ -1,5 +1,6 @@
 """Dashboard ticker that extends Ticker with dashboard-specific metrics."""
 
+import threading
 import time
 from src.ticker import Ticker
 from src.dashboard.models import (
@@ -19,6 +20,8 @@ class DashboardTicker(Ticker):
         current_win_rate: float | WinRateMetric = 0.0,
         bankroll_history: float | BankrollCurvePoint = 0.0,
         nash_distance: float | NashEquilibriumShift = 0.0,
+        interval: float = 1.0,
+        callback=None,
     ):
         super().__init__(symbol=symbol)
         # Accept floats and convert to objects
@@ -34,6 +37,61 @@ class DashboardTicker(Ticker):
             self.nash_distance = NashEquilibriumShift(distance=float(nash_distance))
         else:
             self.nash_distance = nash_distance or NashEquilibriumShift()
+        
+        self._interval = interval
+        self._callback = callback
+        self._running = False
+        self._thread = None
+
+    @property
+    def interval(self) -> float:
+        """Return the ticker interval."""
+        return self._interval
+
+    @interval.setter
+    def interval(self, value: float) -> None:
+        """Set the ticker interval."""
+        self._interval = value
+
+    @property
+    def callback(self):
+        """Return the callback function."""
+        return self._callback
+
+    @callback.setter
+    def callback(self, value) -> None:
+        """Set the callback function."""
+        self._callback = value
+
+    @property
+    def running(self) -> bool:
+        """Return whether the ticker is running."""
+        return self._running
+
+    @property
+    def thread(self):
+        """Return the ticker thread."""
+        return self._thread
+
+    def start(self) -> None:
+        """Start the ticker."""
+        self._running = True
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def stop(self) -> None:
+        """Stop the ticker."""
+        self._running = False
+        if self._thread:
+            self._thread.join(timeout=1.0)
+            self._thread = None
+
+    def _run(self) -> None:
+        """Internal run loop."""
+        while self._running:
+            time.sleep(self._interval)
+            if self._callback:
+                self._callback(self)
 
     @property
     def price_color(self) -> str:

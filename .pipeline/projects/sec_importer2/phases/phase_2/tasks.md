@@ -1,31 +1,26 @@
 # Phase 2 Tasks
 
-- [ ] Task 1: Add `filing_contents` table and ORM model
-  - What: Extend the database schema with a `filing_contents` table to store parsed XBRL facts and HTML text. Add a SQLAlchemy ORM model `FilingContent` in `models.py`. The table needs columns for `filing_id` (FK), `content_type` (xbrl/html), `content_data` (JSON/text), `parse_status` (success/partial/failed), `parse_error` (nullable string), and `parsed_at` (datetime).
+- [ ] Task 1: Add `FilingContent` model and `filing_contents` table
+  - What: Add a `FilingContent` SQLAlchemy ORM model in `models.py` with columns: `id`, `filing_id` (FK), `content_type` (xbrl/html), `content_data` (JSON/text), `parse_status` (success/partial/failed), `parse_error` (nullable string), `parsed_at` (datetime). Also add `upsert_filing_content` and `get_filing_content_data` helpers in `storage.py`.
   - Files: `sec_importer/models.py`, `sec_importer/storage.py`
-  - Done when: `FilingContent` model exists in `models.py`, `init_db()` creates the table, `storage.py` has `upsert_filing_content(session, filing_id, content_type, content_data)` and `get_filing_content(session, filing_id)` helpers, and the existing `companies`/`filings` tables still work unchanged.
+  - Done when: `FilingContent` model exists in `models.py`, `init_db()` creates the `filing_contents` table, `storage.py` has `upsert_filing_content(session, filing_id, content_type, content_data, parse_status, parse_error)` and `get_filing_content_data(session, filing_id, content_type)` helpers, and the existing `companies`/`filings` tables still work unchanged.
 
-- [ ] Task 2: Implement XBRL/iXBRL parser
-  - What: Create `sec_importer/parser/xbrl_parser.py` that downloads XBRL instance documents from SEC EDGAR (using the accession number to build the URL) and parses iXBRL facts. Extract at least 20 financial facts per filing including: revenue, cost of revenue, gross profit, operating income, net income, EPS (basic & diluted), total assets, total liabilities, total equity, cash and equivalents, accounts receivable, inventory, property plant equipment, long-term debt, current portion of debt, operating cash flow, investing cash flow, financing cash flow, shares outstanding, and effective tax rate. Handle malformed XBRL gracefully — return partial facts with `parse_status="partial"` and a descriptive error, never crash.
+- [ ] Task 2: Expand XBRL parser to extract 20+ financial facts
+  - What: Extend `KEY_CONCEPTS` in `xbrl_parser.py` to cover at least 20 financial concepts including: revenue, cost of revenue, gross profit, operating income, net income, EPS (basic & diluted), total assets, total liabilities, total equity, cash and equivalents, accounts receivable, inventory, property plant equipment, long-term debt, current portion of debt, operating cash flow, investing cash flow, financing cash flow, shares outstanding, effective tax rate, operating expenses, interest expense, income tax expense, goodwill, intangible assets, retained earnings, current portion of long-term debt, short-term debt.
   - Files: `sec_importer/parser/xbrl_parser.py`
-  - Done when: `parse_xbrl(accession_number, session)` downloads the XBRL document, extracts 20+ financial facts as a dict keyed by concept name, returns `{"facts": {...}, "parse_status": "success"|"partial"|"failed", "parse_error": str|None}`. Gracefully handles missing tags, malformed XML, and network errors.
+  - Done when: `KEY_CONCEPTS` maps at least 20 metric names to US-GAAP XBRL concept URIs. `_extract_key_metrics` returns all 20+ metrics. The parser handles missing concepts gracefully (skips them, does not crash).
 
-- [ ] Task 3: Implement HTML text extraction parser
-  - What: Create `sec_importer/parser/html_parser.py` that downloads HTML filing documents from SEC EDGAR and extracts structured text sections. Use BeautifulSoup to parse HTML and extract key sections: MD&A (Management Discussion & Analysis), Risk Factors, Business Overview, Financial Statements, and General Body Text. Return a dict with section keys and extracted text content.
-  - Files: `sec_importer/parser/html_parser.py`
-  - Done when: `parse_html(accession_number, session)` downloads the HTML filing, extracts at least 5 named sections (MD&A, Risk Factors, Business, Financial Statements, Body), returns `{"sections": {"mda": str, "risk_factors": str, "business": str, "financial_statements": str, "body": str}, "parse_status": "success"|"partial"|"failed", "parse_error": str|None}`. Handles malformed HTML gracefully.
+- [ ] Task 3: Add `parse_filings` batch function and integrate parsing into `sync`
+  - What: Add a `parse_filings` function in `parser/__init__.py` that takes a list of filing dicts and parses each one (auto-detecting XBRL vs HTML based on filing type). Update `sync.py` to call `parse_filings` after storing new filings so that `sec-importer sync` fetches new filings AND parses them end-to-end.
+  - Files: `sec_importer/parser/__init__.py`, `sec_importer/sync.py`
+  - Done when: `parse_filings(filing_list)` returns a list of parse results. `run_sync` in `sync.py` calls `parse_filings` for newly inserted filings and stores the parsed content via `upsert_filing_content`. Running `sec-importer sync` produces parsed XBRL/HTML content in the DB.
 
-- [ ] Task 4: Create unified parser interface and download helpers
-  - What: Create `sec_importer/parser/__init__.py` as the unified parser module. It should expose: `download_filing_document(accession_number, session)` — downloads the primary document (XBRL or HTML) from SEC EDGAR given an accession number; `parse_filing(accession_number, session)` — auto-detects filing type and dispatches to the right parser (XBRL for 10-K/10-Q, HTML for 8-K/others); `parse_and_store(accession_number, filing_id, session)` — parses and stores results in the `filing_contents` table. Also add `get_filing_document_url(accession_number)` helper that constructs the SEC EDGAR download URL.
-  - Files: `sec_importer/parser/__init__.py`
-  - Done when: `parse_filing(accession_number)` auto-dispatches to XBRL or HTML parser based on filing type and returns a unified result dict. `parse_and_store(accession_number, filing_id)` parses and writes to DB. `download_filing_document(accession_number)` returns the raw document bytes. All functions are importable from `sec_importer.parser`.
+- [ ] Task 4: Add CLI `show` command to display parsed filing content
+  - What: Add a `show` CLI command in `cli.py` that takes a filing ID or accession number and displays the parsed content (XBRL metrics or HTML sections) in a readable format.
+  - Files: `sec_importer/cli.py`
+  - Done when: `sec-importer show <filing_id>` prints parsed XBRL metrics as a table or HTML sections as text. `sec-importer show <accession_number>` works the same way.
 
-- [ ] Task 5: Add `sec-importer show` CLI command and integrate parsing into `sync`
-  - What: Add a `sec-importer show <accession_number>` CLI command that looks up the filing by accession number, retrieves parsed content from the database, and displays financial facts (for XBRL) or text sections (for HTML) in a readable format. Also update `sync.py` to call `parse_and_store()` for newly synced filings so that `sec-importer sync` fetches new filings AND parses them end-to-end.
-  - Files: `sec_importer/cli.py`, `sec_importer/sync.py`
-  - Done when: `sec-importer show <accession>` prints the filing metadata plus parsed financial facts or text sections in a formatted table. `sec-importer sync` now parses newly fetched filings automatically (logging parse status). Running sync on a ticker with existing 10-K filings results in parsed content being stored.
-
-- [ ] Task 6: End-to-end validation — parse at least 3 companies' latest 10-K filings
-  - What: Run `sec-importer sync` for at least 3 companies that have recent 10-K filings in the database, then verify that XBRL parsing extracted 20+ facts per filing and that `sec-importer show` displays the data correctly. Also verify that HTML parsing works for at least one 8-K filing. Confirm that malformed XBRL is handled without crashes.
-  - Files: No new files — validation via CLI commands and manual inspection.
-  - Done when: At least 3 companies have parsed 10-K data in `filing_contents` with 20+ facts each. At least one 8-K has parsed HTML sections. `sec-importer show` displays all data correctly. No crashes on any filing type.
+- [ ] Task 5: Add tests for the parser and sync integration
+  - What: Write unit tests for `XBRLParser`, `HTMLParser`, `parse_filings`, and the sync integration. Use mock HTTP responses for SEC endpoints.
+  - Files: `tests/test_parser.py`, `tests/test_sync.py`
+  - Done when: All parser tests pass. Sync integration tests verify end-to-end flow with mocked SEC API responses.

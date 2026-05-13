@@ -191,8 +191,14 @@ def run_now() -> dict:
 def show_config() -> None:
     """Show current scheduler configuration."""
     config = SchedulerConfig.from_env()
-    click = __import__("click")
-    click.echo(click.style("Scheduler Configuration", fg="cyan"))
-    click.echo()
-    for key, value in config.to_dict().items():
-        click.echo(f"  {key:20s}: {value}")
+    try:
+        import click
+        click.echo(click.style("Scheduler Configuration", fg="cyan"))
+        click.echo()
+        for key, value in config.to_dict().items():
+            click.echo(f"  {key:20s}: {value}")
+    except ImportError:
+        print("Scheduler Configuration")
+        print()
+        for key, value in config.to_dict().items():
+            print(f"  {key:20s}: {value}")

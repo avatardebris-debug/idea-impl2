@@ -206,7 +206,7 @@ def stats(ctx, ticker, db_path):
         if ticker:
             click.echo(f"  Filtered by ticker: {ticker}")
 
-        # Get date range
+        # Get date range (filing_date is stored as string YYYY-MM-DD)
         if total > 0:
             min_date = session.execute(
                 select(func.min(Filing.filing_date))
@@ -214,7 +214,8 @@ def stats(ctx, ticker, db_path):
             max_date = session.execute(
                 select(func.max(Filing.filing_date))
             ).scalar_one_or_none()
-            click.echo(f"  Date range: {min_date} to {max_date}")
+            if min_date and max_date:
+                click.echo(f"  Date range: {min_date} to {max_date}")
 
     finally:
         session.close()

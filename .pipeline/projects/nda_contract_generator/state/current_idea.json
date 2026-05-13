@@ -11,5 +11,6 @@
   "_slug": "nda_contract_generator",
   "_instance_skip": true,
   "pre_skip_status": "budget_exceeded",
-  "budget_note": "Skipped \u2014 running on another instance"
+  "pre_budget_status": "phase_1_executing",
+  "budget_note": "Force-completed after 7528 min (budget: 225 min for 3-phase project)"
 }

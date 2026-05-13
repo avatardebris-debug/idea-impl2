@@ -85,10 +85,10 @@ def check_text_patterns(items: list) -> List[RedFlag]:
     """Check for suspicious text patterns."""
     flags = []
     suspicious_patterns = [
-        ("fraud", "Fraud mention detected", RedFlagSeverity.CRITICAL),
+        ("fraud", "Fraud mention detected", RedFlagSeverity.HIGH),
         ("misstatement", "Misstatement language detected", RedFlagSeverity.WARNING),
         ("restatement", "Financial restatement detected", RedFlagSeverity.WARNING),
-        ("manipulat", "Manipulation language detected", RedFlagSeverity.CRITICAL),
+        ("manipulat", "Manipulation language detected", RedFlagSeverity.HIGH),
         ("cook the books", "Cook the books phrase detected", RedFlagSeverity.CRITICAL),
         ("off-balance sheet", "Off-balance sheet arrangement detected", RedFlagSeverity.WARNING),
         ("channel stuffing", "Channel stuffing detected", RedFlagSeverity.CRITICAL),

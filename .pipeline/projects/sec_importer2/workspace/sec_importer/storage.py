@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import create_engine, select, func
 from sqlalchemy.orm import Session, sessionmaker
 
-from .models import Base, Company, Filing
+from .models import Base, Company, Filing, FilingContent
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "sec_importer.db")
 
@@ -42,12 +42,18 @@ def get_session(db_path: Optional[str] = None) -> Session:
 
 def upsert_company(session: Session, ticker: str, name: Optional[str] = None,
                    cik: Optional[str] = None) -> Company:
-    """Insert or update a company record. Returns the company."""
+    """Insert or update a company record. Returns the company.
+
+    Only updates name and cik if new values are provided.
+    The ticker is used as the primary key and is never overwritten.
+    """
     company = session.execute(select(Company).where(Company.ticker == ticker)).scalar_one_or_none()
     if company:
-        company.ticker = ticker
-        company.name = name or company.name
-        company.cik = cik or company.cik
+        # Only update name/cik if new values are provided
+        if name is not None:
+            company.name = name
+        if cik is not None:
+            company.cik = cik
     else:
         company = Company(ticker=ticker, name=name, cik=cik)
         session.add(company)
@@ -111,4 +117,99 @@ def count_filings(session: Session, ticker: Optional[str] = None) -> int:
     stmt = select(func.count(Filing.id))
     if ticker:
         stmt = stmt.where(Filing.ticker == ticker)
-    return session.execute(stmt).scalar_one()
+    result = session.execute(stmt).scalar_one_or_none()
+    return result or 0
+
+
+def upsert_filing_content(session: Session, filing_id: int, content_type: str,
+                          content_data: dict, parse_status: str = "success",
+                          parse_error: Optional[str] = None) -> FilingContent:
+    """Insert or update parsed content for a filing.
+
+    Args:
+        session: SQLAlchemy session.
+        filing_id: ID of the Filing record.
+        content_type: 'xbrl' or 'html'.
+        content_data: Dictionary of parsed data (stored as-is for testing).
+        parse_status: 'success', 'partial', or 'failed'.
+        parse_error: Optional error message.
+
+    Returns:
+        The FilingContent record.
+    """
+    content = session.execute(
+        select(FilingContent).where(
+            (FilingContent.filing_id == filing_id) &
+            (FilingContent.content_type == content_type)
+        )
+    ).scalar_one_or_none()
+
+    if content:
+        content.content_data = content_data
+        content.parse_status = parse_status
+        content.parse_error = parse_error
+    else:
+        content = FilingContent(
+            filing_id=filing_id,
+            content_type=content_type,
+            content_data=content_data,
+            parse_status=parse_status,
+            parse_error=parse_error,
+        )
+        session.add(content)
+
+    session.commit()
+    return content
+
+
+def get_filing_content(session: Session, filing_id: int) -> Optional[FilingContent]:
+    """Retrieve the FilingContent record for a filing.
+
+    Args:
+        session: SQLAlchemy session.
+        filing_id: ID of the Filing record.
+
+    Returns:
+        FilingContent record, or None if not found.
+    """
+    content = session.execute(
+        select(FilingContent).where(FilingContent.filing_id == filing_id)
+    ).scalar_one_or_none()
+    return content
+
+
+def get_filing_content_data(session: Session, filing_id: int,
+                            content_type: str = "xbrl") -> Optional[dict]:
+    """Retrieve parsed content data for a filing.
+
+    Args:
+        session: SQLAlchemy session.
+        filing_id: ID of the Filing record.
+        content_type: 'xbrl' or 'html'.
+
+    Returns:
+        Dictionary of parsed data, or empty dict if not found.
+    """
+    content = session.execute(
+        select(FilingContent).where(
+            (FilingContent.filing_id == filing_id) &
+            (FilingContent.content_type == content_type)
+        )
+    ).scalar_one_or_none()
+
+    if not content or not content.content_data:
+        return {}
+
+    return content.content_data
+
+
+def get_all_filing_contents(session: Session) -> list[FilingContent]:
+    """Retrieve all FilingContent records.
+
+    Args:
+        session: SQLAlchemy session.
+
+    Returns:
+        List of all FilingContent records.
+    """
+    return session.execute(select(FilingContent)).scalars().all()

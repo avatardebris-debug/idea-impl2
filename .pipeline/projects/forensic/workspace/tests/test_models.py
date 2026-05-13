@@ -259,6 +259,7 @@ class TestFraudReport:
         report = FraudReport(
             ticker="NVDA",
             cik="0001045810",
+            filing_date="2023-11-03",
             risk_score=85.0,
             overall_risk=RiskLevel.CRITICAL,
             red_flags=[
@@ -289,6 +290,7 @@ class TestFraudReport:
         report = FraudReport(
             ticker="JPM",
             cik="0000019617",
+            filing_date="2023-11-03",
             risk_score=30.0,
             overall_risk=RiskLevel.LOW,
             red_flags=[],
@@ -306,6 +308,7 @@ class TestFraudReport:
         report = FraudReport(
             ticker="BAC",
             cik="0000070858",
+            filing_date="2023-11-03",
             risk_score=50.0,
             overall_risk=RiskLevel.MEDIUM,
             red_flags=[],

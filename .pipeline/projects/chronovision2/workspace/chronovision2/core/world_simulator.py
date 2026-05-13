@@ -99,8 +99,8 @@ class WorldSimulator:
         """
         for _ in range(num_steps):
             self._apply_rules()
-            self._apply_hypothesis_effects()
             self.time_step += 1
+            self._apply_hypothesis_effects()
             self._history.append(copy.deepcopy(self.current_state))
         return self.state
 
@@ -118,8 +118,8 @@ class WorldSimulator:
         trajectory = [copy.deepcopy(self.initial_state)]
         for _ in range(num_steps):
             self._apply_rules()
-            self._apply_hypothesis_effects()
             self.time_step += 1
+            self._apply_hypothesis_effects()
             trajectory.append(copy.deepcopy(self.current_state))
         return trajectory
 

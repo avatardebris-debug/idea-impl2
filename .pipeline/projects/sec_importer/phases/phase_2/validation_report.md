@@ -1,14 +1,35 @@
 # Validation Report — Phase 2
 ## Summary
-- Tests: 111 passed, 5 failed
-- Failed tests:
-  1. `tests/test_parser.py::TestFilingParserParse::test_parse_xbrl_filing` — assert False
-  2. `tests/test_parser.py::TestFilingParserParse::test_parse_xbrl_no_elements` — AssertionError: assert 'full_text' == 'xbrl_full'
-  3. `tests/test_parser.py::TestGetSummary::test_get_summary_counts` — assert 0 >= 2
-  4. `tests/test_rate_limiter.py::TestRateLimiterWait::test_wait_enforces_delay` — assert 0.035 >= 0.04
-  5. `tests/test_repository_integration.py::TestSECDatabase::test_full_workflow` — AssertionError: assert 8 == 1
-  6. `tests/test_repository_integration.py::TestSECDatabase::test_deduplication_prevents_duplicates` — AssertionError: assert 8 == 1
-- Core files present: schema.py, models.py, config.py, repository.py, rate_limiter.py, parser.py, cli.py, config.yaml, requirements.txt, README.md
-- Missing Phase 2 files: import_pipeline.py, sync.py, query.py, test_import_pipeline.py, test_query.py, test_sync.py
+- Tests: 129 passed, 16 failed, 1 error (collection error)
+- Errors: test_models.py fails to collect due to missing imports (XBRLFactModel, FilingSchemaConfig not in models.py)
+- Failures: 16 tests across test_config.py (3), test_parser.py (3), test_repository_integration.py (2), test_repository_rate_limiter.py (8)
 
 ## Verdict: FAIL
+
+### Reasons for FAIL:
+
+1. **Missing Phase 2 files:**
+   - `src/sec_importer/import_pipeline.py` — required by Task 3, NOT PRESENT
+   - `src/sec_importer/sync.py` — required by Task 3, NOT PRESENT
+   - `src/sec_importer/query.py` — required by Task 4, NOT PRESENT
+
+2. **Missing Pydantic models:**
+   - `XBRLFactModel` — imported by test_models.py but not defined in models.py
+   - `FilingSchemaConfig` — imported by test_models.py but not defined in models.py
+
+3. **Missing dependencies in requirements.txt:**
+   - `pydantic` — NOT listed (required by Phase 2)
+   - `pyyaml` — NOT listed (required by Phase 2)
+
+4. **Test failures (16 total):**
+   - `test_config.py`: 3 failures — Config class lacks `from_file` classmethod, env loading, and property setters
+   - `test_parser.py`: 3 failures — XBRL parsing broken, summary counts incorrect
+   - `test_repository_integration.py`: 2 failures — deduplication not working (returns 8 rows instead of 1)
+   - `test_repository_rate_limiter.py`: 8 failures — FilingItemModel filing_id type mismatch, DeduplicationManager missing methods, RateLimiter tests failing
+   - `test_models.py`: 1 collection error — cannot import missing models
+
+5. **Core functionality gaps:**
+   - Batch import pipeline (Task 3) not implemented
+   - Query API (Task 4) not implemented
+   - Sync script (Task 3) not implemented
+   - Deduplication not functioning correctly in repository layer

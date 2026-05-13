@@ -1,14 +1,14 @@
 {
   "title": "[SEC importer]",
   "description": "Ability to import all the latest data of SEC filings for US companies.",
-  "status": "phase_2_executing",
-  "phase": 2,
+  "status": "complete",
+  "phase": 3,
   "total_phases": 3,
   "started_at": "2026-05-05T01:42:56.422863+00:00",
   "depends_on": [],
   "tasks_done": 0,
-  "tasks_total": 5,
+  "tasks_total": 8,
   "_slug": "sec_importer",
-  "budget_note": "",
-  "budget_lock": true
+  "budget_lock": true,
+  "session_started_at": "2026-05-11T20:34:55.258497+00:00"
 }

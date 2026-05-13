@@ -166,8 +166,9 @@ class WinRatePanel(DashboardPanel):
     def render_data(self) -> Dict[str, Any]:
         """Return panel data as a dict."""
         data = super().render_data()
-        data["gauge_value"] = self.gauge_value
-        data["confidence_interval"] = self.confidence_interval
+        data["value"] = self.gauge_value
+        data["ci_lower"] = self.confidence_interval[0]
+        data["ci_upper"] = self.confidence_interval[1]
         data["trend_arrow"] = self.trend_arrow
         data["total_games"] = self.total_games
         data["wins"] = self.wins
@@ -252,10 +253,11 @@ class BankrollCurvePanel(DashboardPanel):
     def render_data(self) -> Dict[str, Any]:
         """Return panel data as a dict."""
         data = super().render_data()
-        data["current_bankroll"] = self.current_bankroll
+        data["step"] = self.current_bankroll  # will be overridden by update_from_bound_ticker
+        data["bankroll"] = self.current_bankroll
         data["peak_bankroll"] = self.peak_bankroll
         data["drawdown"] = self.drawdown
-        data["sparkline"] = self.sparkline
+        data["history"] = self.sparkline
         data["profit_loss"] = self.profit_loss
         return data
 
@@ -299,7 +301,7 @@ class BankrollCurvePanel(DashboardPanel):
 class NashEquilibriumPanel(DashboardPanel):
     """Panel for Nash equilibrium metrics."""
 
-    symbol = "NASH_DIST"
+    symbol = "NASH_DISTANCE"
 
     def __init__(
         self,
@@ -309,7 +311,7 @@ class NashEquilibriumPanel(DashboardPanel):
         nash_strategy: str = "nash_equilibrium",
         heatmap_color: str = "white",
         title: str = "Nash Equilibrium Distance",
-        description: str = "Shows the distance to Nash equilibrium.",
+        description: str = "Shows the distance from the Nash Equilibrium.",
         width: int = 10,
         height: int = 10,
         x: int = 0,

@@ -4,7 +4,6 @@ import sqlite3
 from typing import List, Optional, Dict, Any
 from forensic.config import get_config
 from sec_importer.models import FilingItemModel
-from sec_importer.schema import init_db
 
 
 class ForensicDatabase:
@@ -99,6 +98,30 @@ class ForensicDatabase:
             CREATE INDEX IF NOT EXISTS idx_red_flags_severity ON red_flags(severity);
             CREATE INDEX IF NOT EXISTS idx_capital_flows_ticker ON capital_flows(ticker);
             CREATE INDEX IF NOT EXISTS idx_capital_flows_date ON capital_flows(filing_date);
+            -- Monitoring results table
+            CREATE TABLE IF NOT EXISTS monitoring_results (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                filing_date TEXT NOT NULL,
+                score REAL NOT NULL,
+                risk_level TEXT NOT NULL,
+                checked_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (ticker) REFERENCES companies(ticker)
+            );
+            CREATE INDEX IF NOT EXISTS idx_monitoring_results_ticker ON monitoring_results(ticker);
+            CREATE INDEX IF NOT EXISTS idx_monitoring_results_checked_at ON monitoring_results(checked_at);
+            -- Alerts table
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                score REAL NOT NULL,
+                risk_level TEXT NOT NULL,
+                flags TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (ticker) REFERENCES companies(ticker)
+            );
+            CREATE INDEX IF NOT EXISTS idx_alerts_ticker ON alerts(ticker);
+            CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
             """
         )
         return self
@@ -479,3 +502,47 @@ class ForensicDatabase:
             "top_flags": [dict(r) for r in top_flags],
             "capital_flow_trends": capital_flow_trends,
         }
+
+    # ---- Monitoring results ----
+
+    def get_last_monitoring_time(self, ticker: str) -> Optional[str]:
+        """Get the last monitoring check time for a ticker."""
+        conn = self._get_conn()
+        row = conn.execute(
+            "SELECT checked_at FROM monitoring_results WHERE ticker = ? ORDER BY checked_at DESC LIMIT 1",
+            (ticker,),
+        ).fetchone()
+        return row[0] if row else None
+
+    def record_monitoring_result(
+        self, ticker: str, filing_date: str, score: float, risk_level: str
+    ) -> None:
+        """Record a monitoring check result."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO monitoring_results (ticker, filing_date, score, risk_level, checked_at)
+               VALUES (?, ?, ?, ?, datetime('now'))""",
+            (ticker, filing_date, score, risk_level),
+        )
+        conn.commit()
+
+    def get_recent_alerts(self, ticker: str, hours: int = 1) -> List[Dict[str, Any]]:
+        """Get recent alerts for a ticker within the last N hours."""
+        conn = self._get_conn()
+        rows = conn.execute(
+            "SELECT * FROM alerts WHERE ticker = ? AND created_at >= datetime('now', ?) ORDER BY created_at DESC",
+            (ticker, f"-{hours} hours"),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def insert_alert(
+        self, ticker: str, score: float, risk_level: str, flags: List[str]
+    ) -> None:
+        """Insert an alert record."""
+        conn = self._get_conn()
+        conn.execute(
+            """INSERT INTO alerts (ticker, score, risk_level, flags, created_at)
+               VALUES (?, ?, ?, ?, datetime('now'))""",
+            (ticker, score, risk_level, ",".join(flags)),
+        )
+        conn.commit()

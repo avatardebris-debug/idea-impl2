@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
+import json
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
-class Severity(str, Enum):
-    """Red flag severity levels."""
+# ---------------------------------------------------------------------------
+# Enums
+# ---------------------------------------------------------------------------
 
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+class RedFlagSeverity(str, Enum):
+    """Severity levels for red flags."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+    @classmethod
+    def _missing_(cls, value):
+        """Map 'high' to CRITICAL for backward compatibility."""
+        if value == "high":
+            return cls.CRITICAL
+        return None
 
 
 class RiskLevel(str, Enum):
@@ -25,15 +37,17 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
 
-class RedFlagEntry(BaseModel):
+# ---------------------------------------------------------------------------
+# Red flag / recommendation
+# ---------------------------------------------------------------------------
+
+class RedFlag(BaseModel):
     """A single fraud red flag finding."""
 
-    flag_name: str = Field(description="Name of the red flag check")
-    severity: Severity = Field(description="Severity of the red flag")
-    evidence_excerpt: str = Field(description="Relevant excerpt from the filing")
-    score_contribution: float = Field(
-        ge=0.0, le=100.0, description="Points contributed to the composite score"
-    )
+    category: str = Field(description="Category of the red flag")
+    description: str = Field(default="", description="Human-readable description")
+    severity: RedFlagSeverity = Field(description="Severity of the red flag")
+    evidence: Optional[str] = Field(default=None, description="Supporting evidence excerpt")
 
     def model_dump(self, **kwargs) -> dict:
         """Serialize to dict, converting enum to string."""
@@ -41,52 +55,185 @@ class RedFlagEntry(BaseModel):
         data["severity"] = data["severity"].value
         return data
 
+    def to_dict(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return self.model_dump(**kwargs)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "RedFlag":
+        """Deserialize from dict."""
+        severity = data.get("severity", "info")
+        if isinstance(severity, str):
+            severity = RedFlagSeverity(severity)
+        return cls(
+            category=data.get("category", ""),
+            description=data.get("description", ""),
+            severity=severity,
+            evidence=data.get("evidence"),
+        )
+
+
+class Recommendation(BaseModel):
+    """An actionable recommendation."""
+
+    category: str = Field(description="Category of the recommendation")
+    description: str = Field(description="Human-readable recommendation text")
+    priority: str = Field(description="Priority level (low / medium / high / critical)")
+
+    def model_dump(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return super().model_dump(**kwargs)
+
+    def to_dict(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return self.model_dump(**kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Fraud score / report
+# ---------------------------------------------------------------------------
 
 class FraudScore(BaseModel):
     """Composite fraud score for a filing."""
 
-    fraud_score: int = Field(
-        ge=0, le=100, description="Composite fraud score from 0 to 100"
-    )
+    score: float = Field(ge=0.0, le=100.0, description="Composite fraud score from 0 to 100")
     risk_level: RiskLevel = Field(description="Mapped risk level")
-    top_red_flags: List[RedFlagEntry] = Field(
-        default_factory=list, description="Top 3 red flags by score"
-    )
-
-    @field_validator("risk_level", mode="before")
-    @classmethod
-    def _map_risk_level(cls, v):
-        """Map numeric score to risk level."""
-        if isinstance(v, RiskLevel):
-            return v
-        return None  # will be set by compute_fraud_score
+    top_red_flags: List[RedFlag] = Field(default_factory=list, description="Top red flags by score")
 
     def model_dump(self, **kwargs) -> dict:
-        """Serialize to dict, converting enums to strings."""
+        """Serialize to dict."""
         data = super().model_dump(**kwargs)
         data["risk_level"] = data["risk_level"].value
         return data
 
+    @classmethod
+    def from_dict(cls, data: dict) -> "FraudScore":
+        """Deserialize from dict."""
+        red_flags = [RedFlag(**flag) for flag in data.get("top_red_flags", [])]
+        return cls(
+            score=data.get("score", 0.0),
+            risk_level=RiskLevel(data.get("risk_level", "low")),
+            top_red_flags=red_flags,
+        )
 
-class AnalysisReport(BaseModel):
-    """Full forensic analysis report."""
+
+class Report(BaseModel):
+    """Complete fraud risk report for a filing."""
 
     ticker: str = Field(description="Company ticker symbol")
-    cik: str = Field(description="CIK number")
-    filing_date: str = Field(description="Date of the analyzed filing")
-    fraud_score: FraudScore = Field(description="Composite fraud score")
-    red_flags: List[RedFlagEntry] = Field(
-        default_factory=list, description="All detected red flags"
-    )
-    summary: str = Field(
-        default="", description="Human-readable summary of findings"
-    )
+    cik: str = Field(description="Company CIK")
+    filing_date: str = Field(description="Filing date")
+    risk_score: float = Field(ge=0.0, le=100.0, description="Composite fraud score")
+    overall_risk: str = Field(description="Overall risk level string")
+    red_flags: List[RedFlag] = Field(default_factory=list, description="All detected red flags")
+    recommendations: List[Recommendation] = Field(default_factory=list, description="Actionable recommendations")
 
     def model_dump(self, **kwargs) -> dict:
-        """Serialize to dict, converting enums to strings."""
+        """Serialize to dict."""
         data = super().model_dump(**kwargs)
-        data["fraud_score"] = self.fraud_score.model_dump()
-        for flag in data.get("red_flags", []):
-            if isinstance(flag, dict) and "severity" in flag:
-                flag["severity"] = flag["severity"].value if hasattr(flag["severity"], "value") else flag["severity"]
+        data["red_flags"] = [flag.model_dump() for flag in self.red_flags]
+        data["recommendations"] = [r.model_dump() for r in self.recommendations]
         return data
+
+    def to_dict(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return self.model_dump(**kwargs)
+
+    def to_json(self, path: Optional[str] = None, **kwargs) -> Optional[str]:
+        """Serialize to JSON string or write to file."""
+        data = self.to_dict()
+        if path:
+            with open(path, "w") as f:
+                json.dump(data, f, **kwargs)
+            return None
+        return json.dumps(data, **kwargs)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Report":
+        """Deserialize from dict."""
+        red_flags = [RedFlag(**flag) for flag in data.get("red_flags", [])]
+        recommendations = [Recommendation(**rec) for rec in data.get("recommendations", [])]
+        return cls(
+            ticker=data.get("ticker", ""),
+            cik=data.get("cik", ""),
+            filing_date=data.get("filing_date", ""),
+            risk_score=data.get("risk_score", 0.0),
+            overall_risk=data.get("overall_risk", "low"),
+            red_flags=red_flags,
+            recommendations=recommendations,
+        )
+
+
+# Alias for backward compatibility and explicit usage
+FraudReport = Report
+
+
+# ---------------------------------------------------------------------------
+# Pipeline ingest / analysis results
+# ---------------------------------------------------------------------------
+
+class IngestResult(BaseModel):
+    """Result of the ingestion pipeline."""
+
+    ticker: str
+    cik: str
+    accession_no: str
+    filing_type: str
+    filing_date: str
+    item_count: int = 0
+    success: bool = True
+    error: Optional[str] = None
+
+    def model_dump(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return super().model_dump(**kwargs)
+
+    def to_dict(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return self.model_dump(**kwargs)
+
+    def to_json(self, path: Optional[str] = None, **kwargs) -> Optional[str]:
+        """Serialize to JSON string or write to file."""
+        data = self.to_dict()
+        if path:
+            with open(path, "w") as f:
+                json.dump(data, f, **kwargs)
+            return None
+        return json.dumps(data, **kwargs)
+
+
+class AnalysisResult(BaseModel):
+    """Result of the analysis pipeline."""
+
+    ticker: str
+    cik: str
+    accession_no: str
+    filing_date: str = ""
+    fraud_risk_score: float = 0.0
+    risk_level: RiskLevel = RiskLevel.LOW
+    red_flags: List[RedFlag] = Field(default_factory=list)
+    capital_flows: Optional[dict] = None
+    advanced_flags: Optional[dict] = None
+    report: Optional[Report] = None
+
+    def model_dump(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        data = super().model_dump(**kwargs)
+        data["risk_level"] = data["risk_level"].value
+        data["red_flags"] = [flag.model_dump() for flag in self.red_flags]
+        if self.report:
+            data["report"] = self.report.model_dump()
+        return data
+
+    def to_dict(self, **kwargs) -> dict:
+        """Serialize to dict."""
+        return self.model_dump(**kwargs)
+
+    def to_json(self, path: Optional[str] = None, **kwargs) -> Optional[str]:
+        """Serialize to JSON string or write to file."""
+        data = self.to_dict()
+        if path:
+            with open(path, "w") as f:
+                json.dump(data, f, **kwargs)
+            return None
+        return json.dumps(data, **kwargs)

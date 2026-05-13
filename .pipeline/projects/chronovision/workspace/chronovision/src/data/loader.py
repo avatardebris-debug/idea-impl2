@@ -18,12 +18,26 @@ class DataLoader:
 
     def __init__(self, db_url: Optional[str] = None):
         self.db_url = db_url
+        self._companies: Dict[str, Dict[str, Any]] = {}
+        self._stock_prices: Dict[str, pd.DataFrame] = {}
+        self._filings: Dict[str, pd.DataFrame] = {}
+        self._loaded = False
+
+    def _load_data(self):
+        """Initialize in-memory caches to empty state and mark as loaded."""
+        self._companies = {}
+        self._stock_prices = {}
+        self._filings = {}
+        self._loaded = True
 
     def _get_session(self) -> Session:
         return get_session(self.db_url)
 
     def get_companies(self) -> pd.DataFrame:
         """Get all tracked companies as a DataFrame."""
+        if self._loaded:
+            data = list(self._companies.values())
+            return pd.DataFrame(data)
         session = self._get_session()
         companies = session.query(Company).all()
         session.close()
@@ -36,6 +50,8 @@ class DataLoader:
 
     def get_company(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Get a single company by ticker."""
+        if self._loaded:
+            return self._companies.get(ticker, None)
         session = self._get_session()
         company = session.query(Company).filter_by(ticker=ticker).first()
         session.close()
@@ -51,6 +67,14 @@ class DataLoader:
                     start_date: Optional[date] = None, end_date: Optional[date] = None,
                     limit: int = 1000) -> pd.DataFrame:
         """Get filings with optional filters."""
+        if self._loaded:
+            if ticker:
+                df = self._filings.get(ticker, pd.DataFrame())
+            else:
+                df = pd.concat(self._filings.values()) if self._filings else pd.DataFrame()
+            if not df.empty:
+                return df
+            return pd.DataFrame()
         session = self._get_session()
         query = session.query(Filing)
         if ticker:
@@ -77,6 +101,11 @@ class DataLoader:
     def get_stock_prices(self, ticker: str, start_date: Optional[date] = None,
                          end_date: Optional[date] = None, limit: int = 365) -> pd.DataFrame:
         """Get stock prices for a ticker."""
+        if self._loaded:
+            df = self._stock_prices.get(ticker, pd.DataFrame())
+            if not df.empty:
+                return df
+            return pd.DataFrame()
         session = self._get_session()
         query = session.query(StockPrice).filter_by(ticker=ticker)
         if start_date:
@@ -110,6 +139,12 @@ class DataLoader:
 
     def get_latest_financial_metrics(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Get the latest financial metrics for a company."""
+        if self._loaded:
+            df = self._filings.get(ticker, pd.DataFrame())
+            if not df.empty and "financial_metrics" in df.columns:
+                row = df.iloc[-1]
+                return row.get("financial_metrics")
+            return {}
         session = self._get_session()
         filing = session.query(Filing).filter_by(ticker=ticker).order_by(Filing.filing_date.desc()).first()
         session.close()
@@ -119,6 +154,8 @@ class DataLoader:
 
     def get_all_tickers(self) -> List[str]:
         """Get all available tickers."""
+        if self._loaded:
+            return list(self._companies.keys())
         session = self._get_session()
         tickers = session.query(Company.ticker).distinct().all()
         session.close()

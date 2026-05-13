@@ -1,0 +1,844 @@
+{
+  "script": {
+    "title": "The Lying City",
+    "logline": "A detective must solve a murder in a city where everyone lies.",
+    "genre": "Noir Thriller",
+    "scenes": [
+      {
+        "scene_id": "SC-001",
+        "scene_heading": "INT. OPENING_IMAGE - DAY",
+        "action": "[Scene based on beat: Opening Image — [Opening Image] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the opening image of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Opening Image]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Opening Image]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "1",
+        "beat_ref": "Opening Image"
+      },
+      {
+        "scene_id": "SC-002",
+        "scene_heading": "INT. THEME_STATED - DAY",
+        "action": "[Scene based on beat: Theme Stated — [Theme Stated] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the theme stated of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Theme Stated]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Theme Stated]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "1-2",
+        "beat_ref": "Theme Stated"
+      },
+      {
+        "scene_id": "SC-003",
+        "scene_heading": "INT. SETUP - DAY",
+        "action": "[Scene based on beat: Setup — [Setup] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the setup of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Setup]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Setup]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "2-12",
+        "beat_ref": "Setup"
+      },
+      {
+        "scene_id": "SC-004",
+        "scene_heading": "INT. CATALYST - DAY",
+        "action": "[Scene based on beat: Catalyst — [Catalyst] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the catalyst of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Catalyst]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Catalyst]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "12-15",
+        "beat_ref": "Catalyst"
+      },
+      {
+        "scene_id": "SC-005",
+        "scene_heading": "INT. DEBATE - DAY",
+        "action": "[Scene based on beat: Debate — [Debate] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the debate of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Debate]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Debate]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "15-25",
+        "beat_ref": "Debate"
+      },
+      {
+        "scene_id": "SC-006",
+        "scene_heading": "EXT. BREAK_INTO_TWO - DAY",
+        "action": "[Scene based on beat: Break into Two — [Break into Two] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the break into two of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Break into Two]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Break into Two]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "25-28",
+        "beat_ref": "Break into Two"
+      },
+      {
+        "scene_id": "SC-007",
+        "scene_heading": "EXT. B_STORY - DAY",
+        "action": "[Scene based on beat: B Story — [B Story] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the b story of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in B Story]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in B Story]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "28-30",
+        "beat_ref": "B Story"
+      },
+      {
+        "scene_id": "SC-008",
+        "scene_heading": "EXT. FUN_AND_GAMES - DAY",
+        "action": "[Scene based on beat: Fun and Games — [Fun and Games] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the fun and games of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Fun and Games]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Fun and Games]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "30-55",
+        "beat_ref": "Fun and Games"
+      },
+      {
+        "scene_id": "SC-009",
+        "scene_heading": "EXT. MIDPOINT - DAY",
+        "action": "[Scene based on beat: Midpoint — [Midpoint] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the midpoint of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Midpoint]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Midpoint]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "55-60",
+        "beat_ref": "Midpoint"
+      },
+      {
+        "scene_id": "SC-010",
+        "scene_heading": "EXT. BAD_GUYS_CLOSE_IN - DAY",
+        "action": "[Scene based on beat: Bad Guys Close In — [Bad Guys Close In] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the bad guys close in of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Bad Guys Close In]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Bad Guys Close In]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "60-75",
+        "beat_ref": "Bad Guys Close In"
+      },
+      {
+        "scene_id": "SC-011",
+        "scene_heading": "EXT. ALL_IS_LOST - DAY",
+        "action": "[Scene based on beat: All Is Lost — [All Is Lost] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the all is lost of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in All Is Lost]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in All Is Lost]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "75-80",
+        "beat_ref": "All Is Lost"
+      },
+      {
+        "scene_id": "SC-012",
+        "scene_heading": "EXT. DARK_NIGHT_OF_THE_SOUL - DAY",
+        "action": "[Scene based on beat: Dark Night of the Soul — [Dark Night of the Soul] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the dark night of the soul of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Dark Night of the Soul]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Dark Night of the Soul]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "80-85",
+        "beat_ref": "Dark Night of the Soul"
+      },
+      {
+        "scene_id": "SC-013",
+        "scene_heading": "EXT. BREAK_INTO_THREE - DAY",
+        "action": "[Scene based on beat: Break into Three — [Break into Three] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the break into three of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Break into Three]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Break into Three]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "85-88",
+        "beat_ref": "Break into Three"
+      },
+      {
+        "scene_id": "SC-014",
+        "scene_heading": "EXT. FINALE - DAY",
+        "action": "[Scene based on beat: Finale — [Finale] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the finale of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Finale]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Finale]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "88-105",
+        "beat_ref": "Finale"
+      },
+      {
+        "scene_id": "SC-015",
+        "scene_heading": "EXT. FINAL_IMAGE - DAY",
+        "action": "[Scene based on beat: Final Image — [Final Image] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the final image of the narrative arc.]",
+        "characters_present": [],
+        "dialogue_lines": [
+          {
+            "character_name": "Protagonist 1",
+            "character_id": "ac9afb23",
+            "text": "[Dialogue for Protagonist 1 in Final Image]",
+            "parenthetical": null,
+            "delivery": null
+          },
+          {
+            "character_name": "Antagonist 2",
+            "character_id": "37d3e941",
+            "text": "[Dialogue for Antagonist 2 in Final Image]",
+            "parenthetical": null,
+            "delivery": null
+          }
+        ],
+        "estimated_page_range": "105",
+        "beat_ref": "Final Image"
+      }
+    ]
+  },
+  "beat_sheet": {
+    "title": "Untitled",
+    "logline": "A detective must solve a murder in a city where everyone lies.",
+    "genre": "Noir Thriller",
+    "beats": [
+      {
+        "title": "Opening Image",
+        "description": "An image that sets the tone and introduces the world of the story.",
+        "phase": "setup",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "1",
+        "beat_name": "Opening Image",
+        "beat_number": 1,
+        "summary": "[Opening Image] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the opening image of the narrative arc."
+      },
+      {
+        "title": "Theme Stated",
+        "description": "Someone states the theme of the story, often in passing.",
+        "phase": "setup",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "1-2",
+        "beat_name": "Theme Stated",
+        "beat_number": 2,
+        "summary": "[Theme Stated] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the theme stated of the narrative arc."
+      },
+      {
+        "title": "Setup",
+        "description": "We see what the protagonist's life is like before the story begins. We see their flaws and desires.",
+        "phase": "setup",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "2-12",
+        "beat_name": "Setup",
+        "beat_number": 3,
+        "summary": "[Setup] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the setup of the narrative arc."
+      },
+      {
+        "title": "Catalyst",
+        "description": "A major event that changes the protagonist's life forever. The 'inciting incident.'",
+        "phase": "setup",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "12-15",
+        "beat_name": "Catalyst",
+        "beat_number": 4,
+        "summary": "[Catalyst] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the catalyst of the narrative arc."
+      },
+      {
+        "title": "Debate",
+        "description": "The protagonist debates whether to take action. They resist the call to adventure.",
+        "phase": "setup",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "15-25",
+        "beat_name": "Debate",
+        "beat_number": 5,
+        "summary": "[Debate] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the debate of the narrative arc."
+      },
+      {
+        "title": "Break into Two",
+        "description": "The protagonist makes a decisive choice to enter the new world/situation.",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "25-28",
+        "beat_name": "Break into Two",
+        "beat_number": 6,
+        "summary": "[Break into Two] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the break into two of the narrative arc."
+      },
+      {
+        "title": "B Story",
+        "description": "A new relationship or subplot begins (often the love story).",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "28-30",
+        "beat_name": "B Story",
+        "beat_number": 7,
+        "summary": "[B Story] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the b story of the narrative arc."
+      },
+      {
+        "title": "Fun and Games",
+        "description": "The promise of the premise. The fun parts the audience came to see.",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "30-55",
+        "beat_name": "Fun and Games",
+        "beat_number": 8,
+        "summary": "[Fun and Games] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the fun and games of the narrative arc."
+      },
+      {
+        "title": "Midpoint",
+        "description": "A major event that raises the stakes. False victory or false defeat.",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "55-60",
+        "beat_name": "Midpoint",
+        "beat_number": 9,
+        "summary": "[Midpoint] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the midpoint of the narrative arc."
+      },
+      {
+        "title": "Bad Guys Close In",
+        "description": "The antagonist's forces close in. Internal and external pressures mount.",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "60-75",
+        "beat_name": "Bad Guys Close In",
+        "beat_number": 10,
+        "summary": "[Bad Guys Close In] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the bad guys close in of the narrative arc."
+      },
+      {
+        "title": "All Is Lost",
+        "description": "The lowest point. The hero loses everything. 'The death of the hero' (literal or metaphorical).",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "75-80",
+        "beat_name": "All Is Lost",
+        "beat_number": 11,
+        "summary": "[All Is Lost] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the all is lost of the narrative arc."
+      },
+      {
+        "title": "Dark Night of the Soul",
+        "description": "The hero wallows in despair. But then they find inspiration.",
+        "phase": "confrontation",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "80-85",
+        "beat_name": "Dark Night of the Soul",
+        "beat_number": 12,
+        "summary": "[Dark Night of the Soul] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the dark night of the soul of the narrative arc."
+      },
+      {
+        "title": "Break into Three",
+        "description": "The hero has an epiphany and finds the solution to the problem.",
+        "phase": "resolution",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "85-88",
+        "beat_name": "Break into Three",
+        "beat_number": 13,
+        "summary": "[Break into Three] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the break into three of the narrative arc."
+      },
+      {
+        "title": "Finale",
+        "description": "The hero confronts the antagonist and resolves the story. The theme is proven true.",
+        "phase": "resolution",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "88-105",
+        "beat_name": "Finale",
+        "beat_number": 14,
+        "summary": "[Finale] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the finale of the narrative arc."
+      },
+      {
+        "title": "Final Image",
+        "description": "The opposite of the opening image. Shows how the protagonist has changed.",
+        "phase": "resolution",
+        "scene_ref": "",
+        "characters_involved": [],
+        "estimated_page_range": "105",
+        "beat_name": "Final Image",
+        "beat_number": 15,
+        "summary": "[Final Image] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the final image of the narrative arc."
+      }
+    ]
+  },
+  "characters": {
+    "characters": [
+      {
+        "id": "ac9afb23",
+        "name": "Protagonist 1",
+        "role": "protagonist",
+        "motivation": "To overcome their core wound and achieve their goal.",
+        "physical_description": "The protagonist's physical appearance should reflect their inner journey.",
+        "personality_traits": [
+          "determined",
+          "flawed",
+          "relatable"
+        ],
+        "voice_notes": "Distinctive speech pattern that sets them apart.",
+        "costume_notes": "Clothing that evolves with their character arc.",
+        "visual_anchor": "A distinctive visual element that identifies them instantly.",
+        "backstory": "A past event that shaped their core wound or desire.",
+        "arc_summary": "From [initial state] to [final state]."
+      },
+      {
+        "id": "37d3e941",
+        "name": "Antagonist 2",
+        "role": "antagonist",
+        "motivation": "To achieve their goal at any cost, even if it harms others.",
+        "physical_description": "Physically imposing or subtly menacing presence.",
+        "personality_traits": [
+          "ruthless",
+          "calculating",
+          "charismatic"
+        ],
+        "voice_notes": "Cold, measured, or unnervingly calm.",
+        "costume_notes": "Sharp, dark, or authoritative clothing.",
+        "visual_anchor": "A signature prop or visual motif.",
+        "backstory": "A motivation that makes them sympathetic despite their actions.",
+        "arc_summary": "Their plan threatens the protagonist's world."
+      },
+      {
+        "id": "70e238a4",
+        "name": "Mentor 3",
+        "role": "mentor",
+        "motivation": "To ensure the protagonist succeeds where they once failed.",
+        "physical_description": "Weathered, experienced, wise appearance.",
+        "personality_traits": [
+          "wise",
+          "patient",
+          "eccentric"
+        ],
+        "voice_notes": "Warm, gravelly, or scholarly tone.",
+        "costume_notes": "Practical, worn clothing suggesting experience.",
+        "visual_anchor": "A distinctive accessory or mannerism.",
+        "backstory": "A past failure that drives their desire to guide the protagonist.",
+        "arc_summary": "Passes the torch to the protagonist."
+      },
+      {
+        "id": "14283420",
+        "name": "Ally 4",
+        "role": "ally",
+        "motivation": "To help the protagonist succeed and protect their bond.",
+        "physical_description": "Approachable, friendly appearance.",
+        "personality_traits": [
+          "loyal",
+          "humorous",
+          "resourceful"
+        ],
+        "voice_notes": "Casual, warm, or energetic.",
+        "costume_notes": "Casual, practical clothing.",
+        "visual_anchor": "A distinctive style or accessory.",
+        "backstory": "A shared history or bond with the protagonist.",
+        "arc_summary": "Supports the protagonist through the journey."
+      },
+      {
+        "id": "4a58c537",
+        "name": "Sidekick 5",
+        "role": "sidekick",
+        "motivation": "To prove their worth and earn the protagonist's respect.",
+        "physical_description": "Smaller, less imposing than the protagonist.",
+        "personality_traits": [
+          "eager",
+          "comic relief",
+          "devoted"
+        ],
+        "voice_notes": "Quick, nervous, or enthusiastic.",
+        "costume_notes": "Colorful or distinctive clothing.",
+        "visual_anchor": "A quirky habit or prop.",
+        "backstory": "Admires the protagonist and wants to prove themselves.",
+        "arc_summary": "Grows from eager follower to independent hero."
+      }
+    ]
+  },
+  "scene_descriptions": {
+    "descriptions": {
+      "SC-001": {
+        "scene_id": "SC-001",
+        "setting": "INT. OPENING_IMAGE - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Image — [Opening...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-002": {
+        "scene_id": "SC-002",
+        "setting": "INT. THEME_STATED - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Stated — [Theme...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-003": {
+        "scene_id": "SC-003",
+        "setting": "INT. SETUP - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (— [Setup] —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-004": {
+        "scene_id": "SC-004",
+        "setting": "INT. CATALYST - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (— [Catalyst] —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-005": {
+        "scene_id": "SC-005",
+        "setting": "INT. DEBATE - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (— [Debate] —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-006": {
+        "scene_id": "SC-006",
+        "setting": "EXT. BREAK_INTO_TWO - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (into Two —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-007": {
+        "scene_id": "SC-007",
+        "setting": "EXT. B_STORY - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Story — [B...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-008": {
+        "scene_id": "SC-008",
+        "setting": "EXT. FUN_AND_GAMES - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (and Games —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-009": {
+        "scene_id": "SC-009",
+        "setting": "EXT. MIDPOINT - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (— [Midpoint] —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-010": {
+        "scene_id": "SC-010",
+        "setting": "EXT. BAD_GUYS_CLOSE_IN - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Guys Close In...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-011": {
+        "scene_id": "SC-011",
+        "setting": "EXT. ALL_IS_LOST - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Is Lost —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-012": {
+        "scene_id": "SC-012",
+        "setting": "EXT. DARK_NIGHT_OF_THE_SOUL - DAY",
+        "lighting": "low-key, high contrast, practical lights",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "tense, mysterious",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Night of the...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-013": {
+        "scene_id": "SC-013",
+        "setting": "EXT. BREAK_INTO_THREE - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "handheld, close-ups, shallow depth of field",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (into Three —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-014": {
+        "scene_id": "SC-014",
+        "setting": "EXT. FINALE - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (— [Finale] —...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      },
+      "SC-015": {
+        "scene_id": "SC-015",
+        "setting": "EXT. FINAL_IMAGE - DAY",
+        "lighting": "natural, soft, diffused",
+        "camera_notes": "wide shots, establishing shots, crane",
+        "mood": "bright, hopeful",
+        "action_beats": [
+          "Establish the setting ([Scene based on...)",
+          "Introduce the conflict (Image — [Final...)",
+          "Character interaction",
+          "Emotional beat"
+        ],
+        "visual_style": "dark and suspenseful"
+      }
+    }
+  }
+}

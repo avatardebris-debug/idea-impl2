@@ -11,7 +11,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from osint_corp.correlation import correlate, deduplicate_companies, find_companies_by_name
+from osint_corp.correlation import correlate, deduplicate_companies, find_companies_by_name, _name_similarity
 from osint_corp.models.entities import Company, Filing, Manifest
 from osint_corp.sources.corporate_registry import CorporateRegistry
 from osint_corp.sources.sec_importer import SECImporter
@@ -211,14 +211,15 @@ def correlate(
     companies = [Company(**c) for c in company_data]
     filings = [Filing(**f) for f in filing_data]
 
-    manifest = correlate(companies, filings)
+    relationships = correlate(companies, filings)
 
     console.print(f"\n[bold]Correlation complete:[/bold]")
-    console.print(f"  Companies: {len(manifest.entities)}")
-    console.print(f"  Filings: {len(manifest.filings)}")
-    console.print(f"  Relationships: {len(manifest.relationships)}")
+    console.print(f"  Companies: {len(companies)}")
+    console.print(f"  Filings: {len(filings)}")
+    console.print(f"  Relationships: {len(relationships)}")
 
     if output:
+        manifest = Manifest(entities=companies, filings=filings, relationships=relationships)
         with open(output, "w") as f:
             json.dump(manifest.to_dict(), f, indent=2)
         console.print(f"\n[bold]Manifest saved to {output}[/bold]")
@@ -250,7 +251,8 @@ def match(
     table.add_column("Ticker", style="green")
     table.add_column("Score", style="yellow")
 
-    for comp, score in matches:
+    for comp in matches:
+        score = _name_similarity(name, comp.name or "")
         table.add_row(comp.name or "", comp.ticker or "", f"{score:.2f}")
 
     console.print(table)

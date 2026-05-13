@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-json-schema-profiler = "json_schema_profiler.cli:main"
+json-schema-profiler = "json_schema_profiler.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]

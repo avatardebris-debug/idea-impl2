@@ -12,6 +12,8 @@ import logging
 import requests
 from typing import Optional
 
+from sec_importer.rate_limiter import RateLimiter
+
 logger = logging.getLogger(__name__)
 
 # SEC EDGAR API endpoints
@@ -20,13 +22,22 @@ SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 FULL_TEXT_URL = "https://www.sec.gov/Archives/edgar/full-text/{accession_no}.txt"
 FULL_TEXT_URL_NO_DASHES = "https://www.sec.gov/Archives/edgar/full-text/{accession_no}.txt"
 
-# SEC EDGAR rate limit: 10 requests per second
-SEC_RATE_LIMIT_DELAY = 0.1  # 100ms between requests
+# Global rate limiter instance
+_rate_limiter: Optional[RateLimiter] = None
+
+
+def _get_rate_limiter() -> RateLimiter:
+    """Get or create the global rate limiter instance."""
+    global _rate_limiter
+    if _rate_limiter is None:
+        _rate_limiter = RateLimiter(requests_per_second=10, delay=0.1)
+    return _rate_limiter
 
 
 def _throttle():
-    """Respect SEC EDGAR rate limits."""
-    time.sleep(SEC_RATE_LIMIT_DELAY)
+    """Respect SEC EDGAR rate limits using the RateLimiter."""
+    rl = _get_rate_limiter()
+    rl.wait()
 
 
 def _fetch_json(url: str) -> dict:

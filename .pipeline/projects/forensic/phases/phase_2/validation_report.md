@@ -1,10 +1,14 @@
 # Validation Report — Phase 2
 ## Summary
-- Tests: 50 passed, 8 failed (Phase 2 specific: test_normalization.py, test_compare.py, test_earnings.py)
-- Overall: 120 passed, 28 failed (includes non-Phase 2 tests)
-- Core files present: normalization.py, compare.py, earnings.py, test_normalization.py, test_compare.py, test_earnings.py, requirements.txt — all PRESENT
-## Failures (Phase 2 related)
-- test_normalization.py: 7 failures — extract_cogs, extract_net_income, extract_operating_income, extract_capex, extract_cash_flow_ops, normalized_values_are_ratios, multiple_text_parts all return None instead of expected values
-- test_earnings.py: 1 failure — test_insufficient_data asserts inf == 0.0 (expected 0.0, got inf)
-- test_compare.py: 0 failures — all 20 tests passed
+- Tests: 172 passed, 99 failed
 ## Verdict: FAIL
+
+### Details
+- 271 tests collected and executed.
+- 172 tests passed.
+- 99 tests failed across multiple test modules:
+  - `tests/test_models.py`: Failures due to `AttributeError` (missing `to_json`, `to_dict` methods) and `pydantic_core.ValidationError` on `AnalysisResult`, `FraudReport`, `RedFlag`, and `Recommendation` models.
+  - `tests/test_normalization.py`: Failures due to `assert None == <value>` — normalization extraction functions returning `None` instead of expected values.
+  - `tests/test_scoring.py`: Failures due to `pydantic_core.ValidationError` on `RedFlag` model.
+- Core files are present in the workspace (src/forensic/ contains all expected modules including pipeline.py, scoring.py, red_flags.py, normalization.py, models.py, etc.).
+- The failures indicate bugs in the implementation: missing model methods, Pydantic validation errors, and normalization extraction returning None.

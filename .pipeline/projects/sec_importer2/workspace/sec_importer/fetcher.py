@@ -50,6 +50,8 @@ class SECFetcher:
             },
             timeout=self.timeout,
         )
+        # Cache for the last company name lookup
+        self._last_company_name: Optional[str] = None
 
     def fetch_filings(self, ticker: Optional[str] = None,
                       cik: Optional[str] = None,
@@ -225,6 +227,8 @@ class SECFetcher:
             response = self._request_with_retry("GET", url)
             data = response.json()
             cik = data.get("cik")
+            # Also cache the company name for use by sync.py
+            self._last_company_name = data.get("companyName")
             if cik:
                 # CIK might be returned as int or string
                 cik_str = str(cik).zfill(10)

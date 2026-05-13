@@ -1,0 +1,41 @@
+{
+  "title": "[Chronovision autoresearch adapter]",
+  "description": "adaptor for chronovision. tracks research papers across arxiv, openreview, bioRxiv, NASA ADS, NBER,FRED,OECD, predicts paper and impact it will have. Also tracks crunchbase, pitchbook, cb insights, y combinator, a16z research to monitor and predict funding spikes to anticipate industry booms and changes and new transformations and growth. require",
+  "status": "budget_exceeded",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-12T11:06:24.635239+00:00",
+  "depends_on": [
+    "osint_corp",
+    "forensic",
+    "sec_importer",
+    "chronovision"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 1,
+  "review_result": {
+    "blocking_bugs": 1,
+    "review_path": "phases/phase_1/review.md",
+    "tasks_path": "phases/phase_1/tasks.md",
+    "workspace_path": "/workspace/idea impl/.pipeline/projects/chronovision_autoresearch_adapter/workspace",
+    "files_written": [
+      ".pytest_cache/README.md",
+      "__pycache__/test_dependency_system.cpython-312-pytest-9.0.3.pyc",
+      "tools.py",
+      "llm_interface.py",
+      "import_zip.py",
+      "test_harness_capabilities.py",
+      ".pytest_cache/CACHEDIR.TAG",
+      "test_dependency_system.py",
+      "conftest.py",
+      "__pycache__/conftest.cpython-312-pytest-9.0.3.pyc",
+      ".pytest_cache/v/cache/nodeids",
+      "import_cloud_zip.py"
+    ],
+    "non_blocking_notes": "",
+    "review_content_preview": "# Code Review \u2014 Phase 1\n\n## Blocking Bugs\n- Review could not be completed (LLM did not write review file)\n\n## Non-Blocking Notes\nNone\n\n## Verdict\nFAIL \u2014 review file was not generated\n"
+  },
+  "_slug": "chronovision_autoresearch_adapter",
+  "pre_budget_status": "phase_1_reviewed",
+  "budget_note": "Force-completed after 228 min (budget: 225 min for 3-phase project)"
+}

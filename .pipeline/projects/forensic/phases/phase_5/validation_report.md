@@ -1,34 +1,45 @@
 # Validation Report — Phase 5
 ## Summary
-- Tests: 174 passed, 97 failed
+- Tests: 196 passed, 57 failed, 18 errors
 ## Verdict: FAIL
 
 ### Details
-Phase 5 tests were executed across the workspace. Out of 271 total tests collected:
-- **174 passed**
-- **97 failed**
+- Total tests collected: 271
+- 57 tests FAILED (assertion errors, attribute errors, validation errors)
+- 18 tests ERRORED (attribute errors, missing module attributes)
+- 196 tests PASSED
 
-### Failure Categories
-The 97 failures span multiple modules and test files:
+### Key Failure Categories
+1. **RedFlagSeverity.HIGH missing** — Multiple tests in `test_compare.py` fail with `AttributeError: type object 'RedFlagSeverity' has no attribute 'HIGH'`
+2. **ForensicDatabase missing methods** — Tests in `test_database.py` fail with missing `execute`, `get_companies` attributes
+3. **Config env override not working** — Tests in `test_config.py` fail with assertion errors on DB path overrides
+4. **SEC importer API missing** — Tests in `test_importer.py` fail with `module 'sec_importer' has no attribute 'api'`
+5. **Pydantic validation errors** — Tests in `test_ingest.py` and `test_importer.py` fail with Pydantic model validation errors
+6. **Normalization issues** — Tests in `test_normalization.py` fail with None return values where numbers expected
+7. **API tests all error** — All 8 API tests in `test_api.py` ERROR due to missing database methods
+8. **Capital flow extraction issues** — Tests in `test_capital_flow.py` and `test_capital_flows.py` fail on period extraction and anomaly detection
+9. **CLI tests fail** — Tests in `test_cli.py` fail on company listing and score retrieval
 
-1. **test_database.py** (7 failures): `ForensicDatabase` object missing `execute` and `get_companies` attributes — database API mismatch.
-2. **test_ingest.py** (4 failures): `IngestResult.__init__()` rejects `accession_no` keyword argument — model signature mismatch.
-3. **test_models.py** (7 failures): `RedFlag.from_dict` missing, `IngestResult`/`AnalysisResult`/`Report` constructor mismatches.
-4. **test_normalization.py** (10+ failures): `extract_*` methods return `None` instead of expected values; `normalize_multiple` returns `None`.
-5. **test_capital_flow.py** (10 failures): Period extraction returns wrong counts/amounts (e.g., `0.0` vs `300000.0`, `1` vs `2`).
-6. **test_capital_flows.py** (2 failures): `'dict' object has no attribute 'amount'` — return type mismatch.
-7. **test_cli.py** (4 failures): CLI module attribute errors — CLI interface broken.
-8. **test_config.py** (2 failures): Config returns wrong database paths (`forensic.db` vs expected `test.db`/`test_singleton.db`).
-9. **test_earnings.py** (1 failure): `inf` returned instead of `0.0` for insufficient data case.
-10. **test_advanced_flags.py** (1 failure): Altman Z-score returns `'grey'` instead of `'safe'`.
-11. **test_scoring.py** (12 failures): `'dict' object has no attribute 'severity'` — scoring returns dicts instead of objects; risk level mismatch.
-12. **test_reporting.py** (4 failures): `RedFlagSeverity.HIGH` missing; report generation broken.
-13. **test_web.py** (6 failures): Template files not found (`base.html`, `companies.html`, etc.) — Jinja2 template resolution broken.
-14. **test_red_flags.py** (1 failure): Revenue/receivables mismatch check returns `0` instead of `> 0`.
+### Core Files Present
+All expected source files are present in the workspace:
+- `src/forensic/pipeline.py` — Core pipeline
+- `src/forensic/fraud.py` — Fraud detection
+- `src/forensic/compare.py` — Company comparison
+- `src/forensic/capital_flow.py` — Capital flow analysis
+- `src/forensic/red_flags.py` — Red flag detection
+- `src/forensic/scoring.py` — Fraud scoring
+- `src/forensic/database.py` — Database layer
+- `src/forensic/config.py` — Configuration
+- `src/forensic/api.py` — API layer
+- `src/forensic/cli.py` — CLI interface
+- `src/forensic/earnings.py` — Earnings analysis
+- `src/forensic/ingest.py` — Data ingestion
+- `src/forensic/normalization.py` — Data normalization
+- `src/forensic/analyzer.py` — Text/financial analysis
+- `src/forensic/advanced_flags.py` — Advanced flag detection
+- `src/forensic/reporting.py` — Report generation
+- `src/forensic/web.py` — Web interface
+- `tests/` — Test files present
 
-### Root Causes
-- API contracts between modules are inconsistent (dicts vs objects, missing methods).
-- Model constructors do not match test expectations (missing/extra arguments).
-- Database layer missing key methods (`execute`, `get_companies`).
-- Template paths not resolved correctly for web module.
-- Financial calculation functions return `None` or wrong values.
+### Conclusion
+Phase 5 FAILS because 57 tests failed and 18 tests errored. The core files are present but the implementation has significant bugs including missing enum attributes, missing database methods, broken config overrides, and Pydantic model issues.

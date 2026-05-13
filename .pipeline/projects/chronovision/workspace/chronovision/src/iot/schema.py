@@ -1,0 +1,162 @@
+"""Unified sensor data schema for IoT data normalization."""
+
+import time
+from enum import Enum
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
+
+
+class SensorType(Enum):
+    """Types of IoT sensors."""
+    TEMPERATURE = "temperature"
+    HUMIDITY = "humidity"
+    PRESSURE = "pressure"
+    LOCATION = "location"
+    VOLTAGE = "voltage"
+    CURRENT = "current"
+    POWER = "power"
+    FLOW = "flow"
+    PROXIMITY = "proximity"
+    ACCELERATION = "acceleration"
+    GYROSCOPE = "gyroscope"
+    MAGNETOMETER = "magnetometer"
+    LIGHT = "light"
+    SOUND = "sound"
+    GAS = "gas"
+    CUSTOM = "custom"
+
+
+class SensorStatus(Enum):
+    """Status of a sensor."""
+    ONLINE = "online"
+    OFFLINE = "offline"
+    ERROR = "error"
+    MAINTENANCE = "maintenance"
+    CALIBRATING = "calibrating"
+
+
+@dataclass
+class SensorData:
+    """Unified sensor data schema that normalizes data from both MQTT and OPC-UA sources."""
+    
+    # Identification
+    sensor_id: str
+    sensor_type: SensorType
+    source_protocol: str  # "mqtt" or "opcua"
+    
+    # Data
+    value: float
+    unit: str = ""
+    timestamp: float = field(default_factory=time.time)
+    
+    # Metadata
+    quality: float = 1.0  # 0.0 to 1.0
+    status: SensorStatus = SensorStatus.ONLINE
+    location: Optional[Dict[str, float]] = None  # lat, lon, alt
+    tags: Dict[str, str] = field(default_factory=dict)
+    
+    # Raw data (preserved for debugging)
+    raw_data: Optional[Dict[str, Any]] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary representation."""
+        return {
+            "sensor_id": self.sensor_id,
+            "sensor_type": self.sensor_type.value,
+            "source_protocol": self.source_protocol,
+            "value": self.value,
+            "unit": self.unit,
+            "timestamp": self.timestamp,
+            "quality": self.quality,
+            "status": self.status.value,
+            "location": self.location,
+            "tags": self.tags,
+            "raw_data": self.raw_data,
+        }
+    
+    @classmethod
+    def from_mqtt(cls, topic: str, payload: Any, **kwargs) -> "SensorData":
+        """Create SensorData from MQTT message."""
+        # Parse topic to extract sensor info
+        parts = topic.split("/")
+        sensor_id = parts[-1] if parts else topic
+        sensor_type_str = parts[1] if len(parts) > 1 else "custom"
+        
+        try:
+            sensor_type = SensorType(sensor_type_str)
+        except ValueError:
+            sensor_type = SensorType.CUSTOM
+        
+        value = float(payload) if isinstance(payload, (int, float, str)) else 0.0
+        
+        return cls(
+            sensor_id=sensor_id,
+            sensor_type=sensor_type,
+            source_protocol="mqtt",
+            value=value,
+            timestamp=time.time(),
+            raw_data={"topic": topic, "payload": payload},
+            **kwargs,
+        )
+    
+    @classmethod
+    def from_opcua(cls, node_id: str, value: Any, **kwargs) -> "SensorData":
+        """Create SensorData from OPC-UA node value."""
+        sensor_type_str = kwargs.pop("sensor_type", "custom")
+        try:
+            sensor_type = SensorType(sensor_type_str)
+        except ValueError:
+            sensor_type = SensorType.CUSTOM
+        
+        return cls(
+            sensor_id=node_id,
+            sensor_type=sensor_type,
+            source_protocol="opcua",
+            value=float(value) if value is not None else 0.0,
+            timestamp=time.time(),
+            raw_data={"node_id": node_id, "value": value},
+            **kwargs,
+        )
+    
+    def update_state_space(self, state_space) -> None:
+        """Update the StateSpace with sensor data."""
+        from chronovision.src.model.entity import Entity
+        from chronovision.src.model.state_space import StateSpace
+        
+        # Map sensor data to entity features
+        ticker = self.sensor_id.upper()
+        entity = state_space.get_entity(ticker)
+        if entity is None:
+            entity = Entity(ticker=ticker, name=f"Sensor-{ticker}")
+        
+        # Update entity with sensor-derived features
+        if self.sensor_type == SensorType.TEMPERATURE:
+            entity.price = self.value  # Use value as a proxy metric
+        elif self.sensor_type == SensorType.POWER:
+            entity.revenue = self.value
+        elif self.sensor_type == SensorType.VOLTAGE:
+            entity.eps = self.value
+        
+        entity.last_updated = self.timestamp
+        state_space.add_entity(entity)
+
+
+@dataclass
+class SensorConfig:
+    """Configuration for a sensor."""
+    sensor_id: str
+    sensor_type: SensorType
+    topic: str = ""
+    polling_interval: float = 1.0  # seconds
+    min_quality: float = 0.5
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SensorEvent:
+    """Event generated by a sensor."""
+    sensor_id: str
+    event_type: str
+    timestamp: float = field(default_factory=time.time)
+    data: Dict[str, Any] = field(default_factory=dict)
+    severity: str = "info"  # info, warning, error, critical

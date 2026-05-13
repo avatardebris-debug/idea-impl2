@@ -1,7 +1,7 @@
 {
   "title": "[EcommerceCatalog Metadata Optimizer]",
   "description": "Merge the autoSEO tool with the CSV Analyzer to automatically audit product catalogs, optimize metadata, and export enriched spreadsheets.",
-  "status": "budget_exceeded",
+  "status": "phase_1_executing",
   "phase": 1,
   "total_phases": 3,
   "started_at": "2026-05-07T03:53:29.243933+00:00",
@@ -26,6 +26,5 @@
   },
   "_slug": "ecommercecatalog_metadata_optimizer",
   "_instance_skip": true,
-  "pre_skip_status": "budget_exceeded",
-  "budget_note": "Skipped \u2014 running on another instance"
+  "pre_skip_status": "budget_exceeded"
 }

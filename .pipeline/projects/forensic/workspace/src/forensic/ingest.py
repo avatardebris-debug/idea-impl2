@@ -12,7 +12,7 @@ from typing import List, Optional, Tuple
 from pydantic import BaseModel
 
 from forensic.config import get_config
-from forensic.models import Severity
+from forensic.models import RedFlagSeverity
 
 # Import sec_importer components
 from sec_importer import SECDatabase
@@ -31,7 +31,7 @@ class IngestResult(BaseModel):
     filing_date: str
     filing_type: str
     item_count: int
-    red_flags: List[dict] = []
+    red_flags: List[dict]
 
 
 def ingest_company(
@@ -113,4 +113,5 @@ def ingest_company(
             filing_date=latest_10k.filing_date or "",
             filing_type=latest_10k.filing_type,
             item_count=len(items),
+            red_flags=[],
         )
