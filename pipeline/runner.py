@@ -1298,27 +1298,78 @@ def _tick_project(
                             if word in review_content.lower())
     is_emergency = rework_indicators >= 3 or blocking_bugs > 5
 
-    if is_emergency:
-        # EMERGENCY REWORK — re-plan the phase
-        review_full = str(project_dir / review_path) if review_path else ""
+    # Cap emergency reworks — after 2, fall through to normal fix path
+    MAX_EMERGENCY_REWORKS = 2
+    emergency_count = 0
+    retries_file = project_dir / "state" / "phase_retries.json"
+    if retries_file.exists():
+        try:
+            _rd = json.loads(retries_file.read_text(encoding="utf-8"))
+            emergency_count = _rd.get(f"phase_{phase_num}_emergency", 0)
+        except Exception:
+            pass
+
+    if is_emergency and emergency_count < MAX_EMERGENCY_REWORKS:
+        # EMERGENCY REWORK — re-plan the phase with actual review content
+        review_full_path = project_dir / review_path if review_path else None
+        review_text = ""
+        if review_full_path and review_full_path.exists():
+            try:
+                review_text = review_full_path.read_text(encoding="utf-8")[:4000]
+            except Exception:
+                pass
+
+        # Read master plan section for this phase
+        master_plan_section = ""
+        mp_file = project_dir / "state" / "master_plan.md"
+        if mp_file.exists():
+            try:
+                mp = mp_file.read_text(encoding="utf-8")
+                m = re.search(rf"## Phase {phase_num}\b[^\n]*\n.*?(?=## Phase \d|$)",
+                              mp, re.DOTALL | re.IGNORECASE)
+                if m:
+                    master_plan_section = m.group(0)[:2000]
+            except Exception:
+                pass
+
         bus.send(Message.create(
             from_agent="runner",
             to_agent="phase_planner",
             type="task",
             payload={
                 "phase": phase_num,
-                "phase_spec": f"REWORK REQUIRED — see review at {review_full}",
+                "phase_spec": (
+                    f"REWORK REQUIRED for phase {phase_num} (attempt {emergency_count + 1}/{MAX_EMERGENCY_REWORKS}).\n\n"
+                    f"## Original Phase Goal\n{master_plan_section}\n\n"
+                    f"## Reviewer Feedback (fix these issues):\n{review_text}\n"
+                ),
                 "is_rework": True,
                 "idea_slug": slug,
             },
             priority=0,
         ))
+        # Track emergency count
+        _rd = {}
+        if retries_file.exists():
+            try:
+                _rd = json.loads(retries_file.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        _rd[f"phase_{phase_num}_emergency"] = emergency_count + 1
+        retries_file.parent.mkdir(parents=True, exist_ok=True)
+        retries_file.write_text(json.dumps(_rd, indent=2), encoding="utf-8")
+
         # Update status
         _write_state(project_dir, state, f"phase_{phase_num}_planning")
-        print(f"  🚨 Emergency rework for '{title}' phase {phase_num}")
+        print(f"  🚨 Emergency rework for '{title}' phase {phase_num} (attempt {emergency_count + 1}/{MAX_EMERGENCY_REWORKS})")
         return True
 
-    elif blocking_bugs > 0:
+    elif is_emergency and emergency_count >= MAX_EMERGENCY_REWORKS:
+        # Emergency cap hit — demote to normal fix path (blocking_bugs > 0 branch below)
+        print(f"  ⚠️  Emergency cap hit for '{title}' phase {phase_num} — switching to incremental fix path")
+        blocking_bugs = max(blocking_bugs, 1)  # ensure we enter the fix path
+
+    if blocking_bugs > 0:
         # Increment retry counter
         retries = _increment_retries(project_dir, phase_num)
 
