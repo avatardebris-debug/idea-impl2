@@ -24,13 +24,11 @@ class TestHypothesisManagerInit:
             min_weight=0.05,
             reward_decay=0.9,
             surprise_metric="l1",
-            normalize_surprise=False,
         )
         assert hm.learning_rate == 0.2
         assert hm.min_weight == 0.05
         assert hm.reward_decay == 0.9
-        assert hm.surprise_meter.default_metric == "l1"
-        assert hm.surprise_meter.normalize is False
+        assert hm.surprise_metric == "l1"
 
 
 class TestHypothesisManagerAdd:

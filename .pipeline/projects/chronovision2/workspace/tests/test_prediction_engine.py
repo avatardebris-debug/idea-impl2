@@ -3,7 +3,7 @@
 import pytest
 import numpy as np
 
-from chronovision2.core.prediction_engine import PredictionEngine
+from chronovision2.core.prediction_engine import PredictionEngine, PredictionResult
 
 
 class TestPredictionEngineInit:

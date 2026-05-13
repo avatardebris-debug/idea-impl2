@@ -14,6 +14,16 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+def _has_anthropic():
+    try:
+        import anthropic
+        return True
+    except ImportError:
+        return False
+
 # Add parent to path
 import sys
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
@@ -194,6 +204,7 @@ class TestLLMInterface(unittest.TestCase):
             self.assertIsNotNone(llm)
             self.assertTrue(hasattr(llm, 'chat'))
 
+    @pytest.mark.skipif(not _has_anthropic(), reason="anthropic package not installed")
     def test_get_llm_factory_claude(self):
         from chronovision2.llm_interface import get_llm
 

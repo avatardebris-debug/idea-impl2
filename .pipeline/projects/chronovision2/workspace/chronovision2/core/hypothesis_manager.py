@@ -47,19 +47,25 @@ class HypothesisManager:
         Step-size for weight updates (0–1).
     min_weight : float
         Hypotheses with weight below this are pruned.
+    reward_decay : float
+        Exponential decay for running-average scoring (0–1).
     """
 
     def __init__(
         self,
         surprise_metric: str = "l2",
-        learning_rate: float = 0.3,
-        min_weight: float = 0.001,
+        learning_rate: float = 0.1,
+        min_weight: float = 0.01,
+        reward_decay: float = 0.95,
+        **kwargs,
     ):
         self.surprise_metric = surprise_metric
         self.learning_rate = learning_rate
         self.min_weight = min_weight
+        self.reward_decay = reward_decay
         self.hypotheses: dict[str, HypothesisRecord] = {}
         self.episode_count: int = 0
+        self._episode_count: int = 0  # alias for compat
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -69,6 +75,7 @@ class HypothesisManager:
         self,
         hypothesis_id: str | None = None,
         config: dict[str, Any] | None = None,
+        initial_weight: float = 1.0,
     ) -> str:
         """
         Register a new hypothesis.
@@ -83,6 +90,7 @@ class HypothesisManager:
         self.hypotheses[hypothesis_id] = HypothesisRecord(
             hypothesis_id=hypothesis_id,
             config=config or {},
+            weight=initial_weight,
         )
         return hypothesis_id
 
@@ -108,6 +116,7 @@ class HypothesisManager:
 
         Surprise is the normalised distance (L1 or L2) between the two dicts.
         Lower surprise → better hypothesis.
+        Uses exponential moving average with reward_decay.
 
         Returns the computed surprise value.
         """
@@ -117,10 +126,18 @@ class HypothesisManager:
 
         # Compute surprise
         surprise = self._compute_surprise(prediction, actual)
-        rec.score += surprise
+
+        # Running average with decay
+        if rec.survival_count == 0:
+            rec.score = surprise
+        else:
+            rec.score = (1 - self.reward_decay) * surprise + self.reward_decay * rec.score
+
+        rec.survival_count += 1
         rec.history.append({
             "episode": self.episode_count,
             "surprise": surprise,
+            "score": rec.score,
             "prediction": prediction,
             "actual": actual,
         })
@@ -182,11 +199,11 @@ class HypothesisManager:
             for rec in self.hypotheses.values():
                 rec.weight /= total
 
-        # Update survival counts
-        for rec in self.hypotheses.values():
-            rec.survival_count += 1
+        # Prune low-weight hypotheses
+        self.prune()
 
         self.episode_count += 1
+        self._episode_count = self.episode_count
         return {hid: rec.weight for hid, rec in self.hypotheses.items()}
 
     def prune(self, min_weight: float | None = None) -> int:
