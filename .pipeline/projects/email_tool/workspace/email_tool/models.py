@@ -25,6 +25,7 @@ class RuleType(Enum):
     TO_EXACT = "to_exact"
     BODY_CONTAINS = "body_contains"
     BODY_CONTAINS_EXACT = "body_contains_exact"
+    BODY_CONTAINS_CONTAINS = "body_contains_contains"
     BODY_REGEX = "body_regex"
     BODY_CONTAINS_PATTERN = "body_contains_pattern"
     HAS_ATTACHMENT = "has_attachment"
