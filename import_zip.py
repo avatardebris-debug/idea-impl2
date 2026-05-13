@@ -91,6 +91,8 @@ def main() -> None:
                         help="Only import files for a specific project slug (partial match ok)")
     parser.add_argument("--only-state", action="store_true",
                         help="Only import state/ and phases/ files (skip workspace code)")
+    parser.add_argument("--skip-existing", action="store_true",
+                        help="Skip importing files for projects that already exist on disk")
     parser.add_argument("--yes", "-y", action="store_true",
                         help="Skip confirmation prompt and import immediately")
     parser.add_argument("--dest", default=".",
@@ -136,6 +138,19 @@ def main() -> None:
                 skipped_filter.append(name)
                 continue
 
+            # Skip-existing filter: skip any file belonging to a project
+            # that already has a directory on disk
+            if args.skip_existing:
+                p = pathlib.PurePosixPath(name)
+                parts = p.parts
+                if (len(parts) >= 3
+                        and parts[0] == ".pipeline"
+                        and parts[1] == "projects"):
+                    existing_proj_dir = dest_root / parts[0] / parts[1] / parts[2]
+                    if existing_proj_dir.is_dir():
+                        skipped_filter.append(name)
+                        continue
+
             # Only-state filter: skip workspace/ files
             if args.only_state:
                 p = pathlib.PurePosixPath(name)
@@ -170,6 +185,8 @@ def main() -> None:
             print(f"  Filter:   --project '{args.project}'")
         if args.only_state:
             print(f"  Filter:   --only-state (skipping workspace code)")
+        if args.skip_existing:
+            print(f"  Filter:   --skip-existing (skipping projects already on disk)")
         print(f"\n  New files:      {len(new_files):4d}")
         print(f"  Changed files:  {len(changed_files):4d}")
         print(f"  Unchanged:      {len(skipped_same):4d}  (skipped)")
