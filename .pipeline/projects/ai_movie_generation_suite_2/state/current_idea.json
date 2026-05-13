@@ -3,7 +3,7 @@
   "description": "core suite. API surface, data models, file formats for movie generation.",
   "status": "complete",
   "phase": 6,
-  "total_phases": 6,
+  "total_phases": 3,
   "started_at": "2026-05-11T16:13:56.663801+00:00",
   "depends_on": [],
   "tasks_done": 0,

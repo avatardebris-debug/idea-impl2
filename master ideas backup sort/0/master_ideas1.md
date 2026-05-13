@@ -49,7 +49,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 - [x] **[drop servicing tool]** — [store SOPs and workflows and enable LLM scaling and agentic scaling for perfoming bulk tasks.]
 
-- [x] **[Youtube studio]** — [multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]
+- [ ] **[Youtube studio]** — [multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]
 
 - [ ] **[tim ferriss learning tool]** — [Using meta-learning accelerated learning techniques to help deconstruct topic, DISSS. (decnstruction, selection, sequencing, stakes) Gather material of various media, summarize sources, outline, provide an LLM/RAG for asking/answering about the details, deep dive and 80/20 extraction of most important parts, lesson plans sequencing of the parts, etc. Cafe. Compression, Frequency, Encoding for memory tricks.]
 
@@ -61,7 +61,9 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 - [ ] **[advantage player cardgame simulator training]** — [monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]
 
-- [ ] **[SEO tool]** — []
+- [ ] **[SEO tool]** — [SEO tool]
+
+- [ ] **[udemy training tool]** — [udemy training tool]
 
 - [ ] **[udemy training tool2]** — [The idea is to assist user in building a udemy training course.  This tool will use tim ferriss learning tool to deconstruct the topic into maximally efficient learning and construct an actual course based on the information. Should develop doc or pdf, plus transcripts for video creation. Enable import from a tool that will be developed separately. the tool you will not be building will export selected topics that can then be processed by this tool that you will be building, additional manual entry option for topic can be enabled and it will build the course. requires:tim_ferriss_learning_tool]
 

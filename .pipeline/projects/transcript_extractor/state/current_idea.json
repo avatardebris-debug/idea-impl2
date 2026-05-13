@@ -2,7 +2,7 @@
   "title": "[transcript extractor]",
   "description": "[transcript extractor from video and audio + summary tool. use fast whisperer or faster whisperer github or something.]",
   "status": "complete",
-  "total_phases": 1,
+  "total_phases": 5,
   "tasks_done": 0,
   "tasks_total": 8,
   "phase": 1,
