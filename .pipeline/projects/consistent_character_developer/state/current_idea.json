@@ -1,8 +1,8 @@
 {
   "title": "[consistent character developer]",
   "description": "consistent characters using Kling AI or similar. require",
-  "status": "budget_exceeded",
-  "phase": 2,
+  "status": "complete",
+  "phase": 3,
   "total_phases": 3,
   "started_at": "2026-05-12T23:17:13.602078+00:00",
   "depends_on": [
@@ -12,5 +12,6 @@
   "tasks_total": 6,
   "_slug": "consistent_character_developer",
   "pre_budget_status": "phase_2_reviewing",
-  "budget_note": "Force-completed after 225 min (budget: 225 min for 3-phase project)"
+  "budget_note": "Force-completed after 225 min (budget: 225 min for 3-phase project)",
+  "completed_at": "2026-05-13T20:40:26.270584+00:00"
 }

@@ -1,8 +1,8 @@
 {
   "title": "[NDA Contract Generator]",
   "description": "Create a CLI tool that drafts jurisdiction-specific non-disclosure agreements using customizable clauses and AI-assisted legal phrasing.",
-  "status": "budget_exceeded",
-  "phase": 2,
+  "status": "complete",
+  "phase": 3,
   "total_phases": 3,
   "started_at": "2026-05-06T15:07:26.460075+00:00",
   "depends_on": [],
@@ -12,5 +12,6 @@
   "_instance_skip": true,
   "pre_skip_status": "budget_exceeded",
   "pre_budget_status": "phase_1_executing",
-  "budget_note": "Force-completed after 7528 min (budget: 225 min for 3-phase project)"
+  "budget_note": "Force-completed after 7528 min (budget: 225 min for 3-phase project)",
+  "completed_at": "2026-05-13T20:40:26.267728+00:00"
 }
