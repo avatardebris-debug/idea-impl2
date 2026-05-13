@@ -1,9 +1,10 @@
 {
   "title": "URL Health Checker",
   "description": "Build a Python CLI that reads a list of URLs from a text file, sends HEAD requests (with timeout), and outputs a report showing status code, response time, and whether each URL is up or down. Include concurrent checking with threading and unit tests with mock HTTP responses.",
-  "status": "phase_1_executing",
+  "status": "complete",
   "total_phases": 1,
   "phase": 1,
   "started_at": "2026-05-05T05:11:21.677178+00:00",
-  "_slug": "url_health_checker"
+  "_slug": "url_health_checker",
+  "completed_at": "2026-05-13T16:36:21.504139+00:00"
 }

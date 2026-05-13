@@ -7,7 +7,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 ## Ideas
 
-- [ ] **[Summarizer tool]** — [[lock]from a dashboard use an llm to summarize uploaded pdfs, youtube links, websites, blogs. user share links or download files and click summarize, or prompt agent what is needed from source material. Then agent uses tools/functions to access the sources, extracts, summaries, and presents.]
+- [x] **[Summarizer tool]** — [[lock]from a dashboard use an llm to summarize uploaded pdfs, youtube links, websites, blogs. user share links or download files and click summarize, or prompt agent what is needed from source material. Then agent uses tools/functions to access the sources, extracts, summaries, and presents.]
 - [ ] **[extraction]** — [turn source material from summarizer tool into a "recipe" or specific step by step sequences and for potential specific skill extraction. Enable button that save's skill.  requires:summarizer_tool]
 - [ ] **[skillify]** — [turn recipe from extraction into claude skill. Also ability to convert claude skill to JSON file for other LLM. "system_prompt": "..." "functions": [ ... ] "examples": [ ... ]. Also, ability to export JSON file or claude skill. requires:summarizer_tool, extraction]
 - [ ] **[skill ninja]** — [container and public facing tool for skillify, extraction, summarizer tool. requires:summarizer_tool, extraction, skillify]

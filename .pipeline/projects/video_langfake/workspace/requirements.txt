@@ -1,3 +1,11 @@
+# Core dependencies
 moviepy>=1.0.3
 numpy>=1.24.0
 openai-whisper>=20231117
+
+# API dependencies
+flask>=2.3.0
+gunicorn>=21.2.0
+
+# CLI dependencies
+pyyaml>=6.0
