@@ -49,7 +49,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 - [x] **[drop servicing tool]** — [store SOPs and workflows and enable LLM scaling and agentic scaling for perfoming bulk tasks.]
 
-- [ ] **[Youtube studio]** — [multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]
+- [x] **[Youtube studio]** — [multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]
 
 - [ ] **[tim ferriss learning tool]** — [Using meta-learning accelerated learning techniques to help deconstruct topic, DISSS. (decnstruction, selection, sequencing, stakes) Gather material of various media, summarize sources, outline, provide an LLM/RAG for asking/answering about the details, deep dive and 80/20 extraction of most important parts, lesson plans sequencing of the parts, etc. Cafe. Compression, Frequency, Encoding for memory tricks.]
 

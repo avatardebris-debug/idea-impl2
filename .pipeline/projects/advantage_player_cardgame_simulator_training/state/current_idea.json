@@ -1,11 +1,12 @@
 {
   "title": "[advantage player cardgame simulator training]",
   "description": "[monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]",
-  "status": "phase_1_executing",
+  "status": "complete",
   "total_phases": 6,
   "tasks_done": 6,
   "tasks_total": 6,
   "started_at": "2026-04-27T18:43:36.022797+00:00",
   "_slug": "advantage_player_cardgame_simulator_training",
-  "phase": 1
+  "phase": 1,
+  "completed_at": "2026-05-13T20:16:56.620222+00:00"
 }

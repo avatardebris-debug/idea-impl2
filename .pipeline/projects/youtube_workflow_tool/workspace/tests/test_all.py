@@ -101,13 +101,13 @@ class TestTemplates:
     def test_template_engine_initialization(self):
         """Test that engine loads built-in templates."""
         engine = TemplateEngine()
-        assert len(engine.built_in_templates) > 0
-        assert "tutorial" in engine.list_categories()
+        assert len(engine.templates) > 0  # built-in templates loaded
+        assert "tutorial" in engine.get_categories()
 
-    def test_template_engine_list_categories(self):
+    def test_template_engine_get_categories(self):
         """Test listing categories."""
         engine = TemplateEngine()
-        categories = engine.list_categories()
+        categories = engine.get_categories()
         assert isinstance(categories, list)
         assert len(categories) > 0
 
@@ -115,16 +115,8 @@ class TestTemplates:
         """Test generating titles from templates."""
         engine = TemplateEngine()
         titles = engine.generate_titles(
-            category="tutorial",
             topic="Python",
-            niche="tech",
-            tone="informative",
-            audience="beginners",
-            time="10",
-            year="2024",
-            product_a="Option A",
-            product_b="Option B",
-            role="creator",
+            categories=["tutorial"],
         )
         
         assert len(titles) >= 1
@@ -135,16 +127,8 @@ class TestTemplates:
         """Test that we get limited titles."""
         engine = TemplateEngine()
         titles = engine.generate_titles(
-            category="tutorial",
             topic="Test",
-            niche="general",
-            tone="informative",
-            audience="beginners",
-            time="5",
-            year="2024",
-            product_a="A",
-            product_b="B",
-            role="user",
+            categories=["tutorial"],
         )
         # The engine returns all matching templates, so we check it's reasonable
         assert len(titles) >= 1

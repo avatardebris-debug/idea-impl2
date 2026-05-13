@@ -158,7 +158,7 @@ def generate_metadata(
 
     # Generate titles using template engine
     engine = TemplateEngine()
-    categories = engine.list_categories()
+    categories = engine.get_categories()
 
     # Pick relevant categories based on niche
     relevant_categories = _select_categories(niche, categories)
@@ -166,17 +166,8 @@ def generate_metadata(
     all_titles: List[str] = []
     for cat in relevant_categories:
         titles = engine.generate_titles(
-            cat,
             topic=topic,
-            niche=niche,
-            tone=tone,
-            audience="beginners",
-            time="10",
-            n="10",
-            year="2026",
-            product_a="Option A",
-            product_b="Option B",
-            role="creator",
+            categories=[cat],
         )
         all_titles.extend(titles)
 

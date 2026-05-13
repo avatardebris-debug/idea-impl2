@@ -51,22 +51,24 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 - [x] **[Youtube studio]** — [multistep studio for building youtube videos. story generator or video commercial to video or movie format save cat format video format or useful youtube informational format. Title and thumbnail and keyword generator, transcript builder tool. template developer and implementor]
 
-- [ ] **[tim ferriss learning tool]** — [Using meta-learning accelerated learning techniques to help deconstruct topic, DISSS. (decnstruction, selection, sequencing, stakes) Gather material of various media, summarize sources, outline, provide an LLM/RAG for asking/answering about the details, deep dive and 80/20 extraction of most important parts, lesson plans sequencing of the parts, etc. Cafe. Compression, Frequency, Encoding for memory tricks.]
+- [x] **[tim ferriss learning tool]** — [Using meta-learning accelerated learning techniques to help deconstruct topic, DISSS. (decnstruction, selection, sequencing, stakes) Gather material of various media, summarize sources, outline, provide an LLM/RAG for asking/answering about the details, deep dive and 80/20 extraction of most important parts, lesson plans sequencing of the parts, etc. Cafe. Compression, Frequency, Encoding for memory tricks.]
 
-- [ ] **[social media management/etc]** — [airtable like platform or system for managing social media posts and accounts. AI can help generate content and schedule posts and scale]
+- [x] **[social media management/etc]** — [airtable like platform or system for managing social media posts and accounts. AI can help generate content and schedule posts and scale]
 
-- [ ] **[video management]** — [airtable like platform or system for managing video content. AI can help generate content and schedule videos and scale. Integration with youtube suite]
+- [x] **[video management]** — [airtable like platform or system for managing video content. AI can help generate content and schedule videos and scale. Integration with youtube suite]
 
-- [ ] **[thronglets as a game]** — [each thronglet is an agent, each agent has a 2d world and you can prompt it and it can visualize interactions with the others. Turn system management into a game where the interactions of the game map to realworld usefulness and gamifies system buildling]
+- [x] **[thronglets as a game]** — [each thronglet is an agent, each agent has a 2d world and you can prompt it and it can visualize interactions with the others. Turn system management into a game where the interactions of the game map to realworld usefulness and gamifies system buildling]
 
-- [ ] **[advantage player cardgame simulator training]** — [monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]
+- [x] **[advantage player cardgame simulator training]** — [monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]
 
-- [ ] **[SEO tool]** — []
+- [x] **[SEO tool]** — [SEO tool]
 
-- [ ] **[udemy training tool2]** — [The idea is to assist user in building a udemy training course.  This tool will use tim ferriss learning tool to deconstruct the topic into maximally efficient learning and construct an actual course based on the information. Should develop doc or pdf, plus transcripts for video creation. Enable import from a tool that will be developed separately. the tool you will not be building will export selected topics that can then be processed by this tool that you will be building, additional manual entry option for topic can be enabled and it will build the course. requires:tim_ferriss_learning_tool]
+- [x] **[udemy training tool]** — [udemy training tool]
 
-- [ ] **[udemy training tool researcher]** — [The idea is to build a udemy training course. This tool finds topics at scale for potential course building and enables export directly into requires:tim_ferriss_learning_tool, udemy_training_tool2]
+- [x] **[udemy training tool2]** — [The idea is to assist user in building a udemy training course.  This tool will use tim ferriss learning tool to deconstruct the topic into maximally efficient learning and construct an actual course based on the information. Should develop doc or pdf, plus transcripts for video creation. Enable import from a tool that will be developed separately. the tool you will not be building will export selected topics that can then be processed by this tool that you will be building, additional manual entry option for topic can be enabled and it will build the course. requires:tim_ferriss_learning_tool]
 
-- [ ] **[youtube workflow tool.]** — []
+- [x] **[udemy training tool researcher]** — [The idea is to build a udemy training course. This tool finds topics at scale for potential course building and enables export directly into requires:tim_ferriss_learning_tool, udemy_training_tool2]
 
-- [ ] **[newsletter /online profit environment for LLM RL training and sims.]** — []
+- [x] **[youtube workflow tool.]** — []
+
+- [x] **[newsletter /online profit environment for LLM RL training and sims.]** — []

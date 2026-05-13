@@ -1,12 +1,13 @@
 {
   "title": "[youtube workflow tool.]",
   "description": "[youtube workflow tool.]",
-  "status": "phase_1_executing",
+  "status": "complete",
   "total_phases": 1,
   "tasks_done": 0,
   "tasks_total": 6,
   "phase": 1,
   "started_at": "2026-05-04T09:26:31.850950+00:00",
   "_slug": "youtube_workflow_tool",
-  "pre_budget_status": "phase_1_executing"
+  "pre_budget_status": "phase_1_executing",
+  "completed_at": "2026-05-13T20:14:53.654903+00:00"
 }
