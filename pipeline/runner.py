@@ -2088,7 +2088,34 @@ def run_pipeline(
                         print(f"\n  ✓ All queues empty — pipeline complete.")
                         break
                 elif all_empty and from_list:
-                    if not bus.has_active_work():
+                    # --- Guard: don't seed a new project if any project is
+                    # actively being worked on.  The queue looks empty because
+                    # the agent acked the message, but the agent is still
+                    # processing it.  Check if ANY project has a working-state
+                    # status that was recently modified (< 15 min ago). ---
+                    _any_working = False
+                    _working_states = ("_executing", "_validating", "_reviewing", "_planning")
+                    _recency_cutoff = time.time() - 900  # 15 min
+                    _projects_dir = PIPELINE_DIR / "projects"
+                    if _projects_dir.exists():
+                        for _pd in _projects_dir.iterdir():
+                            _sf = _pd / "state" / "current_idea.json"
+                            if not _sf.exists():
+                                continue
+                            try:
+                                if os.path.getmtime(str(_sf)) < _recency_cutoff:
+                                    continue
+                                _st = json.loads(_sf.read_text(encoding="utf-8"))
+                                _ss = _st.get("status", "")
+                                if any(_ss.endswith(ws) for ws in _working_states):
+                                    _any_working = True
+                                    break
+                            except Exception:
+                                pass
+
+                    if _any_working:
+                        pass  # agent is mid-task — wait for it to finish
+                    elif not bus.has_active_work():
                         now = time.time()
                         if now - last_orphan_requeue >= ORPHAN_REQUEUE_COOLDOWN:
                             orphaned = 0 if fresh_list_only else _rebuild_queues_from_state(bus)
