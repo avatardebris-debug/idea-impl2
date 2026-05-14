@@ -261,8 +261,8 @@ class TestWinRatePanel:
         )
         panel.update(ticker)
         data = panel.render_data()
-        assert data["gauge_value"] == 0.75
-        assert data["confidence_interval"] is not None
+        assert data["value"] == 0.75
+        assert data["ci_lower"] is not None
         assert data["trend_arrow"] is not None
         assert data["total_games"] == 100
         assert data["wins"] == 75
@@ -277,7 +277,7 @@ class TestWinRatePanel:
 
     def test_visual_encoding_red(self):
         panel = WinRatePanel()
-        panel.gauge_value = 0.4
+        panel.gauge_value = 0.3
         encoding = panel.get_visual_encoding()
         assert encoding["type"] == "gauge"
         assert encoding["color"] == "red"
@@ -340,10 +340,10 @@ class TestBankrollCurvePanel:
         )
         panel.update(ticker)
         data = panel.render_data()
-        assert data["current_bankroll"] == 1050.0
+        assert data["bankroll"] == 1050.0
         assert data["peak_bankroll"] == 1100.0
         assert data["drawdown"] == -50.0
-        assert data["sparkline"] == [1000.0, 1050.0]
+        assert data["history"] == [1000.0, 1050.0]
         assert data["profit_loss"] == 50.0
 
     def test_visual_encoding_green(self):

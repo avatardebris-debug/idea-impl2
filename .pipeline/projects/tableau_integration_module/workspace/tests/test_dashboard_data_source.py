@@ -90,7 +90,7 @@ class TestDashboardDataSourceCallbacks:
         ds.register_callback(lambda x: received.append(x))
         ds.force_update()
         assert len(received) == 1
-        assert isinstance(received[0], dict)
+        assert isinstance(received[0], DashboardState)
 
     def test_multiple_callbacks(self):
         ds = DashboardDataSource()

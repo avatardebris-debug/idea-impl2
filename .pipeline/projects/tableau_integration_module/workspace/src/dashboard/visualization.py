@@ -49,6 +49,14 @@ class TableauRenderer(ABC):
         """Render a list of panels."""
         return [self.render_panel(p) for p in panels]
 
+    def create_dashboard(self) -> "TableauDashboard":
+        """Create a default dashboard."""
+        dashboard = TableauDashboard(renderer=self)
+        dashboard.add_panel(WinRatePanel())
+        dashboard.add_panel(BankrollCurvePanel())
+        dashboard.add_panel(NashEquilibriumPanel())
+        return dashboard
+
 
 # ---------------------------------------------------------------------------
 # CSV Renderer
@@ -217,12 +225,7 @@ class TableauDashboard:
     ticker: Optional[DashboardTicker] = None
 
     def __post_init__(self) -> None:
-        if not self.panels:
-            self.panels = [
-                WinRatePanel(),
-                BankrollCurvePanel(),
-                NashEquilibriumPanel(),
-            ]
+        pass
 
     def update(self) -> None:
         """Update all panels from the ticker."""
@@ -283,3 +286,35 @@ class TableauDashboard:
     def get_panels_by_type(self, panel_type: type) -> List[DashboardPanel]:
         """Return panels of a specific type."""
         return [p for p in self.panels if isinstance(p, panel_type)]
+
+    def add_board(self, board: Any) -> None:
+        """Add all panels from a board to this dashboard."""
+        for panel in board.panels:
+            self.add_panel(panel)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize the dashboard to a dictionary."""
+        return {
+            "panels": [p.to_dict() for p in self.panels],
+            "layout": {"type": "default"},
+            "ticker": self.ticker.to_dict() if self.ticker else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TableauDashboard":
+        """Deserialize a dashboard from a dictionary."""
+        dashboard = cls(panels=[])
+        for p_data in data.get("panels", []):
+            ptype = p_data.get("type")
+            if ptype == "WinRatePanel":
+                from src.dashboard.panels import WinRatePanel
+                dashboard.add_panel(WinRatePanel.from_dict(p_data))
+            elif ptype == "BankrollCurvePanel":
+                from src.dashboard.panels import BankrollCurvePanel
+                dashboard.add_panel(BankrollCurvePanel.from_dict(p_data))
+            elif ptype == "NashEquilibriumPanel":
+                from src.dashboard.panels import NashEquilibriumPanel
+                dashboard.add_panel(NashEquilibriumPanel.from_dict(p_data))
+        if data.get("ticker"):
+            dashboard.bind_ticker(DashboardTicker.from_dict(data["ticker"]))
+        return dashboard

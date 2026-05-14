@@ -135,6 +135,7 @@ class WinRatePanel(DashboardPanel):
 
     def update(self, ticker: DashboardTicker) -> None:
         """Update the panel from a ticker."""
+        super().update(ticker)
         wr = ticker.current_win_rate
         # Clamp gauge value to [0, 1]
         self.gauge_value = max(0.0, min(1.0, wr.value))
@@ -144,7 +145,7 @@ class WinRatePanel(DashboardPanel):
 
         # Compute confidence interval (Wilson score interval)
         n = max(wr.total_games, 1)
-        p = wr.value
+        p = self.gauge_value
         z = 1.96  # 95% confidence
         denominator = 1 + z**2 / n
         center = (p + z**2 / (2 * n)) / denominator
@@ -243,6 +244,7 @@ class BankrollCurvePanel(DashboardPanel):
 
     def update(self, ticker: DashboardTicker) -> None:
         """Update the panel from a ticker."""
+        super().update(ticker)
         bh = ticker.bankroll_history
         self.current_bankroll = bh.bankroll if bh.bankroll else (bh.history[-1] if bh.history else 0.0)
         self.peak_bankroll = bh.peak_bankroll
@@ -325,6 +327,7 @@ class NashEquilibriumPanel(DashboardPanel):
 
     def update(self, ticker: DashboardTicker) -> None:
         """Update the panel from a ticker."""
+        super().update(ticker)
         nd = ticker.nash_distance
         self.distance = nd.distance
         self.current_strategy = nd.current_strategy

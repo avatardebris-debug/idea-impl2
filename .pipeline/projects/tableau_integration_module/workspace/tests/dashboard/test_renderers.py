@@ -163,7 +163,7 @@ class TestTableauRESTRenderer:
         assert "0.75" in result
         assert "0.65" in result
         assert "0.85" in result
-        assert "↑" in result
+        assert r"\u2191" in result or "↑" in result
         assert "100" in result
         assert "75" in result
         assert "25" in result

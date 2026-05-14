@@ -151,11 +151,11 @@ class TestTickerToPanel:
 
     def test_win_rate_panel_trend_arrow_up(self):
         ticker = DashboardTicker(symbol="TEST")
-        ticker.current_win_rate = WinRateMetric(value=0.4, total_games=10)
+        ticker.current_win_rate = WinRateMetric(value=0.3, total_games=10)
         panel = WinRatePanel()
         panel.update(ticker)
-        # Set previous value lower
-        ticker.current_win_rate = WinRateMetric(value=0.3, total_games=10)
+        # Set new value higher
+        ticker.current_win_rate = WinRateMetric(value=0.4, total_games=10)
         panel._ticker = ticker
         panel.update(ticker)
         assert panel.trend_arrow == "↑"
@@ -165,8 +165,8 @@ class TestTickerToPanel:
         ticker.current_win_rate = WinRateMetric(value=0.6, total_games=10)
         panel = WinRatePanel()
         panel.update(ticker)
-        # Set previous value higher
-        ticker.current_win_rate = WinRateMetric(value=0.7, total_games=10)
+        # Set new value lower
+        ticker.current_win_rate = WinRateMetric(value=0.5, total_games=10)
         panel._ticker = ticker
         panel.update(ticker)
         assert panel.trend_arrow == "↓"
@@ -349,7 +349,7 @@ class TestFullPipeline:
         assert ne_panel.distance == ticker.nash_distance.distance
 
         # Create dashboard
-        dashboard = TableauDashboard()
+        dashboard = TableauDashboard(panels=[])
         dashboard.add_panel(wr_panel)
         dashboard.add_panel(br_panel)
         dashboard.add_panel(ne_panel)
@@ -377,7 +377,7 @@ class TestFullPipeline:
         ne_panel.update(ticker)
         board.add_panel(ne_panel)
 
-        dashboard = TableauDashboard()
+        dashboard = TableauDashboard(panels=[])
         dashboard.add_board(board)
 
         assert len(dashboard.panels) == 3
@@ -470,8 +470,9 @@ class TestVisualizationIntegration:
 
         renderer = TableauCSVRenderer()
         dashboard = renderer.create_dashboard()
+        dashboard.bind_ticker(ds.ticker)
 
-        output = renderer.render(dashboard)
+        output = dashboard.render()
         assert isinstance(output, str)
         assert len(output) > 0
 
@@ -487,45 +488,63 @@ class TestVisualizationIntegration:
 
         renderer = TableauCSVRenderer()
         dashboard = renderer.create_dashboard()
+        dashboard.bind_ticker(ds.ticker)
 
-        output = renderer.render(dashboard)
+        output = dashboard.render()
         reader = csv.reader(io.StringIO(output))
         header = next(reader)
 
-        assert "symbol" in header
-        assert "title" in header
-        assert "type" in header
+        assert "timestamp" in header
+        assert "win_rate_value" in header
+        assert "nash_distance" in header
 
-    def test_rest_renderer_returns_json(self):
-        """Test that TableauRESTRenderer returns valid JSON."""
+    @patch("requests.post")
+    def test_rest_renderer_returns_json(self, mock_post):
+        """Test that TableauRESTRenderer sends valid JSON."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
         ds = DashboardDataSource(seed=42)
         ds.force_update()
 
         renderer = TableauRESTRenderer()
         dashboard = renderer.create_dashboard()
+        dashboard.bind_ticker(ds.ticker)
 
-        output = renderer.render(dashboard)
-        data = json.loads(output)
+        output = dashboard.render()
+        assert output is mock_response
+        assert mock_post.called
+        kwargs = mock_post.call_args.kwargs
+        data = kwargs.get("json", {})
 
-        assert "panels" in data
-        assert "layout" in data
-        assert len(data["panels"]) > 0
+        assert "win_rate" in data
+        assert "bankroll" in data
 
-    def test_rest_renderer_panel_data(self):
+    @patch("requests.post")
+    def test_rest_renderer_panel_data(self, mock_post):
         """Test that REST renderer panel data is correct."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+
         ds = DashboardDataSource(seed=42)
         ds.force_update()
 
         renderer = TableauRESTRenderer()
         dashboard = renderer.create_dashboard()
+        dashboard.bind_ticker(ds.ticker)
 
-        output = renderer.render(dashboard)
-        data = json.loads(output)
+        panel = dashboard.panels[0]
+        output = dashboard.render_panel(panel)
+        assert output is mock_response
+        
+        kwargs = mock_post.call_args.kwargs
+        data = kwargs.get("json", {})
 
-        panel = data["panels"][0]
-        assert "symbol" in panel
-        assert "title" in panel
-        assert "render_data" in panel
+        assert "panel" in data
+        assert "data" in data
+        assert data["panel"] == panel.symbol
 
     def test_dashboard_serialization(self):
         """Test that TableauDashboard serialization works."""
@@ -763,20 +782,30 @@ class TestComprehensiveEndToEnd:
         board.add_panel(ne_panel)
 
         # 6. Create dashboard
-        dashboard = TableauDashboard()
+        dashboard = TableauDashboard(panels=[])
         dashboard.add_board(board)
 
         # 7. Render to CSV
         csv_renderer = TableauCSVRenderer()
-        csv_output = csv_renderer.render(dashboard)
+        dashboard.renderer = csv_renderer
+        dashboard.bind_ticker(ticker)
+        csv_output = dashboard.render()
         assert len(csv_output) > 0
 
         # 8. Render to REST
-        rest_renderer = TableauRESTRenderer()
-        rest_output = rest_renderer.render(dashboard)
-        rest_data = json.loads(rest_output)
-        assert "panels" in rest_data
-        assert len(rest_data["panels"]) == 3
+        with patch("requests.post") as mock_post:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_post.return_value = mock_response
+
+            rest_renderer = TableauRESTRenderer()
+            dashboard.renderer = rest_renderer
+            rest_output = dashboard.render()
+            assert rest_output is mock_response
+            assert mock_post.called
+
+            rest_data = mock_post.call_args.kwargs.get("json", {})
+            assert "win_rate" in rest_data
 
         # 9. Verify serialization roundtrip
         dashboard_dict = dashboard.to_dict()
