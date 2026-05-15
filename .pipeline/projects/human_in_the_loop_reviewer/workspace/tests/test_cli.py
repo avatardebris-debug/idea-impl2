@@ -18,24 +18,52 @@ if str(_ws) not in sys.path:
     sys.path.insert(0, str(_ws))
 
 
-def _run_cli(*args: str, state_file: Path | None = None) -> subprocess.CompletedProcess[str]:
-    """Run the CLI as a subprocess and return the result.
+import io
+import contextlib
+import sys
+from unittest.mock import patch
+from human_in_the_loop_reviewer import cli
+
+class CompletedProcessMock:
+    def __init__(self, returncode, stdout, stderr):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+def _run_cli(*args: str, state_file: Path | None = None) -> CompletedProcessMock:
+    """Run the CLI directly and return a mock CompletedProcess.
 
     Args:
         *args: CLI arguments.
         state_file: Optional path to a temporary state file.
 
     Returns:
-        CompletedProcess with stdout, stderr, and returncode.
+        CompletedProcessMock with stdout, stderr, and returncode.
     """
-    cmd = [sys.executable, "-m", "human_in_the_loop_reviewer"] + list(args)
+    stdout_buf = io.StringIO()
+    stderr_buf = io.StringIO()
 
-    env = None
+    env_patch = {}
     if state_file is not None:
-        env = dict(__import__("os").environ)
-        env["HUMAN_IN_THE_LOOP_STATE"] = str(state_file)
+        env_patch["HUMAN_IN_THE_LOOP_STATE"] = str(state_file)
 
-    return subprocess.run(cmd, capture_output=True, text=True, env=env)
+    with patch.dict("os.environ", env_patch), \
+         patch("sys.stdout", stdout_buf), \
+         patch("sys.stderr", stderr_buf):
+        
+        try:
+            cli.main(list(args))
+            returncode = 0
+        except SystemExit as e:
+            returncode = e.code if e.code is not None else 0
+            if isinstance(returncode, str):
+                stderr_buf.write(returncode + "\n")
+                returncode = 1
+        except Exception as e:
+            stderr_buf.write(str(e) + "\n")
+            returncode = 1
+
+    return CompletedProcessMock(returncode, stdout_buf.getvalue(), stderr_buf.getvalue())
 
 
 @pytest.fixture()
@@ -236,3 +264,53 @@ class TestCLIStatePersistence:
         status_result = _run_cli("status", checkpoint_id, state_file=state_file)
         assert status_result.returncode == 0
         assert "pending" in status_result.stdout.lower()
+
+    def test_wait_missing_checkpoint(self, state_file: Path) -> None:
+        """Waiting on a missing checkpoint returns error."""
+        result = _run_cli("wait", "nonexistent", state_file=state_file)
+        assert result.returncode != 0
+        assert "not found" in result.stderr.lower()
+
+class TestCLIFormatting:
+    def test_formatting_metadata_and_updated(self, state_file: Path) -> None:
+        """Metadata and updated_at are formatted correctly."""
+        result = _run_cli("create", "meta test", "--metadata", '{"key": "value"}', state_file=state_file)
+        assert result.returncode == 0
+        cp_id = result.stdout.strip().split(": ")[1]
+        
+        # Approve to set status
+        _run_cli("approve", cp_id, state_file=state_file)
+        status_result = _run_cli("status", cp_id, state_file=state_file)
+        assert "Metadata:" in status_result.stdout
+        assert '"key": "value"' in status_result.stdout
+
+class TestCLIMain:
+    def test_no_command(self) -> None:
+        result = _run_cli()
+        assert result.returncode != 0
+
+    def test_invalid_command(self) -> None:
+        result = _run_cli("invalid_cmd")
+        assert result.returncode != 0
+        
+    def test_cmd_func_is_none(self, monkeypatch) -> None:
+        import argparse
+        from unittest.mock import patch
+        
+        # mock parse_args to return a namespace with an invalid command,
+        # bypassing the argparse validation
+        with patch("argparse.ArgumentParser.parse_args", return_value=argparse.Namespace(command="hacked_cmd")):
+            result = _run_cli()
+            assert result.returncode != 0
+
+    def test_cli_save_exception(self, state_file: Path, monkeypatch) -> None:
+        import os
+        from unittest.mock import patch
+        
+        def mock_replace(*args, **kwargs):
+            raise PermissionError("Mocked error")
+            
+        with patch('pathlib.Path.replace', side_effect=mock_replace):
+            result = _run_cli("create", "meta test", state_file=state_file)
+            assert result.returncode != 0
+

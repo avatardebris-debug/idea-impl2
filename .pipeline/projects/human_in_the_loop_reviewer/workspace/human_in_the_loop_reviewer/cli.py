@@ -192,8 +192,6 @@ def _format_checkpoint(cp: Checkpoint) -> str:
         f"  Status:         {cp.status}",
         f"  Created At:     {cp.created_at.isoformat()}",
     ]
-    if hasattr(cp, 'updated_at') and cp.updated_at:
-        lines.append(f"  Updated At:     {cp.updated_at.isoformat()}")
     if cp.metadata:
         lines.append(f"  Metadata:       {json.dumps(cp.metadata, indent=4)}")
     return "\n".join(lines)

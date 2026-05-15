@@ -124,3 +124,31 @@ class TestHumanInLoopReviewer:
         assert len(results) == 3
         statuses = {r[1] for r in results}
         assert statuses == {"approved"}
+
+    def test_wait_for_response_deleted_while_waiting(self):
+        """wait_for_response raises ValueError if checkpoint is deleted while waiting."""
+        cp_id = self.reviewer.create_checkpoint("Delete me")
+        error_holder = {}
+
+        def waiter():
+            try:
+                self.reviewer.wait_for_response(cp_id, timeout=5)
+            except Exception as e:
+                error_holder["error"] = e
+
+        t = threading.Thread(target=waiter, daemon=True)
+        t.start()
+        time.sleep(0.2)
+
+        # Delete the checkpoint directly from the store
+        # First we have to trigger the condition to wake the waiter
+        condition = self.reviewer._get_condition(cp_id)
+        with condition:
+            self.reviewer._store._store.pop(cp_id)
+            condition.notify_all()
+
+        t.join(timeout=5)
+        assert "error" in error_holder
+        assert isinstance(error_holder["error"], ValueError)
+        assert "deleted while waiting" in str(error_holder["error"])
+
