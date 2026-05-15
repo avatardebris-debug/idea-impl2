@@ -61,7 +61,7 @@ class Source(BaseModel):
             score += 0.10
         if self.full_text:
             score += 0.05
-        return min(score, 1.0)
+        return round(min(score, 1.0), 10)
 
 
 # ── Citation / Bibliography ─────────────────────────────────────────────
@@ -93,6 +93,10 @@ class Section(BaseModel):
     inline_citations: List[InlineCitation] = Field(default_factory=list)
 
 
+# Alias — some tests import DraftSection instead of Section
+DraftSection = Section
+
+
 # ── Draft ───────────────────────────────────────────────────────────────
 
 class Draft(BaseModel):
@@ -106,7 +110,7 @@ class Draft(BaseModel):
 
     def full_text(self) -> str:
         """Return the entire draft as a single string."""
-        parts: List[str] = []
+        parts: List[str] = [f"# {self.topic}"]
         for sec in self.sections:
             parts.append(f"## {sec.name.value.title().replace('_', ' ')}\n\n{sec.content}")
             for cit in sec.inline_citations:
