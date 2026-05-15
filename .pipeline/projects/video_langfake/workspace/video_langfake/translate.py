@@ -134,8 +134,8 @@ def _mock_translate_string(text: str, source_lang: str, target_lang: str) -> str
     Uses a deterministic shift based on language codes (not hash())
     so results are reproducible across runs.
     """
-    # Deterministic shift: sum of ord values of target_lang
-    shift = sum(ord(c) for c in target_lang) % 3 + 1
+    # Deterministic shift based on target_lang
+    shift = sum(ord(c) * (i + 1) for i, c in enumerate(target_lang)) % 25 + 1
 
     shifted_chars = []
     for ch in text:

@@ -32,6 +32,8 @@ class WhisperTranscriber:
             device=device,
             compute_type=compute_type,
         )
+        self.model_size = model_size
+        self.model_path = model_path
     
     def transcribe(
         self,
@@ -73,4 +75,9 @@ class WhisperTranscriber:
         Returns:
             TranscriptionResultData with transcription information
         """
-        return self.transcribe(audio_path, language=language)
+        if progress_callback:
+            progress_callback(0.0)
+        result = self.transcribe(audio_path, language=language)
+        if progress_callback:
+            progress_callback(100.0)
+        return result

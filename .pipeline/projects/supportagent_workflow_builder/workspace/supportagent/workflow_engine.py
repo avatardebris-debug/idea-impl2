@@ -103,20 +103,28 @@ class WorkflowEngine:
             current_step_id=workflow.steps[0].id if workflow.steps else None,
         )
 
+        last_step_id = None
         while execution.current_step_id and not execution.is_complete:
             step = self._get_step(workflow, execution.current_step_id)
             if step is None:
                 execution.is_complete = True
                 break
 
+            last_step_id = step.id
             try:
                 result = self._execute_step(step, execution)
                 if result is not None:
                     execution.output[step.id] = result
+                    
+                if step.step_type == WorkflowStepType.GATE:
+                    break
             except WorkflowEngineError as e:
                 execution.error = str(e)
                 execution.failed_steps.append(step.id)
                 break
+
+        if not execution.current_step_id and (not last_step_id or not execution.output.get(last_step_id, {}).get("gate_type")):
+            execution.is_complete = True
 
         return execution
 
@@ -136,13 +144,25 @@ class WorkflowEngine:
             The result of the step, or None if the step completes normally.
         """
         if step.step_type == WorkflowStepType.ACTION:
-            return self._execute_action(step, execution)
+            res = self._execute_action(step, execution)
+            execution.current_step_id = step.then_step or self._get_next_sequential_step_id(execution.workflow, step.id)
+            return res
         elif step.step_type == WorkflowStepType.CONDITION:
             return self._execute_condition(step, execution)
         elif step.step_type == WorkflowStepType.GATE:
-            return self._execute_gate(step, execution)
+            res = self._execute_gate(step, execution)
+            execution.current_step_id = step.then_step or self._get_next_sequential_step_id(execution.workflow, step.id)
+            return res
         else:
             raise WorkflowEngineError(f"Unknown step type: {step.step_type}")
+
+    def _get_next_sequential_step_id(self, workflow: Workflow, current_id: str) -> Optional[str]:
+        for i, s in enumerate(workflow.steps):
+            if s.id == current_id:
+                if i + 1 < len(workflow.steps):
+                    return workflow.steps[i+1].id
+                break
+        return None
 
     def _execute_action(
         self, step: WorkflowStep, execution: WorkflowExecution
@@ -341,9 +361,10 @@ class WorkflowEngine:
         if data.get("action"):
             action = WorkflowAction(data["action"])
 
+        gate_str = data.get("gate_type") or data.get("params", {}).get("gate_type")
         gate_type = None
-        if data.get("gate_type"):
-            gate_type = GateType(data["gate_type"])
+        if gate_str:
+            gate_type = GateType(gate_str)
 
         condition = data.get("condition")
         params = data.get("params", {})

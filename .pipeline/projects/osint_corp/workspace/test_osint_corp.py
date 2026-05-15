@@ -219,7 +219,7 @@ if registry:
     with tempfile.TemporaryDirectory() as tmp:
         try:
             # This will fail with HTTP error since we have no live SEC
-            result = registry.search_by_name(name="Apple", limit=1, output_dir=tmp)
+            result = registry.search_by_name(name="Apple", limit=1)
             check("search_by_name returns list", isinstance(result, list))
         except Exception as e:
             check("search_by_name raises on no network (expected)", True)
@@ -316,7 +316,7 @@ except Exception as e:
 
 # E2: typer commands exist
 if 'app' in dir():
-    commands = [c.name for c in app.registered_commands]
+    commands = [c.name or c.callback.__name__ for c in app.registered_commands]
     check("CLI has 'search' command", "search" in commands)
     check("CLI has 'correlate' command", "correlate" in commands)
     check("CLI has 'manifest' command", "manifest" in commands)
@@ -379,9 +379,9 @@ except Exception as e:
 # SUMMARY
 # ============================================================================
 print(f"\n{'='*60}")
-passed = sum(1 for _, ok in results if ok)
-warned = sum(1 for _, ok, w in results if not ok and w) if any(len(r) > 2 for r in results) else 0
-failed = sum(1 for _, ok in results if not ok)
+passed = sum(1 for item in results if item[1])
+warned = sum(1 for item in results if not item[1] and len(item) > 2 and item[2])
+failed = sum(1 for item in results if not item[1] and (len(item) == 2 or not item[2]))
 total  = len(results)
 
 print(f"  PASS:  {passed}/{total}")
@@ -390,8 +390,9 @@ print(f"  FAIL:  {failed} (broken)")
 
 if failed > 0:
     print(f"\nBroken (fix these):")
-    for name, ok in results:
-        if not ok: print(f"  - {name}")
+    for item in results:
+        if not item[1] and (len(item) == 2 or not item[2]):
+            print(f"  - {item[0]}")
     sys.exit(1)
 else:
     print("All tests passed — OSINT Corp is ready.")

@@ -37,7 +37,17 @@ def test_full_pipeline():
         # Step 3: Create strategy and backtester
         strategy = SMACrossoverStrategy(fast_window=10, slow_window=30)
         backtester = Backtester(strategy, risk_free_rate=0.02)
-        equity_curve, per_trade_returns = backtester.run(loaded_df)
+        df_result = backtester.run_backtest(loaded_df)
+        
+        # Ensure 'strategy_return' exists (we can compute it from equity if not exposed, but my run_backtest exposes it? wait, run_backtest returns a subset of columns)
+        # Let me re-compute equity_curve and per_trade_returns
+        equity_curve = df_result["equity"] / backtester.initial_capital
+        
+        # In the old code, per_trade_returns were just the non-zero strategy returns.
+        # Since I dropped strategy_return from the final returned DataFrame, I'll approximate it or just use equity differences.
+        strategy_return = df_result["equity"].pct_change().fillna(0)
+        per_trade_returns = strategy_return[strategy_return != 0].reset_index(drop=True)
+        
         assert len(equity_curve) > 0
         assert len(per_trade_returns) > 0
         assert equity_curve.iloc[0] == 1.0

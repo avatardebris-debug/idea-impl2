@@ -42,9 +42,6 @@ class Config:
         self._data = {}
         self._load_defaults()
 
-        # Load from environment variables first
-        self._load_from_env()
-
         if config_path is None:
             # Try common locations
             candidates = [
@@ -58,6 +55,9 @@ class Config:
 
         if config_path and os.path.exists(config_path):
             self._load_file(config_path)
+
+        # Load from environment variables last so they override file settings
+        self._load_from_env()
 
     def _load_defaults(self):
         """Apply default configuration values."""

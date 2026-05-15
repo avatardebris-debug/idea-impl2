@@ -161,7 +161,7 @@ class TestCorrelation:
         assert "MSFT" in tickers
 
     def test_find_companies_by_name(self, sample_companies):
-        matches = find_companies_by_name("apple", sample_companies, threshold=0.5)
+        matches = find_companies_by_name(sample_companies, "apple", threshold=0.5)
         assert len(matches) >= 1
         assert any("apple" in (m.name or "").lower() for m in matches)
 
@@ -189,7 +189,7 @@ class TestPipelineOrchestrator:
         assert orch is not None
 
     def test_orchestrator_has_run_method(self):
-        assert hasattr(PipelineOrchestrator, "run") or hasattr(PipelineOrchestrator, "execute")
+        assert hasattr(PipelineOrchestrator, "run_pipeline")
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +202,7 @@ class TestReportGenerator:
         assert gen is not None
 
     def test_generator_has_generate_method(self):
-        assert hasattr(ReportGenerator, "generate") or hasattr(ReportGenerator, "create_report")
+        assert hasattr(ReportGenerator, "generate_report")
 
 
 # ---------------------------------------------------------------------------

@@ -46,6 +46,7 @@ class TestYouTubeUploadService:
     @pytest.mark.asyncio
     async def test_upload_video_success(self, upload_service, db_session):
         """Test successful video upload."""
+        from unittest.mock import AsyncMock
         with patch("app.services.youtube_upload.httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -53,9 +54,9 @@ class TestYouTubeUploadService:
             mock_response.raise_for_status = MagicMock()
 
             mock_client_instance = MagicMock()
-            mock_client_instance.__aenter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__aexit__ = MagicMock(return_value=None)
-            mock_client_instance.post = MagicMock(return_value=mock_response)
+            mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+            mock_client_instance.post = AsyncMock(return_value=mock_response)
 
             mock_client.return_value = mock_client_instance
 
@@ -86,6 +87,7 @@ class TestYouTubeUploadService:
         """Test video upload when token refresh fails."""
         mock_channel.refresh_token = None
         mock_channel.token_expiry = None
+        mock_channel.access_token = None
         db_session.commit()
 
         service = YouTubeUploadService(db_session)
@@ -99,6 +101,7 @@ class TestYouTubeUploadService:
     @pytest.mark.asyncio
     async def test_upload_video_with_thumbnail(self, upload_service, db_session):
         """Test video upload with thumbnail URL."""
+        from unittest.mock import AsyncMock
         with patch("app.services.youtube_upload.httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -106,9 +109,9 @@ class TestYouTubeUploadService:
             mock_response.raise_for_status = MagicMock()
 
             mock_client_instance = MagicMock()
-            mock_client_instance.__aenter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__aexit__ = MagicMock(return_value=None)
-            mock_client_instance.post = MagicMock(return_value=mock_response)
+            mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+            mock_client_instance.post = AsyncMock(return_value=mock_response)
 
             mock_client.return_value = mock_client_instance
 
@@ -127,6 +130,7 @@ class TestYouTubeStatsService:
     @pytest.mark.asyncio
     async def test_get_stats_success(self, stats_service, db_session):
         """Test successful stats retrieval."""
+        from unittest.mock import AsyncMock
         with patch("app.services.youtube_stats.httpx.AsyncClient") as mock_client:
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -142,9 +146,9 @@ class TestYouTubeStatsService:
             mock_response.raise_for_status = MagicMock()
 
             mock_client_instance = MagicMock()
-            mock_client_instance.__aenter__ = MagicMock(return_value=mock_client_instance)
-            mock_client_instance.__aexit__ = MagicMock(return_value=None)
-            mock_client_instance.get = MagicMock(return_value=mock_response)
+            mock_client_instance.__aenter__ = AsyncMock(return_value=mock_client_instance)
+            mock_client_instance.__aexit__ = AsyncMock(return_value=None)
+            mock_client_instance.get = AsyncMock(return_value=mock_response)
 
             mock_client.return_value = mock_client_instance
 

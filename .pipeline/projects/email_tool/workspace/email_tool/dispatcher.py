@@ -73,18 +73,21 @@ class ActionDispatcher:
             }
         
         if action == ActionType.MOVE:
-            return self._handle_move_as_dict(email, action_params)
+            result = self._handle_move_as_dict(email, action_params)
         elif action == ActionType.FILE:
-            return self._handle_file_as_dict(email, action_params)
+            result = self._handle_file_as_dict(email, action_params)
         elif action == ActionType.LABEL:
-            return self._handle_label_as_dict(email, action_params)
+            result = self._handle_label_as_dict(email, action_params)
         elif action == ActionType.NOTIFY:
-            return self._handle_notify_as_dict(email, action_params)
+            result = self._handle_notify_as_dict(email, action_params)
         else:
-            return {
+            result = {
                 "success": False,
                 "error": f"Unknown action type: {action}"
             }
+            
+        self.operations_log.append(result)
+        return result
     
     def dispatch(
         self,
@@ -105,19 +108,32 @@ class ActionDispatcher:
         action_params = action_params or {}
         
         if action_type == ActionType.MOVE:
-            return self._handle_move(email, action_params)
+            result = self._handle_move(email, action_params)
         elif action_type == ActionType.FILE:
-            return self._handle_file(email, action_params)
+            result = self._handle_file(email, action_params)
         elif action_type == ActionType.LABEL:
-            return self._handle_label(email, action_params)
+            result = self._handle_label(email, action_params)
         elif action_type == ActionType.NOTIFY:
-            return self._handle_notify(email, action_params)
+            result = self._handle_notify(email, action_params)
         else:
-            return ActionExecutionResult(
+            result = ActionExecutionResult(
                 action_type=action_type,
                 success=False,
                 message=f"Unknown action type: {action_type}"
             )
+            
+        # Convert ActionExecutionResult to dict for operations log
+        result_dict = {
+            "success": result.success,
+            "action": result.action_type.value if hasattr(result.action_type, 'value') else str(result.action_type),
+            "message": result.message,
+            "details": result.details
+        }
+        if not result.success:
+            result_dict["error"] = result.message
+            
+        self.operations_log.append(result_dict)
+        return result
     
     def _handle_move_as_dict(
         self,
@@ -374,6 +390,13 @@ class ActionDispatcher:
                         message=str(e)
                     )
         else:
+            if self.dry_run:
+                return ActionExecutionResult(
+                    action_type=ActionType.MOVE,
+                    success=True,
+                    message="Would move (no email provided, dry_run mode)",
+                    details={"dry_run": True}
+                )
             return ActionExecutionResult(
                 action_type=ActionType.MOVE,
                 success=False,
@@ -446,6 +469,13 @@ class ActionDispatcher:
                         message=str(e)
                     )
         else:
+            if self.dry_run:
+                return ActionExecutionResult(
+                    action_type=ActionType.FILE,
+                    success=True,
+                    message="Would file (no email provided, dry_run mode)",
+                    details={"dry_run": True}
+                )
             return ActionExecutionResult(
                 action_type=ActionType.FILE,
                 success=False,
@@ -473,6 +503,13 @@ class ActionDispatcher:
                 details={"labels": labels, "dry_run": self.dry_run}
             )
         else:
+            if self.dry_run:
+                return ActionExecutionResult(
+                    action_type=ActionType.LABEL,
+                    success=True,
+                    message="Would label (no email provided, dry_run mode)",
+                    details={"dry_run": True}
+                )
             return ActionExecutionResult(
                 action_type=ActionType.LABEL,
                 success=False,

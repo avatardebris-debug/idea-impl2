@@ -21,7 +21,7 @@ class JobOpportunity:
     """
 
     id: Optional[str] = None
-    title: str = ""
+    title: Optional[str] = ""
     description: str = ""
     budget_min: Optional[float] = None
     budget_max: Optional[float] = None
@@ -29,6 +29,12 @@ class JobOpportunity:
     buyer_name: str = ""
     keywords: Optional[list] = field(default_factory=list)
     score: Optional[float] = None
+
+    def __post_init__(self):
+        if self.title is None:
+            self.title = ""
+        if self.keywords is None:
+            self.keywords = []
 
     @property
     def budget_range(self) -> tuple:

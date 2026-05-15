@@ -7,6 +7,7 @@ import shutil
 import struct
 import numpy as np
 import pytest
+from unittest.mock import patch
 
 from video_langfake.audio import (
     extract_audio,
@@ -71,12 +72,19 @@ def sample_video_path(tmp_dir):
     path = os.path.join(tmp_dir, "sample.mp4")
     # Create a minimal valid MP4 using moviepy if available
     try:
-        from moviepy.editor import VideoFileClip, ColorClip
+        from moviepy import VideoFileClip, ColorClip, AudioClip
         import subprocess
+        import numpy as np
 
         # Create a simple color clip
         clip = ColorClip(size=(100, 100), color=(255, 0, 0), duration=1.0)
-        clip.write_videofile(path, fps=10, codec="libx264", audio=False, logger=None)
+        
+        # Create a dummy audio clip
+        make_frame = lambda t: [np.sin(440 * 2 * np.pi * t)]
+        audio = AudioClip(make_frame, duration=1.0)
+        clip = clip.with_audio(audio)
+        
+        clip.write_videofile(path, fps=10, codec="libx264", audio_codec="aac", logger=None)
         clip.close()
     except Exception:
         # Fallback: create a dummy file
@@ -196,6 +204,11 @@ class TestExceptions:
 
 class TestAudio:
     """Test audio module functions."""
+    
+    @pytest.fixture(autouse=True)
+    def mock_whisper(self):
+        with patch("video_langfake.audio.WHISPER_AVAILABLE", False):
+            yield
 
     def test_extract_audio_nonexistent(self, tmp_dir):
         """Test extract_audio with nonexistent file."""
@@ -405,6 +418,11 @@ class TestSynthesize:
 
 class TestPipeline:
     """Test the main pipeline class."""
+    
+    @pytest.fixture(autouse=True)
+    def mock_whisper(self):
+        with patch("video_langfake.audio.WHISPER_AVAILABLE", False):
+            yield
 
     def test_pipeline_nonexistent_video(self, tmp_dir):
         """Test pipeline with nonexistent video."""
@@ -489,6 +507,11 @@ class TestPipeline:
 
 class TestIntegration:
     """Integration tests for the full workflow."""
+    
+    @pytest.fixture(autouse=True)
+    def mock_whisper(self):
+        with patch("video_langfake.audio.WHISPER_AVAILABLE", False):
+            yield
 
     def test_full_workflow(self, tmp_dir, sample_video_path):
         """Test the complete workflow end-to-end."""
@@ -548,6 +571,11 @@ class TestIntegration:
 
 class TestEdgeCases:
     """Test edge cases and error conditions."""
+    
+    @pytest.fixture(autouse=True)
+    def mock_whisper(self):
+        with patch("video_langfake.audio.WHISPER_AVAILABLE", False):
+            yield
 
     def test_translate_with_special_characters(self):
         """Test translation with special characters."""

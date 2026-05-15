@@ -25,8 +25,9 @@ class TestRedFlagSeverity:
     def test_severity_iteration(self):
         """Test that all severity levels are present."""
         severities = list(RedFlagSeverity)
-        assert len(severities) == 3
+        assert len(severities) == 4
         assert RedFlagSeverity.CRITICAL in severities
+        assert RedFlagSeverity.HIGH in severities
         assert RedFlagSeverity.WARNING in severities
         assert RedFlagSeverity.INFO in severities
 
@@ -75,7 +76,7 @@ class TestRedFlag:
             severity="high",
             evidence="Evidence text",
         )
-        assert flag.severity == RedFlagSeverity.CRITICAL
+        assert flag.severity == RedFlagSeverity.HIGH
 
     def test_to_dict(self):
         """Test converting RedFlag to dictionary."""

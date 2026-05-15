@@ -248,7 +248,7 @@ class TestYAMLFormatter:
         assert "title" in output_str
 
     def test_yaml_contains_beat_sheet(self):
-        beat_sheet = BeatSheet(title="My Beat Sheet", logline="Test logline.", genre="drama")
+        beat_sheet = BeatSheet(logline="Test logline.", genre="drama")
         script = Script(title="Test", logline="Test logline.", genre="drama")
         character_registry = CharacterRegistry()
         scene_descriptions = SceneDescriptionCollection()
@@ -267,7 +267,8 @@ class TestYAMLFormatter:
 
         with open(output_path) as f:
             content = f.read()
-        assert "My Beat Sheet" in content
+        assert "beat_sheet" in content  # BeatSheet section is present
+        assert "Test logline." in content
 
         Path(output_path).unlink()
 

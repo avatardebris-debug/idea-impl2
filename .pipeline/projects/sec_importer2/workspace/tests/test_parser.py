@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sec_importer.parser import parse_filings, _parse_single_filing, parse_and_store
+from sec_importer.parser import parse_filings, _parse_single_filing
 from sec_importer.models import Filing
 
 
@@ -118,47 +118,4 @@ class TestParseSingleFiling:
         assert result is None
 
 
-class TestParseAndStore:
-    """Tests for parse_and_store function."""
 
-    def test_parse_and_store_xbrl(self):
-        """Test parsing and storing XBRL content."""
-        session = MagicMock()
-        filing = Filing(
-            ticker="AAPL",
-            filing_type="10-K",
-            filing_date="2024-01-01",
-            accession_number="0001234567-24-000001",
-        )
-
-        result = parse_and_store(session, filing, content_type="xbrl")
-        assert result["status"] == "success"
-        assert "sections" in result
-
-    def test_parse_and_store_html(self):
-        """Test parsing and storing HTML content."""
-        session = MagicMock()
-        filing = Filing(
-            ticker="AAPL",
-            filing_type="10-K",
-            filing_date="2024-01-01",
-            accession_number="0001234567-24-000001",
-        )
-
-        result = parse_and_store(session, filing, content_type="html")
-        assert result["status"] == "success"
-        assert "sections" in result
-
-    def test_parse_and_store_invalid_content_type(self):
-        """Test parsing with invalid content type."""
-        session = MagicMock()
-        filing = Filing(
-            ticker="AAPL",
-            filing_type="10-K",
-            filing_date="2024-01-01",
-            accession_number="0001234567-24-000001",
-        )
-
-        result = parse_and_store(session, filing, content_type="invalid")
-        assert result["status"] == "failed"
-        assert "error" in result

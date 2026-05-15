@@ -86,9 +86,10 @@ class FilingParser:
         self._sections = []
 
         if self._is_xbrl(raw_text):
-            return self._parse_xbrl(raw_text)
+            self.items = self._parse_xbrl(raw_text)
         else:
-            return self._parse_text(raw_text)
+            self.items = self._parse_text(raw_text)
+        return self.items
 
     def _is_xbrl(self, text: str) -> bool:
         """Detect if the filing text is in XBRL format.
@@ -281,7 +282,7 @@ class FilingParser:
         Returns:
             List of dictionaries with section information.
         """
-        return self._sections
+        return [{"label": item.item_label, "content": item.item_content, "type": item.item_type} for item in getattr(self, "items", [])]
 
     def get_summary(self) -> Dict[str, int]:
         """Get a summary of parsed sections by type.
@@ -290,8 +291,8 @@ class FilingParser:
             Dictionary mapping section types to counts.
         """
         summary: Dict[str, int] = {}
-        for section in self._sections:
-            section_type = section.get("type", "unknown")
+        for item in getattr(self, "items", []):
+            section_type = item.item_type or "unknown"
             summary[section_type] = summary.get(section_type, 0) + 1
         return summary
 

@@ -1,0 +1,302 @@
+{
+  "consistent_character_developer": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "32 passed in 16.51s",
+    "elapsed": 18.3,
+    "full_stdout_tail": "................................                                         [100%]\n32 passed in 16.51s",
+    "stderr_tail": ""
+  },
+  "consistent_scene_developer": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "docsai_documentation_generator": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 0.33s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "ERROR tests/test_integration.py\nERROR tests/test_llm_interface.py\nERROR tests/test_parsers.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.33s",
+    "stderr_tail": ""
+  },
+  "drop_servicing_tool": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "12 failed, 211 passed in 21.00s",
+    "elapsed": 24.3,
+    "full_stdout_tail": "FAILED tests/test_phase2_integration.py::TestResultsStore::test_get_result_task_not_found\nFAILED tests/test_phase4.py::TestTemplates::test_list_templates_with_templates\nFAILED tests/test_phase4.py::TestTemplates::test_get_existing_template - asse...\nFAILED tests/test_phase4.py::TestTemplates::test_delete_template - assert 404...\n12 failed, 211 passed in 21.00s",
+    "stderr_tail": ""
+  },
+  "financial_document_analyzer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "16 failed, 40 passed in 1.40s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "FAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_no_tables - Attribu...\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_empty_table - Attri...\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_mixed_numeric_and_text\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_filename_extraction - At...\n16 failed, 40 passed in 1.40s",
+    "stderr_tail": ""
+  },
+  "football_nfl_draft_and_recruit_optimizer": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.20s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_import_zip.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.20s",
+    "stderr_tail": ""
+  },
+  "forensic2": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "market_strategy_backtester": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "25 failed, 30 passed in 1.28s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "FAILED tests/test_strategies.py::TestSMACrossoverStrategy::test_invalid_params_window_lt_1\nFAILED tests/test_strategies.py::TestSMACrossoverStrategy::test_generate_signals_no_lookahead\nFAILED tests/test_strategies.py::TestMACDStrategy::test_invalid_params - Fail...\nFAILED tests/test_strategies.py::TestBollingerBandsStrategy::test_bollinger_bands_computation\n25 failed, 30 passed in 1.28s",
+    "stderr_tail": ""
+  },
+  "player_attribute_library": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "sec_importer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "29 failed, 131 passed in 18.30s",
+    "elapsed": 19.7,
+    "full_stdout_tail": "FAILED tests/test_repository_rate_limiter.py::TestRateLimiter::test_wait_between\nFAILED tests/test_repository_rate_limiter.py::TestRateLimiter::test_reset - a...\nFAILED tests/test_schema_models_config.py::TestFilingItemModel::test_invalid_filing_id\nFAILED tests/test_schema_models_config.py::TestConfig::test_missing_file_uses_defaults\n29 failed, 131 passed in 18.30s",
+    "stderr_tail": ""
+  },
+  "supportagent_workflow_builder": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "59 passed in 0.26s",
+    "elapsed": 1.0,
+    "full_stdout_tail": "...........................................................              [100%]\n59 passed in 0.26s",
+    "stderr_tail": ""
+  },
+  "tim_ferriss_learning_tool": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "=================== 1 failed, 18 passed, 2 errors in 0.10s ====================",
+    "elapsed": 2.8,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nFAILED tests\\test_extraction_pipeline.py::TestIntegration::test_summary_generation\nERROR tests\\test_extraction_pipeline.py::TestSummaryGenerator::test_initialization\nERROR tests\\test_extraction_pipeline.py::TestSummaryGenerator::test_generate_markdown_summary\n=================== 1 failed, 18 passed, 2 errors in 0.10s ====================",
+    "stderr_tail": ""
+  },
+  "transcript_extractor": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "86 failed, 106 passed, 4 errors in 5.40s",
+    "elapsed": 7.5,
+    "full_stdout_tail": "ERROR tests/test_formatter.py::TestFormatToSrt::test_format_to_srt - TypeErro...\nERROR tests/test_formatter.py::TestFormatToSrt::test_format_to_srt_empty_result\nERROR tests/test_formatter.py::TestFormatToVtt::test_format_to_vtt - TypeErro...\nERROR tests/test_formatter.py::TestFormatToVtt::test_format_to_vtt_empty_result\n86 failed, 106 passed, 4 errors in 5.40s",
+    "stderr_tail": ""
+  },
+  "video_ingestor_summary": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "10 errors in 1.19s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "ERROR tests/test_storage.py\nERROR tests/test_summarizer.py\nERROR tests/test_vector_store.py\n!!!!!!!!!!!!!!!!!! Interrupted: 10 errors during collection !!!!!!!!!!!!!!!!!!!\n10 errors in 1.19s",
+    "stderr_tail": ""
+  },
+  "ai_movie_generation_suite_2": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "29 failed, 108 passed, 43 errors in 11.26s",
+    "elapsed": 12.9,
+    "full_stdout_tail": "ERROR tests/test_stage_generators.py::TestStage5MusicComposer::test_stage_name\nERROR tests/test_stage_generators.py::TestStage5MusicComposer::test_execute_sets_status\nERROR tests/test_stage_generators.py::TestStage6PostProductionPlanner::test_stage_name\nERROR tests/test_stage_generators.py::TestStage6PostProductionPlanner::test_execute_sets_status\n29 failed, 108 passed, 43 errors in 11.26s",
+    "stderr_tail": ""
+  },
+  "chronovision": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "chronovision2": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "124 passed in 4.17s",
+    "elapsed": 6.3,
+    "full_stdout_tail": "........................................................................ [ 58%]\n....................................................                     [100%]\n124 passed in 4.17s",
+    "stderr_tail": ""
+  },
+  "football_simulator": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 0.9,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:11: in <module>\n    from .field import Field\nE   ModuleNotFoundError: No module named 'workspace.field'"
+  },
+  "financial_portfolio_simulator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "99 passed in 0.82s",
+    "elapsed": 1.6,
+    "full_stdout_tail": "........................................................................ [ 72%]\n...........................                                              [100%]\n99 passed in 0.82s",
+    "stderr_tail": ""
+  },
+  "forensic": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "271 passed in 3.25s",
+    "elapsed": 5.4,
+    "full_stdout_tail": "........................................................................ [ 26%]\n........................................................................ [ 53%]\n........................................................................ [ 79%]\n.......................................................                  [100%]\n271 passed in 3.25s",
+    "stderr_tail": ""
+  },
+  "osint_corp": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "43 passed in 0.29s",
+    "elapsed": 1.3,
+    "full_stdout_tail": "...........................................                              [100%]\n43 passed in 0.29s",
+    "stderr_tail": ""
+  },
+  "sec_importer2": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "75 passed in 2.39s",
+    "elapsed": 5.2,
+    "full_stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 2.39s",
+    "stderr_tail": ""
+  },
+  "sopdata_ingestion_bridge": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "64 passed in 0.29s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "................................................................         [100%]\n64 passed in 0.29s",
+    "stderr_tail": ""
+  },
+  "url_health_checker": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "42 passed in 0.49s",
+    "elapsed": 1.4,
+    "full_stdout_tail": "..........................................                               [100%]\n42 passed in 0.49s",
+    "stderr_tail": ""
+  },
+  "scott_adams_botllm_fine_tuning": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "73 passed in 27.22s",
+    "elapsed": 30.2,
+    "full_stdout_tail": "........................................................................ [ 98%]\n.                                                                        [100%]\n73 passed in 27.22s",
+    "stderr_tail": ""
+  },
+  "video_langfake": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "83 passed in 29.52s",
+    "elapsed": 31.8,
+    "full_stdout_tail": "........................................................................ [ 86%]\n...........                                                              [100%]\n83 passed in 29.52s",
+    "stderr_tail": ""
+  },
+  "video_management": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "fiverr_job_automation_tool": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "201 passed in 0.78s",
+    "elapsed": 1.7,
+    "full_stdout_tail": "........................................................................ [ 35%]\n........................................................................ [ 71%]\n.........................................................                [100%]\n201 passed in 0.78s",
+    "stderr_tail": ""
+  },
+  "human_in_the_loop_reviewer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "5 failed, 53 passed in 10.73s",
+    "elapsed": 12.0,
+    "full_stdout_tail": "FAILED tests/test_cli.py::TestApproveCommand::test_approve_success - Assertio...\nFAILED tests/test_cli.py::TestRejectCommand::test_reject_success - AssertionE...\nFAILED tests/test_cli.py::TestRejectCommand::test_reject_with_reason - Assert...\nFAILED tests/test_cli.py::TestWaitCommand::test_wait_approved - AssertionErro...\n5 failed, 53 passed in 10.73s",
+    "stderr_tail": ""
+  },
+  "tableau_integration_module": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "254 passed in 1.60s",
+    "elapsed": 2.6,
+    "full_stdout_tail": "........................................................................ [ 28%]\n........................................................................ [ 56%]\n........................................................................ [ 85%]\n......................................                                   [100%]\n254 passed in 1.60s",
+    "stderr_tail": ""
+  },
+  "video_babbel": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "20 failed, 102 passed in 0.43s",
+    "elapsed": 1.5,
+    "full_stdout_tail": "FAILED tests/test_translator.py::TestTranslateGoogle::test_translate_google_import_error\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_success\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_missing_api_key\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_import_error\n20 failed, 102 passed in 0.43s",
+    "stderr_tail": ""
+  },
+  "ai_movie_generation_suite": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "99 passed, 10 warnings in 0.85s",
+    "elapsed": 1.8,
+    "full_stdout_tail": "tests/test_pipeline.py::TestPipelineIntegration::test_full_pipeline\n  c:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\ai_movie_generation_suite\\workspace\\ai_movie_gen_suite\\models.py:215: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n99 passed, 10 warnings in 0.85s",
+    "stderr_tail": ""
+  },
+  "dynamic_pricing_integrator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "97 passed in 0.18s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "........................................................................ [ 74%]\n.........................                                                [100%]\n97 passed in 0.18s",
+    "stderr_tail": ""
+  },
+  "ffo": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "59 passed in 0.05s",
+    "elapsed": 0.9,
+    "full_stdout_tail": "...........................................................              [100%]\n59 passed in 0.05s",
+    "stderr_tail": ""
+  },
+  "movieseries_auto_tracker": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "79 passed in 0.40s",
+    "elapsed": 1.3,
+    "full_stdout_tail": "........................................................................ [ 91%]\n.......                                                                  [100%]\n79 passed in 0.40s",
+    "stderr_tail": ""
+  },
+  "multi_format_export_engine": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "118 passed in 3.40s",
+    "elapsed": 4.9,
+    "full_stdout_tail": "........................................................................ [ 61%]\n..............................................                           [100%]\n118 passed in 3.40s",
+    "stderr_tail": ""
+  },
+  "nda_contract_generator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "92 passed in 0.54s",
+    "elapsed": 1.5,
+    "full_stdout_tail": "........................................................................ [ 78%]\n....................                                                     [100%]\n92 passed in 0.54s",
+    "stderr_tail": ""
+  },
+  "pocketknife_of_the_internet": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "80 passed in 0.14s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "........................................................................ [ 90%]\n........                                                                 [100%]\n80 passed in 0.14s",
+    "stderr_tail": ""
+  },
+  "rule_based_triage_engine": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "53 passed in 0.13s",
+    "elapsed": 1.3,
+    "full_stdout_tail": ".....................................................                    [100%]\n53 passed in 0.13s",
+    "stderr_tail": ""
+  },
+  "udemy_training_tool": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "183 passed in 0.27s",
+    "elapsed": 1.1,
+    "full_stdout_tail": "........................................................................ [ 39%]\n........................................................................ [ 78%]\n.......................................                                  [100%]\n183 passed in 0.27s",
+    "stderr_tail": ""
+  }
+}

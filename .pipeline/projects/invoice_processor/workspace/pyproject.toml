@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "invoice-processor"
+version = "1.0.0"
+description = "Tool that scans email attachments for invoices, extracts line items and totals via OCR or text parsing, and organizes them into a searchable ledger."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Developer" }
+]
+dependencies = [
+    "pymupdf>=1.23.0",
+]
+
+[project.scripts]
+invoice-processor = "invoice_processor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["invoice_processor*"]

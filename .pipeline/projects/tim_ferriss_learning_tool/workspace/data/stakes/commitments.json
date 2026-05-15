@@ -5103,6 +5103,39 @@
       "audience_size": 100,
       "status": "active",
       "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_465",
+      "goal_id": "goal_1",
+      "goal_description": "Learn Python",
+      "commitment_date": "2026-05-13T20:53:51.281462",
+      "deadline": "2026-06-12T20:53:51.281441",
+      "public_platform": "twitter",
+      "audience_size": 500,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_466",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-05-13T20:53:51.672688",
+      "deadline": "2026-06-12T20:53:51.672667",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
+    },
+    {
+      "commitment_id": "commitment_467",
+      "goal_id": "goal_1",
+      "goal_description": "Test",
+      "commitment_date": "2026-05-13T20:53:51.843898",
+      "deadline": "2026-06-12T20:53:51.843877",
+      "public_platform": "social_media",
+      "audience_size": 100,
+      "status": "active",
+      "progress_percentage": 0.0
     }
   ]
 }

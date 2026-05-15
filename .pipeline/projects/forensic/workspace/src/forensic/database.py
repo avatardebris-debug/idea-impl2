@@ -13,6 +13,8 @@ class ForensicDatabase:
         config = get_config()
         self.db_path = db_path or config.db_path
         self.conn: Optional[sqlite3.Connection] = None
+        # Auto-connect so callers don't need to call connect() explicitly
+        self.connect()
 
     def connect(self) -> "ForensicDatabase":
         """Connect to the database."""
@@ -546,3 +548,26 @@ class ForensicDatabase:
             (ticker, score, risk_level, ",".join(flags)),
         )
         conn.commit()
+
+    def execute(self, query: str, params: tuple = ()) -> sqlite3.Cursor:
+        """Execute a raw SQL query and return cursor."""
+        conn = self._get_conn()
+        return conn.execute(query, params)
+
+    def get_companies(
+        self,
+        ticker: Optional[str] = None,
+        limit: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """Get companies with optional ticker filter."""
+        conn = self._get_conn()
+        query = "SELECT * FROM companies WHERE 1=1"
+        params: list = []
+        if ticker:
+            query += " AND ticker = ?"
+            params.append(ticker)
+        query += " LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+

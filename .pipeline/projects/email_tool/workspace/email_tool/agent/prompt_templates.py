@@ -94,6 +94,9 @@ Email analysis:
 Active rules:
 {rules_summary}
 
+Rule matches:
+{matches_summary}
+
 Generate a concise summary that includes:
 1. Total number of emails analyzed
 2. Count of emails matching each category
@@ -283,7 +286,8 @@ Inbox organization status: 42 emails analyzed. 30 emails match rules (15 work, 1
         
         prompt = prompt_template.format(
             email_summary=email_summary,
-            rules_summary=rules_summary
+            rules_summary=rules_summary,
+            matches_summary=matches_summary
         )
         
         if few_shot and self.enable_few_shot:

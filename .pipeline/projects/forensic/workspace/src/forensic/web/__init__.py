@@ -16,34 +16,39 @@ def create_app(db=None):
 
     if db is not None:
         # Register API blueprint
-        api_bp = create_api(app, db)
+        api_bp = create_api(db)
         app.register_blueprint(api_bp)
 
     # --- Web routes ---
     @app.route("/")
     def index():
         """Dashboard index page."""
-        return render_template("dashboard.html")
+        summary = db.get_dashboard_summary() if db else {}
+        return render_template("index.html", summary=summary)
 
     @app.route("/companies")
     def companies():
         """Companies list page."""
-        return render_template("companies.html")
+        companies = db.get_companies() if db else []
+        return render_template("companies.html", companies=companies)
 
     @app.route("/fraud-scores")
     def fraud_scores():
         """Fraud scores page."""
-        return render_template("fraud_scores.html")
+        scores = db.get_fraud_scores() if db else []
+        return render_template("fraud_scores.html", scores=scores)
 
     @app.route("/red-flags")
     def red_flags():
         """Red flags page."""
-        return render_template("red_flags.html")
+        flags = db.get_red_flags() if db else []
+        return render_template("red_flags.html", flags=flags)
 
     @app.route("/capital-flows")
     def capital_flows():
         """Capital flows page."""
-        return render_template("capital_flows.html")
+        flows = db.get_capital_flows() if db else []
+        return render_template("capital_flows.html", flows=flows)
 
     @app.route("/ticker/<ticker>")
     def ticker_detail(ticker):

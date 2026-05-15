@@ -73,11 +73,12 @@ class InboxSummarizer:
             else:
                 summary_parts.append(f"{categorized_count} categorized.")
         
-        if uncategorized_count > 0:
-            if uncategorized_count == 1:
-                summary_parts.append("1 uncategorized.")
-            else:
-                summary_parts.append(f"{uncategorized_count} uncategorized.")
+        if uncategorized_count == 0:
+            summary_parts.append("0 uncategorized.")
+        elif uncategorized_count == 1:
+            summary_parts.append("1 uncategorized.")
+        else:
+            summary_parts.append(f"{uncategorized_count} uncategorized.")
         
         # Category breakdown
         if category_counts:

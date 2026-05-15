@@ -248,10 +248,15 @@ class TestDaemonRunLoop:
         daemon.config = MagicMock()
         daemon.config.get.return_value = 'DEBUG'
         
-        with patch.object(daemon, '_run_cycle', side_effect=Exception("Test error")):
+        def mock_run_cycle():
+            daemon._stopped.set()
+            raise Exception("Test error")
+            
+        with patch.object(daemon, '_run_cycle', side_effect=mock_run_cycle):
             with patch('email_tool.daemon.logger') as mock_logger:
-                # Run loop should handle exception and continue
+                # Run loop should handle exception and exit because we set _stopped
                 daemon._run_loop()
+                mock_logger.error.assert_called()
 
     def test_run_loop_wait_timeout(self):
         """Test daemon loop wait timeout."""
@@ -295,7 +300,10 @@ class TestDaemonRunOnce:
         """Test running once and exiting."""
         daemon = Daemon(interval=1)
         
-        with patch.object(daemon, '_run_cycle'):
+        def mock_run_cycle():
+            daemon._run_count += 1
+            
+        with patch.object(daemon, '_run_cycle', side_effect=mock_run_cycle):
             result = daemon.run_once()
             assert result is True
 

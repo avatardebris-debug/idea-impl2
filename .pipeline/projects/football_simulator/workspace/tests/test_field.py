@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from football_sim.config import Config
-from football_sim.field import Field, YardLine, HashMark, Endzone
+from football_sim.football_field import Field, YardLine, HashMark, Endzone
 
 
 class TestConfig:
@@ -212,3 +212,4 @@ class TestField:
         assert field.field_of_play_yards == 100
         assert field.is_in_field_of_play(100.0) is True
         assert field.is_in_field_of_play(105.0) is False
+

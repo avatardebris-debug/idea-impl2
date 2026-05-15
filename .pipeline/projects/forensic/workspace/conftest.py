@@ -3,3 +3,6 @@ import sys, pathlib
 _ws = pathlib.Path(__file__).parent
 if str(_ws) not in sys.path:
     sys.path.insert(0, str(_ws))
+_src = _ws / "src"
+if str(_src) not in sys.path:
+    sys.path.insert(0, str(_src))

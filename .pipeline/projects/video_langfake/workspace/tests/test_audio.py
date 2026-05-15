@@ -21,8 +21,9 @@ class TestExtractAudio:
         with pytest.raises(AudioError, match="Video file not found"):
             extract_audio("/nonexistent/video.mp4")
 
+    @patch("video_langfake.audio.os.path.exists", return_value=True)
     @patch("video_langfake.audio.MOVIEPY_AVAILABLE", False)
-    def test_extract_audio_moviepy_not_available(self):
+    def test_extract_audio_moviepy_not_available(self, mock_exists):
         with pytest.raises(AudioError, match="moviepy is required"):
             extract_audio("/tmp/test.mp4")
 
@@ -39,13 +40,15 @@ class TestExtractAudio:
             assert os.path.exists(result)
             mock_clip.return_value.audio.write_audiofile.assert_called_once()
         finally:
-            tmp_video.unlink(missing_ok=True)
+            if os.path.exists(tmp_video.name):
+                os.unlink(tmp_video.name)
             if os.path.exists(result):
                 os.unlink(result)
 
     @patch("video_langfake.audio.VideoFileClip")
     def test_extract_audio_with_output_path(self, mock_clip):
         mock_audio = MagicMock()
+        mock_audio.write_audiofile.side_effect = lambda path, **kwargs: open(path, "w").close()
         mock_clip.return_value.audio = mock_audio
         tmp_video = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
         tmp_video.close()
@@ -54,7 +57,8 @@ class TestExtractAudio:
             result = extract_audio(tmp_video.name, output_path=tmp_output)
             assert result == tmp_output
         finally:
-            tmp_video.unlink(missing_ok=True)
+            if os.path.exists(tmp_video.name):
+                os.unlink(tmp_video.name)
             if os.path.exists(tmp_output):
                 os.unlink(tmp_output)
 
@@ -75,7 +79,8 @@ class TestTranscribeAudio:
             assert "words" in result
             assert result["text"] == "This is a mock transcription for testing purposes."
         finally:
-            tmp_audio.unlink(missing_ok=True)
+            if os.path.exists(tmp_audio.name):
+                os.unlink(tmp_audio.name)
 
     @patch("video_langfake.audio._transcribe_with_whisper")
     def test_transcribe_audio_with_whisper(self, mock_whisper):
@@ -86,7 +91,8 @@ class TestTranscribeAudio:
             result = transcribe_audio(tmp_audio.name, language="en")
             mock_whisper.assert_called_once_with(tmp_audio.name, "en")
         finally:
-            tmp_audio.unlink(missing_ok=True)
+            if os.path.exists(tmp_audio.name):
+                os.unlink(tmp_audio.name)
 
 
 class TestDetectLanguage:
@@ -96,7 +102,7 @@ class TestDetectLanguage:
 
     @patch("video_langfake.audio.extract_audio")
     @patch("video_langfake.audio.WHISPER_AVAILABLE", False)
-    def test_detect_language_from_video_mock(self, mock_whisper, mock_extract):
+    def test_detect_language_from_video_mock(self, mock_extract):
         tmp_audio = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
         tmp_audio.close()
         mock_extract.return_value = tmp_audio.name
@@ -105,7 +111,8 @@ class TestDetectLanguage:
             assert result["language"] == "en"
             assert result["confidence"] == 0.85
         finally:
-            tmp_audio.unlink(missing_ok=True)
+            if os.path.exists(tmp_audio.name):
+                os.unlink(tmp_audio.name)
 
     @patch("video_langfake.audio._detect_with_whisper")
     def test_detect_language_from_audio_whisper(self, mock_detect):
@@ -116,7 +123,8 @@ class TestDetectLanguage:
             result = detect_language(audio_path=tmp_audio.name)
             assert result["language"] == "es"
         finally:
-            tmp_audio.unlink(missing_ok=True)
+            if os.path.exists(tmp_audio.name):
+                os.unlink(tmp_audio.name)
 
 
 class TestSaveLoadTranscription:

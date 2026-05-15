@@ -70,6 +70,14 @@ class FilingItemModel(BaseModel):
     item_content: Optional[str] = Field(None, description="Item content text")
     item_type: str = Field("text", description="Item type/category")
 
+    @field_validator("filing_id")
+    @classmethod
+    def validate_filing_id(cls, v: Optional[int]) -> Optional[int]:
+        """Validate filing_id is greater than 0 if provided."""
+        if v is not None and v <= 0:
+            raise ValueError("filing_id must be greater than 0")
+        return v
+
     @field_validator("accession_no")
     @classmethod
     def validate_accession_no(cls, v: str) -> str:
@@ -91,7 +99,7 @@ class XBRLFactModel(BaseModel):
     value: str = Field(..., description="Fact value as string")
     unit: Optional[str] = Field(None, description="Unit of measurement")
 
-    @field_validator("value")
+    @field_validator("value", mode="before")
     @classmethod
     def validate_value(cls, v) -> str:
         """Ensure value is stored as string."""

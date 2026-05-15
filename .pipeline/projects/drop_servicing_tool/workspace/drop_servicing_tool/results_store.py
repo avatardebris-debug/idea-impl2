@@ -95,15 +95,20 @@ class ResultsStore:
         # Update summary
         self._update_summary(queue_id)
 
-    def get_result(self, queue_id: str, task_id: str) -> dict | None:
-        """Retrieve a single task result. Returns None if not found."""
+    def get_result(self, queue_id: str, task_id: str) -> dict:
+        """Retrieve a single task result.
+
+        Raises:
+            FileNotFoundError: If the queue does not exist.
+            KeyError: If the task_id is not found within the queue.
+        """
         results_file = self._base / queue_id / "results.json"
         if not results_file.exists():
-            return None
+            raise FileNotFoundError(f"Queue results not found: {queue_id}")
 
         results = json.loads(results_file.read_text(encoding="utf-8"))
         if task_id not in results:
-            return None
+            raise KeyError(f"Task not found in queue {queue_id!r}: {task_id!r}")
         return results[task_id]
 
     def get_result_path(self, queue_id: str) -> Path:

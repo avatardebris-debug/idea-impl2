@@ -147,8 +147,9 @@ class TestCompanyRepository:
 class TestFilingRepository:
     """Tests for FilingRepository."""
 
-    def test_upsert_filing(self, repositories, mock_filing):
+    def test_upsert_filing(self, repositories, mock_company, mock_filing):
         """Test inserting a new filing."""
+        repositories["company"].upsert(mock_company)
         filing_id = repositories["filing"].upsert(mock_filing)
         assert filing_id > 0
 
@@ -158,8 +159,9 @@ class TestFilingRepository:
         assert stored["filing_type"] == "10-K"
         assert stored["cik"] == "0000320193"
 
-    def test_upsert_updates_existing(self, repositories, mock_filing):
+    def test_upsert_updates_existing(self, repositories, mock_company, mock_filing):
         """Test that upsert updates an existing filing."""
+        repositories["company"].upsert(mock_company)
         # Insert initial filing
         repositories["filing"].upsert(mock_filing)
 
@@ -180,8 +182,9 @@ class TestFilingRepository:
         assert stored["filing_type"] == "10-K (Updated)"
         assert stored["is_xbrl"] == 1  # SQLite stores booleans as integers
 
-    def test_normalize_accession(self, repositories):
+    def test_normalize_accession(self, repositories, mock_company):
         """Test that accession numbers are normalized (dashes removed)."""
+        repositories["company"].upsert(mock_company)
         filing_with_dashes = FilingModel(
             accession_no="0000320193-21-000099",  # With dashes
             cik="0000320193",
@@ -194,8 +197,9 @@ class TestFilingRepository:
         stored = repositories["filing"].get_by_accession_no("000032019321000099")
         assert stored is not None
 
-    def test_exists_by_accession_no(self, repositories, mock_filing):
+    def test_exists_by_accession_no(self, repositories, mock_company, mock_filing):
         """Test exists_by_accession_no method."""
+        repositories["company"].upsert(mock_company)
         # Should not exist initially
         assert not repositories["filing"].exists_by_accession_no("000032019321000099")
 
@@ -212,8 +216,9 @@ class TestFilingRepository:
 class TestFilingItemRepository:
     """Tests for FilingItemRepository."""
 
-    def test_upsert_item(self, repositories, mock_filing):
+    def test_upsert_item(self, repositories, mock_company, mock_filing):
         """Test inserting a new filing item."""
+        repositories["company"].upsert(mock_company)
         filing_id = repositories["filing"].upsert(mock_filing)
 
         item = FilingItemModel(
@@ -231,8 +236,9 @@ class TestFilingItemRepository:
         assert len(stored_items) == 1
         assert stored_items[0]["item_label"] == "Item 1. Business"
 
-    def test_get_by_accession_no(self, repositories, mock_filing):
+    def test_get_by_accession_no(self, repositories, mock_company, mock_filing):
         """Test getting items by accession number."""
+        repositories["company"].upsert(mock_company)
         filing_id = repositories["filing"].upsert(mock_filing)
 
         item = FilingItemModel(
@@ -248,8 +254,9 @@ class TestFilingItemRepository:
         stored_items = repositories["item"].get_by_accession_no("000032019321000099")
         assert len(stored_items) == 1
 
-    def test_bulk_insert(self, repositories, mock_filing):
+    def test_bulk_insert(self, repositories, mock_company, mock_filing):
         """Test bulk insert of filing items."""
+        repositories["company"].upsert(mock_company)
         filing_id = repositories["filing"].upsert(mock_filing)
 
         items = [
@@ -334,10 +341,12 @@ class TestDeduplicationManager:
         dedup.mark_seen_cik(cik)
         assert dedup.is_cik_seen(cik)
 
-    def test_is_accession_in_db(self, conn, mock_filing):
+    def test_is_accession_in_db(self, conn, mock_company, mock_filing):
         """Test checking if accession exists in database."""
-        from sec_importer.repository import DeduplicationManager
+        from sec_importer.repository import DeduplicationManager, CompanyRepository
         dedup = DeduplicationManager(conn)
+        company_repo = CompanyRepository(conn)
+        company_repo.upsert(mock_company)
 
         # Should not exist initially
         assert not dedup.is_accession_in_db("000032019321000099")

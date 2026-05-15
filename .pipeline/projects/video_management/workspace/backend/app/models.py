@@ -1,7 +1,7 @@
 """SQLAlchemy models for the video management platform."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
@@ -49,8 +49,8 @@ class TableMetadata(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(Text, default="")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     fields = relationship("TableField", back_populates="table", cascade="all, delete-orphan")
     videos = relationship("Video", back_populates="table", cascade="all, delete-orphan")
@@ -67,7 +67,7 @@ class TableField(Base):
     is_deleted = Column(Boolean, default=False)
     options = Column(JSON, default=list)  # For SELECT type: list of options
     is_required = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     table = relationship("TableMetadata", back_populates="fields")
 
@@ -91,8 +91,8 @@ class Video(Base):
     thumbnail_url = Column(String, default="")
     youtube_video_id = Column(String, nullable=True)
     custom_fields = Column(JSON, default=dict)  # Stores values for custom fields
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     table = relationship("TableMetadata", back_populates="videos")
 
@@ -101,3 +101,25 @@ class Video(Base):
         Index("ix_videos_status", "status"),
         Index("ix_videos_publish_date", "publish_date"),
     )
+
+
+class YouTubeChannel(Base):
+    """Connected YouTube Channel details and OAuth credentials."""
+    __tablename__ = "youtube_channels"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    channel_id = Column(String, nullable=True)
+    channel_name = Column(String, nullable=True)
+    channel_avatar = Column(String, nullable=True)
+    
+    is_connected = Column(Boolean, default=False)
+    access_token = Column(String, nullable=True)
+    refresh_token = Column(String, nullable=True)
+    token_expiry = Column(DateTime, nullable=True)
+    
+    channel_stats = Column(JSON, default=dict)
+    last_sync_at = Column(DateTime, nullable=True)
+    sync_error = Column(String, nullable=True)
+    
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

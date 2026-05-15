@@ -74,7 +74,8 @@ class Classifier:
         Returns:
             Dict with keys: category, urgency, priority_score
         """
-        text = f"{ticket.subject} {ticket.body}".lower()
+        metadata_text = " ".join(str(v) for v in ticket.metadata.values()) if ticket.metadata else ""
+        text = f"{ticket.subject} {ticket.body} {metadata_text}".lower()
         scores: Dict[str, float] = {}
 
         for category, rule in self.rules.items():

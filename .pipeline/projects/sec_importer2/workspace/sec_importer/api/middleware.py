@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Callable
 
@@ -9,6 +10,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import APIConfig
+
+logger = logging.getLogger(__name__)
 
 
 def setup_middleware(app: FastAPI, config: APIConfig) -> None:
@@ -39,13 +42,12 @@ def _add_request_logging(app: FastAPI) -> None:
         response = await call_next(request)
 
         duration = time.time() - start_time
-        level = "WARNING" if response.status_code >= 400 else "DEBUG"
-
-        app.logger.log(
-            level,
-            f"{request.method} {request.url.path} "
-            f"{response.status_code} {duration:.3f}s",
-        )
+        msg = f"{request.method} {request.url.path} {response.status_code} {duration:.3f}s"
+        
+        if response.status_code >= 400:
+            logger.warning(msg)
+        else:
+            logger.debug(msg)
 
         response.headers["X-Response-Time"] = f"{duration:.3f}s"
         return response

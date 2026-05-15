@@ -29,8 +29,8 @@ class MACDStrategy(Strategy):
     ):
         if fast_period >= slow_period:
             raise ValueError("fast_period must be less than slow_period")
-        if signal_period >= slow_period:
-            raise ValueError("signal_period must be less than slow_period")
+        if signal_period >= fast_period:
+            raise ValueError("signal_period must be less than fast_period")
         self.fast_period = fast_period
         self.slow_period = slow_period
         self.signal_period = signal_period

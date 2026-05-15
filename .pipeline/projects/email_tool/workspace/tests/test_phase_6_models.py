@@ -21,7 +21,10 @@ from email_tool.models import (
     ProcessingStats,
     RuleSet,
     ActionSet,
-    ProcessingConfig
+    ProcessingConfig,
+    EmailMatch,
+    EmailProcessingResult,
+    Phase6ProcessingConfig
 )
 
 
@@ -425,7 +428,7 @@ class TestProcessingStats:
         stats_dict = stats.to_dict()
         assert stats_dict["total_emails"] == 100
         assert stats_dict["processed_emails"] == 95
-        assert stats_dict["success_rate"] == 0.95
+        assert abs(stats_dict["success_rate"] - (90 / 95)) < 0.001
         assert stats_dict["total_processing_time_ms"] == 1500.5
 
 
@@ -547,7 +550,7 @@ class TestProcessingConfig:
     
     def test_processing_config_creation(self):
         """Test basic processing config creation."""
-        config = ProcessingConfig()
+        config = Phase6ProcessingConfig()
         assert config.max_processing_time_ms == 30000
         assert config.max_actions_per_email == 10
         assert config.enable_attachments is True
@@ -558,7 +561,7 @@ class TestProcessingConfig:
     
     def test_processing_config_to_dict(self):
         """Test processing config serialization."""
-        config = ProcessingConfig(
+        config = Phase6ProcessingConfig(
             max_processing_time_ms=60000,
             max_actions_per_email=20,
             enable_attachments=False,

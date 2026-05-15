@@ -27,6 +27,7 @@ from extraction import (
     TimeEstimates,
     ExtractionOrchestrator,
     ExtractionResult,
+    SummaryGenerator,
 )
 from extraction.patterns.learning_patterns import PatternGenerator, LearningPattern, CompressionOpportunity, EncodingStrategy, PatternExtractionResult as LearningPatternResult
 from extraction.outline.outline_generator import OutlineGenerator, LearningModule as OutlineModule, LearningActivity as OutlineActivity, ModuleSequence, TimeEstimates, OutlineExtractionResult as OutlineResult

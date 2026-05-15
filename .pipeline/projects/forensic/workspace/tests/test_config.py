@@ -37,9 +37,12 @@ class TestConfig:
 
     def test_get_config_with_env(self, monkeypatch):
         """Test that get_config respects environment variables."""
+        import forensic.config as config_mod
+        config_mod._config_instance = None  # Reset singleton
         monkeypatch.setenv("FORENSIC_DB_PATH", "test_singleton.db")
         config = get_config()
         assert config.db_path == "test_singleton.db"
+        config_mod._config_instance = None  # Cleanup
 
     def test_to_dict(self):
         """Test that to_dict returns a proper dict."""

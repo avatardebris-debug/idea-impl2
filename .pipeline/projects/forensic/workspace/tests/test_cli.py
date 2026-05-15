@@ -13,62 +13,66 @@ from forensic.cli import main
 
 
 class TestCLI:
-    @patch("forensic.cli.ForensicDatabase")
-    def test_list_companies(self, mock_db):
-        """Test the list_companies command."""
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_db_instance.get_companies.return_value = [
-            {"ticker": "AAPL", "name": "Apple Inc.", "cik": "0000320193", "sic": "3571", "industry": "Computer Manufacturing", "state": "CA"}
-        ]
+    @patch("forensic.cli.ForensicPipeline")
+    def test_ingest(self, mock_pipeline_cls):
+        """Test the ingest command."""
+        mock_pipeline = MagicMock()
+        mock_pipeline_cls.return_value = mock_pipeline
+        mock_result = MagicMock()
+        mock_result.item_count = 10
+        mock_result.ticker = "AAPL"
+        mock_result.cik = "320193"
+        mock_result.filing_type = "10-K"
+        mock_result.filing_date = "2023-01-01"
+        mock_pipeline.ingest_filing.return_value = mock_result
 
-        with patch("sys.argv", ["forensic", "list-companies"]):
+        with patch("sys.argv", ["forensic", "ingest", "--ticker", "AAPL"]):
             main()
 
-        mock_db_instance.get_companies.assert_called_once()
-        mock_db_instance.close.assert_called_once()
+        mock_pipeline.ingest_filing.assert_called_once_with("AAPL", "10-K")
 
-    @patch("forensic.cli.Database")
-    def test_get_fraud_scores(self, mock_db):
-        """Test the get-fraud-scores command."""
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_db_instance.get_fraud_scores.return_value = [
-            {"ticker": "AAPL", "fraud_score": 75.5, "risk_level": "high", "filing_date": "2023-01-01", "accession_no": "0000320193-23-000001"}
-        ]
+    @patch("forensic.cli.ForensicPipeline")
+    def test_analyze(self, mock_pipeline_cls):
+        """Test the analyze command."""
+        mock_pipeline = MagicMock()
+        mock_pipeline_cls.return_value = mock_pipeline
+        mock_result = MagicMock()
+        mock_result.fraud_risk_score = 50.0
+        mock_result.red_flags = []
+        mock_pipeline.analyze_filing.return_value = mock_result
 
-        with patch("sys.argv", ["forensic", "get-fraud-scores", "--ticker", "AAPL"]):
+        with patch("sys.argv", ["forensic", "analyze", "--ticker", "AAPL"]):
             main()
 
-        mock_db_instance.get_fraud_scores.assert_called_once()
-        mock_db_instance.close.assert_called_once()
+        mock_pipeline.analyze_filing.assert_called_once_with("AAPL")
 
-    @patch("forensic.cli.Database")
-    def test_get_red_flags(self, mock_db):
-        """Test the get-red-flags command."""
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_db_instance.get_red_flags.return_value = [
-            {"ticker": "AAPL", "category": "accounting", "severity": "high", "description": "Revenue recognition issues", "filing_date": "2023-01-01", "accession_no": "0000320193-23-000001"}
-        ]
+    @patch("forensic.cli.ForensicPipeline")
+    def test_report(self, mock_pipeline_cls):
+        """Test the report command."""
+        mock_pipeline = MagicMock()
+        mock_pipeline_cls.return_value = mock_pipeline
+        mock_report = MagicMock()
+        mock_report.overall_risk = "medium"
+        mock_report.risk_score = 50.0
+        mock_report.recommendations = []
+        mock_pipeline.generate_report.return_value = mock_report
 
-        with patch("sys.argv", ["forensic", "get-red-flags", "--ticker", "AAPL"]):
+        with patch("sys.argv", ["forensic", "report", "--ticker", "AAPL"]):
             main()
 
-        mock_db_instance.get_red_flags.assert_called_once()
-        mock_db_instance.close.assert_called_once()
+        mock_pipeline.generate_report.assert_called_once_with("AAPL")
 
-    @patch("forensic.cli.Database")
-    def test_get_capital_flows(self, mock_db):
-        """Test the get-capital-flows command."""
-        mock_db_instance = MagicMock()
-        mock_db.return_value = mock_db_instance
-        mock_db_instance.get_capital_flows.return_value = [
-            {"ticker": "AAPL", "period_label": "2023-Q1", "operating_cash_flow": 100.0, "investing_cash_flow": -50.0, "financing_cash_flow": -30.0, "net_change_in_cash": 20.0, "capital_expenditures": 40.0, "free_cash_flow": 60.0, "filing_date": "2023-01-01", "accession_no": "0000320193-23-000001"}
-        ]
+    @patch("forensic.cli.ForensicPipeline")
+    def test_capital(self, mock_pipeline_cls):
+        """Test the capital command."""
+        mock_pipeline = MagicMock()
+        mock_pipeline_cls.return_value = mock_pipeline
+        mock_result = MagicMock()
+        mock_result.capital_flows = {"summary": "test"}
+        mock_result.advanced_flags = {}
+        mock_pipeline.analyze_filing.return_value = mock_result
 
-        with patch("sys.argv", ["forensic", "get-capital-flows", "--ticker", "AAPL"]):
+        with patch("sys.argv", ["forensic", "capital", "--ticker", "AAPL"]):
             main()
 
-        mock_db_instance.get_capital_flows.assert_called_once()
-        mock_db_instance.close.assert_called_once()
+        mock_pipeline.analyze_filing.assert_called_once_with("AAPL")

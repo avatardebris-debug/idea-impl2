@@ -494,8 +494,8 @@ class TestSECDatabase:
             assert company_result["name"] == "Apple Inc."
 
             filing_result = db.filings.get_by_accession_no("0000320193-24-000047")
-            assert len(filing_result) == 1
-            assert filing_result[0]["filing_type"] == "10-K"
+            assert filing_result is not None
+            assert filing_result["filing_type"] == "10-K"
 
             items_result = db.items.get_by_filing_id(filing_id)
             assert len(items_result) == 2
@@ -525,4 +525,4 @@ class TestSECDatabase:
 
             # Only one record in DB
             results = db.filings.get_by_accession_no("0000320193-24-000047")
-            assert len(results) == 1
+            assert results is not None

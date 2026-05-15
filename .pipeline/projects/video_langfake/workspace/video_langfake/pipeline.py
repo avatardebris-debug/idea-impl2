@@ -66,17 +66,17 @@ class VideoLangFake:
         Raises:
             PipelineError: If any pipeline step fails.
         """
-        # Validate inputs
-        if not os.path.exists(video_path):
-            raise PipelineError("validate", f"Input video not found: {video_path}")
-
-        if not target_language:
-            raise PipelineError("validate", "Target language must be specified")
-
-        if not output_path:
-            raise PipelineError("validate", "Output path must be specified")
-
         try:
+            # Validate inputs
+            if not os.path.exists(video_path):
+                raise PipelineError("validate", f"Input video not found: {video_path}")
+
+            if not target_language:
+                raise PipelineError("validate", "Target language must be specified")
+
+            if not output_path:
+                raise PipelineError("validate", "Output path must be specified")
+
             # Step 1: Extract audio
             audio_path = os.path.join(self._tmp_dir, "audio.wav")
             self._run_step("extract_audio", self._extract_audio, video_path, audio_path)

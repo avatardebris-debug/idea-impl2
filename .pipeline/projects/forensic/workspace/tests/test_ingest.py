@@ -54,9 +54,15 @@ class TestIngestResult:
         assert d["item_count"] == 5
 
     def test_to_json_defaults(self):
-        result = IngestResult(ticker="TSLA", cik="1318605", accession_no="0001318605-23-000010")
+        result = IngestResult(
+            ticker="TSLA", 
+            cik="1318605", 
+            accession_no="0001318605-23-000010",
+            filing_type="10-K",
+            filing_date="2023-01-01"
+        )
         j = result.to_json()
         d = json.loads(j)
-        assert d["filing_date"] is None
-        assert d["filing_type"] is None
+        assert d["filing_date"] == "2023-01-01"
+        assert d["filing_type"] == "10-K"
         assert d["item_count"] == 0

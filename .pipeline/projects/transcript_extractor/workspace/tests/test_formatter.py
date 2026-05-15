@@ -88,7 +88,7 @@ class TestFormatToTxt:
                 text="Test",
                 start=0.0,
                 end=1.0,
-                speaker=None
+                language='en'
             )
         ]
         
@@ -148,7 +148,7 @@ class TestFormatToSrt:
                 text="Test",
                 start=0.0,
                 end=1.0,
-                speaker=None
+                language='en'
             )
         ]
     
@@ -189,7 +189,7 @@ class TestFormatToVtt:
                 text="Test",
                 start=0.0,
                 end=1.0,
-                speaker=None
+                language='en'
             )
         ]
     

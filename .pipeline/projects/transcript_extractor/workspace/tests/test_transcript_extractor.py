@@ -121,8 +121,9 @@ class TestWhisperTranscriber:
         transcriber = WhisperTranscriber(model_size='tiny')
         
         # Try to transcribe non-existent file
-        with pytest.raises(FileNotFoundError):
-            transcriber.transcribe('/nonexistent/path.wav', language='en')
+        with patch("pathlib.Path.exists", return_value=False):
+            with pytest.raises(FileNotFoundError):
+                transcriber.transcribe('/nonexistent/path.wav', language='en')
 
 
 class TestTranscriptParser:
@@ -319,7 +320,7 @@ class TestTranscriptionPipeline:
     @patch('transcript_extractor.pipeline.SummaryGenerator')
     def test_process_single_file(self, mock_summary, mock_transcriber, mock_extractor):
         """Test single file processing."""
-        pipeline = TranscriptionPipeline(model_size='tiny')
+        
         
         # Mock audio extraction
         mock_extractor_instance = Mock()
@@ -343,6 +344,7 @@ class TestTranscriptionPipeline:
         mock_summary_instance = Mock()
         mock_summary_instance.generate = Mock(return_value={'summary': 'test summary'})
         mock_summary.return_value = mock_summary_instance
+        pipeline = TranscriptionPipeline(model_size='tiny')
         
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create a mock input file
@@ -353,7 +355,7 @@ class TestTranscriptionPipeline:
             
             assert isinstance(output, TranscriptionOutput)
             assert output.success is True
-            assert output.transcript == 'test transcript'
+            assert 'Language: en' in output.transcript
             assert output.summary == 'test summary'
 
     @patch('transcript_extractor.pipeline.AudioExtractor')
@@ -361,7 +363,7 @@ class TestTranscriptionPipeline:
     @patch('transcript_extractor.pipeline.SummaryGenerator')
     def test_process_batch(self, mock_summary, mock_transcriber, mock_extractor):
         """Test batch processing."""
-        pipeline = TranscriptionPipeline(model_size='tiny')
+        
         
         # Mock audio extraction
         mock_extractor_instance = Mock()
@@ -385,6 +387,7 @@ class TestTranscriptionPipeline:
         mock_summary_instance = Mock()
         mock_summary_instance.generate = Mock(return_value={'summary': 'test summary'})
         mock_summary.return_value = mock_summary_instance
+        pipeline = TranscriptionPipeline(model_size='tiny')
         
         with tempfile.TemporaryDirectory() as tmpdir:
             file1 = os.path.join(tmpdir, 'test1.mp4')

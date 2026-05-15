@@ -238,6 +238,35 @@ class WorkflowStep:
     then_step: Optional[str] = None
     else_step: Optional[str] = None
 
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WorkflowStep":
+        step_type_str = data.get("type", "action")
+        try:
+            step_type = WorkflowStepType(step_type_str)
+        except ValueError:
+            step_type = WorkflowStepType.ACTION
+
+        action_str = data.get("action")
+        try:
+            action = WorkflowAction(action_str) if action_str else None
+        except ValueError:
+            action = None
+
+        gate_str = data.get("gate_type") or data.get("params", {}).get("gate_type")
+        gate_type = GateType(gate_str) if gate_str else None
+
+        return cls(
+            id=data["id"],
+            step_type=step_type,
+            action=action,
+            condition=data.get("condition"),
+            gate_type=gate_type,
+            params=data.get("params", {}),
+            description=data.get("description", ""),
+            then_step=data.get("then"),
+            else_step=data.get("else")
+        )
+
 
 @dataclass
 class Workflow:
@@ -247,6 +276,24 @@ class Workflow:
     description: str = ""
     steps: List[WorkflowStep] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "Workflow":
+        steps_data = data.get("steps", [])
+        steps = [WorkflowStep.from_dict(s) for s in steps_data]
+        return cls(
+            name=data["name"],
+            version=data.get("version", "1.0"),
+            description=data.get("description", ""),
+            steps=steps,
+            metadata=data.get("metadata", {})
+        )
+
+    @classmethod
+    def from_yaml(cls, yaml_str: str) -> "Workflow":
+        import yaml
+        data = yaml.safe_load(yaml_str)
+        return cls.from_dict(data)
 
 
 @dataclass

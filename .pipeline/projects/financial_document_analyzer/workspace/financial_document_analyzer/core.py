@@ -20,11 +20,18 @@ def _extract_numeric(value: str) -> float:
     if value is None:
         return 0.0
     cleaned = str(value).strip()
-    # Remove currency symbols and commas
-    cleaned = cleaned.replace("$", "").replace(",", "").replace("(", "").replace(")", "")
-    # Handle parenthetical negatives: (1,234) -> -1234
+    # Check for parenthetical negative before removing characters
+    is_negative = False
     if "(" in cleaned and ")" in cleaned:
-        cleaned = "-" + cleaned.replace("(", "").replace(")", "")
+        is_negative = True
+
+    # Remove currency symbols, commas, and parentheses
+    for char in ["$", "€", "£", ",", "(", ")", " "]:
+        cleaned = cleaned.replace(char, "")
+
+    if is_negative:
+        cleaned = "-" + cleaned
+        
     try:
         return float(cleaned)
     except (ValueError, TypeError):

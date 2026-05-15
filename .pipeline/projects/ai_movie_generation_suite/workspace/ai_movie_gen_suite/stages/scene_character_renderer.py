@@ -213,7 +213,7 @@ class SceneCharacterRenderer:
             if char:
                 notes[char.name] = (
                     f"Role: {char.role.value}\n"
-                    f"Motivation: {char.motivation}\n"
+                    f"Backstory: {char.backstory}\n"
                     f"Visual Anchor: {char.visual_anchor}"
                 )
 

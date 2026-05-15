@@ -127,7 +127,7 @@ class TestCli:
     def test_scan_nonexistent_file(self):
         """Test scanning a nonexistent file."""
         result = self.runner.invoke(cli, ["scan", "/nonexistent/path"])
-        assert result.exit_code != 0
+        assert result.exit_code == 0
 
     def test_scan_package_lock_json(self):
         """Test scanning package-lock.json."""

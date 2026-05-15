@@ -1391,6 +1391,18 @@
       "status": "active",
       "shared_goals": [],
       "communication_method": "email"
+    },
+    {
+      "partner_id": "partner_117",
+      "goal_id": "goal_1",
+      "partner_name": "John Doe",
+      "partner_email": "john@example.com",
+      "relationship_type": "peer",
+      "check_in_frequency": "weekly",
+      "next_check_in": "2026-05-20T20:53:51.545415",
+      "status": "active",
+      "shared_goals": [],
+      "communication_method": "email"
     }
   ]
 }

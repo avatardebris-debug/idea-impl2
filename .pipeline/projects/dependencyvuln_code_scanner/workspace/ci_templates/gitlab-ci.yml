@@ -1,0 +1,13 @@
+depvuln_scan:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - pip install -q depvuln
+  script:
+    - depvuln scan . --threshold HIGH --format sarif -o gl-dependency-scanning-report.json
+  artifacts:
+    reports:
+      dependency_scanning: gl-dependency-scanning-report.json
+    paths:
+      - gl-dependency-scanning-report.json
+  allow_failure: true

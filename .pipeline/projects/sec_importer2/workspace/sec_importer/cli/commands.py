@@ -8,7 +8,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 
-from ..config import Settings
+from ..config import get_config
 from ..storage import init_db
 from ..fetcher import SECFetcher
 from ..parser import XBRLParser, HTMLParser
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 def cmd_schedule(args: argparse.Namespace) -> None:
     """Schedule a recurring import job."""
-    settings = Settings()
+    settings = get_config()
     logger.info("Scheduling import job")
     logger.info(f"  Ticker: {args.ticker}")
     logger.info(f"  Filing type: {args.filing_type}")
@@ -36,8 +36,8 @@ def cmd_schedule(args: argparse.Namespace) -> None:
 
 def cmd_import(args: argparse.Namespace) -> None:
     """Import filings for a given ticker and filing type."""
-    settings = Settings()
-    init_db(settings.db_path)
+    settings = get_config()
+    init_db(settings["db_path"])
 
     fetcher = SECFetcher()
     parser = XBRLParser()
@@ -126,8 +126,8 @@ def cmd_import(args: argparse.Namespace) -> None:
 
 def cmd_list(args: argparse.Namespace) -> None:
     """List stored filings."""
-    settings = Settings()
-    init_db(settings.db_path)
+    settings = get_config()
+    init_db(settings["db_path"])
 
     session = get_session()
     try:
@@ -146,8 +146,8 @@ def cmd_list(args: argparse.Namespace) -> None:
 
 def cmd_status(args: argparse.Namespace) -> None:
     """Show import status and statistics."""
-    settings = Settings()
-    init_db(settings.db_path)
+    settings = get_config()
+    init_db(settings["db_path"])
 
     session = get_session()
     try:

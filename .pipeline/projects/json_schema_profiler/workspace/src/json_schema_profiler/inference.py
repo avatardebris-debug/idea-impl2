@@ -28,6 +28,36 @@ def infer_schema(data: Any) -> dict[str, Any]:
         return {"type": _json_type(data)}
 
 
+def infer_schema_stream(file_obj: Any, chunk_size: int = 10000) -> dict[str, Any]:
+    """Stream a JSON or JSONL file and infer schema.
+    
+    Uses `ijson` for standard JSON arrays or standard line-iteration for JSONL.
+    """
+    import ijson
+    
+    # Check if it's JSONL by peeking at first character
+    first_char = file_obj.read(1)
+    file_obj.seek(0)
+    
+    if first_char == b'{' or (isinstance(first_char, str) and first_char == '{'):
+        # JSONL
+        objects = []
+        for line in file_obj:
+            if not line.strip():
+                continue
+            objects.append(json.loads(line))
+            if len(objects) >= chunk_size:
+                break
+        return _infer_object_schema(objects)
+    else:
+        # JSON array using ijson
+        objects = []
+        for obj in ijson.items(file_obj, 'item'):
+            objects.append(obj)
+            if len(objects) >= chunk_size:
+                break
+        return _infer_array_schema(objects)
+
 def _json_type(value: Any) -> str:
     """Map a Python value to a JSON Schema type string."""
     if value is None:

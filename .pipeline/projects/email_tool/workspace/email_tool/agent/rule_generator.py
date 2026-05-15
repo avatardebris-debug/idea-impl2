@@ -57,6 +57,11 @@ class RuleGenerator:
                 metadata={"conversation_id": context.conversation_id if context else None}
             )
         
+        # Check for warnings
+        warnings = []
+        if not sample_emails:
+            warnings.append("No sample emails provided")
+            
         try:
             # Call LLM agent to generate rules
             result = self.llm_agent.generate_rules(
@@ -68,6 +73,8 @@ class RuleGenerator:
             )
             
             if not result.success:
+                result.metadata["warnings"] = warnings
+                result.metadata["description"] = description
                 return result
             
             # Validate generated rules
@@ -77,7 +84,11 @@ class RuleGenerator:
                     success=False,
                     data=None,
                     error_message=f"Invalid rules: {validation_result.metadata.get('errors', [])}",
-                    metadata={"conversation_id": context.conversation_id if context else None}
+                    metadata={
+                        "conversation_id": context.conversation_id if context else None,
+                        "warnings": warnings,
+                        "description": description
+                    }
                 )
             
             return AgentResult(
@@ -85,7 +96,10 @@ class RuleGenerator:
                 data=result.data,
                 metadata={
                     "conversation_id": context.conversation_id if context else None,
-                    "rules_count": len(result.data)
+                    "rules_count": len(result.data),
+                    "generated_count": len(result.data),
+                    "warnings": warnings,
+                    "description": description
                 }
             )
             

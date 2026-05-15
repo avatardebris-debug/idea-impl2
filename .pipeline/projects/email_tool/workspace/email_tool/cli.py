@@ -314,32 +314,24 @@ Examples:
             print(f"Loaded {len(rules)} rules from {rules_path}")
         
         # Create organizer
-        organizer = EmailOrganizer(rules=rules)
+        organizer = EmailOrganizer(base_path=str(output_path), dry_run=args.dry_run)
         
         # Organize
         results = organizer.organize_directory(
-            path,
-            output_path,
-            dry_run=args.dry_run
+            str(path),
+            rules=rules
         )
         
         # Output results
         print("\nOrganization Results:")
         print("=" * 60)
-        print(f"Total files: {results.get('total_files', 0)}")
-        print(f"Organized: {results.get('organized', 0)}")
-        print(f"Skipped: {results.get('skipped', 0)}")
-        print(f"Errors: {results.get('errors', 0)}")
+        print(f"Total files: {results.get('total_processed', 0)}")
+        print(f"Organized: {results.get('successful', 0)}")
+        print(f"Skipped: {results.get('failed', 0)}")
         print()
         
         if args.dry_run:
             print("Dry run - no changes were made")
-        
-        # Save to file if requested
-        if args.output:
-            with open(args.output, 'w', encoding='utf-8') as f:
-                json.dump(results, f, indent=2)
-            print(f"Results saved to {args.output}")
         
         return 0
     
@@ -366,19 +358,16 @@ Examples:
                 return 1
             
             try:
-                rules = load_rules_from_yaml(rules_path)
+                errors = validate_rule_config_file(str(rules_path))
+                if errors:
+                    print("Validation failed:")
+                    for error in errors:
+                        print(f"  ✗ {error}")
+                    return 1
+                
                 print(f"Rules file is valid: {rules_path}")
-                print(f"Loaded {len(rules)} rules")
-                
-                # Validate each rule
-                for rule in rules:
-                    try:
-                        validate_rule_config_file(rule)
-                        print(f"  ✓ {rule['name']}")
-                    except Exception as e:
-                        print(f"  ✗ {rule['name']}: {e}")
-                        return 1
-                
+                rules = load_rules_from_yaml(str(rules_path))
+                print(f"Loaded {len(rules)} valid rules")
                 return 0
             except Exception as e:
                 print(f"Validation failed: {e}")
@@ -387,17 +376,19 @@ Examples:
         if args.list:
             # List rules from config
             rules_path = DEFAULT_RULES_FILE
-            if self.config and self.config.rules and self.config.rules.path:
-                rules_path = Path(self.config.rules.path)
+            if self.config:
+                configured_rules_path = self.config.get_rules_path()
+                if configured_rules_path:
+                    rules_path = Path(configured_rules_path)
             
             if not rules_path.exists():
                 print(f"Rules file not found: {rules_path}")
                 return 1
             
-            rules = load_rules_from_yaml(rules_path)
+            rules = load_rules_from_yaml(str(rules_path))
             print(f"Rules from {rules_path}:")
             for rule in rules:
-                print(f"  - {rule['name']} ({rule['rule_type']})")
+                print(f"  - {rule.name} ({rule.rule_type.value})")
             
             return 0
         

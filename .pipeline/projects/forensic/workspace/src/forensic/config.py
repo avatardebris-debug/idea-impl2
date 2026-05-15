@@ -42,7 +42,7 @@ class ForensicConfig:
     })
 
     def __post_init__(self):
-        """Load config.yaml automatically on instantiation."""
+        """Load config.yaml automatically on instantiation, then apply env overrides."""
         config_paths = [
             os.path.join(os.getcwd(), "config.yaml"),
             os.path.join(os.path.dirname(__file__), "..", "..", "config.yaml"),
@@ -52,6 +52,20 @@ class ForensicConfig:
             if yaml and os.path.exists(path):
                 self._load_from_file(path)
                 break
+
+        # Environment variable overrides
+        if os.environ.get("FORENSIC_DB_PATH"):
+            self.db_path = os.environ["FORENSIC_DB_PATH"]
+        if os.environ.get("FORENSIC_MAX_RETRIES"):
+            self.max_retries = int(os.environ["FORENSIC_MAX_RETRIES"])
+        if os.environ.get("FORENSIC_LOG_LEVEL"):
+            self.log_level = os.environ["FORENSIC_LOG_LEVEL"]
+        if os.environ.get("FORENSIC_BATCH_SIZE"):
+            self.batch_size = int(os.environ["FORENSIC_BATCH_SIZE"])
+        if os.environ.get("FORENSIC_TIMEOUT"):
+            self.timeout = int(os.environ["FORENSIC_TIMEOUT"])
+        if os.environ.get("FORENSIC_REQUESTS_PER_SECOND"):
+            self.requests_per_second = int(os.environ["FORENSIC_REQUESTS_PER_SECOND"])
 
     def _load_from_file(self, path: str):
         """Load configuration from a YAML file."""

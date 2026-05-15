@@ -1,0 +1,12 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir . || pip install pyyaml fpdf
+
+COPY . .
+RUN pip install --no-cache-dir .
+
+ENTRYPOINT ["auto-client-ops"]
+CMD ["--help"]

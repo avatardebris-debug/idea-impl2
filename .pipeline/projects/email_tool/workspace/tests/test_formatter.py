@@ -306,6 +306,7 @@ class TestBatchFormatter:
     
     def test_format_all_pdf(self, sample_emails, tmp_path):
         """Test batch formatting to PDF."""
+        pytest.importorskip("fpdf")
         batch_formatter = BatchFormatter(sample_emails)
         
         paths = batch_formatter.format_all(
@@ -438,8 +439,12 @@ class TestFormatterEdgeCases:
         formatter = Formatter(email)
         result = formatter.to_pdf("/tmp/test.pdf")
         
-        # Should return True if fpdf is available
-        assert result is True
+        # Should return False if fpdf is not available
+        try:
+            import fpdf
+            assert result is True
+        except ImportError:
+            assert result is False
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # Phase 3 Tasks
 
-- [ ] Task 1: Taskbar Core — Persistent window list with previews
+- [x] Task 1: Taskbar Core — Persistent window list with previews
   - What: Build a Taskbar class that tracks all open windows and displays their current state (title, minimized/maximized/active status). The taskbar should render a visual preview for each window showing its title, icon/state indicator, and active highlight.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/taskbar/taskbar.py` (new — Taskbar class)
@@ -16,7 +16,7 @@
     - Taskbar can be initialized with position (default bottom) and height (default 48)
     - Taskbar remains visible and functional regardless of window state
 
-- [ ] Task 2: Start Menu / App Launcher
+- [x] Task 2: Start Menu / App Launcher
   - What: Build a StartMenu class that provides quick access to bookmarked/favorite web applications. The launcher should display a grid of app icons with titles, support search/filtering, and allow launching new windows for each app.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/taskbar/start_menu.py` (new — StartMenu class)
@@ -32,7 +32,7 @@
     - StartMenu has method `get_categories()` that returns a list of unique categories
     - StartMenu can be initialized with a list of default apps (e.g., Google, GitHub, YouTube, Wikipedia)
 
-- [ ] Task 3: Alt+Tab Window Switcher
+- [x] Task 3: Alt+Tab Window Switcher
   - What: Implement a window switching mechanism that cycles through open windows (like Alt+Tab on desktop). This includes tracking the switch order, showing a preview overlay of the currently selected window, and focusing the selected window when the switch completes.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/taskbar/window_switcher.py` (new — WindowSwitcher class)
@@ -49,7 +49,7 @@
     - Switching a window via the switcher correctly focuses it and updates z-index
     - The switch order persists across multiple activate/deactivate cycles
 
-- [ ] Task 4: System Tray — Notifications and Status Indicators
+- [x] Task 4: System Tray — Notifications and Status Indicators
   - What: Build a SystemTray class that provides a status indicator area on the taskbar for notifications, clock/time display, and system status icons (e.g., volume, network, battery). Supports adding/removing notifications with auto-dismiss.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/taskbar/system_tray.py` (new — SystemTray class)
@@ -68,7 +68,7 @@
     - SystemTray has method `get_indicators()` that returns all indicators
     - Notifications have a `dismissed_at` timestamp for tracking auto-dismiss timing
 
-- [ ] Task 5: Integration with BrowserEngine and Taskbar UI
+- [x] Task 5: Integration with BrowserEngine and Taskbar UI
   - What: Integrate the Taskbar, StartMenu, WindowSwitcher, and SystemTray into the BrowserEngine. Add convenience methods to BrowserEngine for creating windows via the app launcher, switching windows, and managing the taskbar state. Wire up the taskbar to automatically track window lifecycle events.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py` (modify — add taskbar integration)
@@ -87,7 +87,7 @@
     - BrowserEngine has method `get_system_tray_state()` that returns the full system tray state as a dict
     - All properties are accessible and functional together
 
-- [ ] Task 6: Integration Tests and Demo
+- [x] Task 6: Integration Tests and Demo
   - What: Write comprehensive integration tests for all Phase 3 functionality and update the main.py demo to showcase the taskbar, start menu, window switcher, and system tray.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/tests/test_integration.py` (modify — add Phase 3 test classes)

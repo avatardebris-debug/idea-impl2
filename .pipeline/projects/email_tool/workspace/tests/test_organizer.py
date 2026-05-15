@@ -248,7 +248,7 @@ Test email {i}"""
         """Test resetting statistics."""
         self.organizer.reset_statistics()
         stats = self.organizer.get_statistics()
-        assert stats["total_processed"] == 0
+        assert stats["processed"] == 0
 
 
 class TestOrganizerBuilder:

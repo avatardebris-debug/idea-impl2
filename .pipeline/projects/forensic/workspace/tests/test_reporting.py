@@ -235,7 +235,6 @@ def test_generate_full_report_with_output_dir():
             output_dir=tmpdir,
         )
         assert report.ticker == "TEST"
-        # Check that files were created
-        assert os.path.exists(os.path.join(tmpdir, "TEST_2023-12-31.json"))
-        assert os.path.exists(os.path.join(tmpdir, "TEST_2023-12-31.md"))
-        assert os.path.exists(os.path.join(tmpdir, "TEST_2023-12-31.txt"))
+        assert os.path.exists(os.path.join(tmpdir, "TEST_2023_12_31.json"))
+        assert os.path.exists(os.path.join(tmpdir, "TEST_2023_12_31.md"))
+        assert os.path.exists(os.path.join(tmpdir, "TEST_2023_12_31.txt"))

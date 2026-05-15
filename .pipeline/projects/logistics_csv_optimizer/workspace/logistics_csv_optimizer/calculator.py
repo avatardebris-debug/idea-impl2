@@ -81,6 +81,16 @@ class CostCalculator:
         }
 
     @staticmethod
+    def calculate_costs(shipments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Alias for calculate to match test suite expectations, returning only the list."""
+        return CostCalculator.calculate(shipments)["per_shipment"]
+
+    @staticmethod
+    def total_cost(costed_shipments: List[Dict[str, Any]]) -> float:
+        """Calculate total cost from a list of already-costed shipments."""
+        return round(sum(s["cost"] for s in costed_shipments), 2) if costed_shipments else 0.0
+
+    @staticmethod
     def _calculate_single(shipment: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate cost for a single shipment."""
         weight = shipment["weight"]

@@ -34793,6 +34793,96 @@
       "notes": "",
       "activity_id": "activity_4429bb5b",
       "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_b5d2d629",
+      "timestamp": "2026-05-13T20:53:55.875528",
+      "metric_type": "completion_percentage",
+      "value": 50.0,
+      "notes": "Halfway done",
+      "activity_id": "activity_fa639b89",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_5f80c410",
+      "timestamp": "2026-05-13T20:53:56.652933",
+      "metric_type": "completion_percentage",
+      "value": 100.0,
+      "notes": "",
+      "activity_id": "activity_fc5c40d2",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_2973ee97",
+      "timestamp": "2026-05-13T20:53:57.400979",
+      "metric_type": "completion_percentage",
+      "value": 50.0,
+      "notes": "",
+      "activity_id": "activity_c97d1738",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_a765d3e7",
+      "timestamp": "2026-05-13T20:53:57.986507",
+      "metric_type": "practice_frequency",
+      "value": 30,
+      "notes": "Practice session",
+      "activity_id": "activity_ff49b8ad",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_2ccc7caf",
+      "timestamp": "2026-05-13T20:53:58.571717",
+      "metric_type": "assessment_score",
+      "value": 85.0,
+      "notes": "First assessment",
+      "activity_id": "activity_7ad2aab6",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_7704450e",
+      "timestamp": "2026-05-13T20:53:59.196091",
+      "metric_type": "completion_percentage",
+      "value": 50.0,
+      "notes": "",
+      "activity_id": "activity_bbd7e446",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_f2ade4e3",
+      "timestamp": "2026-05-13T20:53:59.412828",
+      "metric_type": "practice_frequency",
+      "value": 60,
+      "notes": "",
+      "activity_id": "activity_bbd7e446",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_e1d3a5de",
+      "timestamp": "2026-05-13T20:53:59.631264",
+      "metric_type": "assessment_score",
+      "value": 85.0,
+      "notes": "",
+      "activity_id": "activity_bbd7e446",
+      "activity_name": "Test Activity"
+    },
+    {
+      "record_id": "record_fc0cedcb",
+      "timestamp": "2026-05-13T20:54:00.612305",
+      "metric_type": "completion_percentage",
+      "value": 50.0,
+      "notes": "",
+      "activity_id": "activity_d0a60536",
+      "activity_name": "Activity 1"
+    },
+    {
+      "record_id": "record_2db74aeb",
+      "timestamp": "2026-05-13T20:54:00.921903",
+      "metric_type": "completion_percentage",
+      "value": 100.0,
+      "notes": "",
+      "activity_id": "activity_dc7e4fd9",
+      "activity_name": "Activity 2"
     }
   ]
 }

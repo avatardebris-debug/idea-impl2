@@ -50,46 +50,27 @@ def main(args: list[str] | None = None) -> int:
     parsed = parser.parse_args(args)
 
     try:
-        # Step 1: Import CSV
+        # Run API pipeline
+        from logistics_csv_optimizer.api import run_optimization
+        
         if parsed.verbose:
-            print(f"Importing CSV from: {parsed.input}")
-
-        shipments = Importer.import_csv(parsed.input)
-
+            print(f"Running optimization for: {parsed.input}")
+            
+        output = run_optimization(parsed.input)
+        
         if parsed.verbose:
-            print(f"Imported {len(shipments)} shipments.")
-
-        # Step 2: Calculate costs
-        if parsed.verbose:
-            print("Calculating costs...")
-
-        costed_shipments = CostCalculator.calculate_costs(shipments)
-        total = CostCalculator.total_cost(costed_shipments)
-
-        if parsed.verbose:
-            print(f"Total cost: {total}")
-
-        # Step 3: Generate schedule
-        if parsed.verbose:
-            print("Generating schedule...")
-
-        schedule = ScheduleGenerator.generate(costed_shipments)
-
-        if parsed.verbose:
-            print(f"Generated schedule with {len(schedule)} entries.")
+            print(f"Generated schedule with {len(output['schedule'])} entries.")
+            print(f"Total cost: {output['total_cost']}")
 
         # Step 4: Write output JSON
-        output = {
-            "shipments": costed_shipments,
-            "total_cost": total,
-            "schedule": schedule,
-        }
-
-        with open(parsed.output, "w", encoding="utf-8") as fh:
-            json.dump(output, fh, indent=2, ensure_ascii=False)
-
-        if parsed.verbose:
-            print(f"Output written to: {parsed.output}")
+        if parsed.output == "-":
+            json.dump(output, sys.stdout, indent=2, ensure_ascii=False)
+            sys.stdout.write("\n")
+        else:
+            with open(parsed.output, "w", encoding="utf-8") as fh:
+                json.dump(output, fh, indent=2, ensure_ascii=False)
+            if parsed.verbose:
+                print(f"Output written to: {parsed.output}")
 
         return 0
 

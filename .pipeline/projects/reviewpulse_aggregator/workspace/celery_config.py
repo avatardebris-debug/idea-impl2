@@ -26,6 +26,11 @@ celery_app.conf.update(
 
 # Periodic task: sync reviews every hour
 celery_app.conf.beat_schedule = {
+    # Every day at 8:00 AM UTC
+    "daily-email-digest": {
+        "task": "tasks.send_daily_digest",
+        "schedule": crontab(hour=8, minute=0),
+    },
     "sync-reviews-hourly": {
         "task": "tasks.sync_google_reviews",
         "schedule": 3600.0,

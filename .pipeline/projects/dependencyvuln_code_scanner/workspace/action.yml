@@ -1,0 +1,35 @@
+name: "DependencyVuln Code Scanner"
+description: "Scan project dependencies for known vulnerabilities."
+inputs:
+  path:
+    description: "Path to scan (directory or specific lock file)"
+    required: false
+    default: "."
+  threshold:
+    description: "Severity threshold (LOW, MEDIUM, HIGH, CRITICAL)"
+    required: false
+    default: "MEDIUM"
+  format:
+    description: "Output format (text, json, html, sarif)"
+    required: false
+    default: "sarif"
+  output_file:
+    description: "Output file path"
+    required: false
+    default: "depvuln-results.sarif"
+  exclude:
+    description: "Space-separated list of exclude patterns"
+    required: false
+    default: ""
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  args:
+    - "scan"
+    - "${{ inputs.path }}"
+    - "--threshold"
+    - "${{ inputs.threshold }}"
+    - "--format"
+    - "${{ inputs.format }}"
+    - "--output"
+    - "${{ inputs.output_file }}"

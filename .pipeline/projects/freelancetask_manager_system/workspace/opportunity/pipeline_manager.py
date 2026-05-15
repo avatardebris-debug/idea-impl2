@@ -46,6 +46,9 @@ class PipelineManager:
         with open(filepath, "r") as f:
             return OpportunityPipeline.from_json(f.read())
 
+    # Alias for test compatibility
+    get_pipeline = get
+
     def delete(self, pipeline_id: str) -> bool:
         """Delete a pipeline by ID."""
         filepath = self._filepath(pipeline_id)

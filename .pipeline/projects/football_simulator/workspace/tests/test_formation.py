@@ -147,3 +147,4 @@ class TestFormationHelpers:
         assert p.x == pytest.approx(16.5, abs=0.01)
         assert p.y == pytest.approx(26.665, abs=0.01)
         assert p.team == "defense"
+

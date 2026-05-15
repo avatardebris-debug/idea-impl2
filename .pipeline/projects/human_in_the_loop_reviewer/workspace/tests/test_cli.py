@@ -124,6 +124,9 @@ class TestApproveCommand:
         checkpoint_id = create_result.stdout.strip().split(": ")[1]
 
         approve_result = _run_cli("approve", checkpoint_id, state_file=state_file)
+        if approve_result.returncode != 0:
+            print(f"STDERR: {approve_result.stderr}")
+            print(f"STDOUT: {approve_result.stdout}")
         assert approve_result.returncode == 0
         assert "approved" in approve_result.stdout.lower()
 

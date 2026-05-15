@@ -287,6 +287,29 @@ def cmd_match(args: argparse.Namespace) -> None:
               f"{match['score']:<8.2f} {keywords:<30}")
 
 
+def cmd_contract_generate(args: argparse.Namespace) -> None:
+    """Handle 'ftm contract generate' command."""
+    try:
+        from contract_engine.contract_generator import ContractGenerator
+    except ImportError:
+        print("Error: Contract Engine not installed/found.")
+        sys.exit(1)
+        
+    generator = ContractGenerator()
+    contract = generator.generate_from_proposal(
+        client_id="client-auto",
+        proposal_id=args.match,
+        amount=1500.0,
+        deliverables=["Custom Deliverable 1", "Custom Deliverable 2"]
+    )
+    
+    if args.format == "pdf":
+        print(f"Contract generated for match {args.match} in PDF format (mock).")
+    else:
+        md = generator.format_as_markdown(contract)
+        print(md)
+
+
 def main() -> None:
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -351,6 +374,14 @@ def main() -> None:
     match_parser = subparsers.add_parser("match", help="Advanced client-offering matching")
     match_parser.add_argument("--sop", required=True, help="SOP name")
 
+    # Contract command
+    contract_parser = subparsers.add_parser("contract", help="Contract management")
+    contract_sub = contract_parser.add_subparsers(dest="contract_command")
+    
+    contract_gen = contract_sub.add_parser("generate", help="Generate a contract")
+    contract_gen.add_argument("--match", required=True, help="Match/Proposal ID")
+    contract_gen.add_argument("--format", choices=["md", "pdf"], default="md", help="Output format")
+
     args = parser.parse_args()
 
     if args.command == "sop":
@@ -391,6 +422,12 @@ def main() -> None:
 
     elif args.command == "match":
         cmd_match(args)
+
+    elif args.command == "contract":
+        if args.contract_command == "generate":
+            cmd_contract_generate(args)
+        else:
+            contract_parser.print_help()
 
     else:
         parser.print_help()

@@ -8351,6 +8351,69 @@
       "outcome": "Commitment created successfully",
       "effectiveness_score": 8.0,
       "notes": ""
+    },
+    {
+      "record_id": "record_929",
+      "timestamp": "2026-05-13T20:53:51.281479",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Learn Python",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_930",
+      "timestamp": "2026-05-13T20:53:51.416283",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_931",
+      "timestamp": "2026-05-13T20:53:51.545442",
+      "stakes_type": "accountability_partner",
+      "action_taken": "Added accountability partner John Doe",
+      "outcome": "Partner added successfully",
+      "effectiveness_score": 8.5,
+      "notes": ""
+    },
+    {
+      "record_id": "record_932",
+      "timestamp": "2026-05-13T20:53:51.672704",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_933",
+      "timestamp": "2026-05-13T20:53:51.706492",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_934",
+      "timestamp": "2026-05-13T20:53:51.843913",
+      "stakes_type": "public_commitment",
+      "action_taken": "Created public commitment for Test",
+      "outcome": "Commitment created successfully",
+      "effectiveness_score": 8.0,
+      "notes": ""
+    },
+    {
+      "record_id": "record_935",
+      "timestamp": "2026-05-13T20:53:51.884489",
+      "stakes_type": "financial_penalty",
+      "action_taken": "Created financial penalty of 100.0 USD",
+      "outcome": "Penalty created successfully",
+      "effectiveness_score": 9.0,
+      "notes": ""
     }
   ]
 }

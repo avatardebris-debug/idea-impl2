@@ -1,6 +1,7 @@
 """Phase 1 — End-to-end verification tests."""
 
 import json
+import os
 import sys
 import tempfile
 from pathlib import Path
@@ -326,6 +327,9 @@ class TestCLI:
         # use exist_ok=True to avoid FileExistsError when _tmp_env already created them
         self.tmp_sops.mkdir(parents=True, exist_ok=True)
         self.tmp_prompts.mkdir(parents=True, exist_ok=True)
+        # Clear out any SOPs copied by conftest.py's _tmp_env
+        for f in self.tmp_sops.glob("*.yaml"):
+            f.unlink()
         self._old_env = {}
         import os
         for key in ("DST_SOPS_DIR", "DST_PROMPTS_DIR"):
@@ -348,11 +352,15 @@ class TestCLI:
             cwd=WORKSPACE,
             capture_output=True,
             text=True,
+            env=os.environ.copy(),
         )
         return result.returncode, result.stdout, result.stderr
 
     def test_cli_list_empty(self):
+        import os
+        print(f"ENV: {os.environ.get('DST_SOPS_DIR')}")
         rc, out, err = self._run_cli("list")
+        print(f"OUT: {out}")
         assert rc == 0
         assert "No SOPs found" in out or "Available SOPs (0)" in out
 

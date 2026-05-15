@@ -109,7 +109,12 @@ class YouTubeUploadService:
         if not self.channel.refresh_token or not self.channel.token_expiry:
             return self.channel.access_token
 
-        if self.channel.token_expiry < datetime.now(timezone.utc) - __import__("datetime").timedelta(minutes=5):
+        expiry = self.channel.token_expiry
+        if expiry.tzinfo is None:
+            from datetime import timezone
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        
+        if expiry < datetime.now(timezone.utc) - __import__("datetime").timedelta(minutes=5):
             async def _do_refresh():
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(

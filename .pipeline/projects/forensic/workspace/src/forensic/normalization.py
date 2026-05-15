@@ -133,6 +133,7 @@ ALIAS_MAP: Dict[str, str] = {
     "capital_expenditures": "capex",
     "capital_expenditure": "capex",
     "ppe": "capex",
+    "purchase_of_property": "capex",
     # working_capital
     "working_capital": "working_capital",
     "net_working_capital": "working_capital",
@@ -174,12 +175,7 @@ def _extract_value(text: str, key: str) -> Optional[float]:
     escaped_parts = [re.escape(part) for part in parts]
     escaped_key = r"[\s_]+".join(escaped_parts)
     patterns = [
-        # "key  $1,234,567"
-        rf"{escaped_key}\s+\$?([\d,]+(?:\.\d+)?)",
-        # "key of $1.23B / $1.23M / $1.23K"
-        rf"{escaped_key}\s+of\s+\$?([\d,]+(?:\.\d+)?)\s*(B|M|K|b|m|k)?",
-        # "key: $1,234,567"
-        rf"{escaped_key}\s*:\s*\$?([\d,]+(?:\.\d+)?)",
+        rf"{escaped_key}[^\d$]*?\$(-?[\d,]+(?:\.\d+)?)\s*([BMKbmk])?(?:\b|$|[^a-zA-Z])",
     ]
 
     for pat in patterns:
@@ -292,7 +288,11 @@ def normalize_multiple(
                 break
 
     if global_normalizer is None:
-        return companies  # nothing to normalize
+        for comp in companies:
+            if not comp.normalized:
+                for k, v in comp.items.items():
+                    comp.normalized[k] = v
+        return companies
 
     for comp in companies:
         base = comp.items.get(global_normalizer, 0)

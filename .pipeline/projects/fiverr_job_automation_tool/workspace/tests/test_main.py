@@ -189,10 +189,13 @@ class TestMain:
 
     def test_main_with_template_file(self, tmp_path):
         """Test main with template file."""
-        with patch("main.AutomationPipeline") as MockPipeline:
+        with patch("main.AutomationPipeline") as MockPipeline, \
+             patch("main.ProposalEngine") as MockProposalEngine:
             mock_pipeline = MagicMock()
             mock_pipeline.run.return_value = [{"status": "DRY_RUN"}]
             MockPipeline.return_value = mock_pipeline
+            mock_proposal = MagicMock()
+            MockProposalEngine.return_value = mock_proposal
 
             exit_code = main([
                 "--template-file", "templates.yaml",
@@ -231,10 +234,13 @@ class TestMain:
 
     def test_main_with_all_args(self, tmp_path):
         """Test main with all arguments."""
-        with patch("main.AutomationPipeline") as MockPipeline:
+        with patch("main.AutomationPipeline") as MockPipeline, \
+             patch("main.ProposalEngine") as MockProposalEngine:
             mock_pipeline = MagicMock()
             mock_pipeline.run.return_value = [{"status": "DRY_RUN"}]
             MockPipeline.return_value = mock_pipeline
+            mock_proposal = MagicMock()
+            MockProposalEngine.return_value = mock_proposal
 
             exit_code = main([
                 "--dry-run",
@@ -280,10 +286,13 @@ class TestMainEdgeCases:
 
     def test_main_with_unicode_template_file(self, tmp_path):
         """Test main with unicode template file."""
-        with patch("main.AutomationPipeline") as MockPipeline:
+        with patch("main.AutomationPipeline") as MockPipeline, \
+             patch("main.ProposalEngine") as MockProposalEngine:
             mock_pipeline = MagicMock()
             mock_pipeline.run.return_value = [{"status": "DRY_RUN"}]
             MockPipeline.return_value = mock_pipeline
+            mock_proposal = MagicMock()
+            MockProposalEngine.return_value = mock_proposal
 
             exit_code = main([
                 "--template-file", "templates_日本語.yaml",

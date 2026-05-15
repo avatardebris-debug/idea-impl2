@@ -27,6 +27,7 @@ class TestSECImporter:
     def test_filing_item_model(self):
         from sec_importer.models import FilingItemModel
         item = FilingItemModel(
+            accession_no="0000320193-23-000047",
             item_label="Item 1",
             item_content="Some content",
             item_type="text",
@@ -38,10 +39,11 @@ class TestSECImporter:
     def test_filing_item_model_to_dict(self):
         from sec_importer.models import FilingItemModel
         item = FilingItemModel(
+            accession_no="0000320193-23-000047",
             item_label="Item 1",
             item_content="Some content",
             item_type="text",
         )
-        d = item.to_dict()
+        d = item.model_dump()
         assert d["item_label"] == "Item 1"
         assert d["item_content"] == "Some content"

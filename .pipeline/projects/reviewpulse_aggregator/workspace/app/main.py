@@ -7,8 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.config import settings
-from app.api.routes import reviews
-
+from app.api.routes import reviews, notifications, dashboard
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -31,6 +30,8 @@ app = FastAPI(
 
 # Register routers
 app.include_router(reviews.router, prefix="/api", tags=["reviews"])
+app.include_router(notifications.router, prefix="/api", tags=["notifications"])
+app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 
 
 @app.get("/health")

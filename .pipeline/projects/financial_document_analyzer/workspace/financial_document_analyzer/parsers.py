@@ -5,6 +5,11 @@ from typing import Dict, Any
 
 import pandas as pd
 
+try:
+    import pdfplumber
+except ImportError:
+    pdfplumber = None
+
 from financial_document_analyzer.core import build_metrics_dict, _normalize_key, _extract_numeric
 
 
@@ -59,20 +64,18 @@ def parse_csv(file_path: str) -> Dict[str, Any]:
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"CSV file not found: {file_path}")
 
-    df = pd.read_csv(file_path)
-    raw_rows = len(df)
+    try:
+        df = pd.read_csv(file_path)
+    except pd.errors.EmptyDataError:
+        df = pd.DataFrame()
 
-    # Detect if the CSV is transposed (line items as rows vs columns)
-    # Heuristic: if there's a column whose name looks like a metric keyword
-    # but the numeric columns are clearly years/periods, it's transposed.
-    # More robust: check if any column name matches a metric key AND
-    # the row count > numeric column count (typical transposed layout).
-    is_transposed = False
-    numeric_cols = df.select_dtypes(include='number').columns.tolist()
-    if len(numeric_cols) > 0 and len(df.columns) > len(numeric_cols):
-        # Check if the non-numeric column contains line item labels
-        non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
-        for col in non_numeric_cols:
+    raw_rows = len(df)
+    if df.empty:
+        return build_metrics_dict(os.path.basename(file_path))
+
+    def _extract_metrics(df: pd.DataFrame) -> Dict[str, float]:
+        is_transposed = False
+        for col in df.columns:
             vals = df[col].dropna().astype(str).str.strip().str.lower()
             for key in REVENUE_KEYS + COGS_KEYS + GROSS_PROFIT_KEYS + OPERATING_INCOME_KEYS + NET_INCOME_KEYS:
                 if vals.str.contains(key, regex=False).any():
@@ -81,45 +84,30 @@ def parse_csv(file_path: str) -> Dict[str, Any]:
             if is_transposed:
                 break
 
-    if is_transposed:
-        # Pivot: make the first non-numeric column the index
-        non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
-        pivot_col = non_numeric_cols[0]
-        df = df.set_index(pivot_col).T
-        raw_rows = len(df)
-        # Now columns are the line items (Revenue, COGS, etc.)
-        rev_col = _find_column(df, REVENUE_KEYS)
-        cogs_col = _find_column(df, COGS_KEYS)
-        gp_col = _find_column(df, GROSS_PROFIT_KEYS)
-        op_col = _find_column(df, OPERATING_INCOME_KEYS)
-        ni_col = _find_column(df, NET_INCOME_KEYS)
+        if is_transposed:
+            # Pivot: find the column that contains the metrics
+            non_numeric_cols = []
+            for col in df.columns:
+                try:
+                    pd.to_numeric(df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True))
+                except Exception:
+                    non_numeric_cols.append(col)
+            
+            pivot_col = non_numeric_cols[0] if non_numeric_cols else df.columns[0]
+            df_pivot = df.set_index(pivot_col).T
+        else:
+            df_pivot = df
+
+        rev_col = _find_column(df_pivot, REVENUE_KEYS)
+        cogs_col = _find_column(df_pivot, COGS_KEYS)
+        gp_col = _find_column(df_pivot, GROSS_PROFIT_KEYS)
+        op_col = _find_column(df_pivot, OPERATING_INCOME_KEYS)
+        ni_col = _find_column(df_pivot, NET_INCOME_KEYS)
 
         def _first_nonzero(col_name: str) -> float:
             if not col_name:
                 return 0.0
-            series = df[col_name].apply(lambda x: _extract_numeric(str(x)) if pd.notna(x) else 0.0)
-            nonzero = series[series != 0]
-            if len(nonzero) == 0:
-                return 0.0
-            return float(nonzero.iloc[0])
-
-        revenue = _first_nonzero(rev_col)
-        cogs = _first_nonzero(cogs_col)
-        gross_profit = _first_nonzero(gp_col)
-        operating_income = _first_nonzero(op_col)
-        net_income = _first_nonzero(ni_col)
-    else:
-        # Standard format: columns are metrics
-        rev_col = _find_column(df, REVENUE_KEYS)
-        cogs_col = _find_column(df, COGS_KEYS)
-        gp_col = _find_column(df, GROSS_PROFIT_KEYS)
-        op_col = _find_column(df, OPERATING_INCOME_KEYS)
-        ni_col = _find_column(df, NET_INCOME_KEYS)
-
-        def _first_nonzero(col_name: str) -> float:
-            if not col_name:
-                return 0.0
-            series = df[col_name].apply(lambda x: _extract_numeric(str(x)) if pd.notna(x) else 0.0)
+            series = df_pivot[col_name].apply(lambda x: _extract_numeric(str(x)) if pd.notna(x) else 0.0)
             nonzero = series[series != 0]
             if len(nonzero) == 0:
                 return 0.0
@@ -131,17 +119,26 @@ def parse_csv(file_path: str) -> Dict[str, Any]:
         operating_income = _first_nonzero(op_col)
         net_income = _first_nonzero(ni_col)
 
-    # If gross_profit wasn't found but revenue and cogs are, compute it
-    if gross_profit == 0 and revenue != 0 and cogs != 0:
-        gross_profit = revenue - cogs
+        if gross_profit == 0 and revenue != 0 and cogs != 0:
+            gross_profit = revenue - cogs
+
+        return {
+            "revenue": revenue,
+            "cogs": cogs,
+            "gross_profit": gross_profit,
+            "operating_income": operating_income,
+            "net_income": net_income,
+        }
+
+    metrics = _extract_metrics(df)
 
     return build_metrics_dict(
         filename=os.path.basename(file_path),
-        revenue=revenue,
-        cogs=cogs,
-        gross_profit=gross_profit,
-        operating_income=operating_income,
-        net_income=net_income,
+        revenue=metrics["revenue"],
+        cogs=metrics["cogs"],
+        gross_profit=metrics["gross_profit"],
+        operating_income=metrics["operating_income"],
+        net_income=metrics["net_income"],
         raw_rows=raw_rows,
     )
 
@@ -160,9 +157,7 @@ def parse_pdf(file_path: str) -> Dict[str, Any]:
     if not os.path.isfile(file_path):
         raise FileNotFoundError(f"PDF file not found: {file_path}")
 
-    try:
-        import pdfplumber
-    except ImportError:
+    if pdfplumber is None:
         raise ImportError("pdfplumber is required for PDF parsing. Install with: pip install pdfplumber")
 
     all_rows = []
@@ -201,7 +196,7 @@ def parse_pdf(file_path: str) -> Dict[str, Any]:
 
     # Clean up: remove rows where all cells are empty
     df = df.dropna(how='all')
-    df = df.applymap(lambda x: str(x).strip() if isinstance(x, str) else x)
+    df = df.map(lambda x: str(x).strip() if isinstance(x, str) else x)
     df = df[df.apply(lambda row: any(str(cell).strip() for cell in row), axis=1)]
 
     raw_rows = len(df)
@@ -209,37 +204,71 @@ def parse_pdf(file_path: str) -> Dict[str, Any]:
     # Normalize column names
     df.columns = [_normalize_key(c) for c in df.columns]
 
-    # Find columns for each metric
-    rev_col = _find_column(df, REVENUE_KEYS)
-    cogs_col = _find_column(df, COGS_KEYS)
-    gp_col = _find_column(df, GROSS_PROFIT_KEYS)
-    op_col = _find_column(df, OPERATING_INCOME_KEYS)
-    ni_col = _find_column(df, NET_INCOME_KEYS)
+    def _extract_metrics(df: pd.DataFrame) -> Dict[str, float]:
+        is_transposed = False
+        for col in df.columns:
+            vals = df[col].dropna().astype(str).str.strip().str.lower()
+            for key in REVENUE_KEYS + COGS_KEYS + GROSS_PROFIT_KEYS + OPERATING_INCOME_KEYS + NET_INCOME_KEYS:
+                if vals.str.contains(key, regex=False).any():
+                    is_transposed = True
+                    break
+            if is_transposed:
+                break
 
-    def _first_nonzero(col_name: str) -> float:
-        if not col_name:
-            return 0.0
-        series = df[col_name].apply(_extract_numeric)
-        nonzero = series[series != 0]
-        if len(nonzero) == 0:
-            return 0.0
-        return nonzero.iloc[0]
+        if is_transposed:
+            # Pivot: find the column that contains the metrics
+            non_numeric_cols = []
+            for col in df.columns:
+                try:
+                    pd.to_numeric(df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True))
+                except Exception:
+                    non_numeric_cols.append(col)
+            
+            pivot_col = non_numeric_cols[0] if non_numeric_cols else df.columns[0]
+            df_pivot = df.set_index(pivot_col).T
+        else:
+            df_pivot = df
 
-    revenue = _first_nonzero(rev_col)
-    cogs = _first_nonzero(cogs_col)
-    gross_profit = _first_nonzero(gp_col)
-    operating_income = _first_nonzero(op_col)
-    net_income = _first_nonzero(ni_col)
+        rev_col = _find_column(df_pivot, REVENUE_KEYS)
+        cogs_col = _find_column(df_pivot, COGS_KEYS)
+        gp_col = _find_column(df_pivot, GROSS_PROFIT_KEYS)
+        op_col = _find_column(df_pivot, OPERATING_INCOME_KEYS)
+        ni_col = _find_column(df_pivot, NET_INCOME_KEYS)
 
-    if gross_profit == 0 and revenue != 0 and cogs != 0:
-        gross_profit = revenue - cogs
+        def _first_nonzero(col_name: str) -> float:
+            if not col_name:
+                return 0.0
+            series = df_pivot[col_name].apply(lambda x: _extract_numeric(str(x)) if pd.notna(x) else 0.0)
+            nonzero = series[series != 0]
+            if len(nonzero) == 0:
+                return 0.0
+            return float(nonzero.iloc[0])
+
+        revenue = _first_nonzero(rev_col)
+        cogs = _first_nonzero(cogs_col)
+        gross_profit = _first_nonzero(gp_col)
+        operating_income = _first_nonzero(op_col)
+        net_income = _first_nonzero(ni_col)
+
+        if gross_profit == 0 and revenue != 0 and cogs != 0:
+            gross_profit = revenue - cogs
+
+        return {
+            "revenue": revenue,
+            "cogs": cogs,
+            "gross_profit": gross_profit,
+            "operating_income": operating_income,
+            "net_income": net_income,
+        }
+
+    metrics = _extract_metrics(df)
 
     return build_metrics_dict(
         filename=os.path.basename(file_path),
-        revenue=revenue,
-        cogs=cogs,
-        gross_profit=gross_profit,
-        operating_income=operating_income,
-        net_income=net_income,
+        revenue=metrics["revenue"],
+        cogs=metrics["cogs"],
+        gross_profit=metrics["gross_profit"],
+        operating_income=metrics["operating_income"],
+        net_income=metrics["net_income"],
         raw_rows=raw_rows,
     )

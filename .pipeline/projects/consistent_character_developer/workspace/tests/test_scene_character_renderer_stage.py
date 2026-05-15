@@ -280,7 +280,7 @@ with tempfile.TemporaryDirectory() as tmp:
 print("\nTest 9: LLMCharacterImageProvider placeholder works")
 with tempfile.TemporaryDirectory() as tmp:
     tmp = pathlib.Path(tmp)
-    provider = LLMCharacterImageProvider(llm_client=None)
+    provider = LLMCharacterImageProvider(api_key=None)
     ref_path = tmp / "llm_ref.png"
     result = provider.generate_reference_image("hero", "test", ref_path)
     check("LLM provider generates file", ref_path.exists())

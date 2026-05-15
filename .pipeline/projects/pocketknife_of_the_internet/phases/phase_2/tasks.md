@@ -1,6 +1,6 @@
 # Phase 2 Tasks
 
-- [ ] Task 1: Tab-to-Window Detach Mechanism
+- [x] Task 1: Tab-to-Window Detach Mechanism
   - What: Add detach_tab_to_window() method to BrowserEngine that converts a tab/window into a detached floating window. The detached window should preserve the tab's URL, history, and title, and the window should be positioned with an animated offset from its original location.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py` (add detach_tab_to_window method)
@@ -12,7 +12,7 @@
     - The new window is created at a position offset from the original (e.g., +20px x, +20px y) to simulate a visual transition
     - A `is_detached` property on Tab tracks whether the tab has been detached
 
-- [ ] Task 2: Window-to-Tab Re-attach Mechanism
+- [x] Task 2: Window-to-Tab Re-attach Mechanism
   - What: Add reattach_window_to_tab() method to BrowserEngine that converts a detached floating window back into a tab in the tab bar. The window's content, URL, and history must be fully preserved during the conversion.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py` (add reattach_window_to_tab method)
@@ -25,7 +25,7 @@
     - The tab's is_detached flag is reset to False
     - Re-attaching a detached window and then re-detaching it preserves state (round-trip integrity)
 
-- [ ] Task 3: State Synchronization Between Tab and Window
+- [x] Task 3: State Synchronization Between Tab and Window
   - What: Implement bidirectional state synchronization so that changes to a tab's URL, history, or title are reflected in its corresponding window, and vice versa. This ensures that navigating in a detached window updates the tab state and navigating in a tab updates the window state.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py` (add sync logic to navigate, go_back, go_forward, reload)
@@ -37,7 +37,7 @@
     - Title changes propagate to both tab and window
     - State is consistent after detach -> navigate -> reattach sequence
 
-- [ ] Task 4: Visual Transition Simulation
+- [x] Task 4: Visual Transition Simulation
   - What: Add visual transition support for the detach and reattach operations. Since this is a Python backend, implement transition metadata (start position, end position, duration, easing) that can be consumed by a frontend renderer to animate the window movement.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/core/browser/browser_engine.py` (add transition metadata to detach/reattach)
@@ -48,7 +48,7 @@
     - Window stores transition state as properties that can be queried
     - Transition metadata includes all fields needed for a frontend to animate: start_x, start_y, end_x, end_y, duration_ms, easing_type
 
-- [ ] Task 5: Integration Tests for Tab-to-Window Bridge
+- [x] Task 5: Integration Tests for Tab-to-Window Bridge
   - What: Write comprehensive integration tests for all Phase 2 functionality including detach, reattach, state synchronization, and round-trip integrity.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/tests/test_integration.py` (add Phase 2 test classes)
@@ -75,7 +75,7 @@
       - `test_transition_metadata_has_correct_values` - verifies start/end positions are reasonable
     - All tests pass (target: 30+ new tests)
 
-- [ ] Task 6: Update Documentation and Demo
+- [x] Task 6: Update Documentation and Demo
   - What: Update main.py demo to showcase the new detach/reattach functionality and update docstrings in all modified files.
   - Files:
     - `/workspace/idea impl/.pipeline/projects/pocketknife_of_the_internet/workspace/main.py` (add detach/reattach demo)

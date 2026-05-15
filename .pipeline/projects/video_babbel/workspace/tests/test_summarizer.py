@@ -81,7 +81,7 @@ class TestSummarizer:
         """SummarizationError should wrap underlying exceptions."""
         summarizer = Summarizer()
         with pytest.raises(SummarizationError, match="Summarization failed"):
-            summarizer.summarize(None)  # type: ignore
+            summarizer.summarize([None])  # type: ignore
 
     def test_summarize_preserves_order(self):
         """summarize should preserve the order of segments."""

@@ -556,8 +556,8 @@ class TestIntegration:
         # Verify in pipeline
         pipeline_mgr = PipelineManager()
         pipeline = pipeline_mgr.create_pipeline("Lifecycle Test")
-        pipeline_mgr.add_opportunity(pipeline.pipeline_id, opp)
-        
+        pipeline = pipeline_mgr.add_opportunity(pipeline.pipeline_id, opp)
+    
         won_opps = pipeline.get_won_opportunities()
         assert len(won_opps) == 1
 

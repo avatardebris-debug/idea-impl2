@@ -250,3 +250,120 @@ class JobPosting:
     @classmethod
     def from_json(cls, json_str: str) -> JobPosting:
         return cls.from_dict(json.loads(json_str))
+
+
+@dataclass
+class FinancialRatio:
+    name: str
+    value: float
+    description: Optional[str] = None
+    benchmark: Optional[float] = None
+    trend: Optional[str] = None
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> FinancialRatio:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class FinancialSummary:
+    company_name: str
+    ticker: Optional[str] = None
+    filing_date: Optional[str] = None
+    total_assets: Optional[float] = None
+    total_liabilities: Optional[float] = None
+    total_equity: Optional[float] = None
+    warnings: list = field(default_factory=list)
+    insights: list = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> FinancialSummary:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class RiskFactor:
+    name: str
+    score: float
+    weight: float
+    description: Optional[str] = None
+    evidence: list = field(default_factory=list)
+    
+    def weighted_score(self) -> float:
+        return self.score * self.weight
+        
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> RiskFactor:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class RiskAssessment:
+    company_name: str
+    ticker: Optional[str] = None
+    cik: Optional[str] = None
+    overall_score: Optional[float] = None
+    risk_level: Optional[str] = None
+    trend: Optional[str] = None
+    recommendations: list = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> RiskAssessment:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class NetworkNode:
+    id: str
+    name: str
+    node_type: str
+    metadata: dict = field(default_factory=dict)
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> NetworkNode:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class NetworkEdge:
+    source: str
+    target: str
+    relationship_type: str
+    confidence: Optional[float] = None
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> NetworkEdge:
+        return _dataclass_from_dict(cls, data)
+
+
+@dataclass
+class NetworkAnalysis:
+    company_name: str
+    ticker: Optional[str] = None
+    insights: list = field(default_factory=list)
+    
+    def to_dict(self) -> dict:
+        return _dataclass_to_dict(self)
+        
+    @classmethod
+    def from_dict(cls, data: dict) -> NetworkAnalysis:
+        return _dataclass_from_dict(cls, data)
+

@@ -9,9 +9,15 @@ from ..storage import get_session
 from .config import APIConfig
 
 
-def get_db() -> Session:
+from typing import Generator
+
+def get_db() -> Generator[Session, None, None]:
     """Get a database session."""
-    return next(get_session())
+    session = get_session()
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 def get_config() -> APIConfig:

@@ -8,9 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from sec_importer.models import Filing
-from .config import APIConfig
-from .dependencies import get_db
-from .schemas import PaginatedResponse, SearchResponse
+from ..config import APIConfig
+from ..dependencies import get_db, get_config
+from ..schemas import PaginatedResponse, SearchResponse
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ def _extract_snippet(text: str, query: str, max_length: int = 100) -> str:
         return ""
 
     query_lower = query.lower()
-    text_lower = text_lower
+    text_lower = text.lower()
 
     idx = text_lower.find(query_lower)
     if idx == -1:
@@ -63,10 +63,10 @@ def _extract_snippet(text: str, query: str, max_length: int = 100) -> str:
     return snippet
 
 
-@router.get("/search", response_model=PaginatedResponse, tags=["Search"])
+@router.get("", response_model=PaginatedResponse, tags=["Search"])
 async def search_filings(
     db: Session = Depends(get_db),
-    config: APIConfig = Depends(),
+    config: APIConfig = Depends(get_config),
     q: str | None = Query(None, description="Search keyword"),
     filing_type: str | None = Query(None, description="Filter by form type"),
     ticker: str | None = Query(None, description="Filter by ticker"),

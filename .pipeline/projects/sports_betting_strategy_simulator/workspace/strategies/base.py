@@ -4,7 +4,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional
 
-from ..engine.market import Market
+from engine.market import Market
 
 
 class Strategy(ABC):

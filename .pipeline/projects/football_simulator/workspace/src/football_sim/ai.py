@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict, Any
 
 from .config import Config
-from .field import Field
+from .football_field import Field
 from .play import PlayCall, PlayType, RunDirection, PassRoute, Route, RunPath
 
 
@@ -414,3 +414,4 @@ class DefensiveAI:
             reasoning=reasoning,
             parameters=parameters,
         )
+

@@ -45,64 +45,64 @@ class TestCharacterRole:
 class TestBeat:
     def test_create_beat(self):
         beat = Beat(
+            beat_name="Opening Image",
+            beat_number=1,
+            summary="The story begins.",
             phase=BeatPhase.SETUP,
-            title="Opening Image",
-            description="The story begins.",
-            scene_ref="SC-001",
+            description="A detailed description.",
         )
         assert beat.phase == BeatPhase.SETUP
-        assert beat.title == "Opening Image"
-        assert beat.description == "The story begins."
-        assert beat.scene_ref == "SC-001"
+        assert beat.beat_name == "Opening Image"
+        assert beat.beat_number == 1
+        assert beat.summary == "The story begins."
 
     def test_beat_model_dump(self):
         beat = Beat(
+            beat_name="Test Beat",
+            beat_number=2,
+            summary="Test summary",
             phase=BeatPhase.SETUP,
-            title="Test Beat",
             description="Test description",
         )
         d = beat.model_dump()
         assert d["phase"] == "setup"
-        assert d["title"] == "Test Beat"
-        assert d["description"] == "Test description"
+        assert d["beat_name"] == "Test Beat"
+        assert d["summary"] == "Test summary"
 
 
 class TestBeatSheet:
     def test_create_beatsheet(self):
         beatsheet = BeatSheet(
-            title="Test Story",
             logline="A test logline.",
             genre="drama",
         )
-        assert beatsheet.title == "Test Story"
         assert beatsheet.logline == "A test logline."
         assert beatsheet.genre == "drama"
         assert len(beatsheet.beats) == 0
 
     def test_add_beat(self):
         beatsheet = BeatSheet(
-            title="Test Story",
             logline="A test logline.",
             genre="drama",
         )
         beat = Beat(
+            beat_name="Test Beat",
+            beat_number=1,
+            summary="A summary",
             phase=BeatPhase.SETUP,
-            title="Test Beat",
-            description="Test description",
         )
         beatsheet.add_beat(beat)
         assert len(beatsheet.beats) == 1
-        assert beatsheet.beats[0].title == "Test Beat"
+        assert beatsheet.beats[0].beat_name == "Test Beat"
 
     def test_model_dump(self):
         beatsheet = BeatSheet(
-            title="Test Story",
             logline="A test logline.",
             genre="drama",
         )
-        beatsheet.add_beat(Beat(phase=BeatPhase.SETUP, title="B1", description="D1"))
+        beatsheet.add_beat(Beat(beat_name="B1", beat_number=1, summary="S1", phase=BeatPhase.SETUP))
         d = beatsheet.model_dump()
-        assert d["title"] == "Test Story"
+        assert d["logline"] == "A test logline."
         assert len(d["beats"]) == 1
 
 
@@ -312,6 +312,6 @@ class TestProject:
         d = project.model_dump()
         assert d["title"] == "Test Project"
         assert "beat_sheet" in d
-        assert "characters" in d
+        assert "character_registry" in d
         assert "script" in d
         assert "scene_descriptions" in d

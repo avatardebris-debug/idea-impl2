@@ -142,6 +142,6 @@ class TestIntegration:
         assert custom_field_response.status_code == 201
 
         # Verify the custom field appears in the list
-        fields_response = test_client.get(f"/api/tables/{table_id}/fields")
+        fields_response = test_client.get(f"/api/tables/{table_id}/fields?page_size=100")
         field_names = [f["name"] for f in fields_response.json()["items"]]
         assert "Custom Integration Field" in field_names

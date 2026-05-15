@@ -8,7 +8,7 @@ This package provides a complete football simulation system with:
 """
 
 from .config import Config
-from .field import Field
+from .football_field import Field
 from .entities import Player, Formation
 from .formation import create_formation
 from .ball import Ball
@@ -16,7 +16,6 @@ from .play import Play, PlayCall, PlayType, RunDirection, PassRoute, Route, RunP
 from .game import Game, GamePhase, Down, GameResult, PlayResult, Team
 from .ai import OffensiveAI, DefensiveAI, AIState, Decision
 from .stats import StatsTracker, PlayStats, DriveStats, GameStats
-from .renderer import Renderer, RendererConfig
 
 __version__ = "0.1.0"
 __all__ = [
@@ -56,7 +55,5 @@ __all__ = [
     "PlayStats",
     "DriveStats",
     "GameStats",
-    # Renderer
-    "Renderer",
-    "RendererConfig",
 ]
+

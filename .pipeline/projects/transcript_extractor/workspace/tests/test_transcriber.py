@@ -129,7 +129,7 @@ class TestTranscribe:
             assert len(result.segments) == 1
             mock_wrapper.transcribe.assert_called_once_with(
                 audio_path="test_audio.wav",
-                language=None,
+                language='en',
                 word_timestamps=True,
             )
     
@@ -149,7 +149,7 @@ class TestTranscribe:
             assert len(result.segments) == 0
             mock_wrapper.transcribe.assert_called_once_with(
                 audio_path="test_audio.wav",
-                language=None,
+                language='en',
                 word_timestamps=False,
             )
     

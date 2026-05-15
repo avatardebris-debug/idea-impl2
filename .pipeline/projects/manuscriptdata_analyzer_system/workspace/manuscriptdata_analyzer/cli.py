@@ -208,7 +208,11 @@ def compare(db_path, book_titles):
             book_titles = tuple(r["book_title"] for r in ranked[:3])
             click.echo(f"Auto-selected top 3 books: {', '.join(book_titles)}")
         comparison = comparator.compare_books(book_titles)
-        click.echo("\n" + comparison)
+        click.echo("\nCross-Book Comparison:")
+        for title, metrics in comparison.items():
+            click.echo(f"  {title}:")
+            for metric, value in metrics.items():
+                click.echo(f"    {metric}: {value}")
     finally:
         db.close()
 

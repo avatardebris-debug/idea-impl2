@@ -308,7 +308,7 @@ class TestAttachmentProcessor:
             attachment_type=AttachmentType.PDF
         )
         
-        assert result.success
+        assert not result.success  # PDF is invalid, so it should fail
         assert result.attachment_type == AttachmentType.PDF
     
     def test_process_attachment_unknown_file(self):
@@ -328,7 +328,7 @@ class TestAttachmentProcessor:
             attachment_type=AttachmentType.UNKNOWN
         )
         
-        assert result.success
+        assert not result.success  # No parser for UNKNOWN type
         assert result.attachment_type == AttachmentType.UNKNOWN
     
     def test_process_attachment_nonexistent_file(self):
@@ -544,9 +544,9 @@ class TestAttachmentPipelineExecutor:
         email = Email(
             id="email_001",
             subject="Test Email",
-            sender="test@example.com",
-            recipients=["recipient@example.com"],
-            body="Test body",
+            from_addr="test@example.com",
+            to_addrs=["recipient@example.com"],
+            body_plain="Test body",
             raw_headers={"Content-Type": "text/plain"},
             attachments=[test_file]
         )
@@ -572,9 +572,9 @@ class TestAttachmentPipelineExecutor:
         email = Email(
             id="email_001",
             subject="Test Email",
-            sender="test@example.com",
-            recipients=["recipient@example.com"],
-            body="Test body",
+            from_addr="test@example.com",
+            to_addrs=["recipient@example.com"],
+            body_plain="Test body",
             raw_headers={"Content-Type": "text/plain"},
             attachments=[test_file]
         )

@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: reviewpulse
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: reviewpulse_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://reviewpulse:password@db:5432/reviewpulse_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  worker:
+    build: 
+      context: .
+      dockerfile: Dockerfile.backend
+    command: celery -A app.tasks.sync_reviews.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://reviewpulse:password@db:5432/reviewpulse_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+
+  beat:
+    build: 
+      context: .
+      dockerfile: Dockerfile.backend
+    command: celery -A app.tasks.sync_reviews.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql://reviewpulse:password@db:5432/reviewpulse_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - db
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

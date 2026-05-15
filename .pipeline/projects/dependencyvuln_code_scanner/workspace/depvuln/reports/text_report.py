@@ -10,7 +10,7 @@ class TextReportGenerator:
         lines: list[str] = []
         for f in findings:
             lines.append(
-                f"[{f['severity']}] {f['package']}=={f['version']}  →  {f['cve_id']}  (CVSS {f['cvss']})"
+                f"[{f['severity']}] {f['package']}=={f['version']}  ->  {f['cve_id']}  (CVSS {f['cvss']})"
             )
             desc = f["description"] or "No description available."
             # Truncate long descriptions

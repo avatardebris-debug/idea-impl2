@@ -108,13 +108,15 @@ class DummyCharacterImageProvider(CharacterImageProvider):
     def _generate_dummy_image(output_path: Path, label: str, suffix: str = "") -> None:
         """Generate a simple gradient PNG with a label."""
         width, height = 512, 512
-        raw_data = b""
+        raw_data = bytearray(width * height * 4)
+        idx = 0
         for y in range(height):
             for x in range(width):
-                r = int(255 * x / width)
-                g = int(255 * y / height)
-                b = 128
-                raw_data += bytes([r, g, b, 255])
+                raw_data[idx] = int(255 * x / width)
+                raw_data[idx+1] = int(255 * y / height)
+                raw_data[idx+2] = 128
+                raw_data[idx+3] = 255
+                idx += 4
 
         compressed = zlib.compress(raw_data)
         png_data = (
@@ -179,13 +181,15 @@ class LLMCharacterImageProvider(CharacterImageProvider):
     def _generate_dummy_image(output_path: Path, label: str, suffix: str = "") -> None:
         """Generate a simple gradient PNG."""
         width, height = 512, 512
-        raw_data = b""
+        raw_data = bytearray(width * height * 4)
+        idx = 0
         for y in range(height):
             for x in range(width):
-                r = int(255 * x / width)
-                g = int(255 * y / height)
-                b = 128
-                raw_data += bytes([r, g, b, 255])
+                raw_data[idx] = int(255 * x / width)
+                raw_data[idx+1] = int(255 * y / height)
+                raw_data[idx+2] = 128
+                raw_data[idx+3] = 255
+                idx += 4
 
         compressed = zlib.compress(raw_data)
         png_data = (
@@ -487,13 +491,15 @@ class StableDiffusionCharacterImageProvider(CharacterImageProvider):
         """Generate a fallback image when Stable Diffusion is not available."""
         width, height = 512, 512
         # Create a simple gradient image
-        raw_data = b""
+        raw_data = bytearray(width * height * 4)
+        idx = 0
         for y in range(height):
             for x in range(width):
-                r = int(255 * x / width)
-                g = int(255 * y / height)
-                b = 128
-                raw_data += bytes([r, g, b, 255])  # RGBA
+                raw_data[idx] = int(255 * x / width)
+                raw_data[idx+1] = int(255 * y / height)
+                raw_data[idx+2] = 128
+                raw_data[idx+3] = 255
+                idx += 4
 
         compressed = zlib.compress(raw_data)
         png_data = (

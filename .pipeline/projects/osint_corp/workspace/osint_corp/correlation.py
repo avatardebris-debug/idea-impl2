@@ -17,10 +17,10 @@ def _normalize_name(name: str) -> str:
         return ""
     # Lowercase, strip common suffixes, remove punctuation
     name = name.lower().strip()
-    for suffix in (" inc", " incorporated", " llc", " ltd", " corp", " company", " co", " llp", " lp", " plc", " gmbh", " ag", " sa", " s.a.", " b.v.", " n.v."):
+    name = name.replace("-", " ").replace("_", " ").replace(".", "").replace(",", "")
+    for suffix in (" inc", " incorporated", " llc", " ltd", " corp", " company", " co", " llp", " lp", " plc", " gmbh", " ag", " sa", " s.a", " bv", " nv"):
         if name.endswith(suffix):
             name = name[: -len(suffix)]
-    name = name.replace("-", " ").replace("_", " ")
     # Remove extra whitespace
     return " ".join(name.split())
 

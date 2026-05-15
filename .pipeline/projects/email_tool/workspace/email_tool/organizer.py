@@ -109,7 +109,8 @@ class EmailOrganizer:
             else parse_email_content(email_source)
         
         # Match against rules
-        rule_matches = self.processor.matcher.match(email, rules)
+        engine = RuleEngine(rules=rules)
+        rule_matches = engine.evaluate(email)
         
         result = {
             "success": False,

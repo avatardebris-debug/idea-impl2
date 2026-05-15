@@ -17,6 +17,7 @@ class TestSECFetcher:
         """Test fetching filings successfully."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
+        mock_response.status_code = 200
         mock_response.json.return_value = {
             "filings": {
                 "recent": {
@@ -29,11 +30,11 @@ class TestSECFetcher:
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client_class.return_value = mock_client
             mock_client.request.return_value = mock_response
 
-            fetcher = SECFetcher()
-            result = fetcher.fetch_filings("AAPL", limit=10)
+            fetcher = SECFetcher(base_delay=0.001)
+            result = fetcher.fetch_filings(cik="12345", limit=10)
 
             assert len(result) == 1
             assert result[0]["form"] == "10-K"
@@ -43,10 +44,10 @@ class TestSECFetcher:
         """Test fetching filings with HTTP error."""
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
-            mock_client.get.side_effect = httpx.HTTPError("HTTP error")
+            mock_client_class.return_value = mock_client
+            mock_client.request.side_effect = httpx.HTTPError("HTTP error")
 
-            fetcher = SECFetcher()
+            fetcher = SECFetcher(base_delay=0.001)
             result = fetcher.fetch_filings("AAPL", limit=10)
 
             assert result == []
@@ -55,26 +56,27 @@ class TestSECFetcher:
         """Test getting CIK from ticker successfully."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
+        mock_response.status_code = 200
         mock_response.json.return_value = {"cik": 1234567}
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client_class.return_value = mock_client
             mock_client.request.return_value = mock_response
 
-            fetcher = SECFetcher()
+            fetcher = SECFetcher(base_delay=0.001)
             cik = fetcher.get_cik_from_ticker("AAPL")
 
-            assert cik == "01234567"
+            assert cik == "0001234567"
 
     def test_get_cik_from_ticker_http_error(self):
         """Test getting CIK from ticker with HTTP error."""
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client_class.return_value = mock_client
             mock_client.request.side_effect = httpx.HTTPError("HTTP error")
 
-            fetcher = SECFetcher()
+            fetcher = SECFetcher(base_delay=0.001)
             cik = fetcher.get_cik_from_ticker("AAPL")
 
             assert cik is None
@@ -83,10 +85,10 @@ class TestSECFetcher:
         """Test fetching filings when CIK lookup fails."""
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client_class.return_value = mock_client
             mock_client.request.side_effect = httpx.HTTPError("HTTP error")
 
-            fetcher = SECFetcher()
+            fetcher = SECFetcher(base_delay=0.001)
             result = fetcher.fetch_filings("INVALID")
 
             assert result == []
@@ -95,14 +97,15 @@ class TestSECFetcher:
         """Test fetching filings when SEC returns no filings."""
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
+        mock_response.status_code = 200
         mock_response.json.return_value = {"filings": {"recent": {}}}
 
         with patch("httpx.Client") as mock_client_class:
             mock_client = MagicMock()
-            mock_client_class.return_value.__enter__.return_value = mock_client
+            mock_client_class.return_value = mock_client
             mock_client.request.return_value = mock_response
 
-            fetcher = SECFetcher()
+            fetcher = SECFetcher(base_delay=0.001)
             result = fetcher.fetch_filings(cik="12345", limit=10)
 
             assert result == []

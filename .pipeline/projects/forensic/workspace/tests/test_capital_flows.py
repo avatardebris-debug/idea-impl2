@@ -52,9 +52,10 @@ class TestDetectAnomalies:
 
     def test_normal_flows(self):
         """Test that normal flows produce no anomalies."""
+        from forensic.capital_flow import CapitalFlow
         flows = [
-            {"type": "insider_purchase", "amount": 100000, "date": "2023-01-01"},
-            {"type": "insider_sale", "amount": 50000, "date": "2023-01-02"},
+            CapitalFlow(flow_type="insider_purchase", amount=100000, date="2023-01-01"),
+            CapitalFlow(flow_type="insider_sale", amount=50000, date="2023-01-02"),
         ]
         anomalies = detect_anomalies(flows)
         assert isinstance(anomalies, list)
@@ -66,8 +67,9 @@ class TestDetectAnomalies:
 
     def test_large_suspicious_flow(self):
         """Test detection of large suspicious flow."""
+        from forensic.capital_flow import CapitalFlow
         flows = [
-            {"type": "insider_sale", "amount": 10000000, "date": "2023-01-01"},
+            CapitalFlow(flow_type="insider_sale", amount=10000000, date="2023-01-01"),
         ]
         anomalies = detect_anomalies(flows)
         assert isinstance(anomalies, list)

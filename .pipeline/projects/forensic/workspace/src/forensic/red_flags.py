@@ -21,14 +21,14 @@ def check_revenue_receivables_mismatch(items: list) -> List[RedFlag]:
         # Look for revenue growth rate
         if "revenue growth" in lower or "revenue growth rate" in lower:
             import re
-            match = re.search(r'revenue\s+growth\s+(?:rate\s+)?(?:of\s+)?([\d.]+)\s*%', lower)
+            match = re.search(r'revenue\s+growth\s+(?:rate\s+)?(?:of\s+|was\s+|is\s+|)?([\d.]+)\s*%', lower)
             if match:
                 revenue_growth = float(match.group(1))
 
         # Look for receivables growth rate
         if "receivables growth" in lower or "receivable growth" in lower:
             import re
-            match = re.search(r'receivables?\s+growth\s+(?:rate\s+)?(?:of\s+)?([\d.]+)\s*%', lower)
+            match = re.search(r'receivables?\s+growth\s+(?:rate\s+)?(?:of\s+|was\s+|is\s+|)?([\d.]+)\s*%', lower)
             if match:
                 receivables_growth = float(match.group(1))
 

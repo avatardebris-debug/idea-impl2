@@ -18,13 +18,12 @@ class RedFlagSeverity(str, Enum):
 
     INFO = "info"
     WARNING = "warning"
+    HIGH = "high"
     CRITICAL = "critical"
 
     @classmethod
     def _missing_(cls, value):
-        """Map 'high' to CRITICAL for backward compatibility."""
-        if value == "high":
-            return cls.CRITICAL
+        """Handle unknown values gracefully."""
         return None
 
 

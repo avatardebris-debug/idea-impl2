@@ -6,7 +6,7 @@ Given true probability and odds, calculates the optimal fraction of bankroll to 
 
 from __future__ import annotations
 from .base import Strategy
-from ..engine.market import Market
+from engine.market import Market
 
 
 class KellyStrategy(Strategy):

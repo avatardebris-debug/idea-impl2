@@ -118,7 +118,7 @@ class TestMovieGenerationPipeline:
         assert len(results["characters"]["characters"]) > 0
 
         assert results["script"] is not None
-        assert len(results["script"].scenes) > 0
+        assert len(results["script"]["scenes"]) > 0
 
         assert results["scene_descriptions"] is not None
-        assert len(results["scene_descriptions"].descriptions) > 0
+        assert len(results["scene_descriptions"]["descriptions"]) > 0

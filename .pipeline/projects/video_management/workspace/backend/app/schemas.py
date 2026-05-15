@@ -110,3 +110,61 @@ class TableResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+# ── YouTube schemas ────────────────────────────────────────────
+
+class YouTubeChannelResponse(BaseModel):
+    id: str
+    channel_id: Optional[str]
+    channel_name: Optional[str]
+    channel_avatar: Optional[str]
+    is_connected: bool
+    channel_stats: dict[str, Any]
+    last_sync_at: Optional[datetime]
+    sync_error: Optional[str]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {
+        "from_attributes": True
+    }
+
+
+class SyncResponse(BaseModel):
+    total: int
+    synced: int
+    failed: int
+    last_sync_at: Optional[datetime]
+
+
+class ChannelStatsResponse(BaseModel):
+    subscriber_count: Optional[int]
+    view_count: Optional[int]
+    video_count: Optional[int]
+    hidden_subscriber_count: Optional[bool]
+    last_updated: datetime
+
+
+class SyncStatusResponse(BaseModel):
+    is_connected: bool
+    last_sync_at: Optional[datetime]
+    next_sync_at: Optional[datetime]
+    sync_error: Optional[str]
+    channel_name: Optional[str]
+
+
+class YouTubeUploadRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=100)
+    description: str = ""
+    tags: List[str] = []
+    status: str = "private"
+    publish_at: Optional[datetime] = None
+    thumbnail_url: Optional[str] = None
+
+
+class YouTubeUploadResponse(BaseModel):
+    success: bool
+    youtube_video_id: Optional[str]
+    message: str
+    error: Optional[str] = None

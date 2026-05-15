@@ -37,14 +37,13 @@ class TestModels:
         assert beat.phase == BeatPhase.SETUP
 
     def test_beat_sheet_creation(self):
-        sheet = BeatSheet(title="Test Film", logline="A test logline.", genre="Drama")
-        assert sheet.title == "Test Film"
+        sheet = BeatSheet(logline="A test logline.", genre="Drama")
         assert sheet.logline == "A test logline."
         assert sheet.genre == "Drama"
         assert len(sheet.beats) == 0
 
     def test_beat_sheet_add_beat(self):
-        sheet = BeatSheet(title="Test Film", logline="A test logline.", genre="Drama")
+        sheet = BeatSheet(logline="A test logline.", genre="Drama")
         beat = Beat(beat_name="Setup", beat_number=3, summary="Setup.")
         sheet.add_beat(beat)
         assert len(sheet.beats) == 1
@@ -319,7 +318,7 @@ class TestPipelineIntegration:
         d = project.model_dump()
         assert d["title"] == "Test Film"
         assert "beat_sheet" in d
-        assert "characters" in d
+        assert "character_registry" in d
         assert "script" in d
         assert "scene_descriptions" in d
 

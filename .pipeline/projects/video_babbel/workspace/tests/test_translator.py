@@ -86,15 +86,17 @@ class TestTranslator:
 class TestTranslateGoogle:
     """Tests for the _translate_google method."""
 
-    @patch("video_babbel.translator.GoogleTranslator")
-    def test_translate_google_success(self, mock_translator_class):
+    @patch("video_babbel.translator._get_google_translator")
+    def test_translate_google_success(self, mock_get_translator):
         """_translate_google should return translated text."""
+        mock_translator_class = MagicMock()
         mock_translator = MagicMock()
         mock_translator.detect.return_value = MagicMock(lang="en")
         mock_result = MagicMock()
         mock_result.text = "Hola mundo"
         mock_translator.translate.return_value = mock_result
         mock_translator_class.return_value = mock_translator
+        mock_get_translator.return_value = mock_translator_class
 
         translator = Translator(target_lang="es")
         result = translator._translate_google("Hello world")
@@ -105,7 +107,6 @@ class TestTranslateGoogle:
             "Hello world", src="en", dest="es"
         )
 
-    @patch("video_babbel.translator.GoogleTranslator")
     def test_translate_google_import_error(self):
         """TranslationError should be raised if googletrans is not installed."""
         with patch.dict("sys.modules", {"googletrans": None}):
@@ -117,14 +118,16 @@ class TestTranslateGoogle:
 class TestTranslateDeepL:
     """Tests for the _translate_deepl method."""
 
-    @patch("video_babbel.translator.deepl")
-    def test_translate_deepl_success(self, mock_deepl):
+    @patch("video_babbel.translator._get_deepl")
+    def test_translate_deepl_success(self, mock_get_deepl):
         """_translate_deepl should return translated text."""
+        mock_deepl = MagicMock()
         mock_translator = MagicMock()
         mock_result = MagicMock()
         mock_result.text = "Hola mundo"
         mock_translator.translate_text.return_value = mock_result
         mock_deepl.Translator.return_value = mock_translator
+        mock_get_deepl.return_value = mock_deepl
 
         with patch.dict("os.environ", {"DEEPL_API_KEY": "fake_key"}):
             translator = Translator(target_lang="es", backend="deepL")
@@ -136,16 +139,16 @@ class TestTranslateDeepL:
             "Hello world", source_lang=None, target_lang="es"
         )
 
-    @patch("video_babbel.translator.deepl")
-    def test_translate_deepl_missing_api_key(self, mock_deepl):
+    @patch("video_babbel.translator._get_deepl")
+    def test_translate_deepl_missing_api_key(self, mock_get_deepl):
         """TranslationError should be raised if DEEPL_API_KEY is not set."""
+        mock_get_deepl.return_value = MagicMock()
         with patch.dict("os.environ", {}, clear=True):
             translator = Translator(target_lang="es", backend="deepL")
             with pytest.raises(TranslationError, match="DEEPL_API_KEY environment variable not set"):
                 translator._translate_deepl("Hello world")
 
-    @patch("video_babbel.translator.deepl")
-    def test_translate_deepl_import_error(self, mock_deepl):
+    def test_translate_deepl_import_error(self):
         """TranslationError should be raised if deepl is not installed."""
         with patch.dict("sys.modules", {"deepl": None}):
             translator = Translator(target_lang="es", backend="deepL")

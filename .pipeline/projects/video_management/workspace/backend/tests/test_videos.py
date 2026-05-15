@@ -148,7 +148,7 @@ class TestVideoEndpoints:
             json={
                 "title": "Search Test Video",
                 "description": "For search test",
-                "status": VideoStatus.PUBLISHED,
+                "status": "published",
             },
         )
 
@@ -159,7 +159,7 @@ class TestVideoEndpoints:
         assert any("Search Test Video" in v["title"] for v in data["items"])
 
         # Search by description
-        response = test_client.get("/api/videos?search=description")
+        response = test_client.get("/api/videos?search=test")
         data = response.json()
         assert data["total"] >= 1
 
@@ -169,26 +169,26 @@ class TestVideoEndpoints:
             "/api/videos",
             json={
                 "title": "Draft Video",
-                "status": VideoStatus.DRAFT,
+                "status": "draft",
             },
         )
         test_client.post(
             "/api/videos",
             json={
                 "title": "Published Video",
-                "status": VideoStatus.PUBLISHED,
+                "status": "published",
             },
         )
 
         # Filter by DRAFT
-        response = test_client.get("/api/videos?status=DRAFT")
+        response = test_client.get("/api/videos?status=draft")
         data = response.json()
-        assert all(v["status"] == VideoStatus.DRAFT for v in data["items"])
+        assert all(v["status"] == "draft" for v in data["items"])
 
         # Filter by PUBLISHED
-        response = test_client.get("/api/videos?status=PUBLISHED")
+        response = test_client.get("/api/videos?status=published")
         data = response.json()
-        assert all(v["status"] == VideoStatus.PUBLISHED for v in data["items"])
+        assert all(v["status"] == "published" for v in data["items"])
 
     def test_list_videos_with_tags_filter(self, sample_table, test_client):
         """Test listing videos with tags filter."""

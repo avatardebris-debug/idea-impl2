@@ -19,6 +19,12 @@ class OpportunityEngine:
     industry alignment, and budget compatibility.
     """
 
+    # Class-level store so opportunities persist across instances
+    _store: dict[str, Opportunity] = {}
+
+    def __init__(self):
+        self._opportunities = OpportunityEngine._store
+
     def create_opportunity(
         self,
         offering: ServiceOffering,
@@ -32,7 +38,7 @@ class OpportunityEngine:
 
         opportunity_id = f"OPP-{uuid.uuid4().hex[:8].upper()}"
 
-        return Opportunity(
+        opp = Opportunity(
             opportunity_id=opportunity_id,
             client_name=client.name,
             client_email=client.email,
@@ -46,6 +52,26 @@ class OpportunityEngine:
                 "client_budget_range": client.budget_range,
             },
         )
+        self._opportunities[opportunity_id] = opp
+        return opp
+
+    def get_opportunity(self, opportunity_id: str) -> Opportunity | None:
+        """Retrieve an opportunity by ID."""
+        return self._opportunities.get(opportunity_id)
+
+    def list_opportunities(self) -> list[Opportunity]:
+        """List all tracked opportunities."""
+        return list(self._opportunities.values())
+
+    def delete_opportunity(self, opportunity_id: str) -> None:
+        """Delete an opportunity by ID."""
+        self._opportunities.pop(opportunity_id, None)
+
+    def update_stage(self, opportunity: Opportunity, stage: OpportunityStage) -> None:
+        """Update the stage of an opportunity."""
+        if not isinstance(stage, OpportunityStage):
+            raise ValueError(f"Invalid stage: {stage}")
+        opportunity.update_stage(stage)
 
     def create_opportunities_from_clients(
         self,

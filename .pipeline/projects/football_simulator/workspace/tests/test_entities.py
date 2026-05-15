@@ -301,3 +301,4 @@ class TestFormation:
         r = repr(f)
         assert "test" in r
         assert "20.0" in r
+

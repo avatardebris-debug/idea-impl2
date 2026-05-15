@@ -34,6 +34,7 @@ class Review(Base):
     source_url = Column(String, nullable=True)
     sentiment_score = Column(Float, nullable=True)
     sentiment_label = Column(String, nullable=True)
+    sentiment_feedback = Column(String, nullable=True)
     review_hash = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)

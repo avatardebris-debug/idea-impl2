@@ -86,7 +86,7 @@ class TestTicketSerialization:
         t = Ticket.from_dict(data)
         assert t.ticket_id == "T1"
         assert t.source == TicketSource.JSON
-        assert t.category == "billing"
+        assert t.category.value == "billing"
         assert t.urgency == Urgency.HIGH
         assert t.priority_score == 7
         assert t.assigned_team == "billing_team"

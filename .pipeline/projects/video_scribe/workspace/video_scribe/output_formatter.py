@@ -139,3 +139,60 @@ class ProgressIndicator:
 
     def finish(self) -> None:
         print()  # Newline after progress
+
+def format_multi_scene_fountain(
+    scenes: List[Dict[str, Any]],
+    title: str = "Video Analysis",
+    duration: float = 0.0,
+) -> str:
+    """Format multi-scene analysis as Fountain screenplay syntax."""
+    lines = []
+    lines.append(f"Title: {title}")
+    lines.append("Author: Video Scribe")
+    lines.append(f"Notes: Duration {duration:.2f}s")
+    lines.append("\n====\n")
+    
+    for i, scene in enumerate(scenes, 1):
+        start = scene.get('start_time', 0)
+        end = scene.get('end_time', 0)
+        lines.append(f"EXT. SCENE {i} - DAY")
+        lines.append(f"[{start:.2f}s - {end:.2f}s]")
+        lines.append("")
+        lines.append(scene.get("content_summary", ""))
+        lines.append("")
+        camera = scene.get("camera_notes", "N/A")
+        lines.append(f"[[Camera: {camera}]]")
+        lighting = scene.get("lighting_color_notes", "N/A")
+        lines.append(f"[[Lighting: {lighting}]]")
+        lines.append("")
+        if scene.get("transition_to_next"):
+            lines.append(f"> {scene.get('transition_to_next').upper()} TO:")
+            lines.append("")
+            
+    return "\n".join(lines)
+
+def format_multi_scene_html(
+    scenes: List[Dict[str, Any]],
+    title: str = "Video Analysis",
+    duration: float = 0.0,
+) -> str:
+    """Format multi-scene analysis as basic HTML."""
+    html = [f"<html><head><title>{title}</title></head><body>"]
+    html.append(f"<h1>Video Scribe Analysis: {title}</h1>")
+    html.append(f"<p><b>Total Duration:</b> {duration:.2f}s</p>")
+    
+    for i, scene in enumerate(scenes, 1):
+        start = scene.get('start_time', 0)
+        end = scene.get('end_time', 0)
+        html.append(f"<h3>Scene {i} — {start:.2f}s to {end:.2f}s</h3>")
+        html.append(f"<p><b>Content:</b> {scene.get('content_summary', '')}</p>")
+        camera = scene.get("camera_notes", "N/A")
+        html.append(f"<p><b>Camera Notes:</b> {camera}</p>")
+        lighting = scene.get("lighting_color_notes", "N/A")
+        html.append(f"<p><b>Lighting:</b> {lighting}</p>")
+        if scene.get("transition_to_next"):
+            html.append(f"<p><b>Transition to next scene:</b> {scene.get('transition_to_next')}</p>")
+            
+    html.append("</body></html>")
+    return "\n".join(html)
+

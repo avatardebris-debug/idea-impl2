@@ -136,7 +136,7 @@ class TestFullPipelineFlow:
         # Verify all components were called in the right order
         mock_ingestor_cls.assert_called_once_with("/fake/video.mp4")
         mock_transcriber_cls.assert_called_once_with("base")
-        mock_translator_cls.assert_called_once_with("es")
+        mock_translator_cls.assert_called_once_with("es", backend="google")
         mock_summarizer_cls.assert_called_once_with(5)
         mock_qa_cls.assert_called_once()
 
@@ -186,7 +186,7 @@ class TestFullPipelineFlow:
 
         assert result["translation"] == "Test FR"
         mock_transcriber_cls.assert_called_once_with("small")
-        mock_translator_cls.assert_called_once_with("fr")
+        mock_translator_cls.assert_called_once_with("fr", backend="deepL")
         mock_summarizer_cls.assert_called_once_with(10)
 
 
@@ -201,7 +201,7 @@ class TestErrorPropagation:
     def test_ingestion_error(self, mock_ingestor):
         mock_ingestor.side_effect = IngestionError("ingest failed")
         pipeline = VideoBabbel()
-        with pytest.raises(VideoBabbelError, match="Ingestion failed"):
+        with pytest.raises(VideoBabbelError, match="ingest failed"):
             pipeline.process("/fake/video.mp4")
 
     @patch("video_babbel.pipeline.VideoIngestor")
@@ -212,7 +212,7 @@ class TestErrorPropagation:
         mock_ingestor.return_value = mock_ingestor_instance
         mock_transcriber.side_effect = TranscriptionError("transcribe failed")
         pipeline = VideoBabbel()
-        with pytest.raises(VideoBabbelError, match="Transcription failed"):
+        with pytest.raises(VideoBabbelError, match="transcribe failed"):
             pipeline.process("/fake/video.mp4")
 
     @patch("video_babbel.pipeline.VideoIngestor")
@@ -227,7 +227,7 @@ class TestErrorPropagation:
         mock_transcriber.return_value = mock_transcriber_instance
         mock_translator.side_effect = TranslationError("translate failed")
         pipeline = VideoBabbel()
-        with pytest.raises(VideoBabbelError, match="Translation failed"):
+        with pytest.raises(VideoBabbelError, match="translate failed"):
             pipeline.process("/fake/video.mp4")
 
     @patch("video_babbel.pipeline.VideoIngestor")
@@ -246,7 +246,7 @@ class TestErrorPropagation:
         mock_translator.return_value = mock_translator_instance
         mock_summarizer.side_effect = SummarizationError("summarize failed")
         pipeline = VideoBabbel()
-        with pytest.raises(VideoBabbelError, match="Summarization failed"):
+        with pytest.raises(VideoBabbelError, match="summarize failed"):
             pipeline.process("/fake/video.mp4")
 
     @patch("video_babbel.pipeline.VideoIngestor")
@@ -269,7 +269,7 @@ class TestErrorPropagation:
         mock_summarizer.return_value = mock_summarizer_instance
         mock_qa.side_effect = QAError("qa failed")
         pipeline = VideoBabbel()
-        with pytest.raises(VideoBabbelError, match="Q&A failed"):
+        with pytest.raises(VideoBabbelError, match="qa failed"):
             pipeline.process("/fake/video.mp4")
 
 
@@ -284,8 +284,8 @@ class TestQAEngine:
         """QA engine answer should return a string."""
         from video_babbel.pipeline import QAEngine
 
-        qa = QAEngine(transcript=[{"text": "Hello world", "start": 0.0, "end": 1.0}])
-        answer = qa.answer("What is the topic?")
+        qa = QAEngine(segments=[{"text": "Hello world", "start": 0.0, "end": 1.0}])
+        answer = qa.answer("Hello?")
         assert isinstance(answer, str)
         assert len(answer) > 0
 
@@ -293,7 +293,7 @@ class TestQAEngine:
         """QA engine should handle empty transcript gracefully."""
         from video_babbel.pipeline import QAEngine
 
-        qa = QAEngine(transcript=[])
+        qa = QAEngine(segments=[])
         answer = qa.answer("What is the topic?")
         assert isinstance(answer, str)
 

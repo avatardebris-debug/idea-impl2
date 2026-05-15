@@ -67,7 +67,9 @@ class SimulationResult:
             "worst_case_99": self.worst_case_99,
             "best_case_95": self.best_case_95,
             "best_case_99": self.best_case_99,
+            "expected_return": self.expected_return,
             "expected_return_pct": self.expected_return * 100,
+            "confidence_intervals": self.confidence_intervals,
             "n_iterations": self.n_iterations,
             "time_horizon": self.time_horizon,
         }

@@ -27,7 +27,7 @@ class SentimentAnalyzer:
             - sentiment_label: One of 'positive', 'neutral', 'negative'.
         """
         if not text:
-            return None, None
+            return 0.0, "neutral"
 
         # Simple keyword-based sentiment for now
         # In production, this would use a proper NLP model
@@ -74,3 +74,9 @@ class SentimentAnalyzer:
             List of (sentiment_score, sentiment_label) tuples.
         """
         return [self.analyze(text) for text in texts]
+
+
+def analyze_sentiment(text: Optional[str]) -> dict[str, Any]:
+    """Analyze sentiment of the given text using SentimentAnalyzer."""
+    score, label = SentimentAnalyzer().analyze(text)
+    return {"compound": score, "label": label}

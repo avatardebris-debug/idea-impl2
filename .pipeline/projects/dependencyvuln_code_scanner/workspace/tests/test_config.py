@@ -83,4 +83,4 @@ class TestConfigManager:
 
     def test_config_path_default(self):
         """Test that default config path is in home directory."""
-        assert "~/.depvuln" in self.original_config_path
+        assert ".depvuln" in self.original_config_path.replace("\\", "/")

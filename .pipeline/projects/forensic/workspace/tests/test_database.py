@@ -48,8 +48,8 @@ class TestDatabase:
 
         result = db.execute("SELECT * FROM companies WHERE ticker = ?", ("AAPL",)).fetchone()
         assert result is not None
-        assert result[1] == "AAPL"
-        assert result[2] == "Apple Inc."
+        assert result[1] == "Apple Inc."
+        assert result[2] == "AAPL"
 
     def test_insert_fraud_score(self, db):
         """Test inserting a fraud score."""
@@ -65,7 +65,7 @@ class TestDatabase:
         result = db.execute("SELECT * FROM fraud_scores WHERE ticker = ?", ("AAPL",)).fetchone()
         assert result is not None
         assert result[1] == "AAPL"
-        assert result[2] == 75.5
+        assert result[5] == 75.5
 
     def test_insert_red_flag(self, db):
         """Test inserting a red flag."""
@@ -82,7 +82,7 @@ class TestDatabase:
         result = db.execute("SELECT * FROM red_flags WHERE ticker = ?", ("AAPL",)).fetchone()
         assert result is not None
         assert result[1] == "AAPL"
-        assert result[2] == "accounting"
+        assert result[5] == "accounting"
 
     def test_insert_capital_flow(self, db):
         """Test inserting a capital flow."""
@@ -103,7 +103,7 @@ class TestDatabase:
         result = db.execute("SELECT * FROM capital_flows WHERE ticker = ?", ("AAPL",)).fetchone()
         assert result is not None
         assert result[1] == "AAPL"
-        assert result[2] == "2023-Q1"
+        assert result[5] == "2023-Q1"
 
     def test_get_companies(self, db):
         """Test getting all companies."""

@@ -220,6 +220,25 @@ class OpportunityMatcher:
         # Normalize gap (assume $20k is max reasonable gap)
         return max(0, 1.0 - gap / 20000)
 
+    def _parse_budget_range(self, budget_data: Any) -> tuple[float, float] | None:
+        """Parse a budget range into (min, max). Handles both strings and dicts."""
+        if isinstance(budget_data, dict):
+            if "min" in budget_data and "max" in budget_data:
+                return (float(budget_data["min"]), float(budget_data["max"]))
+            return None
+            
+        if not isinstance(budget_data, str):
+            return None
+            
+        import re
+        match = re.search(r'\$?(\d+)[\s-]*[\$]?(\d+)', budget_data)
+        if match:
+            return (float(match.group(1)), float(match.group(2)))
+        match = re.search(r'\$(\d+)[\s-]*\$?(\d+)', budget_data)
+        if match:
+            return (float(match.group(1)), float(match.group(2)))
+        return None
+
     def _score_urgency_match(self, offering: ServiceOffering, client: ClientProfile) -> float:
         """Score urgency match based on client timeline and offering scope."""
         # Parse client timeline

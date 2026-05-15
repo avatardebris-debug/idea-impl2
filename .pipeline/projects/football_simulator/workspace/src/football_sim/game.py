@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Tuple, Dict, Any
 
 from .config import Config
-from .field import Field
+from .football_field import Field
 from .entities import Player, Formation
 from .formation import create_formation
 from .ball import Ball
@@ -140,7 +140,7 @@ class Game:
     game_id: str = "game_1"
     home_team: Optional[Team] = None
     away_team: Optional[Team] = None
-    field: Field = field(default_factory=Field)
+    football_field: Field = field(default_factory=Field)
     ball: Ball = field(default_factory=Ball)
     current_down: Down = Down.FIRST
     yards_to_go: float = 10.0
@@ -224,7 +224,7 @@ class Game:
             ),
             formation=self.away_team.formation,
             ball=self.ball,
-            field=self.field,
+            field=self.football_field,
         )
         kickoff_play.start(
             play_call=PlayCall(
@@ -289,7 +289,7 @@ class Game:
             down=self.current_down,
             yards_to_go=self.yards_to_go,
             line_of_scrimmage=self.line_of_scrimmage,
-            field=self.field,
+            field=self.football_field,
         )
 
         # Set up the play
@@ -297,7 +297,7 @@ class Game:
             self.current_play = Play(
                 play_id=f"play_{len(self.play_history) + 1}",
                 ball=self.ball,
-                field=self.field,
+                field=self.football_field,
             )
 
         # Create formation for the play
@@ -358,7 +358,7 @@ class Game:
         is_first_down = self.line_of_scrimmage + yards_gained >= self.first_down_line
 
         # Determine if it's a touchdown
-        is_touchdown = self.line_of_scrimmage + yards_gained >= self.field.end_zone_start
+        is_touchdown = self.line_of_scrimmage + yards_gained >= self.football_field.end_zone_start
 
         # Determine if it's a turnover
         is_turnover = result.get("result") in ("fumble", "interception")
@@ -586,3 +586,4 @@ class Game:
             f"score={self.away_team.score}-{self.home_team.score}, "
             f"status={status})"
         )
+

@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import enum
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field as dc_field
 from typing import List, Optional, Tuple, Dict, Any
 
 from .entities import Player, Formation
 from .ball import Ball
-from .field import Field
+from .football_field import Field
 
 
 class PlayType(enum.Enum):
@@ -212,9 +212,9 @@ class PlayCall:
     """
     play_type: PlayType
     run_path: Optional[RunPath] = None
-    routes: Dict[str, Route] = field(default_factory=dict)
+    routes: Dict[str, Route] = dc_field(default_factory=dict)
     qb_drop: float = 5.0
-    protection: List[str] = field(default_factory=list)
+    protection: List[str] = dc_field(default_factory=list)
     snap_type: str = "shotgun"
     formation: str = "i_formation"
 
@@ -243,8 +243,8 @@ class Play:
     is_running: bool = False
     is_complete: bool = False
     play_result: Optional[Dict[str, Any]] = None
-    play_stats: Dict[str, Any] = field(default_factory=dict)
-    timeline: List[Tuple[float, str]] = field(default_factory=list)
+    play_stats: Dict[str, Any] = dc_field(default_factory=dict)
+    timeline: List[Tuple[float, str]] = dc_field(default_factory=list)
 
     def __post_init__(self):
         if self.ball is None:
@@ -456,3 +456,4 @@ class Play:
             else:
                 status = "complete"
         return f"Play(id={self.play_id}, status={status})"
+

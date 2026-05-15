@@ -2,59 +2,59 @@
   "metrics": [
     {
       "concept_id": "concept_1",
-      "total_attempts": 2104,
-      "successful_attempts": 1326,
-      "average_score": 71.79895437262363,
-      "time_spent_minutes": 40720.0,
-      "last_attempt_date": "2026-04-30T22:39:19.710924",
+      "total_attempts": 2109,
+      "successful_attempts": 1331,
+      "average_score": 71.84921763869137,
+      "time_spent_minutes": 40790.0,
+      "last_attempt_date": "2026-05-13T20:48:41.147554",
       "performance_trend": [
-        80,
-        90,
-        50,
-        50,
-        85
+        85.0,
+        95.0,
+        95.0,
+        95.0,
+        95.0
       ],
       "difficulty_rating": 5.0
     },
     {
       "concept_id": "concept_2",
-      "total_attempts": 554,
-      "successful_attempts": 554,
-      "average_score": 82.92418772563181,
-      "time_spent_minutes": 13260.0,
-      "last_attempt_date": "2026-04-30T22:39:19.601154",
+      "total_attempts": 557,
+      "successful_attempts": 557,
+      "average_score": 82.8994614003591,
+      "time_spent_minutes": 13320.0,
+      "last_attempt_date": "2026-05-13T20:48:36.368510",
       "performance_trend": [
+        90,
+        90,
         70.0,
         80.0,
-        85.0,
-        90,
-        90
+        85.0
       ],
       "difficulty_rating": 0.0
     },
     {
       "concept_id": "concept_3",
-      "total_attempts": 1005,
-      "successful_attempts": 1005,
-      "average_score": 76.68656716417907,
-      "time_spent_minutes": 12230.0,
-      "last_attempt_date": "2026-04-30T22:39:19.651954",
+      "total_attempts": 1013,
+      "successful_attempts": 1013,
+      "average_score": 76.69299111549847,
+      "time_spent_minutes": 12310.0,
+      "last_attempt_date": "2026-05-13T20:48:37.129287",
       "performance_trend": [
+        75,
         80,
         85,
         90,
-        95,
-        70
+        95
       ],
       "difficulty_rating": 0.0
     },
     {
       "concept_id": "concept_4",
-      "total_attempts": 112,
-      "successful_attempts": 112,
+      "total_attempts": 113,
+      "successful_attempts": 113,
       "average_score": 75.0,
-      "time_spent_minutes": 2240.0,
-      "last_attempt_date": "2026-04-30T22:39:13.703455",
+      "time_spent_minutes": 2260.0,
+      "last_attempt_date": "2026-05-13T20:48:37.262808",
       "performance_trend": [
         75.0,
         75.0,
@@ -66,11 +66,11 @@
     },
     {
       "concept_id": "excellent_concept",
-      "total_attempts": 1120,
-      "successful_attempts": 1120,
+      "total_attempts": 1130,
+      "successful_attempts": 1130,
       "average_score": 95.0,
-      "time_spent_minutes": 11200.0,
-      "last_attempt_date": "2026-04-30T22:39:15.388989",
+      "time_spent_minutes": 11300.0,
+      "last_attempt_date": "2026-05-13T20:48:40.215191",
       "performance_trend": [
         95.0,
         95.0,
@@ -82,11 +82,11 @@
     },
     {
       "concept_id": "good_concept",
-      "total_attempts": 560,
-      "successful_attempts": 560,
+      "total_attempts": 565,
+      "successful_attempts": 565,
       "average_score": 80.0,
-      "time_spent_minutes": 5600.0,
-      "last_attempt_date": "2026-04-30T22:39:14.269583",
+      "time_spent_minutes": 5650.0,
+      "last_attempt_date": "2026-05-13T20:48:38.246878",
       "performance_trend": [
         80.0,
         80.0,
@@ -98,11 +98,11 @@
     },
     {
       "concept_id": "average_concept",
-      "total_attempts": 560,
-      "successful_attempts": 560,
+      "total_attempts": 565,
+      "successful_attempts": 565,
       "average_score": 70.0,
-      "time_spent_minutes": 5600.0,
-      "last_attempt_date": "2026-04-30T22:39:14.541405",
+      "time_spent_minutes": 5650.0,
+      "last_attempt_date": "2026-05-13T20:48:38.738006",
       "performance_trend": [
         70.0,
         70.0,
@@ -114,11 +114,11 @@
     },
     {
       "concept_id": "needs_improvement_concept",
-      "total_attempts": 1120,
+      "total_attempts": 1130,
       "successful_attempts": 0,
       "average_score": 45.0,
-      "time_spent_minutes": 11200.0,
-      "last_attempt_date": "2026-04-30T22:39:15.677050",
+      "time_spent_minutes": 11300.0,
+      "last_attempt_date": "2026-05-13T20:48:40.696539",
       "performance_trend": [
         45.0,
         45.0,
@@ -130,11 +130,11 @@
     },
     {
       "concept_id": "struggling_concept",
-      "total_attempts": 560,
+      "total_attempts": 565,
       "successful_attempts": 0,
       "average_score": 30.0,
-      "time_spent_minutes": 5600.0,
-      "last_attempt_date": "2026-04-30T22:39:15.088714",
+      "time_spent_minutes": 5650.0,
+      "last_attempt_date": "2026-05-13T20:48:39.716058",
       "performance_trend": [
         30.0,
         30.0,

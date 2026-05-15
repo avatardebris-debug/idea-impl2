@@ -1,0 +1,8 @@
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\drop_servicing_tool\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\financial_document_analyzer\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\sec_importer\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\supportagent_workflow_builder\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\tim_ferriss_learning_tool\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\transcript_extractor\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\video_ingestor_summary\workspace\requirements.txt"
+-r "c:\Users\avata\aicompete\idea impl\.pipeline\projects\chronovision2\workspace\requirements.txt"

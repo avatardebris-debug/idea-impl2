@@ -130,9 +130,10 @@ class TestDatabase:
             tmp_db.get_book_ranking("invalid")
 
     def test_get_book_engagement(self, tmp_db):
-        # demographics_data doesn't have book_title, so returns empty
+        # Current implementation uses sales_data as a proxy
         engagement = tmp_db.get_book_engagement()
-        assert engagement == []
+        assert len(engagement) == 2
+        assert engagement[0]["book_title"] == "Book A"
 
     def test_insert_empty_records(self, tmp_db):
         count = tmp_db.insert_records("sales_data", [])
@@ -226,7 +227,7 @@ class TestBookComparator:
         comparison = comparator.compare_books(("Book A", "Book B"))
         assert "Book A" in comparison
         assert "Book B" in comparison
-        assert "Revenue" in comparison
+        assert "Revenue" in comparison["Book A"]
 
 
 class TestReportGenerator:
@@ -238,8 +239,8 @@ class TestReportGenerator:
         assert os.path.exists(path)
         with open(path) as f:
             content = f.read()
-            assert "date" in content
-            assert "book_title" in content
+            assert "total_units" in content
+            assert "total_revenue" in content
         os.unlink(path)
 
     def test_export_demographics(self, tmp_db):

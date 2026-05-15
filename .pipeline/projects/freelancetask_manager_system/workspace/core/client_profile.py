@@ -19,9 +19,13 @@ class ClientProfile:
     email: str
     company: str = ""
     industry: str = ""
-    budget_range: dict[str, float] = field(default_factory=lambda: {"min": 0, "max": 100000})
+    budget_range: Any = field(default_factory=lambda: {"min": 0, "max": 100000})
     preferences: dict[str, Any] = field(default_factory=dict)
     history: list[dict[str, Any]] = field(default_factory=list)
+    needs: list[str] = field(default_factory=list)
+    pain_points: list[str] = field(default_factory=list)
+    goals: list[str] = field(default_factory=list)
+    timeline: str = ""
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""

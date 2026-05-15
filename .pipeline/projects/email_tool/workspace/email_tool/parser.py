@@ -304,10 +304,17 @@ class EmailParser:
         Returns:
             Email object if parsing succeeds, None otherwise.
         """
-        if isinstance(source, (str, Path)):
-            return self.parse_file(source)
-        else:
+        if isinstance(source, bytes):
             return self.parse_content(source)
+        elif isinstance(source, str):
+            # If the string contains newlines it's email content, not a path
+            if '\n' in source:
+                return self.parse_content(source)
+            else:
+                return self.parse_file(source)
+        else:
+            # Path object
+            return self.parse_file(source)
     
     @staticmethod
     def parse_file(filepath: str | Path) -> Optional[Email]:

@@ -3827,6 +3827,39 @@
       "status": "active",
       "created_date": "2026-04-30T22:39:19.094542",
       "triggered_date": null
+    },
+    {
+      "penalty_id": "penalty_349",
+      "goal_id": "goal_1",
+      "amount": 100.0,
+      "currency": "USD",
+      "trigger_condition": "Not completing learning goal by deadline",
+      "payout_recipient": "charity",
+      "status": "active",
+      "created_date": "2026-05-13T20:53:51.416259",
+      "triggered_date": null
+    },
+    {
+      "penalty_id": "penalty_350",
+      "goal_id": "goal_1",
+      "amount": 100.0,
+      "currency": "USD",
+      "trigger_condition": "Not completing learning goal by deadline",
+      "payout_recipient": "charity",
+      "status": "active",
+      "created_date": "2026-05-13T20:53:51.706467",
+      "triggered_date": null
+    },
+    {
+      "penalty_id": "penalty_351",
+      "goal_id": "goal_1",
+      "amount": 100.0,
+      "currency": "USD",
+      "trigger_condition": "Not completing learning goal by deadline",
+      "payout_recipient": "charity",
+      "status": "active",
+      "created_date": "2026-05-13T20:53:51.884465",
+      "triggered_date": null
     }
   ]
 }

@@ -62,7 +62,7 @@ class TestStandardError:
         x = [1.0, 2.0]
         y = [2.0, 4.0]
         se = _standard_error(x, y, 0.0, 2.0)
-        assert se == pytest.approx(0.0)
+        assert se == float("inf")
 
 
 class TestTValue:

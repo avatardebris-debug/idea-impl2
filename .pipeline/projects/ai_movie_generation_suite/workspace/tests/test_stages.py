@@ -23,7 +23,7 @@ class TestBeatGenerator:
         )
         beatsheet = generator.generate_beat_sheet()
         assert beatsheet is not None
-        assert beatsheet.title == "Untitled"
+        assert beatsheet.logline == "A hero saves the world."
         assert len(beatsheet.beats) > 0
         # Verify beats are in order
         phases = [b.phase for b in beatsheet.beats]
@@ -71,21 +71,21 @@ class TestCharacterGenerator:
         for char in registry.characters:
             assert char.name
             assert char.role
-            assert char.motivation
+            assert char.backstory  # motivation is stored in backstory
 
 
 class TestScriptWriter:
     def test_write_script(self):
         beat_sheet = BeatSheet(
-            title="Test Story",
             logline="A hero saves the world.",
             genre="action",
         )
         beat_sheet.add_beat(
             pytest.importorskip("ai_movie_gen_suite.models").Beat(
+                beat_name="Test Beat",
+                beat_number=1,
+                summary="A test beat.",
                 phase=BeatPhase.SETUP,
-                title="Test Beat",
-                description="Test description",
             )
         )
         character_registry = CharacterRegistry()
@@ -93,7 +93,7 @@ class TestScriptWriter:
             pytest.importorskip("ai_movie_gen_suite.models").Character(
                 name="Hero",
                 role=CharacterRole.PROTAGONIST,
-                motivation="Save the world",
+                backstory="Wants to save the world",
             )
         )
 
@@ -111,15 +111,15 @@ class TestScriptWriter:
 
     def test_script_has_scenes(self):
         beat_sheet = BeatSheet(
-            title="Test Story",
             logline="A hero saves the world.",
             genre="action",
         )
         beat_sheet.add_beat(
             pytest.importorskip("ai_movie_gen_suite.models").Beat(
+                beat_name="Test Beat",
+                beat_number=1,
+                summary="A test beat.",
                 phase=BeatPhase.SETUP,
-                title="Test Beat",
-                description="Test description",
             )
         )
         character_registry = CharacterRegistry()
@@ -127,7 +127,7 @@ class TestScriptWriter:
             pytest.importorskip("ai_movie_gen_suite.models").Character(
                 name="Hero",
                 role=CharacterRole.PROTAGONIST,
-                motivation="Save the world",
+                backstory="Wants to save the world",
             )
         )
 
@@ -159,7 +159,6 @@ class TestSceneDescriptionEngine:
         )
 
         beat_sheet = BeatSheet(
-            title="Test Story",
             logline="A hero saves the world.",
             genre="action",
         )
@@ -168,7 +167,7 @@ class TestSceneDescriptionEngine:
             pytest.importorskip("ai_movie_gen_suite.models").Character(
                 name="Hero",
                 role=CharacterRole.PROTAGONIST,
-                motivation="Save the world",
+                backstory="Wants to save the world",
             )
         )
 
@@ -196,7 +195,6 @@ class TestSceneDescriptionEngine:
         )
 
         beat_sheet = BeatSheet(
-            title="Test Story",
             logline="A hero saves the world.",
             genre="action",
         )
@@ -205,7 +203,7 @@ class TestSceneDescriptionEngine:
             pytest.importorskip("ai_movie_gen_suite.models").Character(
                 name="Hero",
                 role=CharacterRole.PROTAGONIST,
-                motivation="Save the world",
+                backstory="Wants to save the world",
             )
         )
 

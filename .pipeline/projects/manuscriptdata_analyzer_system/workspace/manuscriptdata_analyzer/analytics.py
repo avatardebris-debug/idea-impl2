@@ -26,7 +26,7 @@ class TrendAnalyzer:
     ) -> dict[str, Any]:
         """Analyse sales trend for *book_title*.
 
-        Returns a dict with keys ``daily_series``, ``spikes``, ``drops``.
+        Returns a dict with keys ``book_title``, ``daily_sales``, ``spikes``, ``drops``.
         """
         series = self.db.get_book_sales_series(book_title)
         if not series:
@@ -64,7 +64,9 @@ class TrendAnalyzer:
                 })
 
         return {
-            "daily_series": series,
+            "book_title": book_title,
+            "daily_sales": series,
+            "rolling_avg": round(sum(values) / len(values), 2) if values else 0,
             "spikes": spikes,
             "drops": drops,
         }
@@ -196,9 +198,9 @@ class ReportGenerator:
         if trends:
             for t in trends:
                 lines.append(f"  Book: {t['book_title']}")
-                if t["daily_series"]:
+                if t["daily_sales"]:
                     lines.append(f"    Daily Series:")
-                    for entry in t["daily_series"]:
+                    for entry in t["daily_sales"]:
                         lines.append(
                             f"      {entry['date']}: {entry['units_sold']} units"
                         )

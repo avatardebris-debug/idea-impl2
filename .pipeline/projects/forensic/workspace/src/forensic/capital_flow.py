@@ -50,7 +50,7 @@ class CapitalFlowReport:
     debt_trend: str = "unknown"
     dividend_trend: str = "unknown"
     repurchase_trend: str = "unknown"
-    cash_flow_quality: str = "unknown"
+    cash_flow_quality: str = "insufficient data"
     summary: str = ""
 
 
@@ -126,15 +126,22 @@ _CASH_FLOW_ALIASES = {
     ],
 }
 
-# Regex to pull a dollar amount (with optional commas and decimals)
-_DOLLAR_RE = re.compile(r"\$?([\d,]+(?:\.\d+)?)")
+# Regex to pull a dollar amount (with optional commas and decimals), supporting negative values like $(100) or -$100
+_DOLLAR_RE = re.compile(r"(-?\$?\s*\(?\s*\$?[\d,]+(?:\.\d+)?\)?|-?[\d,]+(?:\.\d+)?)")
 
 
 def _extract_dollar_amount(text: str) -> Optional[float]:
     """Return the first dollar amount found in *text*, or None."""
-    match = _DOLLAR_RE.search(text)
+    # Find the first number-like string
+    match = re.search(r"(-?\$?\s*\(?\s*\$?[\d,]+(?:\.\d+)?\)?|-?[\d,]+(?:\.\d+)?)", text)
     if match:
-        return float(match.group(1).replace(",", ""))
+        raw = match.group(1).replace(",", "").replace("$", "").replace(" ", "")
+        if "(" in raw and ")" in raw:
+            raw = "-" + raw.replace("(", "").replace(")", "")
+        try:
+            return float(raw)
+        except ValueError:
+            return None
     return None
 
 
@@ -149,9 +156,9 @@ def _find_section(text: str, section_name: str) -> str:
         m = re.search(pat, text, re.IGNORECASE | re.MULTILINE)
         if m:
             start = m.start()
-            # Grab until the next section heading or end of text
+            # Grab until the next major section heading or end of text
             next_section = re.search(
-                r"(?:^|\n)\s*(?:\d+\.\s+)?[A-Z][A-Za-z\s]+[:.\n]",
+                r"(?:^|\n)\s*(?:Item\s+\d+\.?\s+|[IVX]+\.\s+)[A-Z][A-Za-z\s]+[:.\n]",
                 text[start + 10:],
                 re.MULTILINE,
             )
@@ -210,25 +217,50 @@ def extract_cash_flow_periods(
     # If still nothing, treat the whole section as one period
     if not period_labels:
         period_labels = ["Unknown"]
+        
+    period_indices = []
+    for label in period_labels:
+        idx = cf_section.find(label)
+        if idx != -1:
+            period_indices.append((idx, label))
+    period_indices.sort()
 
     periods: List[CashFlowPeriod] = []
     for label in period_labels:
         period = CashFlowPeriod(period_label=f"FY{label}" if label.isdigit() else label)
+        
+        start_idx = 0
+        for idx, lbl in period_indices:
+            if lbl == label:
+                start_idx = idx
+                break
+                
+        end_idx = len(cf_section)
+        for idx, lbl in period_indices:
+            if idx > start_idx:
+                end_idx = idx
+                break
+                
+        chunk = cf_section[start_idx:end_idx] if period_indices else cf_section
+        
         # Extract each line item
         for key, aliases in _CASH_FLOW_ALIASES.items():
             for alias in aliases:
                 # Search within the period's portion of the text
-                # (simplified: search the whole cf_section for now)
-                for m in re.finditer(alias, cf_section, re.IGNORECASE):
+                for m in re.finditer(alias, chunk, re.IGNORECASE):
                     # Look at a window around the match
-                    start = max(0, m.start() - 200)
-                    end = min(len(cf_section), m.end() + 200)
-                    window = cf_section[start:end]
+                    start = m.end()
+                    end = min(len(chunk), m.end() + 100)
+                    window = chunk[start:end]
                     val = _extract_dollar_amount(window)
                     if val is not None:
-                        # Preserve sign for cash flow items (direction matters)
+                        # Some items are strictly magnitudes (absolute values)
+                        if key in ("capital_expenditures", "debt_repayment", "dividends_paid", "share_repurchases", "depreciation_amortization"):
+                            val = abs(val)
                         setattr(period, key, val)
                         break  # first match wins
+                if getattr(period, key) != 0.0:
+                    break
 
         # Derive net change in cash if not present
         period.net_change_in_cash = (

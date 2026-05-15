@@ -17,6 +17,7 @@ Optional columns:
 
 import csv
 import os
+import sys
 from typing import Any, Dict, List
 
 
@@ -43,11 +44,18 @@ class Importer:
             FileNotFoundError: If the file does not exist.
             ValueError: If required columns are missing or data is invalid.
         """
+        if filepath == "-":
+            return Importer._parse_file_obj(sys.stdin)
+
         if not os.path.isfile(filepath):
             raise FileNotFoundError(f"Manifest file not found: {filepath}")
 
         with open(filepath, newline="", encoding="utf-8") as fh:
-            content = fh.read()
+            return Importer._parse_file_obj(fh)
+
+    @staticmethod
+    def _parse_file_obj(fh) -> List[Dict[str, Any]]:
+        content = fh.read()
 
         if not content.strip():
             return []
@@ -72,8 +80,12 @@ class Importer:
         for row_num, row in enumerate(reader, start=2):
             shipment = _parse_row(row, normalized, row_num)
             shipments.append(shipment)
-
         return shipments
+
+    @staticmethod
+    def import_csv(filepath: str) -> List[Dict[str, Any]]:
+        """Alias for load_manifest to match test suite expectations."""
+        return Importer.load_manifest(filepath)
 
 
 def _parse_row(

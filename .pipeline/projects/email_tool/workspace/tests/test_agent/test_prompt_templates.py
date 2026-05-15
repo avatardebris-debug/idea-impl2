@@ -454,7 +454,7 @@ class TestPromptTemplates:
         custom_prompt = "Custom prompt for summarization"
         
         prompt = templates.get_summarization_prompt(
-            emails=[],
+            emails=[{"id": "1"}],
             rules=[],
             matches=[],
             few_shot=False,

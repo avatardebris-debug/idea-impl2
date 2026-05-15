@@ -7,18 +7,18 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from sec_importer.models import Filing, Company
-from .config import APIConfig
-from .dependencies import get_db
-from .schemas import CompanyDetailResponse, CompanyResponse, FilingResponse, PaginatedResponse
+from ..config import APIConfig
+from ..dependencies import get_db, get_config
+from ..schemas import CompanyDetailResponse, CompanyResponse, FilingResponse, PaginatedResponse
 
 router = APIRouter()
 
 
-@router.get("/companies/{ticker}", response_model=CompanyDetailResponse, tags=["Companies"])
+@router.get("/{ticker}", response_model=CompanyDetailResponse, tags=["Companies"])
 async def get_company(
     ticker: str,
     db: Session = Depends(get_db),
-    config: APIConfig = Depends(),
+    config: APIConfig = Depends(get_config),
 ):
     """Get company info by ticker symbol.
 
@@ -71,10 +71,10 @@ async def get_company(
     )
 
 
-@router.get("/companies", response_model=PaginatedResponse, tags=["Companies"])
+@router.get("", response_model=PaginatedResponse, tags=["Companies"])
 async def list_companies(
     db: Session = Depends(get_db),
-    config: APIConfig = Depends(),
+    config: APIConfig = Depends(get_config),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
 ):

@@ -65,8 +65,11 @@ class TranscriptFormatter:
                 end_str = self._format_timestamp(segment.end)
                 lines.append(f"[{start_str}] [{end_str}] {segment.text}")
         else:
-            for segment in result.segments:
-                lines.append(segment.text)
+            if result.segments:
+                for segment in result.segments:
+                    lines.append(segment.text)
+            else:
+                lines.append(result.text)
         
         return "\n".join(lines)
     

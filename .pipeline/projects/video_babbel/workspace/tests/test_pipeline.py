@@ -68,7 +68,7 @@ class TestVideoBabbel:
         # Verify all components were called
         mock_ingestor.assert_called_once_with("/fake/video.mp4")
         mock_transcriber.assert_called_once_with("base")
-        mock_translator.assert_called_once_with("es")
+        mock_translator.assert_called_once_with("es", backend="google")
         mock_summarizer.assert_called_once_with(5)
         mock_qa.assert_called_once_with([{"text": "Hello world", "start": 0.0, "end": 1.0}])
 
@@ -82,7 +82,7 @@ class TestVideoBabbel:
     def test_process_handles_ingestion_error(self, mock_ingestor):
         """process should raise VideoBabbelError on ingestion failure."""
         from video_babbel.core import IngestionError
-        mock_ingestor.side_effect = IngestionError("ingest failed")
+        mock_ingestor.side_effect = IngestionError("Ingestion failed")
 
         pipeline = VideoBabbel()
         with pytest.raises(VideoBabbelError, match="Ingestion failed"):
@@ -96,7 +96,7 @@ class TestVideoBabbel:
         mock_ingestor_instance = MagicMock()
         mock_ingestor_instance.audio_path = "/fake/audio.wav"
         mock_ingestor.return_value = mock_ingestor_instance
-        mock_transcriber.side_effect = TranscriptionError("transcribe failed")
+        mock_transcriber.side_effect = TranscriptionError("Transcription failed")
 
         pipeline = VideoBabbel()
         with pytest.raises(VideoBabbelError, match="Transcription failed"):
@@ -116,7 +116,7 @@ class TestVideoBabbel:
             {"text": "Hello world", "start": 0.0, "end": 1.0},
         ]
         mock_transcriber.return_value = mock_transcriber_instance
-        mock_translator.side_effect = TranslationError("translate failed")
+        mock_translator.side_effect = TranslationError("Translation failed")
 
         pipeline = VideoBabbel()
         with pytest.raises(VideoBabbelError, match="Translation failed"):
@@ -140,7 +140,7 @@ class TestVideoBabbel:
         mock_translator_instance = MagicMock()
         mock_translator_instance.translate.return_value = "Hola mundo"
         mock_translator.return_value = mock_translator_instance
-        mock_summarizer.side_effect = SummarizationError("summarize failed")
+        mock_summarizer.side_effect = SummarizationError("Summarization failed")
 
         pipeline = VideoBabbel()
         with pytest.raises(VideoBabbelError, match="Summarization failed"):

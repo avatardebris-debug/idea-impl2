@@ -61,6 +61,7 @@ class ActionType(Enum):
     CONVERT = "convert"
     IGNORE = "ignore"  # Don't process further
     FILE = "file"  # Save email to file system
+    MOVE_TO_CATEGORY = "move_to_category"  # Phase 6 alias
 
 
 @dataclass
@@ -252,10 +253,10 @@ class ProcessingStats:
     errors_by_type: Dict[str, int] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert stats to dictionary."""
+        """Convert success_rate to fraction for Phase 6 compatibility."""
         success_rate = 0.0
         if self.processed_emails > 0:
-            success_rate = (self.successful_emails / self.processed_emails) * 100
+            success_rate = self.successful_emails / self.processed_emails
         
         return {
             "total_emails": self.total_emails,
@@ -291,8 +292,9 @@ class RuleSet:
         self.rules.append(rule)
         self.updated_at = datetime.now()
     
-    def remove_rule(self, rule_name: str) -> bool:
-        """Remove a rule by name."""
+    def remove_rule(self, rule_or_name) -> bool:
+        """Remove a rule by name or Rule object."""
+        rule_name = rule_or_name.name if hasattr(rule_or_name, 'name') else rule_or_name
         for i, rule in enumerate(self.rules):
             if rule.name == rule_name:
                 self.rules.pop(i)
@@ -347,15 +349,17 @@ class ActionSet:
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     
-    def add_action(self, action: Action):
-        """Add an action to the set."""
+    def add_action(self, action):
+        """Add an action to the set. Accepts Action objects or plain ActionType enums."""
         self.actions.append(action)
         self.updated_at = datetime.now()
     
     def remove_action(self, action_type: ActionType) -> bool:
         """Remove an action by type."""
         for i, action in enumerate(self.actions):
-            if action.action_type == action_type:
+            # Support both plain ActionType enums and Action objects
+            act_type = action if isinstance(action, ActionType) else action.action_type
+            if act_type == action_type:
                 self.actions.pop(i)
                 self.updated_at = datetime.now()
                 return True
@@ -364,19 +368,25 @@ class ActionSet:
     def get_action(self, action_type: ActionType) -> Optional[Action]:
         """Get an action by type."""
         for action in self.actions:
-            if action.action_type == action_type:
+            act_type = action if isinstance(action, ActionType) else action.action_type
+            if act_type == action_type:
                 return action
         return None
     
     def get_enabled_actions(self) -> List[Action]:
         """Get all enabled actions."""
-        return [a for a in self.actions if a.enabled]
+        return [a for a in self.actions if not isinstance(a, ActionType) and a.enabled]
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert action set to dictionary."""
+        def _action_to_dict(a):
+            if isinstance(a, ActionType):
+                return a.value
+            return a.to_dict()
+        
         return {
             "name": self.name,
-            "actions": [a.to_dict() for a in self.actions],
+            "actions": [_action_to_dict(a) for a in self.actions],
             "description": self.description,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat()
@@ -398,21 +408,34 @@ class ActionSet:
 @dataclass
 class AttachmentProcessingResult:
     """Result of processing an attachment."""
-    attachment_name: str
-    success: bool
+    attachment_id: str = ""
+    attachment_name: str = ""
+    email_id: str = ""
+    original_filename: str = ""
+    content_type: str = ""
+    size_bytes: int = 0
+    attachment_type: Any = None
+    processed_at: str = ""
+    text_content: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    success: bool = False
     output_path: Optional[str] = None
     errors: List[str] = field(default_factory=list)
+    error_message: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
     processing_time_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
+    details: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary."""
         return {
+            "attachment_id": self.attachment_id,
             "attachment_name": self.attachment_name,
             "success": self.success,
             "output_path": self.output_path,
             "errors": self.errors,
+            "error_message": self.error_message,
             "warnings": self.warnings,
             "processing_time_ms": self.processing_time_ms,
             "timestamp": self.timestamp.isoformat()
@@ -491,21 +514,34 @@ class Category(Enum):
 @dataclass
 class EmailAttachmentProcessingResult:
     """Result of processing an email attachment."""
-    attachment_name: str
-    success: bool
+    attachment_id: str = ""
+    attachment_name: str = ""
+    email_id: str = ""
+    original_filename: str = ""
+    content_type: str = ""
+    size_bytes: int = 0
+    attachment_type: Any = None
+    processed_at: str = ""
+    text_content: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+    success: bool = False
     output_path: Optional[str] = None
     errors: List[str] = field(default_factory=list)
+    error_message: Optional[str] = None
     warnings: List[str] = field(default_factory=list)
     processing_time_ms: float = 0.0
     timestamp: datetime = field(default_factory=datetime.now)
+    details: Dict[str, Any] = field(default_factory=dict)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert result to dictionary."""
         return {
+            "attachment_id": self.attachment_id,
             "attachment_name": self.attachment_name,
             "success": self.success,
             "output_path": self.output_path,
             "errors": self.errors,
+            "error_message": self.error_message,
             "warnings": self.warnings,
             "processing_time_ms": self.processing_time_ms,
             "timestamp": self.timestamp.isoformat()
@@ -529,9 +565,47 @@ class Email:
     created_at: Optional[datetime] = None
     
     def __post_init__(self):
-        """Initialize created_at if not provided."""
+        """Initialize created_at and id if not provided."""
         if self.created_at is None:
             self.created_at = datetime.now()
+        if self.id is None:
+            import uuid
+            self.id = str(uuid.uuid4())
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert email to dictionary."""
+        return {
+            "id": self.id,
+            "from_addr": self.from_addr,
+            "to_addrs": self.to_addrs,
+            "subject": self.subject,
+            "date": self.date.isoformat() if self.date else None,
+            "body_plain": self.body_plain,
+            "body_html": self.body_html,
+            "attachments": self.attachments,
+            "raw_headers": self.raw_headers,
+            "labels": self.labels,
+            "source_path": self.source_path,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Email':
+        """Create Email from dictionary."""
+        return cls(
+            id=data.get("id"),
+            from_addr=data.get("from_addr", ""),
+            to_addrs=data.get("to_addrs", []),
+            subject=data.get("subject", ""),
+            date=datetime.fromisoformat(data["date"]) if data.get("date") else None,
+            body_plain=data.get("body_plain"),
+            body_html=data.get("body_html"),
+            attachments=data.get("attachments", []),
+            raw_headers=data.get("raw_headers", {}),
+            labels=data.get("labels", []),
+            source_path=data.get("source_path"),
+            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None
+        )
     
     def to_eml(self) -> str:
         """Convert email to EML format string."""
@@ -566,6 +640,26 @@ class RuleMatch:
         if not self.rule_name and self.rule:
             self.rule_name = self.rule.name
     
+    @property
+    def rule_type(self) -> 'RuleType':
+        """Convenience: the rule_type of the matched rule."""
+        return self.rule.rule_type if self.rule else None
+    
+    @property
+    def priority(self) -> int:
+        """Convenience: priority of the matched rule."""
+        return self.rule.priority if self.rule else 0
+    
+    @property
+    def category(self) -> str:
+        """Convenience: category of the matched rule."""
+        return self.rule.category if self.rule else ""
+    
+    @property
+    def type(self) -> str:
+        """Convenience: match_type as a plain string value."""
+        return self.match_type.value if self.match_type else ""
+    
     def __repr__(self) -> str:
         return f"RuleMatch(rule='{self.rule_name}', type={self.match_type.value}, value='{self.matched_value}')"
 
@@ -578,5 +672,101 @@ class ActionExecutionResult:
     message: str
     details: Dict[str, Any] = field(default_factory=dict)
     
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "action_type": self.action_type.value,
+            "success": self.success,
+            "message": self.message,
+            "details": self.details
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'ActionExecutionResult':
+        """Create from dictionary."""
+        return cls(
+            action_type=ActionType(data["action_type"]),
+            success=data["success"],
+            message=data["message"],
+            details=data.get("details", {})
+        )
+    
     def __repr__(self) -> str:
         return f"ActionExecutionResult(action_type={self.action_type}, success={self.success}, message='{self.message}')"
+
+
+# == Phase 6: Extended EmailMatch and EmailProcessingResult ==
+
+@dataclass
+class Phase6EmailMatch:
+    """Phase 6 email match with typed match_type."""
+    email_id: str
+    rule_name: str
+    match_type: 'RuleMatchType'
+    matched_value: str
+    confidence: float = 1.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "email_id": self.email_id,
+            "rule_name": self.rule_name,
+            "match_type": self.match_type.value,
+            "matched_value": self.matched_value,
+            "confidence": self.confidence
+        }
+
+
+@dataclass
+class Phase6EmailProcessingResult:
+    """Phase 6 email processing result."""
+    email_id: str
+    status: str
+    processing_time_ms: float = 0.0
+    rules_matched: int = 0
+    actions_executed: int = 0
+    errors: List[str] = field(default_factory=list)
+    matched_rules: List[str] = field(default_factory=list)
+    executed_actions: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "email_id": self.email_id,
+            "status": self.status,
+            "processing_time_ms": self.processing_time_ms,
+            "rules_matched": self.rules_matched,
+            "actions_executed": self.actions_executed,
+            "errors": self.errors,
+            "matched_rules": self.matched_rules,
+            "executed_actions": self.executed_actions
+        }
+
+
+@dataclass
+class Phase6ProcessingConfig:
+    """Phase 6 extended processing configuration."""
+    max_processing_time_ms: int = 30000
+    max_actions_per_email: int = 10
+    enable_attachments: bool = True
+    enable_llm: bool = False
+    enable_monitoring: bool = True
+    rule_sets: List[Any] = field(default_factory=list)
+    action_sets: List[Any] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary."""
+        return {
+            "max_processing_time_ms": self.max_processing_time_ms,
+            "max_actions_per_email": self.max_actions_per_email,
+            "enable_attachments": self.enable_attachments,
+            "enable_llm": self.enable_llm,
+            "enable_monitoring": self.enable_monitoring,
+            "rule_sets": self.rule_sets,
+            "action_sets": self.action_sets
+        }
+
+
+# Public aliases for backward-compatible and Phase 6 imports
+EmailMatch = Phase6EmailMatch
+EmailProcessingResult = Phase6EmailProcessingResult

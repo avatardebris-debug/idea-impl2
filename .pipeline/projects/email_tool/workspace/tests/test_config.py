@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from email_tool.config import EmailToolConfig, load_config, validate_rule_config, load_rules_from_yaml
+from email_tool.config import EmailToolConfig, load_config, validate_rule_config, load_rules_from_yaml, load_rules_from_dict
 
 
 class TestEmailToolConfigInitialization:
@@ -439,7 +439,7 @@ class TestEmailToolConfigEdgeCases:
     def test_config_with_unicode_content(self, tmp_path):
         """Test configuration with unicode content."""
         config_file = tmp_path / "unicode_config.yaml"
-        config_file.write_text("base_path: /tmp/日本語フォルダ")
+        config_file.write_text("base_path: /tmp/日本語フォルダ", encoding="utf-8")
         
         config = EmailToolConfig(config_path=config_file)
         assert config.get('base_path') == '/tmp/日本語フォルダ'

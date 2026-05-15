@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "PIPE-E3FE2EC8",
+  "name": "Test Workflow",
+  "opportunities": [
+    {
+      "opportunity_id": "OPP-DE4A8D91",
+      "client_name": "Acme Corp",
+      "client_email": "contact@acme.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "matched",
+      "score": 0.4135714285714286,
+      "proposal_id": null,
+      "created_at": "2026-05-13T16:42:49.350156",
+      "updated_at": "2026-05-13T16:42:49.350162",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    }
+  ],
+  "created_at": "2026-05-13T16:42:49.350347",
+  "updated_at": "2026-05-13T16:42:49.360771"
+}

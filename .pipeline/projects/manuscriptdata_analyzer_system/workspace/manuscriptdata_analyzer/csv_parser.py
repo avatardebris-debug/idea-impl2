@@ -66,10 +66,9 @@ def detect_data_type(headers: list[str]) -> str:
     ValueError
         If the headers do not match any known type.
     """
-    normalised = _normalise_header(headers)
-    # Also normalise the required column sets (strip spaces, replace with underscores)
+    normalised = [h.strip().lower().replace(" ", "_").replace("-", "_") for h in headers]
     def _norm_set(cols: set[str]) -> set[str]:
-        return {c.strip().lower().replace(" ", "_") for c in cols}
+        return {c.strip().lower().replace(" ", "_").replace("-", "_") for c in cols}
 
     norm_sales = _norm_set(SALES_COLUMNS)
     norm_demo = _norm_set(DEMOGRAPHICS_COLUMNS)

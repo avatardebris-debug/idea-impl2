@@ -48,9 +48,9 @@ Our revenue increased by 5% this year.
         """Test parsing XBRL-formatted filing."""
         raw_text = """<?xml version="1.0"?>
 <root>
-<us-gaap:Revenue>1000000</us-gaap:Revenue>
-<us-gaap:NetIncome>200000</us-gaap:NetIncome>
-<us-gaap:EarningsPerShare>5.00</us-gaap:EarningsPerShare>
+<us-gaap:Revenue>1000000000000</us-gaap:Revenue>
+<us-gaap:NetIncome>200000000000</us-gaap:NetIncome>
+<us-gaap:EarningsPerShare>5.00 dollars per share</us-gaap:EarningsPerShare>
 </root>
 """
         parser = FilingParser()
@@ -64,6 +64,8 @@ Our revenue increased by 5% this year.
         """Test XBRL parsing when no elements are found."""
         raw_text = """<?xml version="1.0"?>
 <root>
+<empty></empty>
+<empty></empty>
 <empty></empty>
 </root>
 """

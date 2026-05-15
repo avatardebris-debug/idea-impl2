@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "PIPE-7A3BC867",
+  "name": "Test Pipeline",
+  "opportunities": [
+    {
+      "opportunity_id": "OPP-D319898A",
+      "client_name": "Acme Corp",
+      "client_email": "contact@acme.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "new",
+      "score": 0.4135714285714286,
+      "proposal_id": null,
+      "created_at": "2026-05-13T19:34:50.526933",
+      "updated_at": "2026-05-13T19:34:50.526936",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    }
+  ],
+  "created_at": "2026-05-13T19:34:50.527521",
+  "updated_at": "2026-05-13T19:34:50.549678"
+}

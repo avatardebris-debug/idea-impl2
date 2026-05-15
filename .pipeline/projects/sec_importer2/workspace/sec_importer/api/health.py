@@ -10,7 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .config import APIConfig
-from .dependencies import get_db
+from .dependencies import get_db, get_config
 from .schemas import HealthResponse
 
 router = APIRouter()
@@ -21,7 +21,7 @@ _start_time = time.time()
 @router.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check(
     db: Session = Depends(get_db),
-    config: APIConfig = Depends(),
+    config: APIConfig = Depends(get_config),
 ):
     """Comprehensive health check."""
     # Check database connectivity

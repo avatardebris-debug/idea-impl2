@@ -21,8 +21,8 @@ class TestTranscriber:
         transcriber = Transcriber(model_name="small")
         assert transcriber.model_name == "small"
 
-    @patch("video_babbel.transcriber.whisper")
-    def test_transcribe_returns_segments(self, mock_whisper):
+    @patch("video_babbel.transcriber._get_whisper")
+    def test_transcribe_returns_segments(self, mock_get_whisper):
         """transcribe should return a list of segment dicts."""
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
@@ -31,7 +31,9 @@ class TestTranscriber:
                 {"text": "How are you?", "start": 1.0, "end": 2.0},
             ]
         }
+        mock_whisper = MagicMock()
         mock_whisper.load_model.return_value = mock_model
+        mock_get_whisper.return_value = mock_whisper
 
         transcriber = Transcriber()
         segments = transcriber.transcribe("/fake/audio.wav")
@@ -44,8 +46,8 @@ class TestTranscriber:
         assert segments[1]["start"] == 1.0
         assert segments[1]["end"] == 2.0
 
-    @patch("video_babbel.transcriber.whisper")
-    def test_transcribe_filters_empty_text(self, mock_whisper):
+    @patch("video_babbel.transcriber._get_whisper")
+    def test_transcribe_filters_empty_text(self, mock_get_whisper):
         """transcribe should filter out segments with empty text."""
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
@@ -56,7 +58,9 @@ class TestTranscriber:
                 {"text": "World", "start": 3.0, "end": 4.0},
             ]
         }
+        mock_whisper = MagicMock()
         mock_whisper.load_model.return_value = mock_model
+        mock_get_whisper.return_value = mock_whisper
 
         transcriber = Transcriber()
         segments = transcriber.transcribe("/fake/audio.wav")
@@ -65,20 +69,22 @@ class TestTranscriber:
         assert segments[0]["text"] == "Hello"
         assert segments[1]["text"] == "World"
 
-    @patch("video_babbel.transcriber.whisper")
-    def test_transcribe_empty_segments(self, mock_whisper):
+    @patch("video_babbel.transcriber._get_whisper")
+    def test_transcribe_empty_segments(self, mock_get_whisper):
         """transcribe should return empty list for no segments."""
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {"segments": []}
+        mock_whisper = MagicMock()
         mock_whisper.load_model.return_value = mock_model
+        mock_get_whisper.return_value = mock_whisper
 
         transcriber = Transcriber()
         segments = transcriber.transcribe("/fake/audio.wav")
 
         assert segments == []
 
-    @patch("video_babbel.transcriber.whisper")
-    def test_transcribe_missing_text_key(self, mock_whisper):
+    @patch("video_babbel.transcriber._get_whisper")
+    def test_transcribe_missing_text_key(self, mock_get_whisper):
         """transcribe should handle segments missing 'text' key."""
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
@@ -87,7 +93,9 @@ class TestTranscriber:
                 {"text": "Hello", "start": 1.0, "end": 2.0},
             ]
         }
+        mock_whisper = MagicMock()
         mock_whisper.load_model.return_value = mock_model
+        mock_get_whisper.return_value = mock_whisper
 
         transcriber = Transcriber()
         segments = transcriber.transcribe("/fake/audio.wav")
@@ -102,10 +110,12 @@ class TestTranscriber:
             with pytest.raises(TranscriptionError, match="openai-whisper is not installed"):
                 transcriber.transcribe("/fake/audio.wav")
 
-    @patch("video_babbel.transcriber.whisper")
-    def test_transcribe_whisper_error_raises_error(self, mock_whisper):
+    @patch("video_babbel.transcriber._get_whisper")
+    def test_transcribe_whisper_error_raises_error(self, mock_get_whisper):
         """TranscriptionError should be raised if whisper fails."""
+        mock_whisper = MagicMock()
         mock_whisper.load_model.side_effect = Exception("whisper error")
+        mock_get_whisper.return_value = mock_whisper
 
         transcriber = Transcriber()
         with pytest.raises(TranscriptionError, match="Transcription failed"):

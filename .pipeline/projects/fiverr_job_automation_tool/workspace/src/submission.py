@@ -53,7 +53,7 @@ class BidSubmissionEngine:
     def _ensure_csv_exists(self) -> None:
         """Create the CSV file with headers if it doesn't exist."""
         if not os.path.exists(self.log_file):
-            with open(self.log_file, "w", newline="") as f:
+            with open(self.log_file, "w", newline="", encoding="utf-8") as f:
                 writer = csv.DictWriter(f, fieldnames=self.CSV_COLUMNS)
                 writer.writeheader()
 
@@ -99,7 +99,7 @@ class BidSubmissionEngine:
 
         # Write to CSV file
         file_exists = os.path.exists(self.log_file) and os.path.getsize(self.log_file) > 0
-        with open(self.log_file, "a", newline="") as f:
+        with open(self.log_file, "a", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=self.CSV_COLUMNS)
             if not file_exists:
                 writer.writeheader()

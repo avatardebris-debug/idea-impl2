@@ -52,13 +52,17 @@ class ServiceOffering:
     title: str
     description: str
     deliverables: list[str]
-    timeline: dict[str, Any]  # e.g. {"total_days": 30, "milestones": [...]}
-    pricing: list[PricingTier]
+    timeline: dict[str, Any] = field(default_factory=dict)
+    pricing: list[PricingTier] = field(default_factory=list)
     version: str = "1.0.0"
+    features: list[str] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
     tags: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Alias so tests can use ServiceOffering.PricingTier
+    PricingTier = PricingTier
 
     def __post_init__(self):
         if not self.created_at:

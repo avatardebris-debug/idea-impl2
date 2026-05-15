@@ -83,7 +83,7 @@ def test_output_formatter() -> None:
         "camera_notes": "Static camera, no movement detected.",
         "lighting_color_notes": "Dominant red tones, high contrast.",
     }
-    md = format_as_markdown(analysis)
+    md = format_single_frame_markdown(analysis)
     assert "Content Summary" in md
     assert "Visual Elements" in md
     assert "Camera Notes" in md
@@ -138,7 +138,7 @@ def test_cli_with_mock_vlm() -> None:
 
         # Validate output file
         content = Path(output_path).read_text(encoding="utf-8")
-        assert "Scene Content" in content
+        assert "Content Summary" in content
         assert "gradient" in content
         print("  [PASS] Full pipeline (mock VLM)")
     finally:

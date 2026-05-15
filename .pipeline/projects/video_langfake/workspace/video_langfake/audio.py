@@ -11,7 +11,7 @@ import numpy as np
 from video_langfake.exceptions import AudioError, TranscriptionError
 
 try:
-    from moviepy.editor import VideoFileClip
+    from moviepy import VideoFileClip
     MOVIEPY_AVAILABLE = True
 except ImportError:
     MOVIEPY_AVAILABLE = False

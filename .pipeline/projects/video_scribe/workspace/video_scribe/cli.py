@@ -58,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--provider",
         type=str,
         default=DEFAULT_PROVIDER,
-        choices=[PROVIDER_GPT4O, PROVIDER_CLAUDE],
+        choices=[PROVIDER_GPT4O, PROVIDER_CLAUDE, "ollama"],
         help="VLM provider to use (default: gpt-4o).",
     )
     parser.add_argument(
@@ -89,8 +89,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         type=str,
         default="md",
-        choices=["md", "json"],
-        help="Output format: 'md' for markdown (default) or 'json' for JSON.",
+        choices=["md", "json", "fountain", "html"],
+        help="Output format: 'md' (default), 'json', 'fountain', or 'html'.",
     )
     return parser
 
@@ -110,7 +110,7 @@ def run(
     load_env()
 
     # Resolve API key
-    key = api_key or get_api_key(provider)
+    key = api_key or get_api_key(provider) if provider != "ollama" else None
 
     # Validate input file
     video_path = Path(input_path)
@@ -166,6 +166,15 @@ def run(
     # Step 5: Format output
     if output_format == "json":
         output_text = format_multi_scene_json(enriched, title="Video Analysis", duration=total_duration)
+    elif output_format == "fountain":
+        from video_scribe.output_formatter import format_multi_scene_fountain
+        # Map structured enriched list to expected format matching multi scene
+        data = {"title": "Video Analysis", "duration": total_duration, "scenes": enriched}
+        # In our output_formatter.py for fountain, it expected data dict.
+        output_text = format_multi_scene_fountain(enriched, title="Video Analysis", duration=total_duration)
+    elif output_format == "html":
+        from video_scribe.output_formatter import format_multi_scene_html
+        output_text = format_multi_scene_html(enriched, title="Video Analysis", duration=total_duration)
     else:
         output_text = format_multi_scene_markdown(enriched, title="Video Analysis", duration=total_duration)
 

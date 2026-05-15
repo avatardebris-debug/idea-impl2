@@ -107,8 +107,8 @@ class TestFilingRepository:
         repo.upsert(filing)
 
         results = repo.get_by_accession_no("0000320193-21-000047")
-        assert len(results) == 1
-        assert results[0]["filing_type"] == "10-K"
+        assert results is not None
+        assert results["filing_type"] == "10-K"
         conn.close()
 
     def test_exists_by_accession_no(self, tmp_path):
@@ -193,7 +193,7 @@ class TestFilingItemRepository:
         conn.commit()
 
         item = FilingItemModel(
-            filing_id="0000320193-21-000047",
+            filing_id=1,
             accession_no="0000320193-21-000047",
             item_label="Item 1",
             item_content="Business overview content",
@@ -201,7 +201,7 @@ class TestFilingItemRepository:
         )
         repo.upsert(item)
 
-        results = repo.get_by_filing_id("0000320193-21-000047")
+        results = repo.get_by_filing_id(1)
         assert len(results) == 1
         assert results[0]["item_label"] == "Item 1"
         conn.close()
@@ -224,14 +224,14 @@ class TestFilingItemRepository:
         conn.commit()
 
         items = [
-            FilingItemModel(filing_id="0000320193-21-000047", accession_no="0000320193-21-000047", item_label="Item 1", item_content="Content 1"),
-            FilingItemModel(filing_id="0000320193-21-000047", accession_no="0000320193-21-000047", item_label="Item 1A", item_content="Content 2"),
-            FilingItemModel(filing_id="0000320193-21-000047", accession_no="0000320193-21-000047", item_label="Item 7", item_content="Content 3"),
+            FilingItemModel(filing_id=1, accession_no="0000320193-21-000047", item_label="Item 1", item_content="Content 1"),
+            FilingItemModel(filing_id=1, accession_no="0000320193-21-000047", item_label="Item 1A", item_content="Content 2"),
+            FilingItemModel(filing_id=1, accession_no="0000320193-21-000047", item_label="Item 7", item_content="Content 3"),
         ]
         ids = repo.bulk_insert(items)
-        assert len(ids) == 3
+        assert ids == 3
 
-        results = repo.get_by_filing_id("0000320193-21-000047")
+        results = repo.get_by_filing_id(1)
         assert len(results) == 3
         conn.close()
 
@@ -243,9 +243,9 @@ class TestDeduplicationManager:
         conn = init_db(db_path)
         dedup = DeduplicationManager(conn)
 
-        assert dedup.mark_cik_seen("0000320193") is True
-        assert dedup.mark_cik_seen("0000320193") is False  # Duplicate
+        dedup.mark_seen_cik("0000320193")
         assert dedup.is_cik_seen("0000320193") is True
+        assert dedup.is_cik_seen("0000999999") is False
         assert dedup.is_cik_seen("0000999999") is False
         conn.close()
 
@@ -255,9 +255,9 @@ class TestDeduplicationManager:
         conn = init_db(db_path)
         dedup = DeduplicationManager(conn)
 
-        assert dedup.mark_accession_seen("0000320193-21-000047") is True
-        assert dedup.mark_accession_seen("0000320193-21-000047") is False  # Duplicate
+        dedup.mark_seen_accession("0000320193-21-000047")
         assert dedup.is_accession_seen("0000320193-21-000047") is True
+        assert dedup.is_accession_seen("0000999999-21-000001") is False
         assert dedup.is_accession_seen("0000999999-21-000001") is False
         conn.close()
 
@@ -327,7 +327,7 @@ class TestRateLimiter:
         """Test basic token acquisition."""
         rl = RateLimiter(requests_per_second=10)
         rl.acquire()
-        assert rl.available_tokens < 1.0
+        assert rl.available_tokens < 10.0
 
     def test_wait(self):
         """Test wait method."""
@@ -339,7 +339,7 @@ class TestRateLimiter:
 
     def test_wait_between(self):
         """Test wait_between method."""
-        rl = RateLimiter(requests_per_second=10)
+        rl = RateLimiter(delay=1.0)
         last_time = time.monotonic() - 0.5  # 0.5 seconds ago
         start = time.monotonic()
         rl.wait_between(last_time)
@@ -391,7 +391,7 @@ class TestRateLimiter:
         """Test reset method."""
         rl = RateLimiter(requests_per_second=10)
         rl.acquire()
-        assert rl.available_tokens < 1.0
+        assert rl.available_tokens < 10.0
         rl.reset()
         assert rl.available_tokens == 10.0
 

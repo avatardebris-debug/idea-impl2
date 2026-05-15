@@ -11,8 +11,8 @@ from depvuln.cve.cache import CveCache
 class NvdFetcher:
     """Fetch CVE records from the NVD API, with optional SQLite caching."""
 
-    NVD_API = "https://services.nvd.org.az/1.0/json/cve/{cve_id}"
-    NVD_SEARCH_API = "https://services.nvd.org.az/2.0/cves?keywordSearch={keyword}"
+    NVD_API = "https://services.nvd.nist.gov/rest/json/cve/1.0/{cve_id}"
+    NVD_SEARCH_API = "https://services.nvd.nist.gov/rest/json/cves/1.0?keyword={keyword}"
 
     def __init__(self, cache_enabled: bool = True, cache_dir: str | None = None, ttl: int = 3600):
         if cache_enabled:

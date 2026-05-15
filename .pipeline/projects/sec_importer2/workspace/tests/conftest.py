@@ -21,13 +21,20 @@ from sec_importer.api.config import APIConfig as Settings
 
 # ── Fixtures ───────────────────────────────────────────────────
 
+import time
+
 @pytest.fixture
 def db_path():
     """Create a temporary SQLite database for testing."""
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
         path = f.name
     yield path
-    os.unlink(path)
+    for _ in range(5):
+        try:
+            os.unlink(path)
+            break
+        except PermissionError:
+            time.sleep(0.1)
 
 
 @pytest.fixture
@@ -39,6 +46,7 @@ def session(db_path):
     sess = SessionLocal()
     yield sess
     sess.close()
+    engine.dispose()
 
 
 @pytest.fixture

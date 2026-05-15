@@ -154,10 +154,6 @@ class QAEngine:
             if best_segment and best_score > 0:
                 return best_segment["text"]
 
-            # If no keyword match, return the first segment as fallback
-            if valid_segments:
-                return valid_segments[0]["text"]
-
             return ""
         except QAError:
             raise

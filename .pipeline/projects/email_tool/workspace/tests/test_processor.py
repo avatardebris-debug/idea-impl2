@@ -80,8 +80,8 @@ class TestEmailProcessorInitialization:
         """Test EmailProcessor initialization."""
         processor = EmailProcessor(base_path="/tmp/test_base")
         assert processor.base_path == Path("/tmp/test_base")
-        assert processor.rules is None
-        assert processor.stats == {'processed': 0, 'errors': 0}
+        assert processor.rules == []
+        assert processor.stats == {'processed': 0, 'errors': 0, 'rules_matched': 0}
 
     def test_processor_initialization_with_rules(self):
         """Test EmailProcessor initialization with rules."""

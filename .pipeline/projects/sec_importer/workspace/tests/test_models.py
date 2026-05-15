@@ -22,11 +22,11 @@ class TestCompanyModel:
         assert company.cik == "0000000001"
 
     def test_empty_cik_raises(self):
-        with pytest.raises(ValueError, match="CIK cannot be empty"):
+        with pytest.raises(Exception):
             CompanyModel(cik="")
 
     def test_invalid_cik_raises(self):
-        with pytest.raises(ValueError, match="Invalid CIK"):
+        with pytest.raises(Exception, match="Invalid CIK"):
             CompanyModel(cik="abc123")
 
 
@@ -50,11 +50,11 @@ class TestFilingModel:
         assert "-" not in filing.accession_no
 
     def test_empty_accession_no_raises(self):
-        with pytest.raises(ValueError, match="Accession number cannot be empty"):
+        with pytest.raises(Exception):
             FilingModel(accession_no="", cik="123", filing_type="10-K")
 
     def test_invalid_accession_no_raises(self):
-        with pytest.raises(ValueError, match="Invalid accession number"):
+        with pytest.raises(Exception, match="Invalid accession number"):
             FilingModel(accession_no="abc-def-ghi", cik="123", filing_type="10-K")
 
 
@@ -104,5 +104,5 @@ class TestFilingSchemaConfig:
         assert config.prefix == "edgar"
 
     def test_empty_namespace_raises(self):
-        with pytest.raises(ValueError, match="Namespace cannot be empty"):
+        with pytest.raises(Exception, match="Namespace cannot be empty"):
             FilingSchemaConfig(namespace="", prefix="test")

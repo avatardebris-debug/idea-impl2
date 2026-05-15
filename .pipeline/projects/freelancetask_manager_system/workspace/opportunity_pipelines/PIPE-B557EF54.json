@@ -1,0 +1,59 @@
+{
+  "pipeline_id": "PIPE-B557EF54",
+  "name": "Multi Opp Pipeline",
+  "opportunities": [
+    {
+      "opportunity_id": "OPP-627C73E2",
+      "client_name": "Client 0",
+      "client_email": "client0@test.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "new",
+      "score": 0.3984615384615384,
+      "proposal_id": null,
+      "created_at": "2026-05-13T19:34:50.756738",
+      "updated_at": "2026-05-13T19:34:50.756743",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    },
+    {
+      "opportunity_id": "OPP-A6057F27",
+      "client_name": "Client 1",
+      "client_email": "client1@test.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "new",
+      "score": 0.3984615384615384,
+      "proposal_id": null,
+      "created_at": "2026-05-13T19:34:50.776760",
+      "updated_at": "2026-05-13T19:34:50.776765",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    },
+    {
+      "opportunity_id": "OPP-F41F54C1",
+      "client_name": "Client 2",
+      "client_email": "client2@test.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "new",
+      "score": 0.3984615384615384,
+      "proposal_id": null,
+      "created_at": "2026-05-13T19:34:50.797748",
+      "updated_at": "2026-05-13T19:34:50.797756",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    }
+  ],
+  "created_at": "2026-05-13T19:34:50.754280",
+  "updated_at": "2026-05-13T19:34:50.819160"
+}

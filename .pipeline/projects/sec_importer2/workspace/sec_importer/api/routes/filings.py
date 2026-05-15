@@ -8,17 +8,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from sec_importer.models import Filing, FilingContent
-from .config import APIConfig
-from .dependencies import get_db
-from .schemas import FilingFilter, FilingResponse, PaginatedResponse, FinancialResponse, FinancialMetric
+from ..config import APIConfig
+from ..dependencies import get_db, get_config
+from ..schemas import FilingFilter, FilingResponse, PaginatedResponse, FinancialResponse, FinancialMetric
 
 router = APIRouter()
 
 
-@router.get("/filings", response_model=PaginatedResponse, tags=["Filings"])
+@router.get("", response_model=PaginatedResponse, tags=["Filings"])
 async def list_filings(
     db: Session = Depends(get_db),
-    config: APIConfig = Depends(),
+    config: APIConfig = Depends(get_config),
     ticker: str | None = Query(None, description="Filter by ticker"),
     filing_type: str | None = Query(None, description="Filter by form type (e.g., 10-K)"),
     date_from: str | None = Query(None, description="Start date (YYYY-MM-DD)"),
@@ -84,7 +84,7 @@ async def list_filings(
     )
 
 
-@router.get("/filings/{accession}", response_model=FilingResponse, tags=["Filings"])
+@router.get("/{accession}", response_model=FilingResponse, tags=["Filings"])
 async def get_filing(
     accession: str,
     db: Session = Depends(get_db),
@@ -112,7 +112,7 @@ async def get_filing(
     )
 
 
-@router.get("/filings/{accession}/financials", response_model=FinancialResponse, tags=["Financials"])
+@router.get("/{accession_number}/financials", response_model=FinancialResponse, tags=["Financials"])
 async def get_filing_financials(
     accession_number: str,
     db: Session = Depends(get_db),

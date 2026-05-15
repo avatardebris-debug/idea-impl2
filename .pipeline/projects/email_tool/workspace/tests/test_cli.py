@@ -30,9 +30,10 @@ class TestCLI:
     def test_cli_help(self):
         """Test help output."""
         cli = EmailToolCLI()
-        result = cli.run(['--help'])
-        
-        assert result == 0
+        try:
+            cli.run(['--help'])
+        except SystemExit as e:
+            assert e.code == 0
     
     def test_cli_init_command(self):
         """Test init command."""
@@ -95,7 +96,7 @@ This is the email body.
         # Create rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """
@@ -145,7 +146,7 @@ This is the email body.
         # Create rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """
@@ -182,24 +183,30 @@ This is the email body.
         # Create rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """
         rules_path = Path(self.temp_dir) / "rules.yaml"
         rules_path.write_text(rules_content)
         
-        cli = EmailToolCLI()
-        result = cli.run(['rules', '--list'])
-        
-        assert result == 0
+        # Patch DEFAULT_RULES_FILE so the CLI finds the test rules
+        import email_tool.cli
+        original_default = email_tool.cli.DEFAULT_RULES_FILE
+        email_tool.cli.DEFAULT_RULES_FILE = rules_path
+        try:
+            cli = EmailToolCLI()
+            result = cli.run(['rules', '--list'])
+            assert result == 0
+        finally:
+            email_tool.cli.DEFAULT_RULES_FILE = original_default
     
     def test_cli_rules_validate(self):
         """Test rules validate command."""
         # Create valid rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """
@@ -281,7 +288,7 @@ This is the email body.
         # Create rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """
@@ -354,7 +361,7 @@ This is the email body.
         # Create rules file
         rules_content = """rules:
   - name: test_rule
-    rule_type: from
+    type: from_exact
     pattern: sender@example.com
     category: test
 """

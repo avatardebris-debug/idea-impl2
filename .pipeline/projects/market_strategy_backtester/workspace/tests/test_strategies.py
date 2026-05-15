@@ -218,7 +218,7 @@ class TestMACDStrategy:
 
     def test_macd_line_computation(self):
         """Test that MACD line is computed correctly."""
-        strategy = MACDStrategy(fast_period=5, slow_period=10)
+        strategy = MACDStrategy(fast_period=5, slow_period=10, signal_period=3)
         price_data = _make_price_data(n_days=200)
         macd_line, signal_line = strategy._compute_macd(price_data["close"])
 
@@ -286,9 +286,9 @@ class TestBollingerBandsStrategy:
         assert len(middle) == len(price_data)
         assert len(lower) == len(price_data)
         # Upper band should be >= middle band
-        assert (upper >= middle).all()
+        assert (upper.dropna() >= middle.dropna()).all()
         # Middle band should be >= lower band
-        assert (middle >= lower).all()
+        assert (middle.dropna() >= lower.dropna()).all()
 
     def test_inherits_from_strategy(self):
         """Test that BollingerBandsStrategy inherits from Strategy."""

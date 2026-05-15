@@ -553,3 +553,4 @@ class TestCollisionEvent:
         assert d["entity_a"] == "ball_1"
         assert d["entity_b"] == "player_1"
         assert d["force"] == 2.0
+

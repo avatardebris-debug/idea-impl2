@@ -33,17 +33,18 @@ class TestRenderedScene:
             dialogue_lines=[
                 DialogueLine(character_name="Alice", character_id="char1", text="Hello!")
             ],
-            camera_notes="Wide shot",
+            character_notes={"Alice": "brave protagonist"},
         )
         d = rendered.to_dict()
         assert d["scene_id"] == "SC-001"
-        assert d["action_lines"] == ["Alice sits alone."]
-        assert d["dialogue_lines"][0]["text"] == "Hello!"
+        assert "Alice sits alone." in d["action"]  # action is joined string
+        assert d["dialogue"][0]["text"] == "Hello!"
 
 
 class TestRenderedScript:
     def test_rendered_script_to_dict(self):
-        script = RenderedScript()
+        _script = Script(title="Test", logline="", genre="")
+        script = RenderedScript(_script)
         script.add_rendered_scene(
             RenderedScene(
                 scene=Scene(
@@ -54,11 +55,11 @@ class TestRenderedScript:
                 ),
                 action_lines=[],
                 dialogue_lines=[],
-                camera_notes="",
+                character_notes={},
             )
         )
         d = script.to_dict()
-        assert len(d["rendered_scenes"]) == 1
+        assert len(d["scenes"]) == 1
 
 
 class TestSceneCharacterRenderer:
@@ -91,20 +92,18 @@ class TestSceneCharacterRenderer:
                 Character(
                     name="Alice",
                     role=CharacterRole.PROTAGONIST,
-                    description="A brave woman.",
-                    traits=["brave", "kind"],
-                    motivations=["to find truth"],
+                    physical_description="A brave woman.",
+                    personality_traits=["brave", "kind"],
                     backstory="Orphaned young.",
-                    arc="From lost to found.",
+                    arc_summary="From lost to found.",
                 ),
                 Character(
                     name="Bob",
                     role=CharacterRole.SUPPORTING,
-                    description="A helpful man.",
-                    traits=["helpful", "wise"],
-                    motivations=["to help Alice"],
+                    physical_description="A helpful man.",
+                    personality_traits=["helpful", "wise"],
                     backstory="Former teacher.",
-                    arc="From withdrawn to engaged.",
+                    arc_summary="From withdrawn to engaged.",
                 ),
             ]
         )
@@ -112,20 +111,20 @@ class TestSceneCharacterRenderer:
     @pytest.fixture
     def beat_sheet(self):
         return BeatSheet(
+            logline="A test story.",
+            genre="Drama",
             beats=[
                 Beat(
                     beat_number=1,
                     beat_name="Setup",
-                    phase=BeatPhase.ACT_ONE,
+                    phase=BeatPhase.SETUP,
                     summary="Introduce characters.",
-                    scenes=["SC-001"],
                 ),
                 Beat(
                     beat_number=2,
                     beat_name="Confrontation",
-                    phase=BeatPhase.ACT_TWO,
+                    phase=BeatPhase.CONFRONTATION,
                     summary="Characters face challenges.",
-                    scenes=["SC-002"],
                 ),
             ]
         )
@@ -166,7 +165,7 @@ class TestSceneCharacterRenderer:
         """Empty script should produce empty rendered script."""
         renderer = SceneCharacterRenderer(
             script=Script(title="Empty", logline="", genre="", scenes=[]),
-            beat_sheet=BeatSheet(beats=[]),
+            beat_sheet=BeatSheet(logline="", genre="", beats=[]),
             character_registry=CharacterRegistry(characters=[]),
         )
         result = renderer.render()
@@ -188,7 +187,7 @@ class TestSceneCharacterRenderer:
                     )
                 ],
             ),
-            beat_sheet=BeatSheet(beats=[]),
+            beat_sheet=BeatSheet(logline="", genre="", beats=[]),
             character_registry=CharacterRegistry(characters=[]),
         )
         result = renderer.render()

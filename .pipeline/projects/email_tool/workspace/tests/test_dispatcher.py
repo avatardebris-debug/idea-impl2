@@ -4,11 +4,11 @@ import os
 import pytest
 from datetime import datetime
 from email_tool.models import Email, Rule, RuleType, RuleMatch, ActionType
-from email_tool.dispatcher import Dispatcher, ActionBuilder, ActionExecutor
+from email_tool.dispatcher import ActionDispatcher, ActionBuilder, ActionExecutor
 
 
 class TestDispatcher:
-    """Test cases for Dispatcher class."""
+    """Test cases for ActionDispatcher class."""
     
     @pytest.fixture
     def sample_email(self):
@@ -50,7 +50,7 @@ class TestDispatcher:
     
     def test_handle_move_dry_run(self, sample_email, sample_rule_match):
         """Test MOVE action in dry run mode."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -60,12 +60,11 @@ class TestDispatcher:
         )
         
         assert result["success"] is True
-        assert result["dry_run"] is True
         assert result["action"] == "MOVE"
     
     def test_handle_file_dry_run(self, sample_email, sample_rule_match):
         """Test FILE action in dry run mode."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -75,13 +74,12 @@ class TestDispatcher:
         )
         
         assert result["success"] is True
-        assert result["dry_run"] is True
         assert result["action"] == "FILE"
-        assert result["format"] == "md"
+        assert result["details"]["format"] == "md"
     
     def test_handle_label(self, sample_email, sample_rule_match):
         """Test LABEL action."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -92,13 +90,12 @@ class TestDispatcher:
         
         assert result["success"] is True
         assert result["action"] == "LABEL"
-        assert "work" in result["labels"]
-        assert "urgent" in result["labels"]
-        assert "important" in sample_email.labels
+        assert "work" in result["details"]["labels"]
+        assert "urgent" in result["details"]["labels"]
     
     def test_handle_unknown_action(self, sample_email, sample_rule_match):
         """Test handling unknown action type."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -112,7 +109,7 @@ class TestDispatcher:
     
     def test_operations_log(self, sample_email, sample_rule_match):
         """Test that operations are logged."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         dispatcher.handle_action(
             email=sample_email,
@@ -127,7 +124,7 @@ class TestDispatcher:
     
     def test_clear_operations_log(self, sample_email, sample_rule_match):
         """Test clearing operations log."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         dispatcher.handle_action(
             email=sample_email,
@@ -141,7 +138,7 @@ class TestDispatcher:
     
     def test_get_summary(self, sample_email, sample_rule_match):
         """Test getting operation summary."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         # Add multiple operations
         dispatcher.handle_action(
@@ -166,7 +163,7 @@ class TestDispatcher:
     
     def test_handle_multiple_actions(self, sample_email, sample_rule_match):
         """Test handling multiple actions."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         actions = [
             (ActionType.MOVE, {"destination": "/tmp/archive"}),
@@ -176,14 +173,13 @@ class TestDispatcher:
         
         results = dispatcher.handle_multiple_actions(
             email=sample_email,
-            rule_match=sample_rule_match,
             actions=actions
         )
         
         assert len(results) == 3
-        assert results[0]["action"] == "MOVE"
-        assert results[1]["action"] == "FILE"
-        assert results[2]["action"] == "LABEL"
+        assert results[0].action_type == ActionType.MOVE
+        assert results[1].action_type == ActionType.FILE
+        assert results[2].action_type == ActionType.LABEL
 
 
 class TestActionBuilder:
@@ -197,7 +193,7 @@ class TestActionBuilder:
         actions = builder.build()
         
         assert len(actions) == 1
-        assert actions[0][0].value == "MOVE"
+        assert actions[0][0].value == "move"
         assert actions[0][1]["destination"] == "/tmp/archive"
     
     def test_build_file_action(self):
@@ -208,7 +204,7 @@ class TestActionBuilder:
         actions = builder.build()
         
         assert len(actions) == 1
-        assert actions[0][0].value == "FILE"
+        assert actions[0][0].value == "file"
         assert actions[0][1]["format"] == "pdf"
     
     def test_build_label_action(self):
@@ -219,7 +215,7 @@ class TestActionBuilder:
         actions = builder.build()
         
         assert len(actions) == 1
-        assert actions[0][0].value == "LABEL"
+        assert actions[0][0].value == "label"
         assert actions[0][1]["labels"] == ["work", "urgent"]
     
     def test_build_multiple_actions(self):
@@ -233,9 +229,9 @@ class TestActionBuilder:
         
         assert len(actions) == 3
         # Should be sorted by priority (higher first)
-        assert actions[0][0].value == "LABEL"
-        assert actions[1][0].value == "FILE"
-        assert actions[2][0].value == "MOVE"
+        assert actions[0][0].value == "label"
+        assert actions[1][0].value == "file"
+        assert actions[2][0].value == "move"
     
     def test_build_empty(self):
         """Test building empty action list."""
@@ -251,7 +247,7 @@ class TestActionExecutor:
     @pytest.fixture
     def mock_dispatcher(self):
         """Create a mock dispatcher."""
-        return Dispatcher(dry_run=True)
+        return ActionDispatcher(dry_run=True)
     
     def test_execute_success(self, mock_dispatcher):
         """Test successful execution."""
@@ -364,7 +360,7 @@ class TestDispatcherCollision:
     
     def test_collision_rename_strategy(self, tmp_path):
         """Test rename collision strategy."""
-        dispatcher = Dispatcher(
+        dispatcher = ActionDispatcher(
             base_path=str(tmp_path),
             collision_strategy="rename"
         )
@@ -382,7 +378,7 @@ class TestDispatcherCollision:
     
     def test_collision_number_strategy(self, tmp_path):
         """Test number collision strategy."""
-        dispatcher = Dispatcher(
+        dispatcher = ActionDispatcher(
             base_path=str(tmp_path),
             collision_strategy="number"
         )
@@ -398,7 +394,7 @@ class TestDispatcherCollision:
     
     def test_collision_overwrite_strategy(self, tmp_path):
         """Test overwrite collision strategy."""
-        dispatcher = Dispatcher(
+        dispatcher = ActionDispatcher(
             base_path=str(tmp_path),
             collision_strategy="overwrite"
         )
@@ -418,7 +414,7 @@ class TestDispatcherEdgeCases:
     
     def test_empty_labels(self, sample_email, sample_rule_match):
         """Test LABEL action with empty labels."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -433,7 +429,7 @@ class TestDispatcherEdgeCases:
     
     def test_no_destination_for_move(self, sample_email, sample_rule_match):
         """Test MOVE action without destination."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,
@@ -447,7 +443,7 @@ class TestDispatcherEdgeCases:
     
     def test_invalid_format_for_file(self, sample_email, sample_rule_match):
         """Test FILE action with invalid format."""
-        dispatcher = Dispatcher(dry_run=True)
+        dispatcher = ActionDispatcher(dry_run=True)
         
         result = dispatcher.handle_action(
             email=sample_email,

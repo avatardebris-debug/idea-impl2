@@ -94,6 +94,20 @@ def sync_google_reviews(self, place_id: str, business_name: str) -> dict:
             result = insert_or_update(SessionLocal(), review_data)
             if result:
                 synced += 1
+                try:
+                    import asyncio
+                    from app.api.ws_manager import ws_manager
+                    
+                    # Convert datetime to string for JSON serialization
+                    if isinstance(review_data.get("published_at"), datetime):
+                        review_data["published_at"] = review_data["published_at"].isoformat()
+                        
+                    asyncio.run(ws_manager.broadcast_to_business(place_id, {
+                        "type": "new_review",
+                        "data": review_data
+                    }))
+                except Exception as e:
+                    logger.error(f"Failed to broadcast websocket notification: {e}")
             else:
                 skipped += 1
 

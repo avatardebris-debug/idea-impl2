@@ -1,7 +1,7 @@
 """Unit tests for the rule engine."""
 
 import pytest
-from email_tool.models import Email, Rule, RuleType, RuleMatchStrategy, RuleMatch
+from email_tool.models import Email, Rule, RuleType, RuleMatchType, RuleMatchStrategy, RuleMatch
 from email_tool.rules import RuleEngine
 
 
@@ -29,7 +29,7 @@ class TestRuleEvaluation:
         matches = RuleEngine.evaluate_rule(rule, email)
         assert len(matches) == 1
         assert matches[0].rule_name == "test_rule"
-        assert matches[0].match_type == "from"
+        assert matches[0].match_type == RuleMatchType.EXACT
 
     def test_from_exact_no_match(self):
         """Test FROM_EXACT rule with no match."""
@@ -835,7 +835,7 @@ class TestRuleMatchObjects:
         match = RuleEngine.evaluate_rule(rule, email)[0]
         assert match.rule_name == "test_rule"
         assert match.rule_type == RuleType.FROM_EXACT
-        assert match.match_type == "from"
+        assert match.match_type == RuleMatchType.EXACT
         assert match.priority == 50
         assert match.category == "important"
 
@@ -860,4 +860,4 @@ class TestRuleMatchObjects:
         match = RuleEngine.evaluate_rule(rule, email)[0]
         assert match.rule_name == "test_rule"
         assert match.rule_type == RuleType.FROM_PATTERN
-        assert match.match_type == "from"
+        assert match.match_type == RuleMatchType.REGEX

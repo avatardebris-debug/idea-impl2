@@ -63,7 +63,9 @@ class Daemon:
         """Set up signal handlers for graceful shutdown."""
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
-        signal.signal(signal.SIGHUP, self._reload_config)
+        # SIGHUP is Unix-only; skip gracefully on Windows
+        if hasattr(signal, "SIGHUP"):
+            signal.signal(signal.SIGHUP, self._reload_config)
     
     def _signal_handler(self, signum, frame):
         """Handle signals for graceful shutdown."""

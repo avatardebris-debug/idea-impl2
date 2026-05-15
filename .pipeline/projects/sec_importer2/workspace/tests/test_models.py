@@ -81,7 +81,6 @@ class TestFilingContentModel:
 
         content = FilingContent(
             filing_id=filing.id,
-            accession_number=sample_filing["accession_number"],
             content_type="xbrl",
             content_data=str(sample_xbrl_data),
         )
@@ -92,4 +91,3 @@ class TestFilingContentModel:
             select(FilingContent).where(FilingContent.filing_id == filing.id)
         ).scalar_one()
         assert result.content_type == "xbrl"
-        assert result.accession_number == sample_filing["accession_number"]

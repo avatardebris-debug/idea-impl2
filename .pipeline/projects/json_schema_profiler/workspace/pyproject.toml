@@ -1,22 +1,30 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "json-schema-profiler"
-version = "0.1.0"
-description = "A CLI tool that scans JSON datasets, infers schemas, detects anomalies, and outputs standardized validation rules."
+version = "1.0.0"
+description = "Scan JSON/Parquet datasets, infer schemas, detect anomalies, and output validation rules."
+readme = "README.md"
 requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Developer" }
+]
 dependencies = [
     "typer>=0.9.0",
-    "jsonschema>=4.20.0",
+    "rich>=13.0.0",
+    "ijson>=3.2.0"
 ]
+
+[project.optional-dependencies]
+parquet = ["pyarrow>=14.0.0", "pandas>=2.0.0"]
+yaml = ["pyyaml>=6.0"]
+all = ["pyarrow>=14.0.0", "pandas>=2.0.0", "pyyaml>=6.0"]
 
 [project.scripts]
 json-schema-profiler = "json_schema_profiler.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]

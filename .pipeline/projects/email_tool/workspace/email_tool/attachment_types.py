@@ -169,10 +169,6 @@ def is_text_attachment(attachment_type: AttachmentType) -> bool:
     text_types = {
         AttachmentType.TXT,
         AttachmentType.CSV,
-        AttachmentType.PDF,
-        AttachmentType.DOCX,
-        AttachmentType.XLSX,
-        AttachmentType.PPTX,
     }
     return attachment_type in text_types
 

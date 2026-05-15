@@ -1,6 +1,6 @@
 # Phase 2 Tasks
 
-- [ ] Task 1: Business Profile Model, Platform Credentials, and Auth Infrastructure
+- [x] Task 1: Business Profile Model, Platform Credentials, and Auth Infrastructure
   - What: Create SQLAlchemy models for business profiles and platform credentials. Build a credential store service with OAuth2 token management (storage, refresh, expiry handling). Add a new Alembic migration.
   - Files:
     - `app/models/business_profile.py` — BusinessProfile model (name, category, tone_preferences, response_policies, contact_email, website)
@@ -17,7 +17,7 @@
     - New env vars (YELP_API_KEY, YELP_API_SECRET, FACEBOOK_APP_ID, FACEBOOK_APP_SECRET) are documented in config.example
     - `alembic upgrade head` succeeds with no errors
 
-- [ ] Task 2: Unified Review Abstraction Layer
+- [x] Task 2: Unified Review Abstraction Layer
   - What: Define an abstract base class (ABC) for review platform clients. Implement a unified `Review` dataclass that normalizes all platform outputs. Build a sync orchestrator that dispatches to all registered platform clients.
   - Files:
     - `app/services/review_client_base.py` — Abstract base class with methods: `fetch_reviews(business_id) -> list[dict]`, `normalize(raw: dict) -> dict`, `get_platform_name() -> str`
@@ -32,7 +32,7 @@
     - Existing sync task is updated to call the orchestrator
     - Unit tests verify that the orchestrator calls each registered client and merges results
 
-- [ ] Task 3: Yelp API Integration
+- [x] Task 3: Yelp API Integration
   - What: Build a Yelp Fusion API client with OAuth2 bearer token flow, rate-limit handling, and a Celery sync task. Normalize Yelp review format into the unified Review schema.
   - Files:
     - `app/services/yelp_client.py` — YelpFusionClient with OAuth2 token management, `fetch_reviews(business_id)`, rate-limiting (Yelp allows 5000 req/hr per app), pagination
@@ -49,7 +49,7 @@
     - Token auto-refresh works when access token expires
     - Tests pass with mocked Yelp API responses
 
-- [ ] Task 4: Facebook Graph API Integration
+- [x] Task 4: Facebook Graph API Integration
   - What: Build a Facebook Graph API client for fetching business page reviews with OAuth2, rate-limit handling, and a Celery sync task. Normalize Facebook review format into the unified Review schema.
   - Files:
     - `app/services/facebook_client.py` — FacebookGraphClient with OAuth2 flow, `fetch_reviews(page_id)`, rate-limiting (Facebook Graph allows ~200 req/hr per access token), pagination via `limit`/`after`
@@ -66,7 +66,7 @@
     - Token auto-refresh works when access token expires
     - Tests pass with mocked Facebook API responses
 
-- [ ] Task 5: LLM-Powered Response Draft Generator
+- [x] Task 5: LLM-Powered Response Draft Generator
   - What: Build a response draft generator that takes a review + business profile context and produces 1–3 draft response options using an LLM (OpenAI API or local model). Support tone customization (formal, friendly, apologetic, appreciative).
   - Files:
     - `app/services/response_draft_generator.py` — ResponseDraftGenerator class with:
@@ -88,7 +88,7 @@
     - Graceful fallback to a default template if LLM is unavailable
     - Tests pass with mocked LLM responses
 
-- [ ] Task 6: Response Draft API Endpoint + Dashboard Aggregation Routes
+- [x] Task 6: Response Draft API Endpoint + Dashboard Aggregation Routes
   - What: Add API endpoints for generating response drafts and aggregating sentiment data. Wire up the dashboard data layer.
   - Files:
     - `app/api/routes/responses.py` — New router with:

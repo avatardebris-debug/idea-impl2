@@ -24,13 +24,11 @@ class TestCompany:
             ticker="TEST",
             cik="0000000001",
             industry="Technology",
-            sector="Information Technology",
         )
         assert company.name == "Test Corp"
         assert company.ticker == "TEST"
         assert company.cik == "0000000001"
         assert company.industry == "Technology"
-        assert company.sector == "Information Technology"
         assert company.metadata == {}
 
     def test_company_to_dict(self):
@@ -45,7 +43,6 @@ class TestCompany:
         assert d["ticker"] == "TEST"
         assert d["cik"] == "0000000001"
         assert d["industry"] == "Technology"
-        assert d["sector"] == "Information Technology"
         assert d["metadata"] == {}
 
     def test_company_to_dict_with_metadata(self):
@@ -113,33 +110,27 @@ class TestRelationship:
     def test_create_relationship(self):
         rel = Relationship(
             source_id="0000000001",
-            source_name="Test Corp",
             source_type="company",
             target_id="0000000002",
-            target_name="Subsidiary LLC",
             target_type="company",
             relationship_type="subsidiary",
             confidence=0.9,
         )
         assert rel.source_id == "0000000001"
-        assert rel.target_name == "Subsidiary LLC"
         assert rel.relationship_type == "subsidiary"
         assert rel.confidence == 0.9
 
     def test_relationship_to_dict(self):
         rel = Relationship(
             source_id="0000000001",
-            source_name="Test Corp",
             source_type="company",
             target_id="0000000002",
-            target_name="Subsidiary LLC",
             target_type="company",
             relationship_type="subsidiary",
             confidence=0.9,
         )
         d = rel.to_dict()
         assert d["source_id"] == "0000000001"
-        assert d["target_name"] == "Subsidiary LLC"
         assert d["confidence"] == 0.9
 
 

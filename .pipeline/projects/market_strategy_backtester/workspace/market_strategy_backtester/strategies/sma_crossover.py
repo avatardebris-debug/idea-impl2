@@ -21,6 +21,10 @@ class SMACrossoverStrategy(Strategy):
     """
 
     def __init__(self, fast_window: int = 10, slow_window: int = 30):
+        if fast_window < 1:
+            raise ValueError("fast_window must be at least 1")
+        if slow_window < 1:
+            raise ValueError("slow_window must be at least 1")
         if fast_window >= slow_window:
             raise ValueError("fast_window must be less than slow_window")
         self.fast_window = fast_window
@@ -52,6 +56,6 @@ class SMACrossoverStrategy(Strategy):
         df.loc[df["fast_sma"] > df["slow_sma"], "signal"] = 1
 
         # Drop intermediate columns
-        result = df[["date", "signal"]].copy()
+        result = df[["date", "signal"]].iloc[self.slow_window:].copy().reset_index(drop=True)
 
         return result

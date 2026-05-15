@@ -101,8 +101,7 @@ def _manuscript_to_html(manuscript: Manuscript, **options: Any) -> str:
 
 
 class PDFExporter:
-    """Exports a Manuscript to PDF format using WeasyPrint."""
-
+    """Exports a Manuscript to PDF format using xhtml2pdf."""
     def export(
         self,
         manuscript: Manuscript,
@@ -127,12 +126,15 @@ class PDFExporter:
         html_content = _manuscript_to_html(manuscript, **options)
 
         try:
-            from weasyprint import HTML
-            HTML(string=html_content).write_pdf(output_path)
+            from xhtml2pdf import pisa
+            with open(output_path, "wb") as f:
+                pisa_status = pisa.CreatePDF(html_content, dest=f)
+                if pisa_status.err:
+                    raise RuntimeError(f"Error generating PDF: {pisa_status.err}")
         except ImportError:
             raise RuntimeError(
-                "WeasyPrint is required for PDF export. "
-                "Install it with: pip install weasyprint"
+                "xhtml2pdf is required for PDF export. "
+                "Install it with: pip install xhtml2pdf"
             )
 
         return output_path

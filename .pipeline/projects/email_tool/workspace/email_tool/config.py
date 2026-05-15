@@ -287,7 +287,7 @@ def validate_rule_config(rule_data: Dict[str, Any], rule_name: str = "unnamed_ru
     errors = []
     
     # Check for required fields
-    if "name" not in rule_data or not rule_data.get("name"):
+    if "name" not in rule_data:
         errors.append(f"Rule '{rule_name}': missing required field 'name'")
     elif not rule_data.get("name", "").strip():
         errors.append(f"Rule '{rule_name}': name cannot be empty")

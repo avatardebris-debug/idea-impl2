@@ -73,7 +73,7 @@ def _save_store(store: CheckpointStore, state_file: Path) -> None:
     try:
         with os.fdopen(fd, "w") as f:
             json.dump(data, f, indent=2)
-        Path(tmp_path).rename(state_file)
+        Path(tmp_path).replace(state_file)
     except Exception:
         Path(tmp_path).unlink(missing_ok=True)
         raise

@@ -14,22 +14,23 @@ class TestConfig:
         assert config.max_retries == 3
         assert config.timeout == 30
 
-    def test_config_from_env(self):
-        os.environ["SEC_IMPORTER_DB_PATH"] = "/tmp/test.db"
-        os.environ["SEC_IMPORTER_REQUESTS_PER_SECOND"] = "5"
+    def test_config_from_env(self, monkeypatch):
+        monkeypatch.setenv("SEC_IMPORTER_DB_PATH", "/tmp/test.db")
+        monkeypatch.setenv("SEC_IMPORTER_REQUESTS_PER_SECOND", "5")
         config = Config()
         assert config.db_path == "/tmp/test.db"
         assert config.requests_per_second == 5
-        del os.environ["SEC_IMPORTER_DB_PATH"]
-        del os.environ["SEC_IMPORTER_REQUESTS_PER_SECOND"]
 
     def test_config_from_file(self):
         with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-            f.write("db_path: /tmp/test.yaml.db\nrequests_per_second: 15\n")
+            f.write("database:\n  db_path: /tmp/test.yaml.db\nrate_limiting:\n  requests_per_second: 15\n")
             f.flush()
+        
+        try:
             config = Config.from_file(f.name)
             assert config.db_path == "/tmp/test.yaml.db"
             assert config.requests_per_second == 15
+        finally:
             os.unlink(f.name)
 
     def test_config_merge(self):
