@@ -17,8 +17,14 @@ def temp_db_path():
     fd, path = tempfile.mkstemp(suffix='.db')
     os.close(fd)
     yield path
-    if os.path.exists(path):
-        os.remove(path)
+    # WAL mode creates -wal and -shm sidecar files; remove them all
+    for suffix in ('', '-wal', '-shm'):
+        p = path + suffix
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except PermissionError:
+                pass  # best-effort on Windows
 
 
 @pytest.fixture
@@ -26,7 +32,8 @@ def db(temp_db_path):
     """Create a fresh database instance."""
     instance = Database(temp_db_path)
     instance.init_schema()
-    return instance
+    yield instance
+    instance.close()  # ensure connection is released before temp file cleanup
 
 
 class TestDatabaseSchema:

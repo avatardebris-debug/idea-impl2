@@ -572,3 +572,8 @@ def get_llm(
             kwargs["think"] = think
     return cls(**kwargs)
 
+
+
+# Re-export DocsAI-specific helpers
+from docsai._llm_extras import LLMInterface, build_prompt, format_symbols_for_llm, generate_readme_content
+__all__ = [*locals().keys()]

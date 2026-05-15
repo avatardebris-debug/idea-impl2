@@ -17,8 +17,14 @@ def db_path():
     fd, path = tempfile.mkstemp(suffix='.db')
     os.close(fd)
     yield path
-    if os.path.exists(path):
-        os.remove(path)
+    # WAL mode creates -wal and -shm sidecar files; remove them all
+    for suffix in ('', '-wal', '-shm'):
+        p = path + suffix
+        if os.path.exists(p):
+            try:
+                os.remove(p)
+            except PermissionError:
+                pass  # best-effort on Windows
 
 
 @pytest.fixture
@@ -28,7 +34,9 @@ def categorizer(db_path):
     db = Database(db_path)
     db.init_schema()
     db.seed_default_data()
-    return Categorizer(db)
+    cat = Categorizer(db)
+    yield cat
+    db.close()  # ensure connection released before temp file cleanup
 
 
 class TestCategorizerBasic:

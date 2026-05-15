@@ -87,7 +87,7 @@ class TestFormatSymbolsForLLM:
 class TestGenerateReadmeContent:
     """Tests for the generate_readme_content function."""
 
-    @patch("docsai.llm_interface.LLMInterface")
+    @patch("docsai._llm_extras.LLMInterface")
     def test_generate_readme_content_calls_llm(self, mock_llm_class):
         """Test that generate_readme_content calls the LLM interface."""
         mock_llm = MagicMock()
@@ -100,7 +100,7 @@ class TestGenerateReadmeContent:
         result = generate_readme_content(symbols, "python", "test_project")
         mock_llm.generate.assert_called_once()
 
-    @patch("docsai.llm_interface.LLMInterface")
+    @patch("docsai._llm_extras.LLMInterface")
     def test_generate_readme_content_returns_string(self, mock_llm_class):
         """Test that generate_readme_content returns a string."""
         mock_llm = MagicMock()
@@ -111,7 +111,7 @@ class TestGenerateReadmeContent:
         result = generate_readme_content(symbols, "python", "test_project")
         assert isinstance(result, str)
 
-    @patch("docsai.llm_interface.LLMInterface")
+    @patch("docsai._llm_extras.LLMInterface")
     def test_generate_readme_content_with_empty_symbols(self, mock_llm_class):
         """Test that generate_readme_content handles empty symbols."""
         mock_llm = MagicMock()

@@ -134,14 +134,14 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if name.startswith("_"):
+        if name.startswith("_") or name == "constructor":
             return
 
         params = self._extract_params(node)
         return_type = self._extract_return_type(node)
         symbols.append({
             "name": name,
-            "kind": f"{kind_prefix}method",
+            "kind": "method",   # always 'method', not 'Calculator.method'
             "params": params,
             "return_type": return_type,
             "docstring": self._get_docstring(node, source),
@@ -250,7 +250,7 @@ class TypeScriptParser:
 
         symbols.append({
             "name": name,
-            "kind": f"{kind_prefix}field",
+            "kind": "field",   # always 'field', not 'Calculator.field'
             "params": [],
             "return_type": field_type,
             "docstring": self._get_docstring(node, source),
@@ -269,27 +269,44 @@ class TypeScriptParser:
                 name = param.text.decode("utf-8")
                 if name not in ("self", "this"):
                     params.append({"name": name, "type": ""})
+            elif param.type == "required_parameter":
+                # tree-sitter-typescript: first named child is identifier,
+                # child_by_field_name("type") returns type_annotation.
+                named = param.named_children
+                if not named:
+                    continue
+                name = named[0].text.decode("utf-8")
+                if name in ("self", "this"):
+                    continue
+                type_node = param.child_by_field_name("type")
+                # type_annotation text is like ": string" — strip the leading ": "
+                type_str = ""
+                if type_node:
+                    raw = type_node.text.decode("utf-8")
+                    type_str = raw.lstrip(": ").strip()
+                params.append({"name": name, "type": type_str})
             elif param.type in ("optional_parameter", "rest_parameter"):
                 name_node = param.child_by_field_name("name")
                 type_node = param.child_by_field_name("type")
                 if name_node:
                     name = name_node.text.decode("utf-8")
-                    type_str = type_node.text.decode("utf-8") if type_node else ""
+                    type_str = ""
+                    if type_node:
+                        raw = type_node.text.decode("utf-8")
+                        type_str = raw.lstrip(": ").strip()
                     params.append({"name": name, "type": type_str})
             elif param.type == "typed_parameter":
-                name_node = param.child_by_field_name("name")
+                # fallback for older grammar versions
+                named = param.named_children
+                if not named:
+                    continue
+                name = named[0].text.decode("utf-8")
                 type_node = param.child_by_field_name("type")
-                if name_node:
-                    name = name_node.text.decode("utf-8")
-                    type_str = type_node.text.decode("utf-8") if type_node else ""
-                    params.append({"name": name, "type": type_str})
-            elif param.type == "pair":
-                key = param.child_by_field_name("key")
-                value = param.child_by_field_name("value")
-                if key and value:
-                    name = key.text.decode("utf-8")
-                    type_str = value.text.decode("utf-8")
-                    params.append({"name": name, "type": type_str})
+                type_str = ""
+                if type_node:
+                    raw = type_node.text.decode("utf-8")
+                    type_str = raw.lstrip(": ").strip()
+                params.append({"name": name, "type": type_str})
 
         return params
 
@@ -301,20 +318,47 @@ class TypeScriptParser:
         return ""
 
     def _get_docstring(self, node: Node, source: str) -> str:
-        """Extract JSDoc comment from a node."""
-        prev = node.prev_named_sibling
+        """Extract JSDoc comment preceding a node.
+
+        In TypeScript, exported declarations are wrapped in an export_statement.
+        The JSDoc comment appears before the export_statement, not before the
+        inner declaration node. We walk up to find the outermost exportable
+        ancestor and then check its previous sibling.
+        """
+        # Walk up through export_statement wrappers
+        target = node
+        while target.parent and target.parent.type == "export_statement":
+            target = target.parent
+
+        # Check previous non-whitespace sibling (may be named or unnamed)
+        prev = target.prev_sibling
+        while prev and prev.type not in ("comment",):
+            if prev.type not in ("\n", " ", "\t"):
+                break
+            prev = prev.prev_sibling
+
+        if not prev or prev.type != "comment":
+            # Try prev_named_sibling as fallback
+            prev = target.prev_named_sibling
+
         if prev and prev.type == "comment":
             text = prev.text.decode("utf-8", errors="replace")
             lines = text.split("\n")
             cleaned = []
             for line in lines:
                 line = line.strip()
-                if line.startswith("*"):
-                    line = line[1:].strip()
-                if line.startswith("//"):
-                    line = line[2:].strip()
+                # Strip JSDoc markers
                 if line.startswith("/**"):
                     line = line[3:].strip()
+                elif line.startswith("*/"):
+                    continue
+                elif line.startswith("*"):
+                    line = line[1:].strip()
+                elif line.startswith("//"):
+                    line = line[2:].strip()
+                # Skip @param / @returns tags
+                if line.startswith("@"):
+                    continue
                 if line:
                     cleaned.append(line)
             return "\n".join(cleaned).strip()
