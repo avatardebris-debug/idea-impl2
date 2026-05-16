@@ -1380,6 +1380,7 @@ def _tick_project(
             advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
             if not advanced:
                 _mark_complete(project_dir, state, title)
+                print(f"  ✅ '{title}' completed all phases (force-advanced past last phase)!")
             return True
         else:
             # Send back to executor with fix instructions
@@ -1628,6 +1629,7 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     state["status"] = "complete"
     state.pop("review_result", None)
     _write_state_dict(project_dir, state)
+    print(f"  ✅ '{title}' completed all phases!")
 
     # Mark in master_ideas.md
     mi_path = ideas_path if ideas_path else PROJECT_ROOT / "master_ideas.md"
