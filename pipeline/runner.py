@@ -994,7 +994,9 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
             except Exception:
                 pass
 
-        DONE = ("complete", "budget_exceeded")
+        DONE = ("complete",)  # budget_exceeded does NOT satisfy a dep — the
+        # prereq must have actually finished. If it only hit budget, the dependent
+        # project stays blocked and waits for the prereq to be retried.
         still_blocked = [
             d for d in deps
             if not (projects_dir / d / "state" / "current_idea.json").exists()
@@ -1084,7 +1086,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         depends_on = state.get("depends_on", [])
         if depends_on:
             dep_blocked = []
-            DONE_STATUSES = ("complete", "budget_exceeded")
+            DONE_STATUSES = ("complete",)  # budget_exceeded is NOT a satisfied dep
             for dep_slug in depends_on:
                 dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
                 if not dep_file.exists():
@@ -1257,6 +1259,60 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
                                 type="task", payload=payload))
         print(f"  🔁 Re-queued '{title}' → {agent} (was: {status})")
         return 1  # One at a time — next project picked up after this one completes
+
+    # -----------------------------------------------------------------
+    # RECOVERY: If we found nothing to run, check whether ALL remaining
+    # blocked projects are waiting exclusively on budget_exceeded prereqs.
+    # In that case, reset those prereqs so they can be retried rather than
+    # generating new ideas or starting dependents without their prereq.
+    # -----------------------------------------------------------------
+    blocked_by_budget: dict[str, list[str]] = {}  # prereq_slug -> [waiters]
+    for project_dir in projects_dir.iterdir():
+        if not project_dir.is_dir():
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.exists():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if state.get("status") != "dep_waiting":
+            continue
+        title = state.get("title", project_dir.name)
+        deps  = state.get("depends_on", [])
+        for dep_slug in deps:
+            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            if not dep_file.exists():
+                continue
+            try:
+                dep_state = json.loads(dep_file.read_text(encoding="utf-8"))
+                if dep_state.get("status") == "budget_exceeded":
+                    blocked_by_budget.setdefault(dep_slug, []).append(title)
+            except Exception:
+                pass
+
+    if blocked_by_budget:
+        now = datetime.now(timezone.utc).isoformat()
+        for dep_slug, waiters in blocked_by_budget.items():
+            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            try:
+                dep_state = json.loads(dep_file.read_text(encoding="utf-8"))
+                # Restore where the project was before it hit budget
+                pre_status = dep_state.get("pre_budget_status", "phase_1_executing")
+                dep_state["status"]            = pre_status
+                dep_state["session_started_at"] = now
+                dep_state["started_at"]         = now
+                dep_state.pop("budget_note", None)
+                dep_file.write_text(json.dumps(dep_state, indent=2), encoding="utf-8")
+                print(
+                    f"  🔄 Resetting budget_exceeded prereq '{dep_slug}' → {pre_status} "
+                    f"(required by: {', '.join(waiters)})"
+                )
+            except Exception:
+                pass
+        # Re-run one more time so the now-unblocked prereq gets queued
+        return _rebuild_queues_from_state(bus, ideas_path)
 
     return 0  # No incomplete projects found
 
