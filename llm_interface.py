@@ -26,6 +26,7 @@ class TokenUsage:
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
+    tokens_per_second: float = 0.0   # output tok/s (Ollama only; 0 for cloud providers)
 
 
 @dataclass
@@ -423,16 +424,38 @@ class OllamaAdapter(LLMBase):
                 "args": args,
             })
 
-        # Token usage
+        # Token usage — Ollama returns eval_count (output tokens) and
+        # eval_duration (nanoseconds spent generating output tokens).
+        # Dividing gives real tok/s which we surface in the runner status line.
         usage = None
         prompt_tokens = raw.get("prompt_eval_count", 0) or 0
         completion_tokens = raw.get("eval_count", 0) or 0
+        eval_duration_ns = raw.get("eval_duration", 0) or 0
+        tps = 0.0
+        if completion_tokens > 0 and eval_duration_ns > 0:
+            tps = completion_tokens / (eval_duration_ns / 1e9)
         if prompt_tokens or completion_tokens:
             usage = TokenUsage(
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=prompt_tokens + completion_tokens,
+                tokens_per_second=round(tps, 1),
             )
+            # Write throughput to a shared state file so the runner (a separate
+            # process) can display tok/s without needing inter-process comms.
+            if tps > 0:
+                try:
+                    import pathlib as _pl, json as _js, time as _t
+                    _tp_path = _pl.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
+                    _tp_path.parent.mkdir(parents=True, exist_ok=True)
+                    _tp_path.write_text(_js.dumps({
+                        "tps": round(tps, 1),
+                        "completion_tokens": completion_tokens,
+                        "prompt_tokens": prompt_tokens,
+                        "updated_at": _t.time(),
+                    }), encoding="utf-8")
+                except Exception:
+                    pass  # non-critical — never break inference for a metric write
 
         return Message(
             role="assistant",

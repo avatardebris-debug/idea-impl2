@@ -1847,6 +1847,8 @@ def run_pipeline(
         IDEATION_TIMEOUT = 35 * 60    # 35 min — retry if ideator hasn't written ideas yet
         ZERO_TASK_PHASE_KILL = 75 * 60  # 75 min in _executing with 0 tasks = stuck, skip it
         _status_count = 0  # for throttling non-interactive log output
+        _last_tps_print = 0.0  # timestamp of last tok/s status print
+        _TPS_PRINT_INTERVAL = 15 * 60  # print throughput every 15 minutes
         ideation_in_progress = False  # True while waiting for Ideator to generate new ideas
         ideation_requested_at = 0.0   # timestamp of last _request_ideation() call
         _zero_progress_since: dict[str, float] = {}  # (slug:phase) -> timestamp first seen 0 tasks
@@ -2041,6 +2043,28 @@ def run_pipeline(
                 if _status_count % 4 == 0:
                     print(status_line, flush=True)
                 _status_count += 1
+
+                # Print tok/s every 15 minutes (independent of the 4-check throttle)
+                _now = time.time()
+                if provider == "ollama" and (_now - _last_tps_print) >= _TPS_PRINT_INTERVAL:
+                    _tp_path = PIPELINE_DIR / "state" / "throughput.json"
+                    if _tp_path.exists():
+                        try:
+                            _tp = json.loads(_tp_path.read_text(encoding="utf-8"))
+                            _tps_val = _tp.get("tps", 0)
+                            _age_s = _now - _tp.get("updated_at", 0)
+                            if _tps_val > 0 and _age_s < 3600:  # ignore stale data > 1h
+                                _age_str = (
+                                    f"{int(_age_s // 60)}m ago" if _age_s > 90 else "recent"
+                                )
+                                print(
+                                    f"  📊 Throughput: {_tps_val:.1f} tok/s output "
+                                    f"(last call: {_age_str})",
+                                    flush=True,
+                                )
+                        except Exception:
+                            pass
+                    _last_tps_print = _now
 
                 # --- Zero-task-progress phase kill ---
                 # If the executor has been in *_executing phase for ZERO_TASK_PHASE_KILL
