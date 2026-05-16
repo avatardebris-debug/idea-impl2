@@ -10,6 +10,7 @@ import typer
 
 from podcastseo.transcript_parser import TranscriptParser
 from podcastseo.keyword_extractor import KeywordExtractor
+from podcastseo.show_notes_generator import ShowNotesGenerator
 
 app = typer.Typer(
     name="podcastseo",
@@ -96,6 +97,72 @@ def keywords(
 def version() -> None:
     """Show version information."""
     pass
+
+
+@app.command("notes")
+def notes(
+    input: str = typer.Argument(..., help="Path to the transcript file (SRT, VTT, TXT, or DOCX)."),
+    format: str = typer.Option("markdown", "--format", "-f", help="Output format: markdown, html, or txt."),
+    output: str = typer.Option(None, "--output", "-o", help="Path to write the output file. Defaults to stdout."),
+    keywords: str = typer.Option(None, "--keywords", "-k", help="Path to a keywords JSON file from Phase 1. Auto-generated if omitted."),
+    config: str = typer.Option(None, "--config", "-c", help="Path to config.yaml for template customization."),
+    top: int = typer.Option(10, "--top", "-t", help="Number of top keywords to use. Overrides config if provided."),
+) -> None:
+    """Generate show notes from a transcript file.
+
+    This command runs the full pipeline:
+    1. Parse the transcript
+    2. Extract keywords (if no --keywords file is provided)
+    3. Generate show notes using templates
+    4. Write output to file or stdout
+    """
+    input_path = Path(input)
+    if not input_path.exists():
+        typer.echo(f"Error: Input file '{input}' not found.", err=True)
+        raise typer.Exit(1)
+
+    # Step 1: Parse transcript
+    parser = TranscriptParser()
+    transcript_text = parser.parse(input_path)
+    if not transcript_text or not transcript_text.strip():
+        typer.echo("Warning: Transcript is empty. Generating show notes with no content.", err=True)
+
+    # Step 2: Extract keywords if not provided
+    if keywords:
+        kw_path = Path(keywords)
+        if not kw_path.exists():
+            typer.echo(f"Error: Keywords file '{keywords}' not found.", err=True)
+            raise typer.Exit(1)
+        with open(kw_path, "r", encoding="utf-8") as f:
+            keywords_data = json.load(f)
+    else:
+        # Auto-generate keywords
+        extractor = KeywordExtractor(top_n=top)
+        transcript_text_for_kw = parser.parse(input_path)
+        keywords_data = extractor.extract(transcript_text_for_kw, top_n=top)
+        typer.echo(f"Auto-generated {len(keywords_data)} keywords.", err=True)
+
+    if not keywords_data:
+        typer.echo("Warning: No keywords extracted. Show notes will be minimal.", err=True)
+
+    # Step 3: Generate show notes
+    generator = ShowNotesGenerator(config_path=config)
+    show_notes = generator.generate(
+        keywords=keywords_data,
+        transcript_text=transcript_text,
+        transcript_path=input,
+        output_format=format,
+    )
+
+    # Step 4: Write output
+    if output:
+        out_path = Path(output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(show_notes)
+        typer.echo(f"Show notes written to '{output}'.", err=True)
+    else:
+        typer.echo(show_notes)
 
 
 if __name__ == "__main__":
