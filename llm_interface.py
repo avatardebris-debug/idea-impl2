@@ -443,19 +443,40 @@ class OllamaAdapter(LLMBase):
             )
             # Write throughput to a shared state file so the runner (a separate
             # process) can display tok/s without needing inter-process comms.
-            if tps > 0:
+            # We accumulate cumulative_tokens, cumulative_inference_s, and
+            # cumulative_wall_s so the runner can show both GPU-only tok/s and
+            # overall pipeline tok/s (tokens / total wall-clock time).
+            try:
+                import pathlib as _pl, json as _js, time as _t
+                _tp_path = _pl.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
+                _tp_path.parent.mkdir(parents=True, exist_ok=True)
+                _now = _t.time()
+                # Read-modify-write (best-effort; telemetry only)
                 try:
-                    import pathlib as _pl, json as _js, time as _t
-                    _tp_path = _pl.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
-                    _tp_path.parent.mkdir(parents=True, exist_ok=True)
-                    _tp_path.write_text(_js.dumps({
-                        "tps": round(tps, 1),
-                        "completion_tokens": completion_tokens,
-                        "prompt_tokens": prompt_tokens,
-                        "updated_at": _t.time(),
-                    }), encoding="utf-8")
+                    _existing = _js.loads(_tp_path.read_text(encoding="utf-8"))
                 except Exception:
-                    pass  # non-critical — never break inference for a metric write
+                    _existing = {}
+                _first = _existing.get("first_call_at", _now)
+                _existing.update({
+                    "tps":                   round(tps, 1),
+                    "completion_tokens":     completion_tokens,
+                    "prompt_tokens":         prompt_tokens,
+                    "updated_at":            _now,
+                    "first_call_at":         _first,
+                    # Cumulative counters (additive across all agent calls)
+                    "cumulative_tokens":     _existing.get("cumulative_tokens", 0) + completion_tokens,
+                    "cumulative_inference_s": round(
+                        _existing.get("cumulative_inference_s", 0.0) + (eval_duration_ns / 1e9), 2
+                    ),
+                    "cumulative_wall_s":     round(_now - _first, 1),
+                    "call_count":            _existing.get("call_count", 0) + 1,
+                    # tool_s is written by agent.py execute_tool(); preserve here
+                    "cumulative_tool_s":     _existing.get("cumulative_tool_s", 0.0),
+                    "tool_call_count":       _existing.get("tool_call_count", 0),
+                })
+                _tp_path.write_text(_js.dumps(_existing, indent=2), encoding="utf-8")
+            except Exception:
+                pass  # non-critical — never break inference for a metric write
 
         return Message(
             role="assistant",

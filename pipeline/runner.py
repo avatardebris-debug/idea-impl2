@@ -2044,22 +2044,51 @@ def run_pipeline(
                     print(status_line, flush=True)
                 _status_count += 1
 
-                # Print tok/s every 15 minutes (independent of the 4-check throttle)
+                # Print full throughput breakdown every 15 minutes
                 _now = time.time()
                 if provider == "ollama" and (_now - _last_tps_print) >= _TPS_PRINT_INTERVAL:
                     _tp_path = PIPELINE_DIR / "state" / "throughput.json"
                     if _tp_path.exists():
                         try:
                             _tp = json.loads(_tp_path.read_text(encoding="utf-8"))
-                            _tps_val = _tp.get("tps", 0)
-                            _age_s = _now - _tp.get("updated_at", 0)
-                            if _tps_val > 0 and _age_s < 3600:  # ignore stale data > 1h
-                                _age_str = (
-                                    f"{int(_age_s // 60)}m ago" if _age_s > 90 else "recent"
-                                )
+                            _age_s      = _now - _tp.get("updated_at", _now)
+                            _cum_tok    = _tp.get("cumulative_tokens", 0)
+                            _cum_inf_s  = _tp.get("cumulative_inference_s", 0.0)
+                            _cum_wall_s = _tp.get("cumulative_wall_s", 0.0) or 1
+                            _cum_tool_s = _tp.get("cumulative_tool_s", 0.0)
+                            _calls      = _tp.get("call_count", 0)
+                            _tool_calls = _tp.get("tool_call_count", 0)
+                            _tps_inf    = _tp.get("tps", 0)  # last-call GPU tok/s
+                            # Pipeline tok/s = total tokens / total elapsed time
+                            _tps_pipe   = _cum_tok / _cum_wall_s if _cum_tok else 0
+                            # Average inference tok/s over the whole session
+                            _tps_inf_avg = _cum_tok / _cum_inf_s if _cum_inf_s > 0 else 0
+                            # Time allocation percentages
+                            _gpu_pct    = (_cum_inf_s  / _cum_wall_s) * 100
+                            _tool_pct   = (_cum_tool_s / _cum_wall_s) * 100
+                            _overhead_pct = max(0, 100 - _gpu_pct - _tool_pct)
+                            # Human-readable wall time
+                            _wall_h     = int(_cum_wall_s // 3600)
+                            _wall_m     = int((_cum_wall_s % 3600) // 60)
+                            _wall_str   = (f"{_wall_h}h{_wall_m:02d}m" if _wall_h
+                                           else f"{_wall_m}m")
+                            _age_str    = (f"{int(_age_s // 60)}m ago"
+                                           if _age_s > 90 else "recent")
+                            if _cum_tok > 0 and _age_s < 3600:
                                 print(
-                                    f"  📊 Throughput: {_tps_val:.1f} tok/s output "
-                                    f"(last call: {_age_str})",
+                                    f"  \U0001f4ca Throughput [{_wall_str} wall-clock, "
+                                    f"{_calls} LLM calls, {_tool_calls} tool calls]\n"
+                                    f"     Inference:  {_tps_inf:.1f} tok/s (last call)  "
+                                    f"/ {_tps_inf_avg:.1f} tok/s avg\n"
+                                    f"     Pipeline:   {_tps_pipe:.1f} tok/s  "
+                                    f"(tokens / total wall-clock)\n"
+                                    f"     Time split: GPU {_gpu_pct:.0f}%  "
+                                    f"| Tools {_tool_pct:.0f}%  "
+                                    f"| Overhead {_overhead_pct:.0f}%  "
+                                    f"(queue/switch/init)\n"
+                                    f"     Tokens:     {_cum_tok:,} generated  "
+                                    f"/ {_cum_tok//_calls if _calls else 0} avg/call  "
+                                    f"(last: {_age_str})",
                                     flush=True,
                                 )
                         except Exception:

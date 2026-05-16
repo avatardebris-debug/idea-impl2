@@ -15,6 +15,7 @@ import json
 import pathlib
 import sys
 import textwrap
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 
@@ -147,10 +148,30 @@ def build_system_prompt(affirmation: AffirmationSystem | None = None,
 # Tool executor
 # ---------------------------------------------------------------------------
 
+# Path to shared throughput telemetry file (same one OllamaAdapter writes to)
+_TP_PATH = pathlib.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
+
+
+def _record_tool_time(elapsed_s: float) -> None:
+    """Accumulate tool execution seconds into throughput.json (best-effort)."""
+    try:
+        import json as _js
+        try:
+            data = _js.loads(_TP_PATH.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+        data["cumulative_tool_s"] = round(data.get("cumulative_tool_s", 0.0) + elapsed_s, 3)
+        data["tool_call_count"] = data.get("tool_call_count", 0) + 1
+        _TP_PATH.write_text(_js.dumps(data, indent=2), encoding="utf-8")
+    except Exception:
+        pass  # telemetry — never break a tool call
+
+
 def execute_tool(name: str, args: dict) -> str:
     fn = TOOLS.get(name)
     if fn is None:
         return f"ERROR: Unknown tool '{name}'"
+    _t0 = time.time()
     try:
         result = fn(**args)
         return str(result)
@@ -158,6 +179,8 @@ def execute_tool(name: str, args: dict) -> str:
         return f"ERROR calling {name}: bad arguments — {e}"
     except Exception as e:
         return f"ERROR in {name}: {e}"
+    finally:
+        _record_tool_time(time.time() - _t0)
 
 
 # ---------------------------------------------------------------------------
