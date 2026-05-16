@@ -72,6 +72,12 @@ class Stage3ScriptWriter(BaseStageGenerator):
     This stage takes a beat sheet and character registry and produces a full screenplay.
     """
 
+    stage_name = "Stage3ScriptWriter"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 3: Script Writer"
+
     def execute(self, project: Project) -> Project:
         """Execute Stage 3: Generate the screenplay script.
 

@@ -61,6 +61,10 @@ class MoviePipeline:
                 Stage6PostProductionPlanner(config=self.config),
             ]
 
+        # Inject the shared llm_client into each stage so tests can mock it
+        for stage in self.stages:
+            stage.client = self.llm_client
+
         # Register stage instances for lookup
         for stage in self.stages:
             self._stage_instances[stage.__class__.__name__] = stage
@@ -75,12 +79,20 @@ class MoviePipeline:
             Updated project with all stages completed.
         """
         logger.info(f"Starting pipeline for '{project.title}'")
+        project.status = "pipeline_started"
 
         for stage in self.stages:
+            stage_name = stage.__class__.__name__.lower()
             logger.info(f"Running stage: {stage.__class__.__name__}")
-            project = stage.execute(project)
+            try:
+                project = stage.execute(project)
+            except Exception as e:
+                project.status = f"failed_at_{stage_name}"
+                logger.error(f"Stage {stage.__class__.__name__} failed: {e}")
+                raise
             logger.info(f"Stage {stage.__class__.__name__} complete")
 
+        project.status = "pipeline_complete"
         logger.info(f"Pipeline complete for '{project.title}'")
         return project
 
@@ -110,3 +122,22 @@ class MoviePipeline:
             List of stage class names.
         """
         return [stage.__class__.__name__ for stage in self.stages]
+
+    def get_stage(self, stage_name: str) -> Optional[BaseStageGenerator]:
+        """Get a stage instance by class name.
+
+        Args:
+            stage_name: Name of the stage class.
+
+        Returns:
+            Stage instance, or None if not found.
+        """
+        return self._stage_instances.get(stage_name)
+
+    def get_available_stages(self) -> List[str]:
+        """Get the list of available stage names (class names).
+
+        Returns:
+            List of stage class names in pipeline order.
+        """
+        return self.get_stage_names()

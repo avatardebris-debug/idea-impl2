@@ -61,6 +61,12 @@ class Stage5MusicComposer(BaseStageGenerator):
     This stage takes a script and produces music composition plans for each scene.
     """
 
+    stage_name = "Stage5MusicComposer"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 5: Music Composer"
+
     def execute(self, project: Project) -> Project:
         """Execute Stage 5: Generate music compositions.
 

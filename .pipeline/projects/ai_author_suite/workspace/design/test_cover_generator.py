@@ -7,13 +7,16 @@ and rule-based generation.
 """
 
 import pytest
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 import json
 import tempfile
 import os
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
-from ..design.models import (
+from design.models import (
     CoverDesign,
     BookMetadata,
     DesignStyle,
@@ -27,7 +30,7 @@ from ..design.models import (
     DesignScore,
     DesignFeedback,
 )
-from ..design.cover_generator import (
+from design.cover_generator import (
     CoverGenerator,
     GenerationMode,
     create_cover_generator,

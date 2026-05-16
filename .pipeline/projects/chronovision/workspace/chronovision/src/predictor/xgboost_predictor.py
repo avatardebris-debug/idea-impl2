@@ -3,6 +3,11 @@
 import numpy as np
 from typing import Dict, Any, List, Optional
 
+try:
+    import xgboost as xgb
+except ImportError:
+    xgb = None
+
 from chronovision.src.predictor.base import BasePredictor
 
 
@@ -25,9 +30,7 @@ class XGBoostPredictor(BasePredictor):
             y: Target vector.
             feature_names: Optional list of feature names.
         """
-        try:
-            import xgboost as xgb
-        except ImportError:
+        if xgb is None:
             raise ImportError("xgboost is required for XGBoostPredictor. Install with: pip install xgboost")
         
         self.feature_names = feature_names or []
@@ -60,6 +63,8 @@ class XGBoostPredictor(BasePredictor):
         """
         if not self.is_trained or self.model is None:
             raise ValueError("Model not trained")
+        if xgb is None:
+            raise ImportError("xgboost is required for XGBoostPredictor. Install with: pip install xgboost")
         
         dtest = xgb.DMatrix(X)
         predictions = self.model.predict(dtest)
@@ -105,10 +110,10 @@ class XGBoostPredictor(BasePredictor):
         if not self.is_trained or self.model is None:
             return {}
         
-        # XGBoost doesn't provide built-in metrics after training
-        # Return placeholder metrics
-        return {
+        metrics = self.metrics.copy()
+        metrics.update({
             "n_estimators": self.n_estimators,
             "max_depth": self.max_depth,
             "learning_rate": self.learning_rate,
-        }
+        })
+        return metrics

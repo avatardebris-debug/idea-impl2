@@ -48,7 +48,11 @@ class TestToolsExistence(unittest.TestCase):
 
     def test_call_tool_dispatch(self):
         """Test that call_tool dispatches to the right function."""
-        result = call_tool("read_file", path="/dev/null")
+        import tempfile, os
+        fd, tmp = tempfile.mkstemp()
+        os.close(fd)
+        result = call_tool("read_file", path=tmp)
+        os.unlink(tmp)
         self.assertIsInstance(result, str)
 
 
@@ -189,7 +193,10 @@ class TestRunShell(unittest.TestCase):
     def test_run_ls(self):
         test_file = pathlib.Path(self.tmpdir) / "test.txt"
         test_file.write_text("x", encoding="utf-8")
-        result = run_shell("ls", cwd=self.tmpdir)
+        # Use 'dir' on Windows, 'ls' on Unix
+        import platform
+        cmd = "dir" if platform.system() == "Windows" else "ls"
+        result = run_shell(cmd, cwd=self.tmpdir)
         self.assertIn("test.txt", result)
 
     def test_run_nonexistent_cmd(self):
@@ -197,7 +204,10 @@ class TestRunShell(unittest.TestCase):
         self.assertTrue(result.startswith("ERROR"))
 
     def test_run_with_timeout(self):
-        result = run_shell("sleep 0.1 && echo done", timeout=5)
+        # Use cross-platform python sleep instead of Unix sleep
+        import sys as _sys
+        cmd = f'"{_sys.executable}" -c "import time; time.sleep(0.05); print(\'done\')"'
+        result = run_shell(cmd, timeout=5)
         self.assertIn("done", result)
 
 

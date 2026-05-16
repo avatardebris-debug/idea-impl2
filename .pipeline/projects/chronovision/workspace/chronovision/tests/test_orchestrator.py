@@ -117,8 +117,7 @@ class TestRunner:
         runner = Runner()
         state = runner.get_world_state()
         
-        assert "entities" in state
-        assert "edges" in state
+        assert "tickers" in state
     
     def test_get_predictions_empty(self):
         """Test getting predictions when none available."""

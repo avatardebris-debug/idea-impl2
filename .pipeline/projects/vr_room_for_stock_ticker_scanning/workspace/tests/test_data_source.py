@@ -33,8 +33,7 @@ class MockDataSource(DataSource):
         self._callbacks.append(callback)
 
     def unsubscribe(self, callback: callable) -> None:
-        if callback in self._callbacks:
-            self._callbacks.remove(callback)
+        self._callbacks = [cb for cb in self._callbacks if cb is not callback]
 
     def is_connected(self) -> bool:
         return self._connected

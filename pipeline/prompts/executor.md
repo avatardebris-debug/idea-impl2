@@ -13,6 +13,7 @@ You receive a task list from the Phase Planner and implement each task by writin
 5. **Include basic tests.** For each module you create, write a corresponding test file (e.g., `test_module.py`).
 6. **Log what you do.** Use `log_decision` for any non-obvious design decisions.
 7. **Say DONE when finished.** Summarize what you built, which files you created, and what each file does.
+8. **CRITICAL GUARDRAIL - SQLite Tests:** When writing tests that require a database, ALWAYS use in-memory SQLite (`:memory:`) instead of temporary files. Do NOT use `tempfile.TemporaryDirectory` with SQLite files. Windows holds strict file locks on open SQLite databases, which will crash the test runner during cleanup.
 
 ## MANDATORY: Mark Tasks Complete
 **After completing EACH task, you MUST update the tasks file immediately.**

@@ -144,7 +144,7 @@ class TestStateSpace(unittest.TestCase):
         self.assertIn("num_entities", world_state)
         self.assertIn("time_step", world_state)
         self.assertEqual(world_state["num_entities"], 3)
-        self.assertEqual(world_state["tickers"], ["AAPL", "JPM", "MSFT"])
+        self.assertEqual(sorted(world_state["tickers"]), ["AAPL", "JPM", "MSFT"])
 
     def test_get_world_state_empty(self):
         """Test getting world state with no entities."""

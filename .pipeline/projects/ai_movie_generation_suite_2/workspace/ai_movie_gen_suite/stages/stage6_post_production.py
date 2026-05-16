@@ -104,6 +104,12 @@ class Stage6PostProductionPlanner(BaseStageGenerator):
     post-production and distribution plan.
     """
 
+    stage_name = "Stage6PostProductionPlanner"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 6: Post Production Planner"
+
     def execute(self, project: Project) -> Project:
         """Execute Stage 6: Generate post-production plan.
 

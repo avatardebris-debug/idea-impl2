@@ -45,4 +45,5 @@ CRITICAL: Use these EXACT heading names. Downstream automation parses them by na
 4. **No false positives.** Don't invent problems. Only flag real issues.
 5. **Distinguish blocking from non-blocking.** Bugs that break functionality go under `## Blocking Bugs`. Style preferences go under `## Non-Blocking Notes`. NEVER put style issues under Blocking Bugs.
 6. A phase PASSES if `## Blocking Bugs` contains only "None" or zero bullet items.
-7. **Say DONE** and state your verdict clearly.
+7. **CRITICAL GUARDRAIL - Float Equality:** If you see exact float assertions in tests (e.g., `assert score == 0.7`), flag it as a bug and require it to be rewritten using `pytest.approx(0.7)`. Exact floating point matches always fail.
+8. **Say DONE** and state your verdict clearly.

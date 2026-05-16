@@ -29,13 +29,15 @@ class FeatureEngine:
         returns_list = []
         for period in periods:
             if len(prices) > period:
-                returns = np.diff(prices[-(period + 1):]) / prices[-(period + 1):-1]
+                returns = (prices[period:] - prices[:-period]) / prices[:-period]
                 returns_list.append(returns)
         
         if not returns_list:
             return np.array([])
         
-        return np.column_stack(returns_list)
+        min_len = min(len(r) for r in returns_list)
+        aligned_returns = [r[-min_len:] for r in returns_list]
+        return np.column_stack(aligned_returns)
 
     @staticmethod
     def compute_moving_averages(prices: np.ndarray, windows: List[int] = None) -> np.ndarray:
@@ -60,7 +62,9 @@ class FeatureEngine:
         if not ma_list:
             return np.array([])
         
-        return np.column_stack(ma_list)
+        min_len = min(len(m) for m in ma_list)
+        aligned_ma = [m[-min_len:] for m in ma_list]
+        return np.column_stack(aligned_ma)
 
     @staticmethod
     def compute_volatility(prices: np.ndarray, window: int = 20) -> np.ndarray:
@@ -77,7 +81,7 @@ class FeatureEngine:
             return np.array([])
         
         returns = np.diff(prices) / prices[:-1]
-        volatility = pd.Series(returns).rolling(window=window).std().values
+        volatility = pd.Series(returns).rolling(window=window).std().dropna().values
         return volatility
 
     @staticmethod
@@ -103,7 +107,7 @@ class FeatureEngine:
         
         rs = avg_gain / (avg_loss + 1e-10)
         rsi = 100 - (100 / (1 + rs))
-        return rsi
+        return rsi[~np.isnan(rsi)]
 
     @staticmethod
     def compute_macd(prices: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> np.ndarray:
@@ -127,7 +131,7 @@ class FeatureEngine:
         signal_line = macd_line.ewm(span=signal, adjust=False).mean()
         macd_histogram = macd_line - signal_line
         
-        return macd_histogram.values
+        return macd_histogram.dropna().values
 
     @staticmethod
     def compute_volume_features(volumes: np.ndarray, window: int = 20) -> np.ndarray:
@@ -147,7 +151,13 @@ class FeatureEngine:
         vol_ratio = volumes / (vol_ma + 1e-10)
         vol_change = np.diff(volumes) / (volumes[:-1] + 1e-10)
         
-        return np.column_stack([vol_ratio, vol_change])
+        # Remove NaNs from vol_ratio (due to rolling mean)
+        valid_idx = ~np.isnan(vol_ratio)
+        vol_ratio = vol_ratio[valid_idx]
+        # vol_change has length len(volumes)-1, vol_ratio was len(volumes). 
+        # By dropping NaNs, vol_ratio becomes shorter. We should compute them aligned.
+        min_len = min(len(vol_ratio), len(vol_change))
+        return np.column_stack([vol_ratio[-min_len:], vol_change[-min_len:]])
 
     @staticmethod
     def compute_bollinger_bands(prices: np.ndarray, window: int = 20, num_std: float = 2.0) -> np.ndarray:
@@ -171,7 +181,8 @@ class FeatureEngine:
         lower_band = ma - num_std * std
         bandwidth = (upper_band - lower_band) / (ma + 1e-10)
         
-        return np.column_stack([ma, upper_band, lower_band, bandwidth])
+        res = np.column_stack([ma, upper_band, lower_band, bandwidth])
+        return res[~np.isnan(res).any(axis=1)]
 
     @staticmethod
     def engineer_features(prices: np.ndarray, volumes: Optional[np.ndarray] = None) -> np.ndarray:

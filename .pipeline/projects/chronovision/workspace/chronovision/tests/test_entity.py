@@ -133,7 +133,7 @@ class TestEntity(unittest.TestCase):
         """Test similarity to entity with all zeros."""
         zero_entity = Entity(ticker="ZERO")
         sim = self.entity.similarity_to(zero_entity)
-        self.assertEqual(sim, 0.0)
+        self.assertAlmostEqual(sim, 0.0, places=7)
 
     def test_similarity_symmetry(self):
         """Test that similarity is symmetric."""

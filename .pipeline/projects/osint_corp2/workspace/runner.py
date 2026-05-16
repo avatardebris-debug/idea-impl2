@@ -77,6 +77,8 @@ def parse_master_ideas(filepath: Optional[str] = None) -> List[Dict[str, Any]]:
                 'requires': [],
                 'status': 'pending',
             }
+        elif line.lower().startswith('slug:'):
+            current_idea['slug'] = line.split(':', 1)[1].strip()
         elif line.lower().startswith('requires:') or line.lower().startswith('depends_on:'):
             deps_str = line.split(':', 1)[1].strip()
             current_idea['requires'] = [d.strip() for d in deps_str.split(',') if d.strip()]
@@ -124,7 +126,14 @@ def check_deps_complete(slug: str, deps: List[str], pipeline_dir: Optional[str] 
     if not deps:
         return True
 
-    ideas = parse_master_ideas()
+    # Use pipeline_dir-relative master_ideas.md when provided (e.g. in tests)
+    ideas_path = None
+    if pipeline_dir:
+        candidate = pathlib.Path(pipeline_dir) / "master_ideas.md"
+        if candidate.exists():
+            ideas_path = str(candidate)
+
+    ideas = parse_master_ideas(ideas_path)
     idea_map = {i['slug']: i for i in ideas}
 
     for dep_slug in deps:
@@ -145,23 +154,26 @@ def build_dep_workspace_map(slug: str, deps: List[str], pipeline_dir: Optional[s
     if not deps:
         return {}
 
+    base_dir = pathlib.Path(pipeline_dir) / "projects" if pipeline_dir else PROJECT_DIR / "workspace"
     workspace_map = {}
     for dep_slug in deps:
-        dep_workspace = PROJECT_DIR / "workspace" / dep_slug
+        dep_workspace = base_dir / dep_slug / "workspace"
         if dep_workspace.exists():
             workspace_map[dep_slug] = str(dep_workspace)
-        else:
-            # Check if it's a phase output
-            phase_dir = PROJECT_DIR / "workspace" / f"phase_{dep_slug}"
-            if phase_dir.exists():
-                workspace_map[dep_slug] = str(phase_dir)
 
     return workspace_map
 
 
 def is_idea_blocked(slug: str, pipeline_dir: Optional[str] = None) -> bool:
     """Check if an idea is blocked by incomplete dependencies."""
-    ideas = parse_master_ideas()
+    # Resolve the ideas file from pipeline_dir (for tests) or the default
+    ideas_path = None
+    if pipeline_dir:
+        candidate = pathlib.Path(pipeline_dir) / "master_ideas.md"
+        if candidate.exists():
+            ideas_path = str(candidate)
+
+    ideas = parse_master_ideas(ideas_path)
     idea_map = {i['slug']: i for i in ideas}
     idea = idea_map.get(slug)
     if not idea:

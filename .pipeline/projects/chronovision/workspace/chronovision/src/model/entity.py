@@ -53,6 +53,10 @@ class Entity:
             "momentum_5d", "momentum_20d", "volatility_20d", "rsi",
         ]
     
+    def get_metrics(self) -> Dict[str, float]:
+        """Return metrics as a dictionary."""
+        return {name: getattr(self, name) for name in self.feature_names()}
+    
     def update_from_filing(self, metrics: Dict[str, Any]) -> None:
         """Update entity features from a filing's financial metrics."""
         self.revenue = metrics.get("revenue", self.revenue)

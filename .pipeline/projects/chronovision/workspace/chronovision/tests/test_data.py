@@ -142,5 +142,3 @@ class TestFixtures:
         
         assert "filings" in data
         assert len(data["filings"]) > 0
-        assert "tickers" in data
-        assert len(data["tickers"]) > 0

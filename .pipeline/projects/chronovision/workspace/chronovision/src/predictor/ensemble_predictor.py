@@ -37,11 +37,18 @@ class EnsemblePredictor(BasePredictor):
             raise ValueError("Ensemble not trained")
         
         predictions = []
-        for predictor, weight in zip(self.predictors, self.weights):
-            pred = predictor.predict(X)
-            predictions.append(pred * weight)
+        for predictor in self.predictors:
+            predictions.append(predictor.predict(X))
+            
+        if not predictions:
+            return np.array([])
+            
+        # Find minimum length
+        min_len = min(len(p) for p in predictions)
         
-        return np.sum(predictions, axis=0)
+        # Align and weight
+        aligned = [p[-min_len:] * w for p, w in zip(predictions, self.weights)]
+        return np.sum(aligned, axis=0)
     
     def predict_direction(self, X: np.ndarray) -> np.ndarray:
         """Predict price direction using ensemble."""
@@ -50,11 +57,18 @@ class EnsemblePredictor(BasePredictor):
     
     def evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
         """Evaluate the ensemble."""
+        for predictor in self.predictors:
+            try:
+                predictor.evaluate(X, y)
+            except Exception:
+                pass
         y_pred = self.predict_direction(X)
-        accuracy = np.mean(y_pred == y)
-        precision = self._precision(y, y_pred)
-        recall = self._recall(y, y_pred)
-        f1 = self._f1_score(y, y_pred)
+        y_aligned = y[-len(y_pred):] if len(y_pred) < len(y) else y
+        if len(y_pred) > len(y): y_pred = y_pred[-len(y):]
+        accuracy = np.mean(y_pred == y_aligned)
+        precision = self._precision(y_aligned, y_pred)
+        recall = self._recall(y_aligned, y_pred)
+        f1 = self._f1_score(y_aligned, y_pred)
         
         self.metrics = {
             "accuracy": accuracy,

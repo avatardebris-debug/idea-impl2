@@ -73,8 +73,7 @@ class LLMClient:
             config: LLM configuration. If None, loads from environment.
         """
         self.config = config or LLMConfig.from_env()
-        self._validate_config()
-        self._client = self._init_client()
+        self._client = self._init_client_lazy()
 
     def _validate_config(self) -> None:
         """Validate the configuration."""
@@ -83,6 +82,12 @@ class LLMClient:
                 f"API key is required for {self.config.provider}. "
                 "Set it in config or FIVERR_LLM_API_KEY environment variable."
             )
+
+    def _init_client_lazy(self) -> Any:
+        """Initialize the client lazily — skip if no API key (for test environments)."""
+        if not self.config.api_key and not os.environ.get("FIVERR_LLM_API_KEY"):
+            return None  # Will fail at call time, not construction time
+        return self._init_client()
 
     def _init_client(self) -> Any:
         """Initialize the provider-specific client.
@@ -225,7 +230,14 @@ class LLMClient:
             ValueError: If the API key is not set.
             Exception: If the API call fails after retries.
         """
-        self._validate_config()
+        # Validate at call time, not construction time
+        if not self.config.api_key and not os.environ.get("FIVERR_LLM_API_KEY"):
+            raise ValueError(
+                f"API key is required for {self.config.provider}. "
+                "Set it in config or FIVERR_LLM_API_KEY environment variable."
+            )
+        if self._client is None:
+            self._client = self._init_client()
 
         formatted_messages, system_msg = self._prepare_messages(messages)
 

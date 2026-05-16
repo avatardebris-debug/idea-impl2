@@ -8,9 +8,9 @@ from __future__ import annotations
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Union
 
-from ai_movie_gen_suite.config import AppConfig
+from ai_movie_gen_suite.config import AppConfig, LLMConfig
 from ai_movie_gen_suite.llm_client import LLMClient, LLMMessage, LLMResponse
 from ai_movie_gen_suite.models import Project
 
@@ -29,13 +29,19 @@ class BaseStageGenerator(ABC):
     - Updating the project state
     """
 
-    def __init__(self, config: AppConfig | None = None):
+    def __init__(self, config: Union[AppConfig, LLMConfig, None] = None):
         """Initialize the stage generator.
 
         Args:
-            config: Application configuration. If None, loads from environment.
+            config: Application configuration or LLM configuration. If None, loads from environment.
         """
-        self.config = config or AppConfig()
+        if isinstance(config, LLMConfig):
+            # Test fixtures may pass LLMConfig directly
+            self.config = AppConfig(llm=config)
+        elif isinstance(config, AppConfig):
+            self.config = config
+        else:
+            self.config = AppConfig()
         self.client = LLMClient(self.config.llm)
 
     @abstractmethod

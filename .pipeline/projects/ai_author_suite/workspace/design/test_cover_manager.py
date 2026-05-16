@@ -7,12 +7,15 @@ and A/B testing.
 """
 
 import pytest
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 import json
 import tempfile
 import os
 from pathlib import Path
 
-from ..design.models import (
+from design.models import (
     CoverDesign,
     CoverAnalysis,
     DesignRecommendation,
@@ -27,7 +30,7 @@ from ..design.models import (
     AnalysisCategory,
     RecommendationPriority,
 )
-from ..design.cover_manager import (
+from design.cover_manager import (
     CoverManager,
     create_cover_manager,
     analyze_cover,
@@ -35,7 +38,7 @@ from ..design.cover_manager import (
     optimize_cover,
     run_ab_test,
 )
-from ..design.cover_generator import GenerationResult, Template
+from design.cover_generator import GenerationResult, Template
 
 
 class TestCoverManager:

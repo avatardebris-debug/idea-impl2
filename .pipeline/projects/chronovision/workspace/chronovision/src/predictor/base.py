@@ -31,10 +31,18 @@ class BasePredictor(abc.ABC):
     def evaluate(self, X: np.ndarray, y: np.ndarray) -> Dict[str, float]:
         """Evaluate the predictor on test data."""
         y_pred = self.predict_direction(X)
-        accuracy = np.mean(y_pred == y)
-        precision = self._precision(y, y_pred)
-        recall = self._recall(y, y_pred)
-        f1 = self._f1_score(y, y_pred)
+        
+        # Squeeze arrays to handle (N, 1) vs (N,)
+        if y.ndim == 2 and y.shape[1] == 1: y = y.flatten()
+        if y_pred.ndim == 2 and y_pred.shape[1] == 1: y_pred = y_pred.flatten()
+        
+        y_aligned = y[-len(y_pred):] if len(y_pred) < len(y) else y
+        if len(y_pred) > len(y_aligned): y_pred = y_pred[-len(y_aligned):]
+        
+        accuracy = float(np.mean(y_pred == y_aligned))
+        precision = self._precision(y_aligned, y_pred)
+        recall = self._recall(y_aligned, y_pred)
+        f1 = self._f1_score(y_aligned, y_pred)
         
         self.metrics = {
             "accuracy": accuracy,

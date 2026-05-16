@@ -16,7 +16,7 @@ from keyword_generator import KeywordGenerator, KeywordResult, KeywordPriority
 from transcript_builder import TranscriptBuilder, TranscriptSection
 from template_manager import TemplateManager
 from template_engine import TemplateEngine
-from config import AppConfig
+from config import APIConfig as AppConfig
 
 
 class TestVideoMetadata(unittest.TestCase):

@@ -244,9 +244,10 @@ class TestBuildDepWorkspaceMap(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
-        self.project_dir = pathlib.Path(self.tmpdir) / "projects" / "osint_corp2"
-        self.project_dir.mkdir(parents=True)
-        (self.project_dir / "workspace").mkdir()
+        # New structure: pipeline_dir/projects/<dep_slug>/workspace/
+        self.dep_project_dir = pathlib.Path(self.tmpdir) / "projects" / "dep-one"
+        self.dep_project_dir.mkdir(parents=True)
+        (self.dep_project_dir / "workspace").mkdir()
 
     def tearDown(self):
         shutil.rmtree(self.tmpdir, ignore_errors=True)
@@ -256,15 +257,14 @@ class TestBuildDepWorkspaceMap(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_existing_workspace_mapped(self):
-        dep_workspace = self.project_dir / "workspace" / "dep-one"
-        dep_workspace.mkdir()
+        dep_workspace = self.dep_project_dir / "workspace"
         result = build_dep_workspace_map("test", ["dep-one"], self.tmpdir)
         self.assertIn("dep-one", result)
         self.assertEqual(result["dep-one"], str(dep_workspace))
 
     def test_missing_workspace_not_mapped(self):
-        result = build_dep_workspace_map("test", ["dep-one"], self.tmpdir)
-        self.assertNotIn("dep-one", result)
+        result = build_dep_workspace_map("test", ["nonexistent-dep"], self.tmpdir)
+        self.assertNotIn("nonexistent-dep", result)
 
 
 if __name__ == "__main__":

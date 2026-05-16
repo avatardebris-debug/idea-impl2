@@ -71,6 +71,8 @@ def run_all_checks(
     results: list[HealthCheckResult] = []
 
     results.extend(check_stray_files(project_root, pipeline_dir, active_slug))
+    results.extend(prune_phantom_tests(pipeline_dir, active_slug))
+    results.extend(fix_datetime_utcnow(pipeline_dir, active_slug))
     results.extend(check_workspace_imports(pipeline_dir, active_slug))
     results.extend(check_state_consistency(pipeline_dir, active_slug))
     results.extend(check_workspace_file_paths(pipeline_dir, active_slug))
@@ -242,6 +244,80 @@ def check_stray_files(
 
     return results
 
+
+def prune_phantom_tests(
+    pipeline_dir: pathlib.Path,
+    active_slug: str,
+) -> list[HealthCheckResult]:
+    """Find and delete test files that are outside the tests/ directory."""
+    results: list[HealthCheckResult] = []
+    if not active_slug:
+        return results
+
+    workspace = pipeline_dir / "projects" / active_slug / "workspace"
+    if not workspace.exists():
+        return results
+
+    tests_dir = workspace / "tests"
+    if not tests_dir.exists() or not tests_dir.is_dir():
+        return results
+
+    # Find test_*.py files that are not in the tests/ directory
+    for f in workspace.rglob("test_*.py"):
+        try:
+            # Check if tests_dir is a parent
+            f.relative_to(tests_dir)
+        except ValueError:
+            # Not in tests_dir -> phantom test!
+            try:
+                f.unlink()
+                results.append(HealthCheckResult(
+                    "phantom_test", "warning",
+                    f"Deleted stray test file: {f.relative_to(workspace)}",
+                    auto_fixed=True,
+                    fix_detail="Removed to prevent cross-contamination during pytest runs",
+                ))
+            except OSError:
+                pass
+
+    return results
+
+
+def fix_datetime_utcnow(
+    pipeline_dir: pathlib.Path,
+    active_slug: str,
+) -> list[HealthCheckResult]:
+    """Replace datetime.utcnow() with datetime.now(timezone.utc) across all python files."""
+    results: list[HealthCheckResult] = []
+    if not active_slug:
+        return results
+
+    workspace = pipeline_dir / "projects" / active_slug / "workspace"
+    if not workspace.exists():
+        return results
+
+    fixed_count = 0
+    for py in workspace.rglob("*.py"):
+        try:
+            content = py.read_text(encoding="utf-8")
+            if "datetime.utcnow()" in content:
+                new_content = content.replace("datetime.utcnow()", "datetime.now(timezone.utc)")
+                if "from datetime import timezone" not in new_content and "import datetime" not in new_content:
+                    # simplistic injection, better than nothing if missing
+                    new_content = "from datetime import timezone\n" + new_content
+                py.write_text(new_content, encoding="utf-8")
+                fixed_count += 1
+        except Exception:
+            pass
+
+    if fixed_count > 0:
+        results.append(HealthCheckResult(
+            "datetime_deprecation", "info",
+            f"Auto-fixed datetime.utcnow() deprecation warnings in {fixed_count} file(s)",
+            auto_fixed=True,
+        ))
+
+    return results
 
 # ---------------------------------------------------------------------------
 # Check 2: Import resolution

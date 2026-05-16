@@ -92,8 +92,8 @@ class Camera:
 
     @property
     def up(self) -> Vector3:
-        """Compute the up direction vector."""
-        return self.forward.cross(self.right).normalized()
+        """Compute the up direction vector (right cross forward gives +Y for default orientation)."""
+        return self.right.cross(self.forward).normalized()
 
     @property
     def target(self) -> Vector3:

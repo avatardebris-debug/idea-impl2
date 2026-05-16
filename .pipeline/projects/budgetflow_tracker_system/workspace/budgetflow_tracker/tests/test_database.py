@@ -6,7 +6,7 @@ import tempfile
 import pytest
 
 # Add workspace to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'budgetflow_tracker'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from src.core.database import Database, get_database, reset_database
 

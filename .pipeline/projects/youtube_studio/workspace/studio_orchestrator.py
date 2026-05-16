@@ -5,6 +5,12 @@ This module provides the StudioOrchestrator class that coordinates all
 YouTube Studio components for generating complete video metadata.
 """
 
+import sys
+import pathlib
+# Ensure the workspace directory is on sys.path so sibling modules resolve
+# correctly when pytest is run from the repo root rather than this directory.
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
@@ -23,6 +29,7 @@ from constants import (
     MAX_NUMBER_OF_KEYWORDS,
     MIN_NUMBER_OF_KEYWORDS,
 )
+
 
 
 @dataclass
@@ -107,13 +114,26 @@ class StudioOrchestrator:
             config: Configuration object
         """
         self.config = config or get_config()
-        self.title_generator = title_generator or TitleGenerator(
-            max_length=self.config.get_title_config().max_length
+        _max_len = (
+            self.config.get_title_config().max_length
+            if hasattr(self.config, 'get_title_config')
+            else MAX_TITLE_LENGTH
         )
+        self.title_generator = title_generator or TitleGenerator(max_length=_max_len)
         self.thumbnail_generator = thumbnail_generator or ThumbnailGenerator()
+        _min_kw = (
+            self.config.get_keyword_config().min_keywords
+            if hasattr(self.config, 'get_keyword_config')
+            else MIN_NUMBER_OF_KEYWORDS
+        )
+        _max_kw = (
+            self.config.get_keyword_config().max_keywords
+            if hasattr(self.config, 'get_keyword_config')
+            else MAX_NUMBER_OF_KEYWORDS
+        )
         self.keyword_generator = keyword_generator or KeywordGenerator(
-            min_keywords=self.config.get_keyword_config().min_keywords,
-            max_keywords=self.config.get_keyword_config().max_keywords
+            min_keywords=_min_kw,
+            max_keywords=_max_kw,
         )
         self.template_manager = template_manager or TemplateManager()
         self.template_engine = template_engine or TemplateEngine()

@@ -69,6 +69,12 @@ _IMPORT_TO_PIP: dict[str, str | None] = {
     "pytube": "pytube",
     "pydub": "pydub",
     "moviepy": "moviepy",
+    "webvtt": "webvtt-py",
+    "tree_sitter_python": "tree-sitter-python",
+    "tree_sitter_javascript": "tree-sitter-javascript",
+    "tree_sitter_typescript": "tree-sitter-typescript",
+    "sentence_transformers": "sentence-transformers",
+    "spacy": "spacy",
     # Web frameworks
     "flask": "flask",
     "fastapi": "fastapi",
@@ -336,6 +342,9 @@ class ValidatorAgent(AgentProcess):
         raw_tasks = self.read_state_file(tasks_path)
         tasks_content = self._extract_phase_tasks(raw_tasks, phase_num)
 
+        tests_dir = ws / "tests"
+        pytest_target = " tests/" if tests_dir.exists() and tests_dir.is_dir() else ""
+
         task_prompt = (
             f"You are validating Phase {phase_num} code output.\n"
             f"IMPORTANT: You are ONLY validating Phase {phase_num}. "
@@ -347,7 +356,7 @@ class ValidatorAgent(AgentProcess):
             f"## Your Job — BE EFFICIENT (you have limited steps)\n"
             f"NOTE: Dependencies and a conftest.py (sys.path fix) have already been set up.\n\n"
             f"STEP 1: Run tests FIRST (most important):\n"
-            f"   `cd {workspace_path} && python -m pytest -v --tb=short --timeout=120 -p no:timeout 2>&1 || true`\n"
+            f"   `cd {workspace_path} && python -m pytest{pytest_target} -v --tb=short --timeout=120 -p no:timeout 2>&1 || true`\n"
             f"   The --timeout=120 flag kills any single test that hangs beyond 2 minutes.\n"
             f"   If pytest-timeout is not installed: `pip install pytest-timeout -q` first, then run.\n"
             f"   If no test files exist, note 'No tests found'.\n\n"
@@ -506,6 +515,10 @@ class ValidatorAgent(AgentProcess):
             else:
                 progress_note = "↓ improving" if made_progress else "→ stalled"
 
+                mock_hint = ""
+                if "AssertionError: Expected mock" in report_content or "AttributeError: <" in report_content or "does not have the attribute" in report_content:
+                    mock_hint = "\n\n💡 HINT: You have mocking errors. Check if your @patch decorators are mocking the target where it is IMPORTED (e.g. `@patch('module_under_test.Dependency')`), not where it is DEFINED."
+
                 # --- Write persistent fix_report.md with full context ---
                 fix_report_path = f"phases/phase_{phase_num}/fix_report.md"
                 fix_report_full = pathlib.Path(self._project_path(fix_report_path))
@@ -569,6 +582,7 @@ class ValidatorAgent(AgentProcess):
                                 f"Validation FAILED — attempt {retry_count}, "
                                 f"{current_failures} failures ({progress_note}). "
                                 f"Read fix_report.md for full details + previous attempts."
+                                f"{mock_hint}"
                             ),
                             "idea_slug": idea_slug,
                         },

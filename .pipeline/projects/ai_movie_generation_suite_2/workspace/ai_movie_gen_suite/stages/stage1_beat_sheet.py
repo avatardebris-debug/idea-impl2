@@ -76,6 +76,12 @@ class Stage1BeatSheetGenerator(BaseStageGenerator):
     beat sheet with 15 beats.
     """
 
+    stage_name = "Stage1BeatSheetGenerator"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 1: Beat Sheet Generator"
+
     def execute(self, project: Project) -> Project:
         """Execute Stage 1: Generate the beat sheet.
 

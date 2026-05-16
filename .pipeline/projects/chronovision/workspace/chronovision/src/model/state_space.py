@@ -64,7 +64,9 @@ class StateSpace:
                 # Same sector or industry gets higher weight
                 sector_match = 1.0 if entity.sector == other.sector else 0.5
                 industry_match = 1.0 if entity.industry == other.industry else 0.0
-                price_sim = 1.0 / (1.0 + abs(math.log(entity.price / other.price) + 1e-10))
+                safe_other_price = max(other.price, 1e-10)
+                safe_entity_price = max(entity.price, 1e-10)
+                price_sim = 1.0 / (1.0 + abs(math.log(safe_entity_price / safe_other_price) + 1e-10))
                 score = sector_match + industry_match + price_sim * 0.5
                 neighbors.append((other_ticker, score))
             neighbors.sort(key=lambda x: x[1], reverse=True)
@@ -100,7 +102,7 @@ class StateSpace:
     
     def propagate_state(self, steps: int = 1) -> Dict[str, float]:
         """Propagate states through the graph for a given number of steps."""
-        if not self.transition_matrix or self.transition_matrix.size == 0:
+        if self.transition_matrix is None or self.transition_matrix.size == 0:
             return {}
         
         tickers = sorted(self.entities.keys())
@@ -116,7 +118,7 @@ class StateSpace:
         
         # Propagate
         for _ in range(steps):
-            state = self.transition_matrix @ state
+            state = state @ self.transition_matrix
         
         # Convert back to dict
         result = {t: float(s) for t, s in zip(tickers, state)}

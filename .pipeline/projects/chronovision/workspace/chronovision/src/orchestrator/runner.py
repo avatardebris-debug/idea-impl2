@@ -167,6 +167,6 @@ class Runner:
     
     def get_predictions(self) -> Dict[str, Any]:
         """Get the latest predictions."""
-        if "run_predictions" in self.workflow.context:
+        if self.workflow and "run_predictions" in self.workflow.context:
             return self.workflow.context["run_predictions"]
         return {}

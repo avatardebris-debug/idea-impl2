@@ -38,6 +38,7 @@ class LSTMModel:
         
         # Output layer
         y = h @ self.W_hy + self.b_y
+        self.h = h
         return y
     
     def train(self, X: np.ndarray, y: np.ndarray, epochs: int = 100, lr: float = 0.01) -> List[float]:
@@ -61,15 +62,15 @@ class LSTMModel:
             dh = error @ self.W_hy.T
             
             # Update weights (simplified)
-            self.W_hy -= lr * np.mean(dh[:, np.newaxis] * h[:, np.newaxis, :], axis=0)
-            self.b_y -= lr * np.mean(error)
+            self.W_hy -= lr * (self.h.T @ error) / batch_size
+            self.b_y -= lr * np.mean(error, axis=0)
             
             # Update hidden weights (simplified)
             for t in range(X.shape[1]):
                 x_t = X[:, t, :]
-                dh_x = dh * (1 - h ** 2)
+                dh_x = dh * (1 - self.h ** 2)
                 self.W_xh -= lr * (x_t.T @ dh_x) / batch_size
-                self.W_hh -= lr * (h.T @ dh_x) / batch_size
+                self.W_hh -= lr * (self.h.T @ dh_x) / batch_size
                 self.b_h -= lr * np.mean(dh_x, axis=0)
         
         self.is_trained = True

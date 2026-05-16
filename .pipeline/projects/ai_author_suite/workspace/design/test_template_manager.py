@@ -1,6 +1,9 @@
 """Tests for the Design Template Manager."""
 
 import pytest
+import sys
+import pathlib
+sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
 from design.template_manager import TemplateManager, DesignTemplate, DesignStyle, ColorScheme, TypographyStyle
 
 

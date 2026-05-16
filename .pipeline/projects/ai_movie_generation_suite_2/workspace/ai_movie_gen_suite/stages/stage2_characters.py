@@ -34,7 +34,7 @@ provide:
 - description: Physical and personality description (2-4 sentences)
 - motivation: What drives this character
 - arc: Character arc / transformation throughout the story
-- relationships: Dict of relationships to other characters (e.g., {"Alice": "best friend"})
+- relationships: Dict of relationships to other characters (e.g., {{"Alice": "best friend"}})
 
 Respond with a JSON object matching this schema:
 {{
@@ -62,6 +62,12 @@ class Stage2CharacterGenerator(BaseStageGenerator):
 
     This stage takes a beat sheet and produces detailed character profiles.
     """
+
+    stage_name = "Stage2CharacterGenerator"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 2: Character Generator"
 
     def execute(self, project: Project) -> Project:
         """Execute Stage 2: Generate the character registry.

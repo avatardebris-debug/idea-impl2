@@ -28,20 +28,13 @@ class TestXGBoostPredictor:
         assert predictor.max_depth == 8
         assert predictor.learning_rate == 0.05
     
+    @patch('chronovision.src.predictor.xgboost_predictor.xgb', None)
     def test_train_import_error(self):
         """Test training with missing xgboost."""
         predictor = XGBoostPredictor()
         
-        with patch.dict('sys.modules', {'xgboost': None}):
-            # Force ImportError by removing xgboost from modules
-            import sys
-            xgb_module = sys.modules.pop('xgboost', None)
-            try:
-                with pytest.raises(ImportError, match="xgboost is required"):
-                    predictor.train(np.array([[1, 2]]), np.array([1]))
-            finally:
-                if xgb_module:
-                    sys.modules['xgboost'] = xgb_module
+        with pytest.raises(ImportError, match="xgboost is required"):
+            predictor.train(np.array([[1, 2]]), np.array([1]))
     
     @patch('chronovision.src.predictor.xgboost_predictor.xgb')
     def test_train(self, mock_xgb):
@@ -201,6 +194,7 @@ class TestXGBoostPredictor:
         
         # Multiple samples
         X = np.array([[1, 2], [3, 4], [5, 6]])
+        mock_model.predict.return_value = np.array([0.8, 0.7, 0.6])
         predictions = predictor.predict(X)
         assert len(predictions) == 3
     

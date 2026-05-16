@@ -63,6 +63,12 @@ class Stage4SceneDescriptionGenerator(BaseStageGenerator):
     This stage takes a script and produces detailed visual direction for each scene.
     """
 
+    stage_name = "Stage4SceneDescriptionGenerator"
+
+    def get_stage_name(self) -> str:
+        """Return the name of this stage."""
+        return "Stage 4: Scene Description Generator"
+
     def execute(self, project: Project) -> Project:
         """Execute Stage 4: Generate scene descriptions.
 

@@ -1,0 +1,25 @@
+{
+  "pipeline_id": "PIPE-1B260162",
+  "name": "Lifecycle Test",
+  "opportunities": [
+    {
+      "opportunity_id": "OPP-32C01145",
+      "client_name": "Acme Corp",
+      "client_email": "contact@acme.com",
+      "service_title": "Website Redesign & Optimization",
+      "stage": "won",
+      "score": 0.4135714285714286,
+      "proposal_id": null,
+      "created_at": "2026-05-15T07:43:57.702803",
+      "updated_at": "2026-05-15T07:43:57.702821",
+      "notes": "",
+      "metadata": {
+        "sop_version": 1,
+        "client_industry": "Technology",
+        "client_budget_range": "$5000-$15000"
+      }
+    }
+  ],
+  "created_at": "2026-05-15T07:43:57.703120",
+  "updated_at": "2026-05-15T07:43:57.725310"
+}
