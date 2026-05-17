@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "research1"
+version = "0.1.0"
+description = "Multi-source research assistant: arXiv + PubMed + Wikipedia + credible web → markdown report"
+requires-python = ">=3.10"
+dependencies = []   # stdlib only — no pip installs required
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov", "responses>=0.25"]
+
+[project.scripts]
+research1 = "research1.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["research1*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
