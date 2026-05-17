@@ -75,46 +75,6 @@ class BacktestVisualizer:
         else:
             plt.show()
 
-    def plot_equity_curves_comparison(
-        self,
-        equity_curves: Dict[str, pd.Series],
-        title: str = "Equity Curves Comparison",
-        output_path: Optional[str] = None,
-    ) -> None:
-        """Plot multiple equity curves on the same chart.
-
-        Args:
-            equity_curves: Dict mapping strategy names to equity curve Series.
-            title: Chart title.
-            output_path: Optional file path to save the figure.
-        """
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-
-        fig, ax = plt.subplots(figsize=self.figsize)
-
-        colors = ["#4ecdc4", "#ff6b6b", "#45b7d1", "#f9ca24", "#6c5ce7",
-                  "#a8e6cf", "#fd79a8", "#e17055", "#00b894", "#636e72"]
-
-        for i, (name, equity_curve) in enumerate(equity_curves.items()):
-            color = colors[i % len(colors)]
-            ax.plot(equity_curve, label=name, color=color, linewidth=1.5)
-
-        ax.set_title(title, fontsize=14, fontweight="bold")
-        ax.set_xlabel("Trading Days", fontsize=12)
-        ax.set_ylabel("Equity Multiplier", fontsize=12)
-        ax.legend(loc="upper left", fontsize=10)
-        ax.grid(True, alpha=0.3)
-
-        fig.tight_layout()
-
-        if output_path:
-            fig.savefig(output_path, dpi=self.dpi, bbox_inches="tight")
-            plt.close(fig)
-        else:
-            plt.show()
-
     def plot_drawdown(
         self,
         equity_curve: pd.Series,

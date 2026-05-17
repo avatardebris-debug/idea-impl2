@@ -10,6 +10,9 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings loaded from environment / .env file."""
 
+    # App
+    app_version: str = "0.1.0"
+
     # LLM
     llm_provider: str = "openai"  # "openai" | "local"
     openai_api_key: str = ""
@@ -26,9 +29,6 @@ class Settings(BaseSettings):
 
     # Citation
     default_citation_style: str = "apa"  # apa | mla | chicago | ieee
-
-    # App
-    app_version: str = "0.1.0"
 
     # Generation
     max_tokens: int = 4096

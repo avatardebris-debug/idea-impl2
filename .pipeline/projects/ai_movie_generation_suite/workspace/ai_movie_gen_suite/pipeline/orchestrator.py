@@ -6,7 +6,6 @@ Orchestrates the sequence: Logline -> Beat Sheet -> Characters -> Script -> Scen
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, Dict, List, Optional
 
 from ai_movie_gen_suite.formatters.fdx_formatter import FDXFormatter
@@ -40,19 +39,9 @@ class PipelineConfig:
         use_llm: bool = False,
         llm_client: Any = None,
     ):
-        # Validate required inputs
-        if not logline or not logline.strip():
-            raise ValueError("logline must be a non-empty string")
-        if not title or not title.strip():
-            raise ValueError("title must be a non-empty string")
-        if not genre or not genre.strip():
-            raise ValueError("genre must be a non-empty string")
-        if output_format not in ("json", "yaml", "fdx"):
-            raise ValueError(f"Unsupported output format: {output_format}. Must be one of: json, yaml, fdx")
-
-        self.logline = logline.strip()
-        self.title = title.strip()
-        self.genre = genre.strip()
+        self.logline = logline
+        self.title = title
+        self.genre = genre
         self.tone = tone
         self.output_format = output_format
         self.output_dir = output_dir
@@ -78,45 +67,20 @@ class MovieGenerationPipeline:
         logger.info(f"Genre: {self.config.genre}")
         logger.info(f"Tone: {self.config.tone or 'Not specified'}")
 
-        try:
-            # Step 1: Generate beat sheet
-            self._generate_beat_sheet()
-        except Exception as e:
-            logger.error(f"Step 1 failed: {e}")
-            self._results["error"] = f"Beat sheet generation failed: {e}"
-            raise
+        # Step 1: Generate beat sheet
+        self._generate_beat_sheet()
 
-        try:
-            # Step 2: Generate characters
-            self._generate_characters()
-        except Exception as e:
-            logger.error(f"Step 2 failed: {e}")
-            self._results["error"] = f"Character generation failed: {e}"
-            raise
+        # Step 2: Generate characters
+        self._generate_characters()
 
-        try:
-            # Step 3: Write script
-            self._write_script()
-        except Exception as e:
-            logger.error(f"Step 3 failed: {e}")
-            self._results["error"] = f"Script writing failed: {e}"
-            raise
+        # Step 3: Write script
+        self._write_script()
 
-        try:
-            # Step 4: Generate scene descriptions
-            self._generate_scene_descriptions()
-        except Exception as e:
-            logger.error(f"Step 4 failed: {e}")
-            self._results["error"] = f"Scene description generation failed: {e}"
-            raise
+        # Step 4: Generate scene descriptions
+        self._generate_scene_descriptions()
 
         # Step 5: Format output
-        try:
-            self._format_output()
-        except Exception as e:
-            logger.error(f"Step 5 failed: {e}")
-            self._results["error"] = f"Output formatting failed: {e}"
-            raise
+        self._format_output()
 
         logger.info("Pipeline complete")
         return self._results
@@ -204,13 +168,6 @@ class MovieGenerationPipeline:
         """Format and save output files."""
         logger.info("Step 5: Formatting output")
 
-        # Ensure output directory exists
-        os.makedirs(self.config.output_dir, exist_ok=True)
-
-        # Determine output filename using os.path.join for portability
-        safe_title = self.config.title.lower().replace(" ", "_")
-        output_path = os.path.join(self.config.output_dir, f"{safe_title}.{self.config.output_format}")
-
         if self.config.output_format == "json":
             formatter = JSONFormatter(
                 script=self.script,
@@ -218,6 +175,7 @@ class MovieGenerationPipeline:
                 characters=self.character_registry,
                 scene_descriptions=self.scene_descriptions,
             )
+            output_path = f"{self.config.output_dir}/{self.config.title.lower().replace(' ', '_')}.json"
             formatter.save(output_path)
             self._results["output_path"] = output_path
             logger.info(f"JSON output saved to {output_path}")
@@ -229,18 +187,17 @@ class MovieGenerationPipeline:
                 characters=self.character_registry,
                 scene_descriptions=self.scene_descriptions,
             )
+            output_path = f"{self.config.output_dir}/{self.config.title.lower().replace(' ', '_')}.yaml"
             formatter.save(output_path)
             self._results["output_path"] = output_path
             logger.info(f"YAML output saved to {output_path}")
 
         elif self.config.output_format == "fdx":
-            # FDX requires script to be non-None
-            if self.script is None:
-                raise ValueError("Script is required for FDX output but was not generated")
             formatter = FDXFormatter(
                 script=self.script,
                 scene_descriptions=self.scene_descriptions,
             )
+            output_path = f"{self.config.output_dir}/{self.config.title.lower().replace(' ', '_')}.fdx"
             formatter.save(output_path)
             self._results["output_path"] = output_path
             logger.info(f"FDX output saved to {output_path}")

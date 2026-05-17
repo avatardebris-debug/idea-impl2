@@ -4588,3 +4588,955 @@
 2026-05-15 16:26:00,125 - src.api.client - INFO - Initializing FiverrAPIClient
 2026-05-15 16:26:00,126 - src.api.client - INFO - FiverrAPIClient initialization complete
 2026-05-15 16:26:00,127 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:08:50,930 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,930 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,931 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,931 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,932 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,932 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,934 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,934 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,934 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:08:50,935 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,935 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,935 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:08:50,935 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:08:50,936 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,936 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,937 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:08:50,937 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:08:50,938 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,938 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,938 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:08:50,939 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,939 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,941 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,942 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,942 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:08:50,942 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:08:50,943 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,943 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,944 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:08:50,944 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:08:50,944 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:08:50,944 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:08:50,955 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:08:50,955 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:12:06,488 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,489 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,490 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,490 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,491 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,491 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,492 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,492 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,492 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:12:06,493 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,493 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,493 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:12:06,493 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:12:06,495 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,495 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,495 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:12:06,495 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:12:06,496 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,496 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,496 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:12:06,498 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,498 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,500 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,500 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,500 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:12:06,500 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:12:06,501 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,501 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,502 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:12:06,502 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:12:06,503 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:12:06,503 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:12:06,514 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:12:06,514 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:18:43,599 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,599 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,600 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,600 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,601 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,601 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,602 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,602 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,603 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:18:43,603 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,604 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,604 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:18:43,604 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:18:43,605 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,605 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,605 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:18:43,605 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:18:43,606 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,606 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,606 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:18:43,607 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,607 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,610 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,610 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,610 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:18:43,610 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:18:43,611 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,611 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,612 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:18:43,612 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:18:43,612 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:18:43,612 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:18:43,623 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:18:43,624 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:20:41,961 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,961 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,962 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,962 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,963 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,963 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,965 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,965 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,965 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:20:41,966 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,966 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,966 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:20:41,966 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:20:41,967 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,967 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,968 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:20:41,968 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:20:41,969 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,969 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,969 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:20:41,970 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,970 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,972 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,973 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,973 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:20:41,973 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:20:41,974 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,974 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,975 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:20:41,975 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:20:41,975 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:20:41,975 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:20:41,988 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:20:41,988 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:22:38,973 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,973 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,974 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,974 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,975 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,975 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,977 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,977 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,977 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:22:38,978 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,978 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,978 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:22:38,978 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:22:38,979 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,979 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,980 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:22:38,980 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:22:38,980 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,981 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,981 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:22:38,982 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,982 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,984 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,984 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,985 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:22:38,985 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:22:38,986 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,986 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,987 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:22:38,987 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:22:38,987 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:22:38,987 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:22:38,998 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:22:38,998 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:24:35,070 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,071 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,071 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,072 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,072 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,073 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,074 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,074 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,074 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:24:35,075 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,075 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,075 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:24:35,075 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:24:35,076 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,076 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,076 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:24:35,077 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:24:35,077 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,077 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,078 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:24:35,079 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,079 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,081 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,081 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,081 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:24:35,081 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:24:35,082 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,082 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,083 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:24:35,083 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:24:35,084 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:24:35,084 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:24:35,095 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:24:35,095 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:26:31,699 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,699 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,700 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,701 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,701 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,701 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,703 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,703 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,703 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:26:31,704 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,704 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,704 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:26:31,704 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:26:31,705 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,705 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,705 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:26:31,705 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:26:31,706 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,706 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,707 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:26:31,708 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,708 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,710 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,710 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,710 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:26:31,710 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:26:31,711 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,711 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,712 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:26:31,712 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:26:31,712 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:26:31,713 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:26:31,723 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:26:31,723 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:28:24,435 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,435 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,436 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,436 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,437 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,437 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,439 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,439 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,439 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:28:24,440 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,440 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,440 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:28:24,440 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:28:24,441 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,441 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,441 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:28:24,441 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:28:24,442 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,442 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,443 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:28:24,444 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,444 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,446 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,446 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,447 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:28:24,447 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:28:24,448 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,448 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,449 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:28:24,449 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:28:24,449 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:28:24,449 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:28:24,460 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:28:24,460 - src.engine - INFO - Engine initialization complete
+2026-05-16 14:35:42,395 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,396 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,396 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,397 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,398 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,398 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,399 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,399 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,399 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:35:42,400 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,400 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,400 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:35:42,400 - src.engine - WARNING - Automation engine is already running
+2026-05-16 14:35:42,401 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,402 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,402 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:35:42,402 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:35:42,403 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,403 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,403 - src.engine - WARNING - Automation engine is not running
+2026-05-16 14:35:42,404 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,404 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,407 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,407 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,407 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-16 14:35:42,407 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-16 14:35:42,408 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,408 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,409 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-16 14:35:42,409 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-16 14:35:42,409 - src.engine - INFO - Initializing engine and API connection
+2026-05-16 14:35:42,409 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-16 14:35:42,421 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-16 14:35:42,421 - src.engine - INFO - Engine initialization complete
+2026-05-17 11:35:46,908 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,908 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,909 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,909 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,910 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,910 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,911 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,911 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,912 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 11:35:46,912 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,913 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,913 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 11:35:46,913 - src.engine - WARNING - Automation engine is already running
+2026-05-17 11:35:46,914 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,914 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,914 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 11:35:46,914 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 11:35:46,915 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,915 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,915 - src.engine - WARNING - Automation engine is not running
+2026-05-17 11:35:46,916 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,917 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,919 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,919 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,919 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 11:35:46,919 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 11:35:46,920 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,920 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,921 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 11:35:46,921 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 11:35:46,921 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 11:35:46,921 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 11:35:46,922 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 11:35:46,922 - src.engine - INFO - Engine initialization complete
+2026-05-17 12:03:47,595 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,595 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,596 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,596 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,597 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,597 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,598 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,598 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,598 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 12:03:47,599 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,599 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,600 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 12:03:47,600 - src.engine - WARNING - Automation engine is already running
+2026-05-17 12:03:47,601 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,601 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,601 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 12:03:47,601 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 12:03:47,602 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,602 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,602 - src.engine - WARNING - Automation engine is not running
+2026-05-17 12:03:47,603 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,603 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,605 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,606 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,606 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 12:03:47,606 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 12:03:47,607 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,607 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,608 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 12:03:47,608 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 12:03:47,608 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 12:03:47,608 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 12:03:47,609 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 12:03:47,609 - src.engine - INFO - Engine initialization complete
+2026-05-17 14:27:57,087 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,087 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,088 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,088 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,089 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,089 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,090 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,091 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,091 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:27:57,092 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,092 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,092 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:27:57,092 - src.engine - WARNING - Automation engine is already running
+2026-05-17 14:27:57,093 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,093 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,093 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:27:57,093 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:27:57,094 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,094 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,095 - src.engine - WARNING - Automation engine is not running
+2026-05-17 14:27:57,096 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,096 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,098 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,098 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,098 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:27:57,098 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:27:57,099 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,099 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,100 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:27:57,100 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:27:57,101 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 14:27:57,101 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 14:27:57,101 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 14:27:57,101 - src.engine - INFO - Engine initialization complete
+2026-05-17 14:29:56,777 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,777 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,778 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,779 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,779 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,780 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,781 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,781 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,781 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:29:56,782 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,782 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,782 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:29:56,782 - src.engine - WARNING - Automation engine is already running
+2026-05-17 14:29:56,783 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,784 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,784 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:29:56,784 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:29:56,785 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,785 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,785 - src.engine - WARNING - Automation engine is not running
+2026-05-17 14:29:56,786 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,786 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,788 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,788 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,789 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:29:56,789 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:29:56,790 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,790 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,791 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:29:56,791 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:29:56,791 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 14:29:56,791 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 14:29:56,791 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 14:29:56,792 - src.engine - INFO - Engine initialization complete
+2026-05-17 14:31:50,818 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,818 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,819 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,819 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,820 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,820 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,821 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,821 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,822 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:31:50,822 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,823 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,823 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:31:50,823 - src.engine - WARNING - Automation engine is already running
+2026-05-17 14:31:50,824 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,824 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,824 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:31:50,824 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:31:50,825 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,825 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,825 - src.engine - WARNING - Automation engine is not running
+2026-05-17 14:31:50,826 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,826 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,828 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,828 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,829 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:31:50,829 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:31:50,830 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,830 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,831 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:31:50,831 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:31:50,831 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 14:31:50,831 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 14:31:50,831 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 14:31:50,832 - src.engine - INFO - Engine initialization complete
+2026-05-17 14:45:17,713 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,713 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,714 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,714 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,715 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,715 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,716 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,716 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,717 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:45:17,717 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,717 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,718 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:45:17,718 - src.engine - WARNING - Automation engine is already running
+2026-05-17 14:45:17,719 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,719 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,719 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:45:17,719 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:45:17,720 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,720 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,720 - src.engine - WARNING - Automation engine is not running
+2026-05-17 14:45:17,721 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,722 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,724 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,724 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,724 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 14:45:17,724 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 14:45:17,725 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,725 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,726 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 14:45:17,726 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 14:45:17,726 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 14:45:17,726 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 14:45:17,727 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 14:45:17,727 - src.engine - INFO - Engine initialization complete
+2026-05-17 15:00:40,639 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,639 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,640 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,641 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,641 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,642 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,643 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,643 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,643 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:00:40,644 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,644 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,644 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:00:40,644 - src.engine - WARNING - Automation engine is already running
+2026-05-17 15:00:40,645 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,646 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,646 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:00:40,646 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:00:40,647 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,647 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,647 - src.engine - WARNING - Automation engine is not running
+2026-05-17 15:00:40,648 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,648 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,650 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,650 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,651 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:00:40,651 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:00:40,652 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,652 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,653 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:00:40,653 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:00:40,653 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 15:00:40,653 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 15:00:40,654 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 15:00:40,654 - src.engine - INFO - Engine initialization complete
+2026-05-17 15:02:41,083 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,083 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,084 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,085 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,085 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,085 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,087 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,087 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,087 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:02:41,088 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,088 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,088 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:02:41,088 - src.engine - WARNING - Automation engine is already running
+2026-05-17 15:02:41,089 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,089 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,089 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:02:41,089 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:02:41,090 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,090 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,091 - src.engine - WARNING - Automation engine is not running
+2026-05-17 15:02:41,092 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,092 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,094 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,094 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,094 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:02:41,094 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:02:41,095 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,095 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,096 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:02:41,096 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:02:41,096 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 15:02:41,096 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 15:02:41,097 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 15:02:41,097 - src.engine - INFO - Engine initialization complete
+2026-05-17 15:04:39,365 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,366 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,367 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,367 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,368 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,368 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,369 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,369 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,370 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:04:39,371 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,371 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,371 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:04:39,371 - src.engine - WARNING - Automation engine is already running
+2026-05-17 15:04:39,372 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,372 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,373 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:04:39,373 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:04:39,374 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,374 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,374 - src.engine - WARNING - Automation engine is not running
+2026-05-17 15:04:39,375 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,375 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,378 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,378 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,378 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:04:39,378 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:04:39,379 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,379 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,380 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:04:39,380 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:04:39,381 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 15:04:39,381 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 15:04:39,381 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 15:04:39,381 - src.engine - INFO - Engine initialization complete
+2026-05-17 15:27:59,609 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,609 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,610 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,610 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,611 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,611 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,612 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,612 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,613 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:27:59,614 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,614 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,614 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:27:59,614 - src.engine - WARNING - Automation engine is already running
+2026-05-17 15:27:59,615 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,615 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,615 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:27:59,615 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:27:59,616 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,616 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,616 - src.engine - WARNING - Automation engine is not running
+2026-05-17 15:27:59,618 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,618 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,620 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,620 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,620 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:27:59,620 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:27:59,621 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,621 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,622 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:27:59,622 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:27:59,622 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 15:27:59,622 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 15:27:59,623 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 15:27:59,623 - src.engine - INFO - Engine initialization complete
+2026-05-17 15:57:12,820 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,820 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,821 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,822 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,822 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,823 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,824 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,824 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,824 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:57:12,825 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,825 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,825 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:57:12,825 - src.engine - WARNING - Automation engine is already running
+2026-05-17 15:57:12,826 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,826 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,827 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:57:12,827 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:57:12,827 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,827 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,828 - src.engine - WARNING - Automation engine is not running
+2026-05-17 15:57:12,829 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,829 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,831 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,831 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,831 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 15:57:12,831 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 15:57:12,832 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,832 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,833 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 15:57:12,833 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 15:57:12,834 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 15:57:12,834 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 15:57:12,834 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 15:57:12,834 - src.engine - INFO - Engine initialization complete
+2026-05-17 16:38:51,921 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,921 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,922 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,922 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,923 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,923 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,924 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,924 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,924 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:38:51,925 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,925 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,925 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:38:51,926 - src.engine - WARNING - Automation engine is already running
+2026-05-17 16:38:51,927 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,927 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,927 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:38:51,927 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:38:51,928 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,928 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,928 - src.engine - WARNING - Automation engine is not running
+2026-05-17 16:38:51,929 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,929 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,931 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,931 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,932 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:38:51,932 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:38:51,932 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,933 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,934 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:38:51,934 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:38:51,934 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 16:38:51,934 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 16:38:51,934 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 16:38:51,934 - src.engine - INFO - Engine initialization complete
+2026-05-17 16:40:47,440 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,441 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,442 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,442 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,443 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,443 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,444 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,444 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,444 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:40:47,445 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,445 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,445 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:40:47,445 - src.engine - WARNING - Automation engine is already running
+2026-05-17 16:40:47,447 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,447 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,448 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:40:47,448 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:40:47,448 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,448 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,449 - src.engine - WARNING - Automation engine is not running
+2026-05-17 16:40:47,450 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,450 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,452 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,452 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,452 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:40:47,452 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:40:47,453 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,453 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,454 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:40:47,454 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:40:47,455 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 16:40:47,455 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 16:40:47,455 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 16:40:47,455 - src.engine - INFO - Engine initialization complete
+2026-05-17 16:42:41,641 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,641 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,642 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,642 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,643 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,643 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,644 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,644 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,644 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:42:41,645 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,645 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,646 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:42:41,646 - src.engine - WARNING - Automation engine is already running
+2026-05-17 16:42:41,647 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,647 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,647 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:42:41,647 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:42:41,648 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,648 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,648 - src.engine - WARNING - Automation engine is not running
+2026-05-17 16:42:41,649 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,649 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,651 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,651 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,652 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:42:41,652 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:42:41,653 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,653 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,654 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:42:41,654 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:42:41,654 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 16:42:41,654 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 16:42:41,654 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 16:42:41,655 - src.engine - INFO - Engine initialization complete
+2026-05-17 16:44:42,611 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,612 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,613 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,613 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,614 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,614 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,615 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,615 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,615 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:44:42,616 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,616 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,616 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:44:42,616 - src.engine - WARNING - Automation engine is already running
+2026-05-17 16:44:42,617 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,617 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,618 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:44:42,618 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:44:42,619 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,619 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,619 - src.engine - WARNING - Automation engine is not running
+2026-05-17 16:44:42,620 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,620 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,622 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,622 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,623 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 16:44:42,623 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 16:44:42,623 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,624 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,625 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 16:44:42,625 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 16:44:42,625 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 16:44:42,625 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 16:44:42,625 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 16:44:42,625 - src.engine - INFO - Engine initialization complete
+2026-05-17 19:32:22,778 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,778 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,779 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,780 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,780 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,780 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,782 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,782 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,782 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:32:22,783 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,783 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,783 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:32:22,783 - src.engine - WARNING - Automation engine is already running
+2026-05-17 19:32:22,784 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,784 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,784 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:32:22,784 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 19:32:22,785 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,785 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,786 - src.engine - WARNING - Automation engine is not running
+2026-05-17 19:32:22,787 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,787 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,789 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,789 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,789 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:32:22,789 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 19:32:22,790 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,790 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,791 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:32:22,791 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:32:22,791 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 19:32:22,791 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 19:32:22,792 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 19:32:22,792 - src.engine - INFO - Engine initialization complete
+2026-05-17 19:34:18,699 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,700 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,701 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,701 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,702 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,702 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,703 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,703 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,703 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:34:18,704 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,704 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,704 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:34:18,704 - src.engine - WARNING - Automation engine is already running
+2026-05-17 19:34:18,705 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,705 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,706 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:34:18,706 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 19:34:18,707 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,707 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,707 - src.engine - WARNING - Automation engine is not running
+2026-05-17 19:34:18,708 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,708 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,710 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,710 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,710 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 19:34:18,710 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 19:34:18,711 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,711 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,712 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 19:34:18,712 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 19:34:18,713 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 19:34:18,713 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 19:34:18,713 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 19:34:18,713 - src.engine - INFO - Engine initialization complete
+2026-05-17 20:15:58,856 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,856 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,857 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,858 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,858 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,859 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,860 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,860 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,860 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:15:58,861 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,861 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,861 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:15:58,861 - src.engine - WARNING - Automation engine is already running
+2026-05-17 20:15:58,862 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,862 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,862 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:15:58,863 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 20:15:58,863 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,863 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,864 - src.engine - WARNING - Automation engine is not running
+2026-05-17 20:15:58,865 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,865 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,867 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,867 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,867 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:15:58,867 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 20:15:58,868 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,868 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,869 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:15:58,869 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:15:58,869 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 20:15:58,869 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 20:15:58,870 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 20:15:58,870 - src.engine - INFO - Engine initialization complete
+2026-05-17 20:41:30,704 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,704 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,705 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,705 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,706 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,706 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,708 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,708 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,708 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:41:30,709 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,709 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,709 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:41:30,709 - src.engine - WARNING - Automation engine is already running
+2026-05-17 20:41:30,711 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,711 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,711 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:41:30,711 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 20:41:30,712 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,712 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,712 - src.engine - WARNING - Automation engine is not running
+2026-05-17 20:41:30,713 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,713 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,715 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,716 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,716 - src.engine - INFO - Starting FiverrAutomationEngine
+2026-05-17 20:41:30,716 - src.engine - INFO - Stopping FiverrAutomationEngine
+2026-05-17 20:41:30,717 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,717 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,718 - src.api.client - INFO - FiverrAPIClient initialized
+2026-05-17 20:41:30,718 - src.engine - INFO - FiverrAutomationEngine initialized
+2026-05-17 20:41:30,718 - src.engine - INFO - Initializing engine and API connection
+2026-05-17 20:41:30,718 - src.api.client - INFO - Initializing FiverrAPIClient
+2026-05-17 20:41:30,719 - src.api.client - INFO - FiverrAPIClient initialization complete
+2026-05-17 20:41:30,719 - src.engine - INFO - Engine initialization complete

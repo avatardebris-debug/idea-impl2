@@ -193,12 +193,12 @@ class MetadataOptimizer:
             keyword_parts.extend(existing)
 
         # Remove duplicates and stop words
-        seen_keywords_set: set[str] = set()
+        seen: set = set()
         unique_keywords: List[str] = []
         for kw in keyword_parts:
             kw_lower = kw.lower()
-            if kw_lower not in STOP_WORDS and kw_lower not in seen_keywords_set and len(kw_lower) > 1:
-                seen_keywords_set.add(kw_lower)
+            if kw_lower not in STOP_WORDS and kw_lower not in seen and len(kw_lower) > 1:
+                seen.add(kw_lower)
                 unique_keywords.append(kw)
 
         if not unique_keywords:
@@ -245,12 +245,9 @@ class MetadataOptimizer:
         """Truncate text to max_length, breaking at the last word boundary."""
         if len(text) <= max_length:
             return text
-        # Reserve space for the ellipsis suffix
-        ellipsis = "..."
-        available = max_length - len(ellipsis)
-        truncated = text[:available]
+        truncated = text[:max_length]
         # Break at last space
         last_space = truncated.rfind(" ")
-        if last_space > available // 2:
-            return truncated[:last_space].strip() + ellipsis
-        return truncated.strip() + ellipsis
+        if last_space > max_length // 2:
+            return truncated[:last_space].strip()
+        return truncated.strip() + "..."

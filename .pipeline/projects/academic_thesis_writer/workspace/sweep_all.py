@@ -1,10 +1,12 @@
 """Comprehensive test sweep of all pipeline projects."""
-import os
+import pathlib
 import subprocess
 import json
 import time
 
-base_dir = r'c:\Users\avata\aicompete\idea impl\.pipeline\projects'
+# Use the script's directory to find the pipeline/projects path
+script_dir = pathlib.Path(__file__).resolve().parent
+base_dir = str(script_dir / ".pipeline" / "projects")
 
 # All projects from the audit (timeout + broken + mixed categories)
 projects = [
@@ -57,16 +59,16 @@ projects = [
 results = {}
 
 for proj in projects:
-    proj_dir = os.path.join(base_dir, proj, 'workspace')
+    proj_dir = pathlib.Path(base_dir) / proj / 'workspace'
     
     # Check if project exists
-    if not os.path.exists(proj_dir):
+    if not proj_dir.exists():
         results[proj] = {'status': 'NOT_FOUND', 'detail': 'workspace dir missing'}
         continue
     
     # Check if tests/ dir exists
-    tests_dir = os.path.join(proj_dir, 'tests')
-    if not os.path.exists(tests_dir):
+    tests_dir = proj_dir / 'tests'
+    if not tests_dir.exists():
         # Some projects put tests in root
         results[proj] = {'status': 'NO_TESTS_DIR', 'detail': 'no tests/ directory'}
         continue
@@ -103,7 +105,8 @@ for proj in projects:
         print(f"TIMEOUT ({elapsed:.1f}s)")
 
 # Write results
-with open('sweep_results.json', 'w') as f:
+output_path = script_dir / 'sweep_results.json'
+with open(output_path, 'w') as f:
     json.dump(results, f, indent=2)
 
 # Print summary table

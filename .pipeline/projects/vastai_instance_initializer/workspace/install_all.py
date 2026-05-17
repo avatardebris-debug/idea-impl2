@@ -23,7 +23,7 @@ projects = [
     'football_simulator'
 ]
 
-base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.pipeline', 'projects')
+base_dir = r'c:\Users\avata\aicompete\idea impl\.pipeline\projects'
 all_reqs = []
 
 for proj in projects:

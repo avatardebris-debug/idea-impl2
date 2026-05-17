@@ -1,21 +1,9 @@
-# Phase 1 Tasks
+# Phase 1: Agency SOP Automator - Initial Setup & Requirements
 
-- [ ] Task 1: Audit current Phase 1 codebase and identify gaps
-  - What: Review existing implementation, compare against spec, and identify what's missing or broken
-  - Done when: A clear inventory of completed vs. missing functionality is documented
-
-- [ ] Task 2: Fix or implement core Phase 1 components
-  - What: Address identified gaps in the primary components (build, import, and functionality)
-  - Done when: All core components work and are importable
-
-- [ ] Task 3: Write or update unit tests for Phase 1
-  - What: Write unit tests covering main code paths; fix any failing tests
-  - Done when: All tests pass with pytest
-
-- [ ] Task 4: Implement integration between Phase 1 and downstream phases
-  - What: Ensure Phase 1 outputs feed correctly into subsequent phases
-  - Done when: End-to-end pipeline runs without errors
-
-- [ ] Task 5: Update documentation and README for Phase 1
-  - What: Document API, usage, and integration points
-  - Done when: README and inline docs are up to date and accurate
+- [ ] Task 1: Define the core SOP automation workflow — identify which agency Standard Operating Procedures (e.g., client onboarding, content approval, reporting) will be automated first and document their step-by-step processes.
+- [ ] Task 2: Design the data model for SOPs — create schemas for SOP definitions, task templates, status tracking, and audit logs to support the automation engine.
+- [ ] Task 3: Build the SOP ingestion module — implement a parser/ingester that can read SOP documents (JSON, YAML, or markdown) and convert them into structured, executable task graphs.
+- [ ] Task 4: Implement the workflow engine core — develop the central execution engine that traverses SOP task graphs, manages dependencies, handles conditional branching, and tracks progress.
+- [ ] Task 5: Create the notification & alerting system — build a module that sends status updates, escalations, and completion alerts via configurable channels (email, Slack, webhooks).
+- [ ] Task 6: Develop the dashboard & API layer — implement a REST API and basic dashboard for viewing active SOPs, task statuses, and audit trails.
+- [ ] Task 7: Write integration tests & smoke tests — create test suites that validate end-to-end SOP execution, error handling, and notification delivery.

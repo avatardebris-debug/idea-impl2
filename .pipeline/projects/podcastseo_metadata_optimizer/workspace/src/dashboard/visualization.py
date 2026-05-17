@@ -19,12 +19,6 @@ from src.dashboard.models import DashboardState
 class TableauRenderer(ABC):
     """Abstract base class for Tableau renderers."""
 
-    def __init__(self):
-        self._ticker = None
-
-    def bind_ticker(self, ticker: DashboardTicker):
-        self._ticker = ticker
-
     @abstractmethod
     def render(self, state: DashboardState):
         pass
@@ -40,7 +34,7 @@ class TableauCSVRenderer(TableauRenderer):
     def __init__(self, delimiter: str = ",", include_header: bool = True):
         self.delimiter = delimiter
         self.include_header = include_header
-        self._csv_buffer = io.StringIO()
+        self._csv_buffer = None
 
     def render(self, state: DashboardState) -> str:
         output = io.StringIO()
@@ -62,102 +56,153 @@ class TableauCSVRenderer(TableauRenderer):
             state.nash_distance.current_strategy,
             state.nash_distance.nash_strategy,
         ])
-        return output.getvalue()
+        self._csv_buffer = output.getvalue()
+        return self._csv_buffer
 
     def render_panel(self, panel: DashboardPanel) -> str:
         if isinstance(panel, WinRatePanel):
-            return str(panel.gauge_value)
+            data = panel.render_data()
+            return self._render_panel_data(data, ["gauge_value"])
         elif isinstance(panel, BankrollCurvePanel):
-            return str(panel.bankroll)
+            data = panel.render_data()
+            return self._render_panel_data(data, ["current_bankroll", "peak_bankroll", "drawdown"])
         elif isinstance(panel, NashEquilibriumPanel):
-            return str(panel.distance)
+            data = panel.render_data()
+            return self._render_panel_data(data, ["distance", "current_strategy", "nash_strategy"])
         return ""
+
+    def _render_panel_data(self, data: dict, fields: list) -> str:
+        output = io.StringIO()
+        writer = csv.writer(output, delimiter=self.delimiter)
+        if self.include_header:
+            writer.writerow(fields)
+        writer.writerow([data.get(f, "") for f in fields])
+        return output.getvalue()
+
+    def get_csv_buffer(self) -> str:
+        return self._csv_buffer
 
 
 class TableauRESTRenderer(TableauRenderer):
     """Renders dashboard state via REST API."""
 
-    def __init__(self, method: str = "POST", url: str = None):
-        self.method = method
-        self.url = url
+    def __init__(self, server_url: str = "", username: str = "", password: str = "",
+                 site_id: str = "", content_url: str = "", timeout: int = 30):
+        self.server_url = server_url
+        self.username = username
+        self.password = password
+        self.site_id = site_id
+        self.content_url = content_url
+        self.timeout = timeout
         self.last_response = None
 
-    def render(self, state: DashboardState) -> dict:
+    def render(self, state: DashboardState):
         try:
-            response = requests.request(
-                method=self.method,
-                url=self.url,
-                json=state.to_dict(),
+            payload = {
+                "win_rate": state.win_rate.value,
+                "total_games": state.win_rate.total_games,
+                "wins": state.win_rate.wins,
+                "losses": state.win_rate.losses,
+                "bankroll": state.bankroll.bankroll,
+                "peak_bankroll": state.bankroll.peak_bankroll,
+                "drawdown": state.bankroll.drawdown,
+                "nash_distance": state.nash_distance.distance,
+                "current_strategy": state.nash_distance.current_strategy,
+                "nash_strategy": state.nash_distance.nash_strategy,
+                "timestamp": state.timestamp,
+            }
+            response = requests.post(
+                self.server_url,
+                json=payload,
+                timeout=self.timeout,
             )
             self.last_response = response
-            if response.status_code == 200:
-                return response.json()
-            return {}
+            return response
         except Exception:
-            return {}
+            self.last_response = None
+            return None
 
-    def render_panel(self, panel: DashboardPanel) -> dict:
+    def render_panel(self, panel: DashboardPanel):
         try:
-            response = requests.request(
-                method=self.method,
-                url=self.url,
-                json=panel.render_data(),
+            panel_name = type(panel).__name__.upper()
+            data = panel.render_data()
+            payload = {
+                "panel": panel_name,
+                "data": data,
+            }
+            response = requests.post(
+                self.server_url,
+                json=payload,
+                timeout=self.timeout,
             )
             self.last_response = response
-            if response.status_code == 200:
-                return response.json()
-            return {}
+            return response
         except Exception:
-            return {}
+            self.last_response = None
+            return None
+
+    def get_last_response(self):
+        return self.last_response
 
 
 class TableauDashboard:
-    """Manages Tableau renderers and panels."""
+    """Orchestrates panels and renderers."""
 
-    def __init__(self):
-        self._panels = []
-        self._renderers = []
-        self._ticker = None
-
-    def add_panel(self, panel: DashboardPanel):
-        self._panels.append(panel)
-
-    def add_renderer(self, renderer: TableauRenderer):
-        self._renderers.append(renderer)
+    def __init__(self, panels: list = None, renderer: TableauRenderer = None):
+        if panels is not None:
+            self.panels = panels
+        else:
+            self.panels = [
+                WinRatePanel(),
+                BankrollCurvePanel(),
+                NashEquilibriumPanel(),
+            ]
+        self.renderer = renderer
+        self.ticker = None
 
     def bind_ticker(self, ticker: DashboardTicker):
-        self._ticker = ticker
-        for panel in self._panels:
+        self.ticker = ticker
+        for panel in self.panels:
             panel.bind_ticker(ticker)
-        for renderer in self._renderers:
-            renderer.bind_ticker(ticker)
 
-    def update_panels(self):
-        if not self._ticker:
-            return
-        for panel in self._panels:
-            panel.update(self._ticker)
+    def update(self):
+        if self.ticker is not None:
+            for panel in self.panels:
+                panel.update_from_bound_ticker()
 
-    def render(self, state: DashboardState) -> list:
-        results = []
-        for renderer in self._renderers:
-            results.append(renderer.render(state))
-        return results
+    def render(self):
+        if self.renderer is None:
+            return None
+        if self.ticker is None:
+            return None
+        state = DashboardState(
+            win_rate=self.ticker.current_win_rate,
+            bankroll=self.ticker.bankroll_history,
+            nash_distance=self.ticker.nash_distance,
+            timestamp=self.ticker.timestamp,
+        )
+        return self.renderer.render(state)
 
-    def render_panel(self, panel: DashboardPanel) -> list:
-        results = []
-        for renderer in self._renderers:
-            results.append(renderer.render_panel(panel))
-        return results
+    def render_panel(self, panel: DashboardPanel):
+        if self.renderer is None:
+            return None
+        return self.renderer.render_panel(panel)
 
-    def get_panel_data(self) -> dict:
-        data = {}
-        for panel in self._panels:
-            data[type(panel).__name__] = panel.render_data()
-        return data
+    def render_all_panels(self):
+        if self.renderer is None:
+            return []
+        return [self.renderer.render_panel(p) for p in self.panels]
 
-    def get_visual_encodings(self) -> dict:
-        encodings = {}
-        for panel in self._panels:
-            encodings[type(panel).__name__] = panel.get_visual_encoding()
-        return encodings
+    def add_panel(self, panel: DashboardPanel):
+        self.panels.append(panel)
+        if self.ticker is not None:
+            panel.bind_ticker(self.ticker)
+
+    def remove_panel(self, panel: DashboardPanel):
+        self.panels.remove(panel)
+
+    def get_panel_count(self) -> int:
+        return len(self.panels)
+
+    def get_panels_by_type(self, panel_type) -> list:
+        return [p for p in self.panels if isinstance(p, panel_type)]

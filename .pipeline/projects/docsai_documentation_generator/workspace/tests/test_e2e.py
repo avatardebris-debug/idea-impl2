@@ -11,10 +11,6 @@ import pytest
 _ws = pathlib.Path(__file__).parent
 if str(_ws) not in sys.path:
     sys.path.insert(0, str(_ws))
-# Also add the parent workspace directory so docsai package is importable
-_parent = _ws.parent
-if str(_parent) not in sys.path:
-    sys.path.insert(0, str(_parent))
 
 
 SAMPLE_PROJECT_DIR = _ws / "sample_project"
@@ -43,7 +39,6 @@ def _run_docsai_spec(output_format: str = "yaml") -> subprocess.CompletedProcess
          f"""
 import sys
 sys.path.insert(0, "{_ws}")
-sys.path.insert(0, "{_ws.parent}")
 from docsai.cli.spec import spec
 spec("{SAMPLE_PROJECT_DIR}", output="{output_path}", format="{output_format}")
 """],

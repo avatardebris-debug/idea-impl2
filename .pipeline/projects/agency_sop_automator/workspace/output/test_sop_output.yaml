@@ -7,5 +7,5 @@ raw: '{"raw": "Step output for step (mock output)", "step_name": "mock", "tokens
 _sop_name: test_sop
 _execution_log:
 - step: step1
-  duration: 0.0001785755157470703
+  duration: 0.00017499923706054688
   error: null

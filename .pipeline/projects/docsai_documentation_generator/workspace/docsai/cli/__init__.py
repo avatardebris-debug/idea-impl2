@@ -3,7 +3,6 @@
 import typer
 
 from docsai.cli.spec import spec_app
-from docsai.cli.readme import register_readme_app
 
 app = typer.Typer(
     name="docsai",
@@ -12,9 +11,6 @@ app = typer.Typer(
 
 # Register the spec subcommand
 app.add_typer(spec_app, name="spec")
-
-# Register the readme subcommand
-register_readme_app(app)
 
 
 def main():

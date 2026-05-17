@@ -1,31 +1,31 @@
 # Phase 1 Tasks
 
-- [ ] Task 1: Scaffold Tauri + Rust + React project
-  - What: Create the initial project structure with Tauri backend (Rust) and React frontend. Set up Cargo.toml with required dependencies (sqlx/rusqlite, reqwest, serde, tauri), tauri.conf.json, Vite + React entry point, and the app shell with navigation between Preset and Execution views.
-  - Files: Cargo.toml, tauri.conf.json, src/main.rs, src/lib.rs, src-tauri/tauri.conf.json, src-tauri/capabilities/, package.json, vite.config.ts, src/App.tsx, src/index.css, .gitignore
-  - Done when: `cargo tauri dev` launches a desktop window showing a basic layout with two tabs (Presets, Executions). The app compiles without errors and runs on macOS.
+- [x] Task 1: Define preset schema and validation
+  - What: Create the YAML preset file format and a Python validator that checks all required/optional fields against known VAST.ai instance parameters (GPU type, price cap, storage, SSH commands, environment variables, image, etc.)
+  - Files: vastai_init/presets/schema.py, vastai_init/presets/__init__.py, vastai_init/presets/validator.py
+  - Done when: Preset schema is defined with all VAST.ai-relevant fields; validator rejects invalid presets with clear error messages; validator accepts valid presets and returns a parsed config dict
 
-- [ ] Task 2: Implement SQLite database layer with preset and execution schemas
-  - What: Create the Rust database module with schema definitions for presets, preset_configs, executions, and instance_statuses tables. Implement CRUD functions for presets (create, read, update, delete, list) and execution history recording (insert execution, update status, list history). Use rusqlite with migrations or sqlx for schema creation.
-  - Files: src/db/mod.rs, src/db/schema.rs, src/db/presets.rs, src/db/executions.rs, src/db/instances.rs, src/db/models.rs
-  - Done when: All four tables are created automatically on first run. Preset CRUD operations work correctly (insert, fetch by ID, update, delete, list all). Execution records can be inserted and queried. Data persists across app restarts. Unit tests pass for all CRUD paths.
+- [x] Task 2: Build CLI entry point and preset loading
+  - What: Implement the `vastai-init` CLI with a `launch` subcommand that accepts a preset file path, loads the preset, and passes the parsed config to the launcher. Use `typer` or `rich` for CLI framework.
+  - Files: vastai_init/cli.py, vastai_init/__init__.py, setup.py or pyproject.toml
+  - Done when: Running `vastai-init launch <preset-file>` from the terminal loads the preset without errors; invalid preset paths produce helpful error messages; CLI shows usage help with `--help`
 
-- [ ] Task 3: Implement VAST AI API client and authentication
-  - What: Build the Rust API client module that handles VAST AI REST API interactions. Implement API key storage in app config (stored in the Tauri config directory). Implement functions for: listing available GPU instances (with price/type filtering), creating a new instance with GPU filter and command, polling instance status, and sending terminal commands to a running instance. Add retry logic with exponential backoff for transient failures.
-  - Files: src/api/mod.rs, src/api/vastai_client.rs, src/api/models.rs, src/api/auth.rs, src/config/app_config.rs
-  - Done when: API key can be set and persisted in app config. `list_instances` returns GPU availability data. `create_instance` returns a valid instance ID when called with a valid API key. `get_instance_status` returns correct status. `send_terminal_command` delivers a command to a running instance. Retry logic handles 429/5xx errors gracefully.
+- [x] Task 3: Implement VAST.ai API adapter and authentication
+  - What: Build an API adapter module that handles authentication (API key from env var, config file, or interactive prompt) and calls the VAST.ai API to create a single instance using the preset parameters.
+  - Files: vastai_init/api/adapter.py, vastai_init/api/auth.py, vastai_init/api/__init__.py
+  - Done when: Adapter authenticates using an API key from VASTAI_API_KEY env var or saved config; adapter can create an instance on VAST.ai with preset parameters; adapter raises descriptive exceptions for auth failures, invalid parameters, and no-GPU-availability errors
 
-- [ ] Task 4: Wire Tauri commands to connect backend to frontend
-  - What: Create Tauri backend commands (pub extern "C" functions) that the React frontend calls via `@tauri-apps/api`. Implement commands for: `create_preset`, `update_preset`, `delete_preset`, `list_presets`, `get_preset`, `run_preset` (triggers instance creation + execution history record), `get_execution_history`, `get_execution_status`. Each command should handle errors and return structured JSON responses.
-  - Files: src/commands/mod.rs, src/commands/preset_commands.rs, src/commands/execution_commands.rs, src/commands/config_commands.rs
-  - Done when: All Tauri commands are registered in lib.rs. Each command can be called from the frontend and returns the expected data. Error cases (e.g., missing API key, invalid preset ID) return proper error messages. `run_preset` creates a VAST AI instance, records the execution, and returns the instance ID.
+- [x] Task 4: Implement instance polling and status reporting
+  - What: Build a status polling loop that queries the VAST.ai API for the launched instance's state (queued, running, stopped, failed) and reports progress updates to the user until the instance reaches a terminal state.
+  - Files: vastai_init/monitor/status.py, vastai_init/monitor/__init__.py
+  - Done when: Polling loop reports status updates at regular intervals (e.g., every 10 seconds); loop exits when instance is running, stopped, or failed; user sees clear status messages in the terminal; polling respects a configurable timeout
 
-- [ ] Task 5: Build React Preset management UI
-  - What: Create the Preset tab UI with: a form to create/edit presets (name, description, GPU type, max price, terminal command(s), delay between commands), a list/grid of saved presets with edit/delete buttons, and a "Run" button on each preset card. Use React Context + useReducer for state management. Connect to Tauri commands for all CRUD operations.
-  - Files: src/components/PresetForm.tsx, src/components/PresetLibrary.tsx, src/components/PresetCard.tsx, src/hooks/usePresets.ts, src/contexts/PresetContext.tsx
-  - Done when: User can create a preset with all fields and see it saved in the list. User can edit an existing preset and save changes. User can delete a preset and it disappears from the list. All changes persist across app restarts. The "Run" button on each preset card is wired to the `run_preset` Tauri command.
+- [x] Task 5: Implement session logging and connection details output
+  - What: After a successful launch, output SSH connection details (SSH command, instance IP, port, etc.) and persist the full session metadata (preset used, instance ID, timestamps, status) to a local JSON session log file.
+  - Files: vastai_init/launcher/session.py, vastai_init/utils/config.py
+  - Done when: On success, the CLI prints the SSH connection command and instance details to stdout; a JSON session log file is written to ~/.vastai-init/sessions/ with instance ID, preset path, timestamps, and final status; session log is append-only (one entry per launch)
 
-- [ ] Task 6: Build React Execution dashboard and real-time status display
-  - What: Create the Execution tab UI that shows: a list of past executions with status (pending/running/completed/failed), instance ID, timestamp, and error message if any. When a preset is running, show real-time status updates (polling via Tauri command). Display the result of the most recent run (success/failure + instance ID). Include a simple execution history log.
-  - Files: src/components/ExecutionDashboard.tsx, src/components/ExecutionCard.tsx, src/components/ExecutionStatus.tsx, src/hooks/useExecutions.ts, src/contexts/ExecutionContext.tsx
-  - Done when: After clicking "Run" on a preset, the Execution tab shows the execution with status "pending" → "running" → "completed"/"failed". The instance ID is displayed on success. Failed executions show the error message. Execution history persists and is queryable. Status updates refresh automatically (polling every 5 seconds while running).
+- [x] Task 6: Create sample preset file and verify end-to-end flow
+  - What: Write a sample preset YAML file demonstrating the format and all common fields. Verify the complete flow: CLI loads preset → validates → authenticates → creates instance → polls → reports status → logs session.
+  - Files: presets/default.yaml, presets/training-gpu.yaml, README.md
+  - Done when: Sample preset files are valid and well-documented with comments explaining each field; README describes how to install, configure (API key), and run the tool; end-to-end flow works with a real or mocked VAST.ai API call

@@ -1,44 +1,35 @@
-## Phase 1: Single-Instance Preset & Launch (MVP)
+## Phase 1 — MVP: Single-Preset Instance Launcher
 
-**Goal:** A user can define a preset with commands and GPU settings, save it, and launch **one** instance with that configuration.
+**Goal:** A working CLI tool that loads a single preset and launches one VAST.ai instance.
 
-**Scope:**
-- SQLite database with preset CRUD (create, read, update, delete)
-- UI form to configure a single preset:
-  - Preset name & description
-  - GPU type / price filter
-  - Terminal command(s) to execute
-  - Delay between commands
-- "Run" button that calls VAST AI API to create one instance
-- Display execution status (pending → running → completed/failed)
-- Basic execution history log
+**Description:**
+- Implement a preset file format (YAML/JSON) that captures all VAST.ai instance parameters: GPU type, price cap, storage size, SSH commands, environment variables, etc.
+- Build a CLI command `vastai-init launch <preset-file>` that:
+  1. Reads and validates the preset
+  2. Authenticates with the VAST.ai API (supports API key or saved credentials)
+  3. Calls the VAST.ai API to create a single instance
+  4. Polls and reports the instance status until it's running
+  5. Outputs connection details (SSH command, IP, etc.)
+- Persist the launched instance metadata in a local session log.
 
 **Deliverable:**
-A working desktop app where a user can:
-1. Create a named preset with GPU + command config
-2. Save it to the local SQLite database
-3. Click "Run" to provision one GPU instance on VAST AI
-4. See the result (success/failure + instance ID)
+- A working CLI tool (`vastai-init`) that launches one instance from a preset.
+- A sample preset file demonstrating the format.
+- Session log output with instance details.
 
 **Dependencies:**
-- None (foundation phase)
+- VAST.ai API documentation and Python SDK
+- User's VAST.ai API key / authentication
 
 **Success Criteria:**
-- [ ] Preset can be created, saved, loaded, edited, and deleted
-- [ ] Preset data persists across app restarts (SQLite)
-- [ ] VAST AI API integration creates an instance with correct GPU filter
-- [ ] Terminal command is sent to the instance's terminal
-- [ ] User sees execution status updates in real-time
-- [ ] Execution history is recorded in the database
-- [ ] App builds and runs on macOS and Windows
+- [ ] Can define a preset in YAML/JSON and validate it against known VAST.ai parameters
+- [ ] Can launch a single instance via CLI with that preset
+- [ ] Reports instance status updates until running
+- [ ] Outputs SSH connection details on success
+- [ ] Handles API errors gracefully (invalid preset, auth failure, no available GPUs)
+- [ ] Logs the session to a local file (JSON)
 
-**Risks & Mitigations:**
-| Risk | Mitigation |
-|------|-----------|
-| VAST AI API rate limits | Implement retry with exponential backoff |
-| VAST AI API auth complexity | Use API key stored in app config; document setup clearly |
-| GPU availability | Show real-time availability warnings from VAST AI API |
-| Tauri cross-platform issues | Test on macOS first, then Windows; use cross-platform crates |
+**Estimated Effort:** 2–3 weeks
 
 ---
 

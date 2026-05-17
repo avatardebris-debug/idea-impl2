@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-import_cloud_zip.py — Import a cloud run zip file into the local project.
+import_cloud_zip.py â€” Import a cloud run zip file into the local project.
 
 Usage:
     python import_cloud_zip.py <path_to_zip>
@@ -15,6 +15,7 @@ What it does:
     6. Does NOT overwrite state files unless cloud version is NEWER
 """
 from __future__ import annotations
+import io
 import json
 import pathlib
 import shutil
@@ -23,8 +24,16 @@ import tempfile
 import zipfile
 from datetime import datetime, timezone
 
+# Force UTF-8 output on Windows (avoids cp1252 UnicodeEncodeError from
+# project content or state JSON that contains non-ASCII characters)
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 PROJECT_ROOT = pathlib.Path(__file__).parent.resolve()
 PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
+
 
 def find_latest_zip() -> pathlib.Path:
     """Find the most recently modified zip in Downloads."""
@@ -66,7 +75,7 @@ def fix_double_workspace(project_dir: pathlib.Path) -> int:
                         shutil.copy2(str(sub), str(target))
                         moved += 1
             else:
-                # File conflict — keep newer
+                # File conflict â€” keep newer
                 try:
                     src_mtime = item.stat().st_mtime
                     dst_mtime = dest.stat().st_mtime
@@ -108,7 +117,7 @@ def fix_stray_phases(project_dir: pathlib.Path) -> int:
             if not dest.exists():
                 shutil.copy2(str(f), str(dest))
                 moved += 1
-                print(f"    Moved stray: workspace/phases/{rel} → phases/{rel}")
+                print(f"    Moved stray: workspace/phases/{rel} â†’ phases/{rel}")
 
     try:
         shutil.rmtree(str(stray_phases))
@@ -117,48 +126,103 @@ def fix_stray_phases(project_dir: pathlib.Path) -> int:
     return moved
 
 
-def merge_state(local: pathlib.Path, remote: pathlib.Path) -> bool:
-    """
-    Merge remote current_idea.json into local — keep whichever has a
-    more advanced status or later timestamp.
-    Returns True if local was updated.
-    """
-    STATUS_ORDER = [
-        "planning", "phase_1_planning", "phase_1_executing",
-        "phase_1_validating", "phase_1_reviewing", "phase_1_reviewed",
-        "phase_2_planning", "phase_2_executing", "phase_2_validating",
-        "phase_2_reviewing", "phase_2_reviewed",
-        "phase_3_planning", "phase_3_executing", "phase_3_validating",
-        "phase_3_reviewing", "phase_3_reviewed",
-        "phase_4_planning", "phase_4_executing", "phase_4_validating",
-        "phase_4_reviewing", "phase_4_reviewed",
-        "phase_5_planning", "phase_5_executing", "phase_5_validating",
-        "phase_5_reviewing", "phase_5_reviewed",
-        "phase_6_planning", "phase_6_executing", "phase_6_validating",
-        "phase_6_reviewing", "phase_6_reviewed",
-        "budget_exceeded", "complete",
-    ]
+STATUS_ORDER = [
+    "dep_waiting",
+    "planning", "phase_1_planning", "phase_1_executing",
+    "phase_1_validating", "phase_1_reviewing", "phase_1_reviewed",
+    "phase_2_planning", "phase_2_executing", "phase_2_validating",
+    "phase_2_reviewing", "phase_2_reviewed",
+    "phase_3_planning", "phase_3_executing", "phase_3_validating",
+    "phase_3_reviewing", "phase_3_reviewed",
+    "phase_4_planning", "phase_4_executing", "phase_4_validating",
+    "phase_4_reviewing", "phase_4_reviewed",
+    "phase_5_planning", "phase_5_executing", "phase_5_validating",
+    "phase_5_reviewing", "phase_5_reviewed",
+    "phase_6_planning", "phase_6_executing", "phase_6_validating",
+    "phase_6_reviewing", "phase_6_reviewed",
+    "budget_exceeded", "complete",
+]
 
+
+def status_rank(status: str) -> int:
+    """Return the ordinal rank of a status string. Unknown = -1."""
+    try:
+        return STATUS_ORDER.index(status)
+    except ValueError:
+        return -1
+
+
+def merge_state(local: pathlib.Path, remote: pathlib.Path) -> tuple[bool, int]:
+    """
+    Merge remote current_idea.json into local â€” keep whichever has a
+    more advanced status rank.
+
+    Returns (updated: bool, rank_delta: int)
+      rank_delta > 0  â†’ remote is ahead  (remote wins)
+      rank_delta == 0 â†’ same rank
+      rank_delta < 0  â†’ local is ahead   (local wins)
+    """
     try:
         r_data = json.loads(remote.read_text(encoding="utf-8"))
+        r_rank = status_rank(r_data.get("status", ""))
         if local.exists():
             l_data = json.loads(local.read_text(encoding="utf-8"))
-            r_status = r_data.get("status", "")
-            l_status = l_data.get("status", "")
-            r_rank = STATUS_ORDER.index(r_status) if r_status in STATUS_ORDER else -1
-            l_rank = STATUS_ORDER.index(l_status) if l_status in STATUS_ORDER else -1
-            if r_rank <= l_rank:
-                return False  # local is same or further ahead
+            l_rank = status_rank(l_data.get("status", ""))
+            delta = r_rank - l_rank
+            if delta <= 0:
+                return False, delta   # local is same or further ahead
+        else:
+            delta = r_rank + 1        # anything > 0 â†’ remote wins
         local.parent.mkdir(parents=True, exist_ok=True)
         local.write_text(json.dumps(r_data, indent=2), encoding="utf-8")
-        return True
+        return True, delta
     except Exception:
-        return False
+        return False, 0
+
+
+def merge_files(src_root: pathlib.Path, dst_root: pathlib.Path,
+                remote_ahead: bool, skip_patterns: tuple[str, ...] = ()) -> int:
+    """
+    Copy files from src_root into dst_root.
+
+    Conflict resolution:
+      remote_ahead=True  â†’ remote wins for ALL files (overwrite existing)
+      remote_ahead=False â†’ copy only files that don't exist locally
+                           (for equal-rank projects, mtime is used as tiebreaker)
+
+    Returns count of files written.
+    """
+    if not src_root.exists():
+        return 0
+    written = 0
+    for src in src_root.rglob("*"):
+        if not src.is_file():
+            continue
+        src_str = str(src)
+        if any(p in src_str for p in skip_patterns):
+            continue
+        rel = src.relative_to(src_root)
+        dst = dst_root / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if not dst.exists():
+            shutil.copy2(str(src), str(dst))
+            written += 1
+        elif remote_ahead:
+            # Remote is further along â€” trust its files unconditionally
+            shutil.copy2(str(src), str(dst))
+            written += 1
+        else:
+            # Same rank â€” use mtime as tiebreaker (git resets mtime, so
+            # this only helps for genuinely concurrent runs, not pulls)
+            if src.stat().st_mtime > dst.stat().st_mtime:
+                shutil.copy2(str(src), str(dst))
+                written += 1
+    return written
 
 
 def import_zip(zip_path: pathlib.Path) -> None:
     print(f"\n{'='*60}")
-    print(f"  📦 Importing: {zip_path.name}")
+    print(f"  ðŸ“¦ Importing: {zip_path.name}")
     print(f"{'='*60}\n")
 
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -182,8 +246,10 @@ def import_zip(zip_path: pathlib.Path) -> None:
         # Process each project
         remote_projects = remote_pipeline / "projects"
         if not remote_projects.exists():
-            print("  No projects/ dir found in zip — nothing to import")
+            print("  No projects/ dir found in zip â€” nothing to import")
             return
+
+        SKIP = (".pytest_cache", "__pycache__", "opportunity_pipelines")
 
         total_files_merged = 0
         for remote_proj in sorted(remote_projects.iterdir()):
@@ -192,66 +258,59 @@ def import_zip(zip_path: pathlib.Path) -> None:
 
             slug = remote_proj.name
             local_proj = PIPELINE_DIR / "projects" / slug
-            print(f"\n  📁 Project: {slug}")
+            print(f"\n  ðŸ“ Project: {slug}")
 
             # Fix double-nesting before merging
             double_fixed = fix_double_workspace(remote_proj)
             if double_fixed:
-                print(f"    ✂️  Fixed workspace/workspace/ double-nesting ({double_fixed} files)")
+                print(f"    âœ‚ï¸  Fixed workspace/workspace/ double-nesting ({double_fixed} files)")
 
             # Fix stray phases
             stray_fixed = fix_stray_phases(remote_proj)
             if stray_fixed:
-                print(f"    ✂️  Fixed {stray_fixed} stray phase files")
+                print(f"    âœ‚ï¸  Fixed {stray_fixed} stray phase files")
 
-            # Merge state (smart: keep more advanced)
+            # â”€â”€ State merge: determines who is "ahead" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             remote_state = remote_proj / "state" / "current_idea.json"
             local_state  = local_proj  / "state" / "current_idea.json"
+            remote_ahead = False
             if remote_state.exists():
-                if merge_state(local_state, remote_state):
+                updated, delta = merge_state(local_state, remote_state)
+                remote_ahead = delta > 0  # remote has higher status rank
+                if updated:
                     state = json.loads(remote_state.read_text())
-                    print(f"    📊 State updated: {state.get('status','?')} phase {state.get('phase','?')}/{state.get('total_phases','?')}")
+                    print(f"    ðŸ“Š State updated â†’ {state.get('status','?')} "
+                          f"phase {state.get('phase','?')}/{state.get('total_phases','?')}")
                 else:
                     if local_state.exists():
                         state = json.loads(local_state.read_text())
-                        print(f"    📊 State kept (local is ahead): {state.get('status','?')}")
+                        arrow = "ahead" if delta < 0 else "same"
+                        print(f"    ðŸ“Š State kept (local is {arrow}): {state.get('status','?')}")
 
-            # Merge workspace files (copy all, newer wins)
-            remote_ws = remote_proj / "workspace"
-            local_ws  = local_proj  / "workspace"
-            proj_files = 0
-            if remote_ws.exists():
-                for src in remote_ws.rglob("*"):
-                    if src.is_file() and ".pytest_cache" not in str(src) and "__pycache__" not in str(src):
-                        rel = src.relative_to(remote_ws)
-                        dst = local_ws / rel
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        if not dst.exists():
-                            shutil.copy2(str(src), str(dst))
-                            proj_files += 1
-                        else:
-                            # Keep newer
-                            if src.stat().st_mtime > dst.stat().st_mtime:
-                                shutil.copy2(str(src), str(dst))
-                                proj_files += 1
+            # â”€â”€ Workspace files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # If remote is further along, its workspace files win unconditionally.
+            # This fixes the git-clone mtime reset problem where git-pulled files
+            # appear "newer" than zip files from a completed cloud run.
+            ws_written = merge_files(
+                remote_proj / "workspace",
+                local_proj  / "workspace",
+                remote_ahead=remote_ahead,
+                skip_patterns=SKIP,
+            )
 
-            # Merge phase files (tasks.md, specs, reports)
-            remote_phases = remote_proj / "phases"
-            local_phases  = local_proj  / "phases"
-            if remote_phases.exists():
-                for src in remote_phases.rglob("*"):
-                    if src.is_file():
-                        rel = src.relative_to(remote_phases)
-                        dst = local_phases / rel
-                        dst.parent.mkdir(parents=True, exist_ok=True)
-                        if not dst.exists():
-                            shutil.copy2(str(src), str(dst))
-                            proj_files += 1
+            # â”€â”€ Phase files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            ph_written = merge_files(
+                remote_proj / "phases",
+                local_proj  / "phases",
+                remote_ahead=remote_ahead,
+            )
 
-            print(f"    📄 Merged {proj_files} file(s) into workspace/phases")
+            proj_files = ws_written + ph_written
+            lead = "â¬†ï¸  remote ahead" if remote_ahead else "local ahead/tied"
+            print(f"    ðŸ“„ Merged {proj_files} file(s)  [{lead}]")
             total_files_merged += proj_files
 
-        print(f"\n  ✅ Import complete — {total_files_merged} total file(s) merged")
+        print(f"\n  âœ… Import complete â€” {total_files_merged} total file(s) merged")
 
     # Print manifest
     print_manifest()
@@ -264,7 +323,7 @@ def print_manifest() -> None:
         return
 
     print(f"\n{'='*60}")
-    print(f"  📋 Project Manifest")
+    print(f"  ðŸ“‹ Project Manifest")
     print(f"{'='*60}")
 
     for proj_dir in sorted(projects_dir.iterdir()):
@@ -308,7 +367,7 @@ def print_manifest() -> None:
         print(f"\n  [{slug}]")
         print(f"    Title:   {title[:55]}")
         print(f"    Status:  {status}  (phase {phase}/{total})")
-        print(f"    Plan:    {'✅' if has_master_plan else '❌ MISSING'}")
+        print(f"    Plan:    {'âœ…' if has_master_plan else 'âŒ MISSING'}")
         print(f"    Source:  {len(source_files)} .py files")
         print(f"    Tests:   {len(test_files)} test files")
         if phases_done:
@@ -316,7 +375,7 @@ def print_manifest() -> None:
 
         # Warn about double-nesting
         if (ws / "workspace").exists():
-            print(f"    ⚠️  workspace/workspace/ double-nesting detected — run this script to fix")
+            print(f"    âš ï¸  workspace/workspace/ double-nesting detected â€” run this script to fix")
 
     print(f"\n{'='*60}\n")
 

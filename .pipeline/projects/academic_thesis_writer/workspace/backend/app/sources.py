@@ -68,7 +68,10 @@ class SourceManager:
 
     def get_sources(self, project_id: str) -> List[Source]:
         """Return all sources for a project."""
-        return self.db.get_sources_for_project(project_id)
+        project = self.db.get_project(project_id)
+        if project is None:
+            return []
+        return project.sources
 
     def get_source_by_title(self, project_id: str, title: str) -> Optional[Source]:
         """Return a single source by title."""
@@ -80,16 +83,21 @@ class SourceManager:
 
     # ── Remove sources ───────────────────────────────────────────
 
-    def remove_source(self, project_id: str, title: str) -> bool:
-        """Remove a source by title. Returns True if removed."""
-        return self.db.remove_source_from_project(project_id, title)
+    def remove_source(self, project_id: str, source_id: str) -> bool:
+        """Remove a source by ID. Returns True if removed."""
+        return self.db.remove_source_from_project(project_id, source_id)
 
     # ── Bulk operations ──────────────────────────────────────────
 
     def add_sources(self, project_id: str, sources: List[Source]) -> None:
         """Add multiple sources to a project."""
-        self.db.add_sources_to_project(project_id, sources)
+        for source in sources:
+            self.db.add_source_to_project(project_id, source)
 
     def clear_sources(self, project_id: str) -> None:
         """Remove all sources from a project."""
-        self.db.clear_sources_for_project(project_id)
+        project = self.db.get_project(project_id)
+        if project is None:
+            return
+        project.sources = []
+        self.db.update_project(project)

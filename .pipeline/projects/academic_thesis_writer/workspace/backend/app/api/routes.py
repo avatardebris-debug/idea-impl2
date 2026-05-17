@@ -5,20 +5,22 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 
-from ..models import CitationStyle, Draft, DraftSection, Source
+from ..models import Draft, Source, CitationStyle
 from ..citation.engine import CitationEngine
 from ..citation.formatters import APAFormatter, MLAFormatter, ChicagoFormatter, IEEEFormatter
-from ..generation.pipeline import GenerationPipeline
-from ..generation.verification import VerificationEngine
+from ..sources import SourceManager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["thesis"])
 
+# Module-level source manager instance
+_source_manager = SourceManager()
 
-# ── Project routes ─────────────────────────────────────────────────────
+
+# ── Project routes ────────────────────────────────────────────────
 
 @router.post("/projects/{project_id}/sources")
 async def add_source(
@@ -30,27 +32,25 @@ async def add_source(
     url: Optional[str] = None,
 ):
     """Add a source to a project."""
-    # In production, this would use SourceManager
-    source = Source(
-        id=f"src_{project_id}_{title}",
+    source = _source_manager.add_manual(
+        project_id=project_id,
         title=title,
         authors=authors,
         year=year,
         abstract=abstract,
         url=url,
-        source_type="manual",
     )
-    return {"status": "ok", "source": source}
+    return {"status": "ok", "source": source.model_dump()}
 
 
 @router.get("/projects/{project_id}/sources")
 async def get_sources(project_id: str):
     """Get all sources for a project."""
-    # In production, this would use SourceManager
-    return {"sources": []}
+    sources = _source_manager.get_sources(project_id)
+    return {"sources": [s.model_dump() for s in sources]}
 
 
-# ── Draft routes ─────────────────────────────────────────────────────
+# ── Draft routes ──────────────────────────────────────────────────
 
 @router.post("/projects/{project_id}/drafts")
 async def create_draft(
@@ -69,10 +69,12 @@ async def create_draft(
     style = style_map.get(citation_style, CitationStyle.APA)
 
     draft = Draft(
+        id=f"draft_{project_id}",
         topic=topic,
+        title=title,
         citation_style=style,
     )
-    return {"status": "ok", "draft": draft}
+    return {"status": "ok", "draft": draft.model_dump()}
 
 
 @router.get("/projects/{project_id}/drafts/{draft_id}")
@@ -102,7 +104,7 @@ async def verify_draft(
     return {"status": "ok", "result": {"is_valid": True, "errors": [], "warnings": []}}
 
 
-# ── Export routes ─────────────────────────────────────────────────────
+# ── Export routes ─────────────────────────────────────────────────
 
 @router.get("/projects/{project_id}/drafts/{draft_id}/export/markdown")
 async def export_markdown(project_id: str, draft_id: str):

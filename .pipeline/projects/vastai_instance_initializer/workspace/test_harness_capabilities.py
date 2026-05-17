@@ -383,9 +383,9 @@ with tempfile.TemporaryDirectory() as tmp:
 # ============================================================================
 
 print(f"\n{'='*60}")
-passed = sum(1 for _, ok, _ in results if ok)
-warned = sum(1 for _, ok, is_warn in results if not ok and is_warn)
-failed = sum(1 for _, ok, is_warn in results if not ok and not is_warn)
+passed = sum(1 for _, ok, warn in results if ok)
+warned = sum(1 for _, ok, warn in results if not ok and warn)
+failed = sum(1 for _, ok, warn in results if not ok and not warn)
 total  = len(results)
 
 print(f"  PASS:  {passed}/{total}")
@@ -394,10 +394,10 @@ print(f"  FAIL:  {failed} (broken -- need fixing)")
 
 if failed > 0:
     print(f"\nBroken (fix these):")
-    for name, ok, is_warn in results:
-        if not ok and not is_warn: print(f"  - {name}")
+    for name, ok, w in results:
+        if not ok and not w: print(f"  - {name}")
 
 if warned > 0:
     print(f"\nGaps (nice to have):")
-    for name, ok, is_warn in results:
-        if not ok and is_warn: print(f"  - {name}")
+    for name, ok, w in results:
+        if not ok and w: print(f"  - {name}")

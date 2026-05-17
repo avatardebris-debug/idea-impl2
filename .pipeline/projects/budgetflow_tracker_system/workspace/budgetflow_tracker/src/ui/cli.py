@@ -11,8 +11,7 @@ from typing import Optional
 from src.core.database import Database, get_database, reset_database
 from src.core.config import Config
 from src.categorize.rule_engine import Categorizer
-import importlib
-csv_parser = importlib.import_module("src.import.csv_parser")
+from src.import.csv_parser import CSVParser
 from src.budget.engine import BudgetEngine
 from src.ui.cli_dashboard import DashboardCLI
 from src.ui.cli_budget import BudgetCLI
@@ -137,7 +136,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     db.seed_default_data()
 
     categorizer = Categorizer(db)
-    csv_parser = csv_parser.CSVParser(db)
+    csv_parser = CSVParser(db)
     budget_engine = BudgetEngine(db)
     dashboard = DashboardCLI(db)
     budget_cli = BudgetCLI(db)
