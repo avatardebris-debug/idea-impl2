@@ -5,21 +5,20 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 
-from ..models import Draft, Source
+from ..models import CitationStyle, Draft, DraftSection, Source
 from ..citation.engine import CitationEngine
 from ..citation.formatters import APAFormatter, MLAFormatter, ChicagoFormatter, IEEEFormatter
 from ..generation.pipeline import GenerationPipeline
 from ..generation.verification import VerificationEngine
-from ..api.export import MarkdownExporter, DocxExporter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["thesis"])
 
 
-# ── Project routes ────────────────────────────────────────────────
+# ── Project routes ─────────────────────────────────────────────────────
 
 @router.post("/projects/{project_id}/sources")
 async def add_source(
@@ -51,7 +50,7 @@ async def get_sources(project_id: str):
     return {"sources": []}
 
 
-# ── Draft routes ──────────────────────────────────────────────────
+# ── Draft routes ─────────────────────────────────────────────────────
 
 @router.post("/projects/{project_id}/drafts")
 async def create_draft(
@@ -62,17 +61,15 @@ async def create_draft(
 ):
     """Create a new thesis draft."""
     style_map = {
-        "APA": CitationEngine.STYLE.APA,
-        "MLA": CitationEngine.STYLE.MLA,
-        "CHICAGO": CitationEngine.STYLE.CHICAGO,
-        "IEEE": CitationEngine.STYLE.IEEE,
+        "APA": CitationStyle.APA,
+        "MLA": CitationStyle.MLA,
+        "CHICAGO": CitationStyle.CHICAGO,
+        "IEEE": CitationStyle.IEEE,
     }
-    style = style_map.get(citation_style, CitationEngine.STYLE.APA)
+    style = style_map.get(citation_style, CitationStyle.APA)
 
     draft = Draft(
-        id=f"draft_{project_id}",
         topic=topic,
-        title=title,
         citation_style=style,
     )
     return {"status": "ok", "draft": draft}
@@ -105,7 +102,7 @@ async def verify_draft(
     return {"status": "ok", "result": {"is_valid": True, "errors": [], "warnings": []}}
 
 
-# ── Export routes ─────────────────────────────────────────────────
+# ── Export routes ─────────────────────────────────────────────────────
 
 @router.get("/projects/{project_id}/drafts/{draft_id}/export/markdown")
 async def export_markdown(project_id: str, draft_id: str):

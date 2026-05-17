@@ -42,6 +42,15 @@ class TypeScriptParser:
         """Check if a name is public (not starting with _)."""
         return not name.startswith("_")
 
+    def _is_public_or_exported(self, node: Node, name: str) -> bool:
+        """Check if a symbol should be included: exported OR not prefixed with _.
+
+        Per the spec, public symbols include those that are either exported
+        or not prefixed with '_'. This is more permissive than requiring
+        both conditions.
+        """
+        return self._is_exported(node) or self._is_public_name(name)
+
     def _extract_symbols(
         self,
         node: Node,
@@ -81,9 +90,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if not self._is_public_name(name):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         params = self._extract_params(node)
@@ -104,9 +111,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if not self._is_public_name(name):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         symbols.append({
@@ -155,9 +160,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if not self._is_public_name(name):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         symbols.append({
@@ -176,9 +179,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if not self._is_public_name(name):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         symbols.append({
@@ -197,9 +198,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if not self._is_public_name(name):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         symbols.append({
@@ -218,9 +217,7 @@ class TypeScriptParser:
         if not name_node:
             return
         name = name_node.text.decode("utf-8")
-        if name.startswith("_"):
-            return
-        if not self._is_exported(node):
+        if not self._is_public_or_exported(node, name):
             return
 
         type_node = node.child_by_field_name("type")
@@ -270,12 +267,15 @@ class TypeScriptParser:
                 if name not in ("self", "this"):
                     params.append({"name": name, "type": ""})
             elif param.type == "required_parameter":
-                # tree-sitter-typescript: first named child is identifier,
+                # tree-sitter-typescript: first named child is identifier or rest_pattern,
                 # child_by_field_name("type") returns type_annotation.
                 named = param.named_children
                 if not named:
                     continue
                 name = named[0].text.decode("utf-8")
+                # Handle rest parameters: rest_pattern has leading dots
+                if named[0].type == "rest_pattern":
+                    name = name.lstrip(".")
                 if name in ("self", "this"):
                     continue
                 type_node = param.child_by_field_name("type")
@@ -285,16 +285,35 @@ class TypeScriptParser:
                     raw = type_node.text.decode("utf-8")
                     type_str = raw.lstrip(": ").strip()
                 params.append({"name": name, "type": type_str})
-            elif param.type in ("optional_parameter", "rest_parameter"):
-                name_node = param.child_by_field_name("name")
+            elif param.type == "optional_parameter":
+                # optional_parameter: name is in named_children[0] (identifier)
+                named = param.named_children
+                if not named:
+                    continue
+                name = named[0].text.decode("utf-8")
+                if name in ("self", "this"):
+                    continue
                 type_node = param.child_by_field_name("type")
-                if name_node:
-                    name = name_node.text.decode("utf-8")
-                    type_str = ""
-                    if type_node:
-                        raw = type_node.text.decode("utf-8")
-                        type_str = raw.lstrip(": ").strip()
-                    params.append({"name": name, "type": type_str})
+                type_str = ""
+                if type_node:
+                    raw = type_node.text.decode("utf-8")
+                    type_str = raw.lstrip(": ").strip()
+                params.append({"name": name, "type": type_str})
+            elif param.type == "rest_parameter":
+                # Fallback for grammar versions that use rest_parameter type
+                named = param.named_children
+                if not named:
+                    continue
+                name = named[0].text.decode("utf-8")
+                name = name.lstrip(".")
+                if name in ("self", "this"):
+                    continue
+                type_node = param.child_by_field_name("type")
+                type_str = ""
+                if type_node:
+                    raw = type_node.text.decode("utf-8")
+                    type_str = raw.lstrip(": ").strip()
+                params.append({"name": name, "type": type_str})
             elif param.type == "typed_parameter":
                 # fallback for older grammar versions
                 named = param.named_children
@@ -314,7 +333,8 @@ class TypeScriptParser:
         """Extract return type annotation."""
         annotation = func_node.child_by_field_name("return_type")
         if annotation:
-            return annotation.text.decode("utf-8")
+            raw = annotation.text.decode("utf-8")
+            return raw.lstrip(": ").strip()
         return ""
 
     def _get_docstring(self, node: Node, source: str) -> str:
@@ -325,41 +345,33 @@ class TypeScriptParser:
         inner declaration node. We walk up to find the outermost exportable
         ancestor and then check its previous sibling.
         """
-        # Walk up through export_statement wrappers
+        # Walk up through export_statement and lexical_declaration wrappers
         target = node
-        while target.parent and target.parent.type == "export_statement":
+        while target.parent and target.parent.type in ("export_statement", "lexical_declaration"):
             target = target.parent
 
-        # Check previous non-whitespace sibling (may be named or unnamed)
-        prev = target.prev_sibling
-        while prev and prev.type not in ("comment",):
-            if prev.type not in ("\n", " ", "\t"):
-                break
-            prev = prev.prev_sibling
-
+        # Find the previous sibling that is a comment (JSDoc)
+        prev = target.prev_named_sibling
         if not prev or prev.type != "comment":
-            # Try prev_named_sibling as fallback
-            prev = target.prev_named_sibling
+            return ""
 
-        if prev and prev.type == "comment":
-            text = prev.text.decode("utf-8", errors="replace")
-            lines = text.split("\n")
-            cleaned = []
-            for line in lines:
-                line = line.strip()
-                # Strip JSDoc markers
-                if line.startswith("/**"):
-                    line = line[3:].strip()
-                elif line.startswith("*/"):
-                    continue
-                elif line.startswith("*"):
-                    line = line[1:].strip()
-                elif line.startswith("//"):
-                    line = line[2:].strip()
-                # Skip @param / @returns tags
-                if line.startswith("@"):
-                    continue
-                if line:
-                    cleaned.append(line)
-            return "\n".join(cleaned).strip()
-        return ""
+        text = prev.text.decode("utf-8", errors="replace")
+        lines = text.split("\n")
+        cleaned = []
+        for line in lines:
+            line = line.strip()
+            # Strip JSDoc markers
+            if line.startswith("/**"):
+                line = line[3:].strip()
+            elif line.startswith("*/"):
+                continue
+            elif line.startswith("*"):
+                line = line[1:].strip()
+            elif line.startswith("//"):
+                line = line[2:].strip()
+            # Skip @param / @returns tags
+            if line.startswith("@"):
+                continue
+            if line:
+                cleaned.append(line)
+        return "\n".join(cleaned).strip()

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Recipe Browser</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">🍳 Video Recipe Browser</a>
+        <div class="nav-links">
+            <a href="/compare">Compare</a>
+            <a href="/search">Search</a>
+        </div>
+    </nav>
+    <main class="container">
+        <h1>All Recipes</h1>
+        {% if videos %}
+        <div class="recipe-grid">
+            {% for video in videos %}
+            <div class="recipe-card">
+                <h3>{{ video.filename }}</h3>
+                <p class="task-type">{{ video.task_type or 'Unknown' }}</p>
+                <p class="duration">Duration: {{ video.duration or 'N/A' }}s</p>
+                <a href="/recipe/{{ video.recipe_id }}" class="btn">View Recipe</a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No recipes yet. Upload a video to get started!</p>
+        {% endif %}
+
+        <section class="upload-section">
+            <h2>Upload a Video</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data" class="upload-form">
+                <input type="file" name="file" accept="video/*" required>
+                <input type="text" name="task_type" placeholder="Task type (optional)">
+                <button type="submit" class="btn btn-primary">Upload & Generate Recipe</button>
+            </form>
+        </section>
+    </main>
+</body>
+</html>

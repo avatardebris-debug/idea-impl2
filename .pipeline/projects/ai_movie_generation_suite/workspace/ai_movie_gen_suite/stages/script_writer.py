@@ -61,7 +61,7 @@ class ScriptWriter:
     def _estimate_scenes_for_beat(self, beat) -> int:
         """Estimate how many scenes a beat should generate.
         
-        For the MVP, each beat maps to exactly one scene.
+        For MVP, each beat maps to exactly one scene.
         """
         return 1
 

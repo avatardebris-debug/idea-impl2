@@ -109,6 +109,17 @@ class PythonParser:
                     continue
                 param_name = named[0].text.decode("utf-8")
                 params.append({"name": param_name, "type": ""})
+            elif arg.type == "typed_default_parameter":
+                # Parameter with both type annotation and default value (e.g., x: float = 0)
+                named = arg.named_children
+                if not named:
+                    continue
+                name_node = named[0]  # identifier
+                type_node = arg.child_by_field_name("type")
+                param_name = name_node.text.decode("utf-8")
+                param_type = type_node.text.decode("utf-8") if type_node else ""
+                if param_name not in ("self", "cls"):
+                    params.append({"name": param_name, "type": param_type})
 
         return params
 

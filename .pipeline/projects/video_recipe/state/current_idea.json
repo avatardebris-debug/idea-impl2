@@ -1,0 +1,11 @@
+{
+  "title": "[video recipe]",
+  "description": "deconstructs video action to a recipe in the sense of describing how to perform a task.",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-16T23:29:03.012277+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 5
+}

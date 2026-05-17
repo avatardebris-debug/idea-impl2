@@ -1,0 +1,11 @@
+{
+  "title": "[Forensic accounting suite]",
+  "description": "OSINT for corporate tracking. Tracking shipping manifests, procurement data, government contract databases, corporate registry data. Correlating companies on maps/satellites to SEC filings. Cross correlation engine, anomaly detection.",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-17T07:36:47.677231+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

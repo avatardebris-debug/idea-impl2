@@ -1,0 +1,3 @@
+opencv-python>=4.8
+moviepy>=2.0
+pillow>=9.2

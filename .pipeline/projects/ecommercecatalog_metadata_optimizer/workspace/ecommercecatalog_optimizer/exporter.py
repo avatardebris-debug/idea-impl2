@@ -112,7 +112,8 @@ class CatalogExporter:
             writer.writerow(columns)
 
             for i, record in enumerate(records):
-                row = self._record_to_row(record, columns)
+                # Always use base columns for the record data
+                row = self._record_to_row(record, OUTPUT_COLUMNS)
 
                 if include_metadata and metadata_results:
                     meta = metadata_results[i]

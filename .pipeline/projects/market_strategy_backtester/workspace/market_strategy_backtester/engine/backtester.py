@@ -38,7 +38,7 @@ class Backtester:
             price_data: DataFrame with OHLCV columns and a 'date' column.
 
         Returns:
-            DataFrame with columns ["date", "equity", "position", "cash", "trades"]
+            DataFrame with columns ["date", "equity", "position", "cash", "trades", "strategy_return"]
         """
         # Generate signals
         signals = self.strategy.generate_signals(price_data)
@@ -78,4 +78,4 @@ class Backtester:
         # Position = 1 means fully invested, Position = 0 means full cash.
         merged["cash"] = merged["equity"] * (1 - merged["position"])
         
-        return merged[["date", "equity", "position", "cash", "trades"]]
+        return merged[["date", "equity", "position", "cash", "trades", "strategy_return"]]

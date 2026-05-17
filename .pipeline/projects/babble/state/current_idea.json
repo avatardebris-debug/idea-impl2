@@ -1,0 +1,11 @@
+{
+  "title": "[babble]",
+  "description": "Duolingo style language learning. Find the most common phrases across multiple languages. Learn in order of usage value. Use accelerating learning techniques and memory palace tricks.",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-17T05:52:53.483282+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

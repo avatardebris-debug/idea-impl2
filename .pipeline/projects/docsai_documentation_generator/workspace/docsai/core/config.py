@@ -16,6 +16,8 @@ DEFAULT_CONFIG_PATH = "docsai.yaml"
 DEFAULT_OUTPUT_FORMAT = "yaml"
 DEFAULT_OUTPUT_PATH = "./docsai_output/api_spec.yaml"
 DEFAULT_LANGUAGES = ["python", "typescript"]
+DEFAULT_README_TEMPLATE_DIR = "docsai/generators/readme_templates/default"
+DEFAULT_README_TEMPLATE_FILE = "readme.md.j2"
 
 
 def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
@@ -47,5 +49,7 @@ def load_config(config_path: Optional[str] = None) -> Dict[str, Any]:
     config["output_format"] = raw.get("output_format", DEFAULT_OUTPUT_FORMAT)
     config["languages"] = raw.get("languages", DEFAULT_LANGUAGES)
     config["output_path"] = raw.get("output_path", DEFAULT_OUTPUT_PATH)
+    config["readme_template_dir"] = raw.get("readme_template_dir", DEFAULT_README_TEMPLATE_DIR)
+    config["readme_template_file"] = raw.get("readme_template_file", DEFAULT_README_TEMPLATE_FILE)
 
     return config

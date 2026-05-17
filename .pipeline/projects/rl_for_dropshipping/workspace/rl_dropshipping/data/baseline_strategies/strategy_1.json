@@ -1,0 +1,23 @@
+{
+    "name": "aggressive_growth",
+    "description": "Aggressive growth strategy: high ad spend, focus on high-demand products",
+    "parameters": {
+        "ad_budget_pct": 0.8,
+        "product_focus": "high_demand",
+        "channel_preference": "facebook",
+        "pricing_strategy": "premium",
+        "inventory_target": 80
+    },
+    "product_weights": {
+        "Phone Case": 0.15,
+        "LED Lamp": 0.05,
+        "Yoga Mat": 0.12,
+        "Water Bottle": 0.10,
+        "Bluetooth Speaker": 0.08,
+        "Desk Organizer": 0.03,
+        "Sunglasses": 0.14,
+        "Backpack": 0.04,
+        "Face Mask Set": 0.18,
+        "Phone Charger": 0.11
+    }
+}

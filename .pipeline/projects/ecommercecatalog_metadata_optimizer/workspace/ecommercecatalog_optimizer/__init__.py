@@ -14,4 +14,8 @@ __all__ = [
     "CatalogExporter",
 ]
 
-__version__ = "0.1.0"
+try:
+    from importlib.metadata import version as _version
+    __version__: str = _version("ecommercecatalog_optimizer")
+except Exception:
+    __version__ = "0.1.0"

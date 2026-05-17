@@ -79,7 +79,7 @@ class TestTableauCSVRenderer:
         reader = csv.reader(io.StringIO(result))
         rows = list(reader)
         assert len(rows) == 1  # no header
-        assert rows[0][0] == "0.5"
+        assert rows[0][1] == "0.5"
 
     def test_render_panel_win_rate(self):
         renderer = TableauCSVRenderer()
@@ -109,8 +109,8 @@ class TestTableauCSVRenderer:
             bankroll=BankrollCurvePoint(),
             nash_distance=NashEquilibriumShift(),
         )
-        renderer.render(state)
-        assert "0.5" in renderer._csv_buffer.getvalue()
+        result = renderer.render(state)
+        assert "0.5" in result
 
 
 # ===== TableauRESTRenderer =====

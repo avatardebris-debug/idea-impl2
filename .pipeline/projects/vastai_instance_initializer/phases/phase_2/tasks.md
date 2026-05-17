@@ -1,0 +1,79 @@
+# Phase 2 Tasks
+
+- [ ] Task 1: Batch config schema and loader
+  - What: Define the YAML batch config format and build a loader/validator for it. The batch config supports multiple preset references with instance counts, global timing settings (delay between launches), concurrency limits, and a batch-level name. Also extend the existing preset schema to support a `count` field that expands a single preset into multiple instances.
+  - Files: 
+    - Create `vastai_init/batch/config.py` — batch config schema constants, batch preset reference type definitions, and `load_batch_config()` function
+    - Create `vastai_init/batch/validator.py` — `BatchConfigValidationError` exception, `validate_batch_config()` function that checks preset references exist, validates timing/concurrency values, validates `count` fields
+    - Create `vastai_init/batch/__init__.py` — public exports
+    - Extend `vastai_init/presets/schema.py` — add `count` to `PRESET_OPTIONAL_FIELDS` with default 1
+    - Extend `vastai_init/presets/validator.py` — validate `count` is a positive integer when provided
+  - Done when: 
+    - A batch config YAML file can be loaded and validated programmatically
+    - Batch config format supports: `name`, `presets` (list of `{preset_path, count}`), `timing` (`delay_seconds` or `stagger_percent`), `concurrency` (max parallel), `timeout`
+    - Preset files can include `count: N` to expand into N identical instances
+    - Validation rejects: missing preset paths, non-positive counts, invalid timing values, concurrency < 1
+    - Unit tests exist for `load_batch_config` and `validate_batch_config` covering valid configs, missing presets, invalid counts, and bad timing values
+
+- [ ] Task 2: Batch orchestrator core
+  - What: Build the batch orchestrator engine that manages queuing, timing, concurrency, and instance state tracking. It should expand the batch config into a flat list of launch tasks, schedule them respecting timing and concurrency constraints, track per-instance state (pending, launching, running, failed, stopped), and expose methods to start, pause, resume, and cancel a batch.
+  - Files:
+    - Create `vastai_init/batch/orchestrator.py` — `BatchOrchestrator` class with methods: `expand()` (expand presets into individual launch tasks), `start()` (begin launching respecting timing/concurrency), `pause()` (stop scheduling new launches, let in-flight complete), `resume()` (continue from pause point), `cancel()` (abort all), `get_status()` (return per-instance state dict), `wait()` (block until all complete)
+    - Create `vastai_init/batch/state.py` — `BatchState` dataclass/model for serializing batch state (for pause/resume persistence), with `save_state()` and `load_state()` functions
+    - Create `vastai_init/batch/__init__.py` — update exports to include orchestrator and state classes
+  - Done when:
+    - `BatchOrchestrator.expand()` correctly expands multi-preset configs into individual tasks with correct counts
+    - `start()` launches instances respecting `concurrency` limit (no more than N simultaneous API calls)
+    - `start()` respects `timing.delay_seconds` by waiting between launches
+    - `pause()` stops scheduling new launches but allows in-flight launches to complete
+    - `resume()` continues launching from where it left off
+    - `get_status()` returns accurate per-instance state for all instances
+    - `BatchState` can serialize/deserialize the full batch state for persistence
+    - Unit tests cover: expansion logic, concurrency limiting, timing delays, pause/resume state round-trip
+
+- [ ] Task 3: Live progress display and batch completion report
+  - What: Build the terminal UI components for real-time progress tracking and final batch reporting. Use `rich` for a polished terminal experience with a live-updating table showing per-instance status, GPU type, and timing. On completion, produce a summary report.
+  - Files:
+    - Create `vastai_init/batch/progress.py` — `BatchProgressView` class that renders a live-updating table in the terminal with columns: Instance ID, Preset, Status, Elapsed, Error (if any). Supports spinner animation, auto-refresh at configurable interval, and graceful Ctrl-C handling
+    - Create `vastai_init/batch/report.py` — `BatchReport` class that generates a text summary after batch completion with: total instances, count by status (running/failed/stopped/queued), per-instance details for failures, total elapsed time, and SSH connection details for running instances
+    - Create `vastai_init/batch/__init__.py` — update exports to include progress and report
+  - Done when:
+    - `BatchProgressView` displays a live table that updates every second showing all instance states
+    - Progress view handles graceful shutdown on KeyboardInterrupt
+    - `BatchReport` produces a clear summary with per-instance status counts and failure details
+    - Failed instances show error messages prominently
+    - Running instances show SSH connection details
+    - Progress view and report work correctly with mocked API responses (no live VAST.ai calls needed)
+
+- [ ] Task 4: CLI `batch launch` command and integration
+  - What: Add a new `batch launch` subcommand to the CLI that wires together the batch config loader, orchestrator, progress view, and report. Support CLI flags for overriding timing, concurrency, and dry-run mode. Also add a `batch list` subcommand to show available batch configs.
+  - Files:
+    - Modify `vastai_init/cli.py` — add `batch` command group with `launch` and `list` subcommands
+    - `batch launch <batch-config>`: loads batch config, expands tasks, runs orchestrator with progress view, prints report on completion
+    - `batch launch` flags: `--delay SECONDS`, `--concurrency N`, `--dry-run`, `--verbose`, `--resume-from PATH` (for resuming paused batches)
+    - `batch list`: lists available batch config files from a configured batch configs directory
+    - Update `vastai_init/batch/__init__.py` — final exports
+  - Done when:
+    - `vastai-init batch launch config.yaml` launches a multi-instance batch with live progress
+    - `--delay`, `--concurrency`, `--dry-run`, `--verbose` flags work correctly
+    - `--resume-from` loads a saved state and continues from the pause point
+    - `vastai-init batch list` shows available batch configs
+    - Dry-run mode expands tasks and prints them without launching
+    - Integration with existing session logging: each launched instance still logs its session
+    - CLI help text is clear and complete
+
+- [ ] Task 5: Sample batch configs, integration tests, and documentation
+  - What: Create sample batch configuration YAML files demonstrating common use cases, write integration tests that verify the full batch launch pipeline (with mocked API), and update project documentation.
+  - Files:
+    - Create `presets/batch/multi-node-training.yaml` — sample batch config for launching 4 identical training instances with 30s delay
+    - Create `presets/batch/heterogeneous-cluster.yaml` — sample batch config with mixed GPU types (2x A100, 4x RTX 4090) and staggered timing
+    - Create `presets/batch/quick-test.yaml` — small batch config for testing (2 instances, no delay)
+    - Create `tests/test_batch_integration.py` — integration tests for the full batch pipeline using `unittest.mock` to mock API calls
+    - Update `README.md` — add Phase 2 documentation: batch config format, CLI usage examples, pause/resume workflow
+  - Done when:
+    - All three sample batch configs are valid YAML and pass validation
+    - Integration tests verify: config loading, task expansion, orchestrator scheduling, progress display, report generation, and pause/resume
+    - README documents batch config YAML format with field descriptions
+    - README includes CLI usage examples for `batch launch` and `batch list`
+    - README documents pause/resume workflow with `--resume-from` flag
+    - All existing Phase 1 tests still pass

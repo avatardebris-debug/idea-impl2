@@ -1,0 +1,13 @@
+{
+  "title": "[video GAN]",
+  "description": "GAN and RL training. one determines if the video is real or fake, the other adapts video pow to generate fake from a real video and presents one or the other and both sides improve. require",
+  "status": "complete",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-16T13:56:06.924564+00:00",
+  "depends_on": [
+    "video_pow"
+  ],
+  "tasks_done": 0,
+  "tasks_total": 3
+}

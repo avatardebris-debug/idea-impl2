@@ -12,6 +12,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from ai_movie_gen_suite.models import (
+    Beat,
     BeatSheet,
     Character,
     CharacterRegistry,

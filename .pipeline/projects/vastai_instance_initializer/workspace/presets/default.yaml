@@ -1,0 +1,39 @@
+# Default preset for VAST.ai instance launch
+# This preset provides sensible defaults for a general-purpose GPU instance.
+
+# Required fields
+name: "default-instance"        # Name for this instance (for your reference)
+gpu_type: "NVIDIA RTX 4090"     # GPU type to request (e.g., "NVIDIA RTX 4090", "NVIDIA A100")
+price_cap: "1.50"               # Maximum price per hour in USD
+storage: "100GB"                # Storage size (must include unit: GB or TB)
+image: "nvidia/cuda:12.2.0-devel-ubuntu22.04"  # Docker image to use
+
+# Optional fields with defaults
+ssh_commands:                   # Commands to run after instance starts
+  - "apt-get update && apt-get install -y python3-pip"
+  - "pip install torch torchvision"
+
+env_vars:                       # Environment variables to set
+  CUDA_VISIBLE_DEVICES: "0"
+  PYTHONUNBUFFERED: "1"
+
+disk_size: null                 # Total disk size (overrides storage if set)
+region: null                    # Preferred region (null = any region)
+min_vram: null                  # Minimum VRAM in GB (null = no minimum)
+uptime: null                    # Maximum uptime (e.g., "2h" or 7200 seconds)
+ssh_public_key: null            # SSH public key to inject (null = generate one)
+docker_args:                    # Additional Docker arguments
+  --shm-size: "16g"
+  --ulimit: "nofile=65535"
+
+ports:                          # Ports to expose
+  - 22
+  - 8888
+
+labels:                         # Labels for the instance
+  project: "vastai-init"
+  environment: "default"
+
+# Polling configuration
+timeout: 300                    # Max seconds to wait for instance to start
+poll_interval: 10               # Seconds between status checks

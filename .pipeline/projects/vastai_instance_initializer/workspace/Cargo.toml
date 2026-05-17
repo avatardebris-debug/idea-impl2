@@ -1,0 +1,28 @@
+[package]
+name = "vastai-instance-initializer"
+version = "0.1.0"
+edition = "2021"
+description = "Desktop app for batch GPU instance provisioning on VAST AI"
+
+[lib]
+name = "vastai_instance_initializer_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "vastai-instance-initializer"
+path = "src/main.rs"
+
+[dependencies]
+tauri = { version = "1", features = ["shell-open"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rusqlite = { version = "0.31", features = ["bundled"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+log = "0.4"
+env_logger = "0.10"
+
+[build-dependencies]
+tauri-build = { version = "1", features = [] }

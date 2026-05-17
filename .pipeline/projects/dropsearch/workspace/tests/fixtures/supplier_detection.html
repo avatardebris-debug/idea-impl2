@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><title>Test Supplier Detection</title></head>
+<body>
+    <!-- AliExpress product link -->
+    <div class="product-item">
+        <h3 class="product-title">Wireless Bluetooth Earbuds</h3>
+        <span class="price">$29.99</span>
+        <a href="https://www.aliexpress.com/item/12345678.html" class="supplier-link">Source from AliExpress</a>
+    </div>
+
+    <!-- CJ Dropshipping data attribute -->
+    <div class="product-item" data-supplier="cjdropshipping" data-supplier-price="8.50">
+        <h3 class="product-title">Phone Case Premium</h3>
+        <span class="price">$19.99</span>
+        <img src="https://www.cjdropshipping.com/product/p12345.jpg" alt="Phone Case">
+    </div>
+
+    <!-- Spocket iframe embed -->
+    <div class="product-item">
+        <h3 class="product-title">LED Desk Lamp</h3>
+        <span class="price">$45.00</span>
+        <iframe src="https://spocket.co/embed/product/67890" width="300" height="200"></iframe>
+    </div>
+
+    <!-- DSers API endpoint -->
+    <div class="product-item" data-product-id="dsers_12345">
+        <h3 class="product-title">Yoga Mat Non-Slip</h3>
+        <span class="price">$35.00</span>
+        <script>
+            window.supplierConfig = {
+                "api_endpoint": "https://www.dsers.com/api/v1/products/12345",
+                "cost": 12.00
+            };
+        </script>
+    </div>
+
+    <!-- Zendrop hidden price -->
+    <div class="product-item" data-cost="15.75">
+        <h3 class="product-title">Water Bottle Insulated</h3>
+        <span class="price">$24.99</span>
+        <a href="https://www.zendrop.com/products/water-bottle">View on Zendrop</a>
+    </div>
+
+    <!-- Doba supplier -->
+    <div class="product-item">
+        <h3 class="product-title">Smart Watch Fitness Tracker</h3>
+        <span class="price">$89.99</span>
+        <a href="https://www.doba.com/catalog/product/54321">Source from Doba</a>
+    </div>
+
+    <!-- Generic product with no supplier -->
+    <div class="product-item">
+        <h3 class="product-title">Generic Product No Supplier</h3>
+        <span class="price">$10.00</span>
+    </div>
+</body>
+</html>

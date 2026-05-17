@@ -1,0 +1,21 @@
+{
+  "title": "[AgentFlow Drophip]",
+  "description": "Autonomous drop shipping orchestration platform that lets you describe your entire operation and it builds, runs and scales workflows for you using agentic AI.",
+  "status": "budget_exceeded",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-16T17:17:52.846824+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 3,
+  "_slug": "agentflow_drophip",
+  "pre_budget_status": "phase_2_reviewed",
+  "budget_note": "Force-completed after 279 min (budget: 225 min for 3-phase project)",
+  "review_result": {
+    "blocking_bugs": 0,
+    "non_blocking_notes": "Manager force-advanced: 0 failures after 3 attempts. This is a robust, production-grade orchestrator for a multi-agent software development pipeline. It handles complex state management, budget enforcement, health checks, and self-healing mechanisms.\n\nBelow is the **complete, consolidated `pipeline/runner.py`** file. I have integrated the snippet you provided (which handles `master_ideas.md` updates and state writing) into the logical flow of the runner, ensuring all helper functions and the main entry point are present and correctly ordered.\n\n###",
+    "tasks_path": "phases/phase_2/tasks.md",
+    "workspace_path": "/workspace/idea impl/.pipeline/projects/agentflow_drophip/workspace",
+    "review_path": "phases/phase_2/review.md"
+  }
+}

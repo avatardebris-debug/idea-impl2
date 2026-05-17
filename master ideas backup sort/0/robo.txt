@@ -1,0 +1,403 @@
+robo
+
+Toward Physical Agency: Roadmap from Video Pipeline to Embodied AI
+Architecture review — 2026-05-16
+
+The Core Insight
+Your current autonomous pipeline is structurally identical to the robot training loop you're describing. You're not building toward that world someday — you're already building the foundation.
+
+CURRENT PIPELINE                    ROBOT TRAINING LOOP
+─────────────────────────────────   ─────────────────────────────────
+executor agent                  ≡   robot attempts task
+pytest validation               ≡   physics engine evaluates outcome
+reviewer agent                  ≡   critic scores sim output
+manager agent                   ≡   goal decomposer / curriculum planner
+retry / fix loop                ≡   RL improvement iteration
+pipeline runner                 ≡   training orchestrator
+The gap between "autonomous software builder" and "autonomous robot trainer" is mostly: (a) swapping Python code generation for MuJoCo program generation, and (b) swapping pytest with physics simulation scoring.
+
+The Full Dependency Chain
+Human video (YouTube, recorded demo)
+    │
+    ▼
+[video_ingestor_summary] ─── Whisper STT → transcript + timestamps  ✅ done
+    │
+    ▼
+[video_scribe] ─────────────── VLM scene description per frame        ✅ done
+    │
+    ▼
+[video_recipe] ─────────────── LLM extracts ordered action primitives ❌ not built
+    │                           Output: [{action, object, XYZ_delta,
+    │                                     duration_s, preconditions}]
+    ▼
+[robo_primitive_mapper] ──────── Maps action descriptions to abstract  ❌ not built
+    │                            robot command sequences (joint space
+    │                            or end-effector XYZ + rotation)
+    │                            Output: robot_program.json
+    ▼
+[mujoco_codegen] ─────────────── Generates MuJoCo XML/Python from     ❌ not built
+    │                            robo primitives. Handles:
+    │                            - object placement in scene
+    │                            - trajectory planning
+    │                            - contact/grasp primitives
+    ▼
+[sim_real_comparator] ────────── Given real video + sim render:        ❌ not built
+    │                            compute frame-level similarity
+    │                            (perceptual hash, SSIM, CLIP embeddings)
+    │                            Output: similarity_score ∈ [0, 1]
+    ▼
+[sim_real_discriminator] ─────── Extends video_GAN critic:             ❌ not built
+    │                            discriminator trained to detect real
+    │                            vs simulated robot footage.
+    │                            Score drives the improvement loop.
+    │
+    ├── [robot_skill_library] ── SQLite/vector DB of learned skills:  ❌ not built
+    │                           {skill_name, video_example, robo_program,
+    │                            sim_score, real_score, last_trained}
+    │
+    └── [goal_decomposer] ────── /goals "build a house"               ❌ not built
+                                 → LLM decomposes to skill tree
+                                 → checks skill_library for each node
+                                 → identifies gaps → queues new recipes
+What Can Be Built Today (No A100 Required)
+Tier 1: Pure LLM + Python (pipeline can build these)
+video_recipe — LLM takes video_scribe output (structured scene descriptions) and extracts an ordered list of atomic actions:
+
+json
+[
+  {"step": 1, "action": "grasp", "object": "hammer",
+   "xyz_delta": [0.0, 0.0, -0.15], "duration_s": 0.8,
+   "preconditions": ["hammer_on_surface", "gripper_open"]},
+  {"step": 2, "action": "swing", "object": "hammer",
+   "direction": "down", "force_estimate": "heavy",
+   "target": "nail", "xyz_delta": [0.0, 0.0, -0.3]}
+]
+This is 100% LLM work. No GPU, no physics engine.
+
+robo_primitive_mapper — Maps the above recipe to abstract robot commands. Define a primitive set (similar to MuJoCo's built-ins):
+
+move_to(xyz, frame="world|gripper|object")
+grasp(object_id, grip_force)
+release()
+apply_force(direction, magnitude, duration)
+wait(seconds)
+observe(sensor="camera|force|joint_pos")
+This is a translation problem — LLM with structured output. The key design decision is the primitive vocabulary: define it now and lock it in. Everything downstream builds on it.
+
+sim_comparator (perceptual only) — Compare two video clips using:
+
+SSIM (structural similarity — OpenCV, no GPU)
+Perceptual hash (difference hash — 16-bit, CPU only)
+CLIP embeddings (if GPU available, else skip)
+Output a [0,1] similarity score + frame-by-frame heatmap
+robot_skill_library — SQLite + FAISS/ChromaDB vector store. Skills indexed by: name, description embedding, input/output object types. Query: "find skills similar to 'hammer a nail'".
+
+goal_decomposer — LLM agent with tool access:
+
+search_skill_library(query) → returns matching skills
+add_skill_gap(skill_description) → queues video_recipe to find a demo
+compose_plan(goal, skills) → builds dependency tree of skills
+Tier 2: Needs A100-class GPU (run on VastAI now, local in ~5 years)
+mujoco_codegen — Generates MuJoCo XML + Python control script. Requires testing against an actual physics simulation. VastAI can run this.
+
+sim_real_discriminator — Extends video_GAN with:
+
+Training data: (sim_frames, real_frames) pairs
+Loss: binary cross-entropy (real=1, sim=0)
+Output: per-frame "realness" score + global score
+Needs at least a few hundred training pairs — robot camera footage vs renders
+Tier 3: Requires Real Hardware + Datacenter
+Actual sim-to-real gap closure
+Physical robot in training facility
+Real camera footage collection
+Policy distillation from sim to real weights
+Why the Discriminator is the Key Investment
+The sim_real_discriminator is the linchpin because:
+
+You can start training it now on synthetic data — generate pairs of (UE5/MuJoCo render, real video of the same action) and train the classifier. Your video_GAN already has this architecture.
+
+Once trained, it becomes a universal reward signal — any new skill attempt gets a "realness score" without needing ground truth labels.
+
+It self-improves with the generator — as MuJoCo renders get more realistic (better materials, physics params), the discriminator gets harder to fool, driving the generator to improve further.
+
+It's the bridge between now and the robot — even before you have a physical robot, you can improve the discriminator using YouTube footage of humans and robots performing tasks.
+
+The "Forked Pipeline" — What It Actually Is
+You mentioned a fork "focused on self-developing tool for agents to develop their own robot software." Here's the precise architecture:
+
+CURRENT PIPELINE                    ROBOT FORK
+──────────────────                  ───────────
+master_ideas.md              →      skill_gaps.md
+                                    (list of needed robot skills)
+idea_planner agent           →      skill_planner agent
+(generates master_plan.md)          (generates skill_spec.md:
+                                     input objects, output state,
+                                     success criteria, XYZ bounds)
+phase_planner agent          →      robo_codegen agent
+(generates tasks.md)                (generates mujoco_program.py)
+executor agent               →      sim_runner agent
+(writes Python code)                (executes MuJoCo sim,
+                                     records render video)
+validator agent              →      sim_critic agent
+(runs pytest)                       (runs sim_real_comparator
+                                     + discriminator → score)
+reviewer agent               →      skill_reviewer agent
+(code review)                       (reviews skill against spec:
+                                     does robot achieve goal state?)
+manager agent                →      curriculum_manager agent
+(decides next phase)                (decides: retry? harder variant?
+                                     add to skill_library? next gap?)
+The fork is ~30% new code, ~70% repurposed prompt templates and agent wiring. The pipeline runner itself is entirely reusable — the orchestration loop, message bus, budget management, retry logic — all carries over unchanged.
+
+Concrete Roadmap: Now → "Build a House"
+Phase A: Foundation (buildable now, ~2-6 months)
+ video_recipe — action primitive extraction from video
+ robo_primitive_mapper — vocabulary of robot commands
+ robot_skill_library v1 — SQLite store with FAISS search
+ goal_decomposer v1 — LLM skill tree builder + gap identification
+Milestone: Given a YouTube video of someone building a LEGO set, system produces a structured skill program describing the assembly sequence.
+
+Phase B: Simulation Bridge (VastAI GPU, ~6-18 months)
+ mujoco_codegen — generates runnable MuJoCo programs from robo primitives
+ sim_real_comparator — SSIM + CLIP similarity scorer
+ sim_real_discriminator v1 — trained on synthetic pairs
+ Robot fork of pipeline runner — self-improving skill generation loop
+Milestone: System generates a MuJoCo program for "stack 3 blocks", runs the simulation, scores the result, retries until sim score > 0.9.
+
+Phase C: Closing the Gap (~18-36 months, parallel track)
+Hardware: low-cost robot arm (UR5, Franka, or custom) in a small facility
+Collect real footage of the same tasks the sim is running
+Fine-tune discriminator on real vs. sim pairs
+Begin transferring policies from sim to real hardware
+Milestone: Robot arm can stack blocks in real life with >80% success rate, having trained entirely in simulation and transferred via discriminator guidance.
+
+Phase D: Skill Compounding (~3-5 years, $1000 A100)
+Skill library has 100+ verified primitives
+Goal decomposer can break "assemble a chair" into known primitives
+Missing primitives auto-queued via video_recipe (find a YouTube demo)
+Sim-to-real discriminator strong enough to score novel skills reliably
+Milestone: Given goal "assemble an IKEA chair," system:
+
+Decomposes into ~15 skill primitives
+Finds 12 in skill_library (already trained)
+Queues 3 new video_recipe jobs (finds YouTube demos for gaps)
+Generates MuJoCo programs, trains to sim score > 0.9
+Transfers to hardware
+Phase E: Open Goals (~5+ years)
+/goals "build a house" → hierarchical skill tree of 500+ primitives
+System identifies ~50 novel skills not in library
+Autonomously finds video demonstrations, generates programs, simulates, validates
+With sufficient hardware: begins physical construction with human oversight
+What to Build Next in the Pipeline
+Immediate (current runner can execute):
+
+video_recipe — add to master_ideas.md with requires: video_scribe
+Define the robo primitive vocabulary (20-30 primitives) as a spec document → this is the most important design decision, everything downstream uses it
+Near-term (next few months): 3. robo_primitive_mapper — requires: video_recipe 4. robot_skill_library — no deps, standalone 5. goal_decomposer — requires: robot_skill_library
+
+The fork — when you're ready, create .pipeline_robot/ as a sibling to .pipeline/ using the same runner with different agent prompt templates.
+
+The Primitive Vocabulary — Most Important Decision to Make Now
+The primitive set should be:
+
+Small (<30 primitives) — discoverable, composable
+Complete — enough to describe most manipulation tasks
+Grounded — each has a clear physical interpretation in XYZ space
+Proposed set:
+
+LOCOMOTION:    move_to, rotate_to, approach, retreat
+MANIPULATION:  grasp, release, push, pull, lift, place, insert, rotate_object
+OBSERVATION:   look_at, scan, measure_distance, detect_object
+FORCE:         apply_force, apply_torque, maintain_contact
+COMPOUND:      sequence, parallel, repeat_until, conditional
+STATE:         wait, pause, signal_done, request_human
+This is a vocabulary design problem that benefits enormously from human input (like this conversation) rather than LLM generation — the LLM will respect and reuse whatever vocabulary we define.
+
+===
+v2
+
+Toward Physical Agency: Roadmap from Video Pipeline to Embodied AI
+Updated 2026-05-17 — unified pipeline architecture
+
+Core Structural Insight: One Pipeline, Multiple Domains
+Not a fork. A mode.
+
+The question of "fork vs. unified" is decided by one scenario:
+
+/goals "build a house and list it on Airbnb"
+Subgoal tree:
+  ├── acquire building permit          [domain: software → legal_doc_generator]
+  ├── dig foundation                   [domain: robot   → mujoco_codegen]
+  ├── frame walls                      [domain: robot   → mujoco_codegen]
+  ├── source materials online          [domain: software → web_scraper + purchasing]
+  ├── electrical + plumbing inspection [domain: software → form_filler]
+  ├── photograph completed house       [domain: robot   → camera_control]
+  ├── write Airbnb listing             [domain: software → ai_author_suite]
+  └── set up payment processing        [domain: software → payment_tool]
+A forked runner needs IPC between processes to coordinate this. A unified runner with a domain field handles it in one goal graph natively. The fork is only the prompt templates and tool wrappers — not the orchestration system.
+
+What Actually Changes Per Domain
+UNCHANGED (same code for all domains):
+  pipeline/runner.py          — orchestration, budget, retry, message bus
+  pipeline/agent.py           — base agent class, LLM calls
+  pipeline/message_bus.py     — queue management
+  shared_libs/               — canonical reviewer for ALL generated code/skills
+DOMAIN-SWITCHED (loaded per project's "domain" field):
+  pipeline/prompts/software/  — current prompts (executor, validator, reviewer)
+  pipeline/prompts/robot/     — robo_codegen, sim_runner, sim_critic, skill_reviewer
+  pipeline/tools/software/    — file ops, subprocess, pytest runner
+  pipeline/tools/robot/       — MuJoCo launcher, PufferLib trainer, discriminator scorer
+The Domain Field in Project State
+json
+{
+  "title": "[dig foundation]",
+  "domain": "robot",
+  "status": "phase_1_executing",
+  "parent_goal": "build a house and list it on Airbnb",
+  ...
+}
+Software projects default to "domain": "software" (backward compatible — no changes needed to existing projects). The runner switches prompt templates and tool wrappers based on this field. One runner instance can process a mixed queue.
+
+The Unified Architecture
+┌─────────────────────────────────┐
+                    │  /goals "build a house + Airbnb" │
+                    └─────────────┬───────────────────┘
+                                  │
+                    ┌─────────────▼───────────────────┐
+                    │      SUBGOAL GENERATOR           │
+                    │  LLM decomposes goal into        │
+                    │  dependency tree of subgoals     │
+                    │  Each tagged domain: robot|sw    │
+                    │  Injected into master_ideas.md   │
+                    └─────────────┬───────────────────┘
+                                  │
+                    ┌─────────────▼───────────────────┐
+                    │      GOAL DECOMPOSER             │
+                    │  Checks robot_skill_library      │
+                    │  Found → reuse. Gap → video_recipe│
+                    │  Unified graph: robot + software  │
+                    └─────────────┬───────────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+    ┌─────────▼────────┐  ┌──────▼──────────┐  ┌────▼────────────┐
+    │  domain: robot   │  │ domain: software │  │ domain: robot   │
+    │                  │  │                  │  │                  │
+    │ skill_planner    │  │ idea_planner     │  │ skill_planner    │
+    │ robo_codegen     │  │ phase_planner    │  │ robo_codegen     │
+    │ sim_runner       │  │ executor         │  │ sim_runner       │
+    │ sim_critic       │  │ validator        │  │ sim_critic       │
+    │ skill_reviewer   │  │ reviewer         │  │ skill_reviewer   │
+    └─────────┬────────┘  └──────┬──────────┘  └────┬────────────┘
+              │                   │                   │
+              └───────────────────┼───────────────────┘
+                                  │
+                    ┌─────────────▼───────────────────┐
+                    │   SHARED LIBRARY (as reviewer)   │
+                    │  shared_libs/RobotPrimitives/    │
+                    │  shared_libs/SoftwareModules/    │
+                    │  All generated code/skills       │
+                    │  checked here before promotion   │
+                    └─────────────────────────────────┘
+Subgoal Generator — The Goal-Creation / Hypothesis Layer
+This is not just for robots. It makes the entire pipeline self-directing on any domain.
+
+Input: Any high-level goal at any abstraction level Output: Ordered dependency list of subgoals, each as a pipeline idea entry
+
+"make $10k/month"
+  → identify high-demand freelance services [domain: software → market_research_tool]
+  → build landing page                       [domain: software → web_builder]
+  → SEO optimization                         [domain: software → SEO_tool]
+  → set up payment processing                [domain: software → payment_tool]
+  → automate client delivery                 [domain: software → job_automation_tool]
+"learn to speak Japanese"
+  → frequency word extraction                [domain: software → babble]
+  → video content ingestion                  [domain: software → video_babbel_enhanced]
+  → spaced repetition schedule               [domain: software → babble SM-2]
+"build a house and rent it"
+  → [mixed dependency tree as shown above]
+The runner picks up each subgoal like any other idea — same executor/validator/critic cycles. The subgoal generator is the hypotheses engine: the agent creates a series of sub-ideas to try, building toward a macro objective.
+
+New Dependencies Added to Master Ideas
+Full dependency chain in topological order:
+
+[subgoal generator]         (no deps — standalone)
+                             │
+              ┌──────────────┴──────────────────────┐
+              │                                      │
+    [robot primitive vocabulary]              [video recipe]
+    (no deps — design spec)                  req: video_scribe ✅
+              │                                      │
+    [robo primitive mapper]  ←────────────────────────┘
+    req: video_recipe, robot_primitive_vocabulary
+              │
+    [mujoco codegen]
+    req: robo_primitive_mapper
+              │
+    ┌─────────┴───────────────┐
+    │                         │
+[pufferlib rl harness]  [sim real comparator]
+req: mujoco_codegen      req: video_ingestor_summary ✅
+    │                         │
+    │                   [sim real discriminator]
+    │                   req: sim_real_comparator, video_gan ✅
+    │                         │
+    └─────────┬───────────────┘
+              │
+    [robot skill library]
+    req: robo_primitive_mapper
+    (shared_libs/ acts as reviewer)
+              │
+    ┌─────────┴──────────────┐
+    │                        │
+[goal decomposer]      [robot pipeline mode]
+req: robot_skill_lib,   req: goal_decomposer,
+     subgoal_generator       pufferlib_rl_harness,
+                             sim_real_discriminator,
+                             robot_skill_library
+Legend: ✅ = already complete in pipeline
+
+PufferLib — The Compute Efficiency Multiplier
+PufferLib (github.com/PufferAI/PufferLib) achieves 10-100x sample efficiency vs. naive RL implementations through:
+
+Vectorized environments — 512+ parallel MuJoCo instances per GPU
+Async rollout collection — GPU never idles waiting for env steps
+Clean env/policy separation — easy to plug in MuJoCo or custom envs
+Battle-tested — used in NeurIPS competition settings
+What this changes for the hardware roadmap:
+
+Task	Naive RL	With PufferLib	Hardware
+Train "grasp object"	~1 week, A100	~4 hours, RTX 4090	Now
+Train "stack 3 blocks"	~2 weeks, 4×A100	~1 day, RTX 4090	Now
+Train "assemble chair"	months, cluster	~1 week, 2×RTX 4090	$1k-2k setup
+Full house build skill tree	years, datacenter	months, 8×RTX 4090	~5 years at $1k/A100
+The discriminator score from sim_real_discriminator feeds directly into PufferLib as the reward function — no custom RL infrastructure needed.
+
+The Robot as a Full Agency Stack
+The robot isn't just a physical actuator. With LLM access + the full pipeline:
+
+Robot capability stack (from bottom to top):
+Level 5: MACRO GOALS
+  "/goals build and monetize a house"
+  → subgoal_generator decomposes
+  → goal_decomposer routes to physical + digital subgoals
+  → unified runner orchestrates everything
+Level 4: DIGITAL AGENCY  
+  Robot can spawn any software pipeline tool:
+  - Launch websites, do SEO, handle legal paperwork
+  - Manage finances, delegate to other robot instances
+  - Use ai_author_suite, job_automation_tool, etc.
+Level 3: SKILL COMPOSITION
+  goal_decomposer checks robot_skill_library
+  Found skills → reused directly
+  Missing skills → queued as video_recipe jobs (find YouTube demo → extract → train)
+Level 2: SKILL TRAINING
+  video_recipe → robo_primitive_mapper → mujoco_codegen
+  → pufferlib_rl_harness (train) → sim_real_discriminator (score)
+  → robot_skill_library (promote when sim_score > threshold)
+Level 1: PHYSICAL PRIMITIVES
+  shared_libs/RobotPrimitives/: move_to, grasp, release, push, pull,
+  lift, place, insert, rotate_object, apply_force, look_at, scan,
+  detect_object, wait, conditional, sequence, parallel, repeat_until
+
+

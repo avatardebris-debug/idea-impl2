@@ -1,0 +1,162 @@
+{
+  "consistent_character_developer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "consistent_scene_developer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "docsai_documentation_generator": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "drop_servicing_tool": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "financial_document_analyzer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "football_nfl_draft_and_recruit_optimizer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "forensic2": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "market_strategy_backtester": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "player_attribute_library": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "sec_importer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "supportagent_workflow_builder": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "tim_ferriss_learning_tool": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "transcript_extractor": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "video_ingestor_summary": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "ai_movie_generation_suite_2": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "chronovision": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "chronovision2": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "football_simulator": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "financial_portfolio_simulator": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "forensic": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "osint_corp": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "sec_importer2": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "sopdata_ingestion_bridge": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "url_health_checker": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "scott_adams_botllm_fine_tuning": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "video_langfake": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "video_management": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "fiverr_job_automation_tool": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "human_in_the_loop_reviewer": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "tableau_integration_module": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "video_babbel": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "ai_movie_generation_suite": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "dynamic_pricing_integrator": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "ffo": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "movieseries_auto_tracker": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "multi_format_export_engine": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "nda_contract_generator": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "pocketknife_of_the_internet": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "rule_based_triage_engine": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  },
+  "udemy_training_tool": {
+    "status": "NOT_FOUND",
+    "detail": "workspace dir missing"
+  }
+}

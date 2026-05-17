@@ -36,10 +36,18 @@ SICA/
 .pipeline/logs/
 .pipeline/state/pipeline_status.json
 .pipeline/state/agent_registry.json
+.pipeline/state/throughput.json
 .pipeline/pipeline_extract*/
 .agent/
 experiments.tsv
 state_*.tar.gz
+
+# --- Generated pipeline runtime data (high-churn, not source) ---
+.pipeline/projects/freelancetask_manager_system/workspace/opportunity_pipelines/
+.pipeline/projects/*/workspace/**/*.log
+.pipeline/projects/*/workspace/**/*.db
+.pipeline/projects/*/workspace/submission_log.csv
+.pipeline/projects/*/workspace/data/**/*.json
 
 # --- Test artifacts ---
 .pytest_cache/

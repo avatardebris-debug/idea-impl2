@@ -1,13 +1,21 @@
 # Phase 1 Tasks
 
-- [x] Task 1: Implement core Phase 1 functionality
-  - What: Build the primary components described in the phase spec
-  - Done when: Core functionality works and is importable
+- [ ] Task 1: Audit current Phase 1 codebase and identify gaps
+  - What: Review existing implementation, compare against spec, and identify what's missing or broken
+  - Done when: A clear inventory of completed vs. missing functionality is documented
 
-- [x] Task 2: Add tests for Phase 1
-  - What: Write unit tests covering the main code paths
-  - Done when: Tests pass with pytest
+- [ ] Task 2: Fix or implement core Phase 1 components
+  - What: Address identified gaps in the primary components (build, import, and functionality)
+  - Done when: All core components work and are importable
 
-- [x] Task 3: Integration and documentation
-  - What: Integrate with existing phases and update README
-  - Done when: Full pipeline works end-to-end
+- [ ] Task 3: Write or update unit tests for Phase 1
+  - What: Write unit tests covering main code paths; fix any failing tests
+  - Done when: All tests pass with pytest
+
+- [ ] Task 4: Implement integration between Phase 1 and downstream phases
+  - What: Ensure Phase 1 outputs feed correctly into subsequent phases
+  - Done when: End-to-end pipeline runs without errors
+
+- [ ] Task 5: Update documentation and README for Phase 1
+  - What: Document API, usage, and integration points
+  - Done when: README and inline docs are up to date and accurate

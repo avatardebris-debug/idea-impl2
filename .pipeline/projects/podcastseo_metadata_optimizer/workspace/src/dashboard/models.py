@@ -29,7 +29,7 @@ class WinRateMetric:
             total_games=data["total_games"],
             wins=data["wins"],
             losses=data["losses"],
-            timestamp=data["timestamp"],
+            timestamp=data.get("timestamp"),
         )
 
 
@@ -61,8 +61,8 @@ class BankrollCurvePoint:
             bankroll=data["bankroll"],
             peak_bankroll=data["peak_bankroll"],
             drawdown=data["drawdown"],
-            timestamp=data["timestamp"],
-            history=data["history"],
+            timestamp=data.get("timestamp"),
+            history=data.get("history"),
         )
 
 
@@ -88,8 +88,8 @@ class NashEquilibriumShift:
         return cls(
             distance=data["distance"],
             current_strategy=data["current_strategy"],
-            nash_strategy=data["nash_strategy"],
-            timestamp=data["timestamp"],
+            nash_strategy=data.get("nash_strategy"),
+            timestamp=data.get("timestamp"),
         )
 
 

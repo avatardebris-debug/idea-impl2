@@ -1,0 +1,11 @@
+{
+  "title": "[VASTAI instance initializer]",
+  "description": "User sets up preset commands for a vast AI terminal, time between commands, number of instances into a database, selects all the settings and so on and clicks run and it initializes according to the user selections",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-17T20:37:42.670371+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 6
+}

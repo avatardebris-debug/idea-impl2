@@ -1,0 +1,21 @@
+{
+  "title": "[pairenv]",
+  "description": "environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool",
+  "status": "budget_exceeded",
+  "phase": 3,
+  "total_phases": 3,
+  "started_at": "2026-05-16T07:11:47.362018+00:00",
+  "depends_on": [],
+  "tasks_done": 0,
+  "tasks_total": 5,
+  "_slug": "pairenv",
+  "pre_budget_status": "phase_3_reviewed",
+  "budget_note": "Force-completed after 355 min (budget: 337 min for 3-phase project)",
+  "review_result": {
+    "blocking_bugs": 0,
+    "non_blocking_notes": "Manager force-advanced: 0 failures after 3 attempts. Based on the file structure provided, this is a **multi-agent AI software development system**.\n\n### System Architecture Overview\n\n1.  **Core Orchestrator (`prompt_versions/`, `state/`, `queues/`)**:\n    *   **Agents**: The system defines distinct roles for AI agents: `executor`, `idea_planner`, `ideator`, `manager`, `phase_planner`, `reviewer`, and `validator`.\n    *   **Communication**: Agents communicate via JSONL queues (`queues/executor.jsonl`, etc.) with lock files to manage concurrency.\n ",
+    "tasks_path": "phases/phase_3/tasks.md",
+    "workspace_path": "/workspace/idea impl/.pipeline/projects/pairenv/workspace",
+    "review_path": "phases/phase_3/review.md"
+  }
+}

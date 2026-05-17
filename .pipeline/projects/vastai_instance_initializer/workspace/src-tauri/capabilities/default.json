@@ -1,0 +1,55 @@
+{
+  "identifier": "com.vastai.instance-initializer",
+  "description": "VASTAI Instance Initializer permissions",
+  "allow": [
+    {
+      "command": "create_preset",
+      "identifier": "allow:create_preset"
+    },
+    {
+      "command": "update_preset",
+      "identifier": "allow:update_preset"
+    },
+    {
+      "command": "delete_preset",
+      "identifier": "allow:delete_preset"
+    },
+    {
+      "command": "list_presets",
+      "identifier": "allow:list_presets"
+    },
+    {
+      "command": "get_preset",
+      "identifier": "allow:get_preset"
+    },
+    {
+      "command": "run_preset",
+      "identifier": "allow:run_preset"
+    },
+    {
+      "command": "get_execution_history",
+      "identifier": "allow:get_execution_history"
+    },
+    {
+      "command": "get_execution_status",
+      "identifier": "allow:get_execution_status"
+    },
+    {
+      "command": "set_api_key",
+      "identifier": "allow:set_api_key"
+    },
+    {
+      "command": "get_api_key",
+      "identifier": "allow:get_api_key"
+    },
+    {
+      "command": "list_instances",
+      "identifier": "allow:list_instances"
+    },
+    {
+      "command": "get_instance_status",
+      "identifier": "allow:get_instance_status"
+    }
+  ],
+  "deny": []
+}

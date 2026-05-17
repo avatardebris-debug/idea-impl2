@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # Citation
     default_citation_style: str = "apa"  # apa | mla | chicago | ieee
 
+    # App
+    app_version: str = "0.1.0"
+
     # Generation
     max_tokens: int = 4096
     temperature: float = 0.7

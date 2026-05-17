@@ -48,27 +48,27 @@ class BankrollCurvePanel(DashboardPanel):
 
     def __init__(self):
         super().__init__()
-        self.current_bankroll = 0.0
+        self.bankroll = 0.0
         self.peak_bankroll = 0.0
         self.drawdown = 0.0
         self.history = []
 
     def update(self, ticker: DashboardTicker):
-        self.current_bankroll = ticker.bankroll_history.bankroll
+        self.bankroll = ticker.bankroll_history.bankroll
         self.peak_bankroll = ticker.bankroll_history.peak_bankroll
         self.drawdown = ticker.bankroll_history.drawdown
         self.history = ticker.bankroll_history.history
 
     def render_data(self) -> dict:
         return {
-            "current_bankroll": self.current_bankroll,
+            "bankroll": self.bankroll,
             "peak_bankroll": self.peak_bankroll,
             "drawdown": self.drawdown,
             "history": self.history,
         }
 
     def get_visual_encoding(self) -> dict:
-        return {"type": "line_chart", "data": self.history}
+        return {"type": "curve", "bankroll": self.bankroll}
 
 
 class NashEquilibriumPanel(DashboardPanel):
@@ -93,4 +93,4 @@ class NashEquilibriumPanel(DashboardPanel):
         }
 
     def get_visual_encoding(self) -> dict:
-        return {"type": "text", "message": f"Distance from Nash: {self.distance}"}
+        return {"type": "distance", "distance": self.distance}

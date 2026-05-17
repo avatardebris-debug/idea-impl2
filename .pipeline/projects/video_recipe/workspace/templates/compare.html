@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Compare Recipes — Video Recipe Browser</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .compare-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+        .compare-panel {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .compare-panel h2 {
+            border-bottom: 2px solid #4a90d9;
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .compare-panel .step-card {
+            margin-bottom: 1rem;
+        }
+        .compare-select {
+            margin-bottom: 1rem;
+        }
+        @media (max-width: 768px) {
+            .compare-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">🍳 Video Recipe Browser</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/search">Search</a>
+        </div>
+    </nav>
+    <main class="container">
+        <h1>Compare Recipes</h1>
+
+        <form action="/compare" method="post" class="compare-select">
+            <label for="recipe_1">Recipe 1:</label>
+            <select name="recipe_id_1" id="recipe_1" required>
+                <option value="">-- Select --</option>
+                {% for video in videos %}
+                <option value="{{ video.video_id }}">{{ video.filename }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="recipe_2">Recipe 2:</label>
+            <select name="recipe_id_2" id="recipe_2" required>
+                <option value="">-- Select --</option>
+                {% for video in videos %}
+                <option value="{{ video.video_id }}">{{ video.filename }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn btn-primary">Compare</button>
+        </form>
+
+        {% if recipe_1 and recipe_2 %}
+        <div class="compare-container">
+            <div class="compare-panel" id="panel-1">
+                <h2>{{ recipe_1.filename }}</h2>
+                <p class="summary">{{ recipe_1.json_content.summary or '' }}</p>
+                <div class="recipe-steps">
+                    {% for step in recipe_1.json_content.steps %}
+                    <div class="step-card" data-step-index="{{ loop.index0 }}">
+                        <div class="step-header">
+                            <span class="step-number">{{ loop.index }}</span>
+                            <span class="step-timestamp">{{ step.timestamp }}s</span>
+                        </div>
+                        <p class="step-description">{{ step.description }}</p>
+                        {% if step.inferred_tools %}
+                        <div class="step-detail"><strong>Tools:</strong> {{ step.inferred_tools | join(', ') }}</div>
+                        {% endif %}
+                        {% if step.inferred_materials %}
+                        <div class="step-detail"><strong>Materials:</strong> {{ step.inferred_materials | join(', ') }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="compare-panel" id="panel-2">
+                <h2>{{ recipe_2.filename }}</h2>
+                <p class="summary">{{ recipe_2.json_content.summary or '' }}</p>
+                <div class="recipe-steps">
+                    {% for step in recipe_2.json_content.steps %}
+                    <div class="step-card" data-step-index="{{ loop.index0 }}">
+                        <div class="step-header">
+                            <span class="step-number">{{ loop.index }}</span>
+                            <span class="step-timestamp">{{ step.timestamp }}s</span>
+                        </div>
+                        <p class="step-description">{{ step.description }}</p>
+                        {% if step.inferred_tools %}
+                        <div class="step-detail"><strong>Tools:</strong> {{ step.inferred_tools | join(', ') }}</div>
+                        {% endif %}
+                        {% if step.inferred_materials %}
+                        <div class="step-detail"><strong>Materials:</strong> {{ step.inferred_materials | join(', ') }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <script>
+            // Synchronized scrolling between panels
+            const panel1 = document.getElementById('panel-1');
+            const panel2 = document.getElementById('panel-2');
+            let syncing = false;
+
+            panel1.addEventListener('scroll', () => {
+                if (syncing) return;
+                syncing = true;
+                panel2.scrollTop = panel1.scrollTop;
+                panel2.scrollLeft = panel1.scrollLeft;
+                syncing = false;
+            });
+
+            panel2.addEventListener('scroll', () => {
+                if (syncing) return;
+                syncing = true;
+                panel1.scrollTop = panel2.scrollTop;
+                panel1.scrollLeft = panel2.scrollLeft;
+                syncing = false;
+            });
+        </script>
+        {% endif %}
+    </main>
+</body>
+</html>

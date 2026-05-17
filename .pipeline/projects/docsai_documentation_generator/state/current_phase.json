@@ -1,7 +1,5 @@
 {
-  "phase_num": 1,
-  "status": "completed",
-  "tasks_path": "phases/phase_1/tasks.md",
-  "review": "PASS",
-  "reviewed_at": "2026-05-05T21:00:00+00:00"
+  "phase_num": 3,
+  "status": "planned",
+  "tasks_path": "phases/phase_3/tasks.md"
 }

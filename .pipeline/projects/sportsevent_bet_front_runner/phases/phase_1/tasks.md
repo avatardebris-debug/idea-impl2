@@ -1,0 +1,83 @@
+# Phase 1 Tasks
+
+- [ ] Task 1: Data Pipeline Foundation — Feed Adapters & Core Ingestion
+  - What: Build the core data ingestion framework with at least 2 raw sports data source adapters and the shared pipeline infrastructure. Use mock/simulated feeds for development (e.g., simulated NFL play-by-play and simulated NBA score feed) so the pipeline is testable without paid API keys. Define shared data models for events, timestamps, and metadata.
+  - Files:
+    - `workspace/src/pipeline/models.py` — Shared data models (Event, FeedRecord, LatencyGap, Signal)
+    - `workspace/src/pipeline/feed_adapter.py` — Base FeedAdapter abstract class
+    - `workspace/src/pipeline/adapters/mock_nfl_feed.py` — Mock NFL play-by-play feed adapter
+    - `workspace/src/pipeline/adapters/mock_nba_feed.py` — Mock NBA score feed adapter
+    - `workspace/src/pipeline/pipeline.py` — Core Pipeline class: manages feed connections, message routing, internal latency tracking
+    - `workspace/src/pipeline/config.py` — Configuration (feed URLs, polling intervals, sport mappings)
+    - `workspace/tests/test_models.py` — Unit tests for data models
+    - `workspace/tests/test_pipeline.py` — Unit tests for pipeline routing and latency measurement
+  - Done when:
+    - Both mock feed adapters produce realistic play-by-play / score events with embedded timestamps
+    - Pipeline ingests events from both feeds simultaneously with <100ms internal processing latency (verified via unit test assertions on timestamp deltas)
+    - All unit tests pass (pytest)
+    - Feed adapters can be swapped out by subclassing FeedAdapter without modifying pipeline code
+
+- [ ] Task 2: Latency Gap Detector
+  - What: Build the latency detection engine that measures the delta between raw feed timestamps and simulated broadcast timestamps, computes confidence scores, and emits LatencyGap records. The detector should handle multiple sports, track per-event latency statistics, and flag gaps exceeding configurable thresholds.
+  - Files:
+    - `workspace/src/pipeline/latency_detector.py` — LatencyGapDetector class: correlates raw vs broadcast timestamps, computes gap size, confidence score, and emits LatencyGap objects
+    - `workspace/src/pipeline/latency_stats.py` — Per-sport/per-event latency statistics aggregator (rolling window, min/max/mean/percentiles)
+    - `workspace/src/pipeline/signals.py` — Rule-based signal generator (e.g., "if goal scored in raw feed and broadcast lag > 3s, emit SCORE_DELAYED signal")
+    - `workspace/src/pipeline/schemas.py` — JSON/Parquet schemas for LatencyGap and Signal records
+    - `workspace/tests/test_latency_detector.py` — Tests: gap detection accuracy, confidence scoring, threshold triggering, multi-sport handling
+    - `workspace/tests/test_latency_stats.py` — Tests: rolling window aggregation, percentile computation, per-event tracking
+  - Done when:
+    - Latency gaps are detected with >95% accuracy when validated against known ground-truth timestamps in test data
+    - Confidence scores are computed and correlate with gap size (larger gaps = higher confidence)
+    - Rule-based signals fire correctly when thresholds are exceeded
+    - Latency statistics (mean, p95, p99) are correctly aggregated per sport/event
+    - All unit tests pass
+
+- [ ] Task 3: Backtesting Harness
+  - What: Build a replay engine that replays historical (or mock-generated) data to quantify latency windows and potential edge. The harness should replay events at controlled speeds, simulate broadcast delays, measure gap sizes, and compute hypothetical P&L based on rule-based signals. Output results as summary statistics and per-event reports.
+  - Files:
+    - `workspace/src/backtest/harness.py` — BacktestHarness: loads historical/mock data, replays events, applies latency detector, computes signals and hypothetical P&L
+    - `workspace/src/backtest/data_generator.py` — Generates realistic historical mock data (30+ days of events) with known latency profiles for reproducible testing
+    - `workspace/src/backtest/metrics.py` — Computes backtest metrics: gap sizes, signal hit rate, hypothetical P&L, latency window distribution
+    - `workspace/src/backtest/reporter.py` — Generates summary reports (CSV/JSON) and per-event analysis
+    - `workspace/tests/test_backtest_harness.py` — Tests: replay accuracy, metric computation, report generation
+    - `workspace/tests/test_data_generator.py` — Tests: data realism (timestamp distributions, event frequency), reproducibility
+  - Done when:
+    - Backtest on 30 days of mock data produces measurable latency windows (minimum 2 seconds of exploitable gap per event, confirmed in output)
+    - Hypothetical P&L is computed and reported per signal type
+    - Summary statistics include gap size distribution, signal hit rate, and edge quantification
+    - All unit tests pass
+    - Reports are reproducible (same seed → same results)
+
+- [ ] Task 4: Real-Time Dashboard (Streamlit)
+  - What: Build a Streamlit dashboard that displays live data feeds, detected latency gaps, confidence scores, historical latency statistics, and rule-based signals. The dashboard should connect to the live pipeline and update in real time with <1 second display lag.
+  - Files:
+    - `workspace/dashboard/app.py` — Main Streamlit app: live feed viewer, latency gap table, statistics panel, signal feed
+    - `workspace/dashboard/components/feeds.py` — Streamlit component: renders live feed events with timestamps
+    - `workspace/dashboard/components/latency_gaps.py` — Streamlit component: displays detected latency gaps with confidence scores
+    - `workspace/dashboard/components/statistics.py` — Streamlit component: historical latency stats per sport/event (charts, tables)
+    - `workspace/dashboard/components/signals.py` — Streamlit component: rule-based signal feed with event context
+    - `workspace/dashboard/utils.py` — Shared dashboard utilities (data fetching, formatting, chart helpers)
+    - `workspace/dashboard/requirements.txt` — Dashboard dependencies (streamlit, plotly, pandas)
+  - Done when:
+    - Dashboard displays live feed events with timestamps in real time
+    - Detected latency gaps are shown with confidence scores and color-coded severity
+    - Historical latency statistics are displayed per sport/event (bar charts, percentile tables)
+    - Rule-based signals appear in a scrolling feed with event context
+    - Display lag is <1 second from event ingestion to dashboard update
+    - Dashboard launches with `streamlit run workspace/dashboard/app.py` and runs without errors
+
+- [ ] Task 5: Integration, End-to-End Validation & Documentation
+  - What: Wire all components together, run end-to-end validation with at least 5 simulated live sports events, validate all Phase 1 success criteria, and produce documentation for the pipeline.
+  - Files:
+    - `workspace/run_pipeline.py` — Entry point script: starts pipeline, latency detector, and dashboard together
+    - `workspace/tests/test_e2e.py` — End-to-end integration test: simulates 5 live events, verifies no data loss, validates latency detection, confirms dashboard connectivity
+    - `workspace/README.md` — Setup instructions, architecture overview, how to run pipeline and dashboard, how to add new feed adapters
+    - `workspace/requirements.txt` — Top-level project dependencies
+    - `workspace/config.example` — Example configuration file
+  - Done when:
+    - `run_pipeline.py` starts the full system (pipeline + detector + dashboard) with a single command
+    - End-to-end test processes 5 simulated live events with zero data loss
+    - All Phase 1 success criteria are verified: <100ms internal latency, >95% gap detection accuracy, <1s dashboard lag, backtest shows exploitable gaps, 5 events processed
+    - README documents setup, architecture, and usage
+    - All tests pass (unit + integration)

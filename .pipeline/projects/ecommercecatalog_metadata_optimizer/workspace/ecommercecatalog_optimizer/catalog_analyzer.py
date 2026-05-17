@@ -47,8 +47,6 @@ COLUMN_ALIASES: Dict[str, str] = {
     "sku": "sku",
     "sku_id": "sku",
     "item_id": "product_id",
-    "item": "product_id",
-    "item_id": "product_id",
     # Title
     "title": "title",
     "product_title": "title",
@@ -84,9 +82,7 @@ COLUMN_ALIASES: Dict[str, str] = {
     "manufacturer": "brand",
     "maker": "brand",
     "brand_name": "brand",
-    # SKU
-    "sku": "sku",
-    "sku_id": "sku",
+    # SKU (already mapped above)
     "stock_keeping_unit": "sku",
     # Image
     "image_url": "image_url",
@@ -106,6 +102,10 @@ COLUMN_ALIASES: Dict[str, str] = {
     "color": "color",
     "colour": "color",
     "product_color": "color",
+    # Material
+    "material": "material",
+    "materials": "material",
+    "fabric": "material",
     # Keywords / SEO
     "keywords": "keywords",
     "meta_keywords": "meta_keywords",
@@ -340,6 +340,8 @@ class CatalogAnalyzer:
 
         # Calculate quality score (0-100)
         total_cells = len(self._records) * len(detected_columns) if detected_columns else 1
+        if total_cells == 0:
+            total_cells = 1  # Avoid division by zero for empty catalogs
         total_empty = sum(empty_cells.values())
         completeness = max(0, 100 - (total_empty / total_cells * 100))
 

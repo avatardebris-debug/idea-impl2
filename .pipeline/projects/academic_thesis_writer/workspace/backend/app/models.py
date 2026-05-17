@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
@@ -136,12 +136,12 @@ class ThesisProject(BaseModel):
 
     def add_source(self, source: Source) -> None:
         self.sources.append(source)
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def remove_source(self, source_id: str) -> bool:
         before = len(self.sources)
         self.sources = [s for s in self.sources if s.id != source_id]
         removed = len(self.sources) < before
         if removed:
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
         return removed

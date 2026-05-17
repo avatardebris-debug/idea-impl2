@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Recipes — Video Recipe Browser</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="nav-brand">🍳 Video Recipe Browser</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/compare">Compare</a>
+        </div>
+    </nav>
+    <main class="container">
+        <h1>Search Recipes</h1>
+        <form class="search-form" onsubmit="searchRecipes(event)">
+            <input type="text" name="task_type" id="task_type" placeholder="Search by task type (e.g., cooking, repair, craft)" class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+
+        <div id="results" class="recipe-grid">
+            <!-- Results populated by JS -->
+        </div>
+    </main>
+
+    <script>
+        async function searchRecipes(event) {
+            event.preventDefault();
+            const taskType = document.getElementById('task_type').value;
+            const resultsDiv = document.getElementById('results');
+
+            const response = await fetch(`/search?task_type=${encodeURIComponent(taskType)}`);
+            const recipes = await response.json();
+
+            if (recipes.length === 0) {
+                resultsDiv.innerHTML = '<p class="empty-state">No recipes found.</p>';
+                return;
+            }
+
+            resultsDiv.innerHTML = recipes.map(r => `
+                <div class="recipe-card">
+                    <h3>${r.filename}</h3>
+                    <p class="task-type">${r.task_type || 'Unknown'}</p>
+                    <p class="duration">Duration: ${r.duration || 'N/A'}s</p>
+                    <a href="/recipe/${r.recipe_id}" class="btn">View Recipe</a>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
