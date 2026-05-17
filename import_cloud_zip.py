@@ -306,14 +306,17 @@ def import_zip(zip_path: pathlib.Path) -> None:
             )
 
             proj_files = ws_written + ph_written
-            lead = "â¬†ï¸  remote ahead" if remote_ahead else "local ahead/tied"
-            print(f"    ðŸ“„ Merged {proj_files} file(s)  [{lead}]")
+            lead = "⬆️   remote ahead" if remote_ahead else "local ahead/tied"
+            print(f"    📄 Merged {proj_files} file(s)  [{lead}]")
             total_files_merged += proj_files
 
-        print(f"\n  âœ… Import complete â€” {total_files_merged} total file(s) merged")
+        print(f"\n  ✅ Import complete — {total_files_merged} total file(s) merged")
 
     # Print manifest
     print_manifest()
+
+    # Auto-generate import report
+    write_import_report(PIPELINE_DIR)
 
 
 def print_manifest() -> None:
@@ -378,6 +381,83 @@ def print_manifest() -> None:
             print(f"    âš ï¸  workspace/workspace/ double-nesting detected â€” run this script to fix")
 
     print(f"\n{'='*60}\n")
+
+
+def write_import_report(pipeline_dir: pathlib.Path) -> pathlib.Path:
+    """Write .pipeline/state/last_import_report.md summarising project states.
+
+    Called after every import to give a quick human-readable snapshot.
+    Returns the path of the written report.
+    """
+    projects_dir = pipeline_dir / "projects"
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    lines = [
+        f"# Import Report — {now}",
+        "",
+        "| Project | Status | Phase | Notes |",
+        "|---|---|---|---|",
+    ]
+
+    complete, budget_exc, in_prog, missing = [], [], [], []
+
+    if projects_dir.exists():
+        for proj_dir in sorted(projects_dir.iterdir()):
+            if not proj_dir.is_dir():
+                continue
+            sf = proj_dir / "state" / "current_idea.json"
+            if not sf.exists():
+                missing.append(proj_dir.name)
+                continue
+            try:
+                s = json.loads(sf.read_text(encoding="utf-8"))
+            except Exception:
+                missing.append(proj_dir.name)
+                continue
+            status = s.get("status", "?")
+            phase  = s.get("phase", "?")
+            total  = s.get("total_phases", "?")
+            title  = s.get("title", proj_dir.name)[:40]
+            note   = ""
+            if status == "complete":
+                try:
+                    if int(phase) < int(total):
+                        note = f"⚠ only p{phase}/{total} done"
+                except Exception:
+                    pass
+                complete.append((proj_dir.name, phase, total, title, note))
+            elif status == "budget_exceeded":
+                pre = s.get("pre_budget_status", "")
+                note = s.get("budget_note", "")[:60]
+                budget_exc.append((proj_dir.name, phase, total, title, note))
+            else:
+                in_prog.append((proj_dir.name, status, phase, total, title))
+
+    for row in complete:
+        slug, phase, total, title, note = row
+        lines.append(f"| {slug} | complete | p{phase}/{total} | {note} |")
+    for row in budget_exc:
+        slug, phase, total, title, note = row
+        lines.append(f"| {slug} | **budget_exceeded** | p{phase}/{total} | {note} |")
+    for row in in_prog:
+        slug, status, phase, total, title = row
+        lines.append(f"| {slug} | {status} | p{phase}/{total} | in progress |")
+    if missing:
+        lines.append("")
+        lines.append(f"**Missing state files:** {', '.join(missing)}")
+
+    lines += [
+        "",
+        f"**Summary:** {len(complete)} complete | {len(budget_exc)} budget_exceeded | {len(in_prog)} in-progress",
+        "",
+        "Run `python pipeline/runner.py --polish` to resume projects with missing phases.",
+        "Run `python pipeline/runner.py --from-list` to retry budget_exceeded projects.",
+    ]
+
+    report_path = pipeline_dir / "state" / "last_import_report.md"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"\n  [import] Report written to {report_path.relative_to(pipeline_dir.parent)}")
+    return report_path
 
 
 if __name__ == "__main__":

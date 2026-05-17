@@ -1750,6 +1750,137 @@ def _append_polish(project_dir: pathlib.Path, phase_num: int, notes: str) -> Non
             f.write(f"- [ ] (polish) {b}\n")
 
 
+def _run_polish_mode(
+    bus: "MessageBus",
+    ideas_path: pathlib.Path | None = None,
+) -> int:
+    """Process polish_queue.md — resume complete projects that have missing phases.
+
+    Reads polish_queue.md (same `- [ ] **[Title]** — notes` format).
+    For each unchecked entry whose slug is 'complete', resets its state to
+    the next unfinished phase so the normal run_pipeline loop can continue it.
+
+    Returns the number of projects re-queued.
+    """
+    import re
+    polish_path = ideas_path or (PROJECT_ROOT.resolve() / "polish_queue.md")
+    if not polish_path.exists():
+        print(f"  [polish] {polish_path.name} not found — creating template...")
+        _write_polish_queue_template(polish_path)
+        print(f"  [polish] Wrote template to {polish_path}")
+        print(f"  [polish] Edit polish_queue.md then re-run with --polish")
+        return 0
+
+    content = polish_path.read_text(encoding="utf-8")
+    queued = 0
+    projects_dir = PIPELINE_DIR / "projects"
+
+    for line in content.splitlines():
+        match = re.match(r"- \[ \]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.*)", line)
+        if not match:
+            continue
+        raw_title = match.group(1).strip().strip("[]")
+        notes = match.group(2).strip()
+        slug = _slugify(raw_title)
+
+        state_file = projects_dir / slug / "state" / "current_idea.json"
+        if not state_file.exists():
+            print(f"  [polish] SKIP '{raw_title}' — no project state found (slug: {slug})")
+            continue
+
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"  [polish] SKIP '{raw_title}' — unreadable state: {e}")
+            continue
+
+        current_status = state.get("status", "")
+        current_phase  = state.get("phase", 1)
+        total_phases   = state.get("total_phases", 1)
+
+        if current_status not in ("complete", "budget_exceeded"):
+            print(f"  [polish] SKIP '{raw_title}' — status is '{current_status}' (not complete/budget_exceeded)")
+            continue
+
+        # Determine which phase to resume from
+        next_phase = int(current_phase) + 1 if current_status == "complete" else int(current_phase)
+        if next_phase > int(total_phases):
+            print(f"  [polish] SKIP '{raw_title}' — already at max phase ({current_phase}/{total_phases})")
+            continue
+
+        # Reset state to target phase
+        resume_status = f"phase_{next_phase}_planning"
+        state["status"] = resume_status
+        state["session_started_at"] = datetime.now(timezone.utc).isoformat()
+        state.pop("budget_note", None)
+        state.pop("pre_budget_status", None)
+        if notes:
+            state["polish_notes"] = notes
+        state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+        # Queue to phase_planner
+        master_plan_file = projects_dir / slug / "state" / "master_plan.md"
+        phase_spec = f"Polish resume: phase {next_phase} of {raw_title}. {notes}"
+        if master_plan_file.exists():
+            try:
+                mp = master_plan_file.read_text(encoding="utf-8")
+                m = re.search(rf"## Phase {next_phase}\b[^\n]*\n.*?(?=## Phase \d|$)",
+                              mp, re.DOTALL | re.IGNORECASE)
+                if m:
+                    phase_spec = m.group(0)[:3000]
+            except Exception:
+                pass
+
+        msg = Message.create(
+            from_agent="runner",
+            to_agent="phase_planner",
+            type="task",
+            payload={"phase": next_phase, "phase_spec": phase_spec, "idea_slug": slug},
+        )
+        bus.send(msg)
+        print(f"  [polish] Queued '{raw_title}' → phase_{next_phase}_planning (was {current_status} p{current_phase}/{total_phases})")
+        _seeded_this_session.add(raw_title)
+        queued += 1
+
+    if queued == 0:
+        print("  [polish] Nothing to polish — all entries already done or missing.")
+    return queued
+
+
+def _write_polish_queue_template(path: pathlib.Path) -> None:
+    """Write a starter polish_queue.md with projects that have missing phases."""
+    projects_dir = PIPELINE_DIR / "projects"
+    lines = [
+        "# Polish Queue",
+        "",
+        "Projects marked complete but with missing phases.",
+        "The --polish flag resumes them from their last completed phase.",
+        "Format: `- [ ] **[project-slug]** — notes about what to add`",
+        "",
+    ]
+    if projects_dir.exists():
+        for proj_dir in sorted(projects_dir.iterdir()):
+            if not proj_dir.is_dir():
+                continue
+            sf = proj_dir / "state" / "current_idea.json"
+            if not sf.exists():
+                continue
+            try:
+                s = json.loads(sf.read_text(encoding="utf-8"))
+                status = s.get("status", "")
+                phase  = s.get("phase", 1)
+                total  = s.get("total_phases", 1)
+                title  = s.get("title", proj_dir.name)
+                if status in ("complete", "budget_exceeded") and int(phase) < int(total):
+                    lines.append(
+                        f"- [ ] **[{proj_dir.name}]** — "
+                        f"p{phase}/{total} {status}. Continue phases {int(phase)+1}-{total}. Original title: {title[:50]}"
+                    )
+            except Exception:
+                continue
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def run_pipeline(
     idea: str | None = None,
     from_list: bool = False,
@@ -1761,6 +1892,7 @@ def run_pipeline(
     phase_budget: int = DEFAULT_PHASE_BUDGET,
     ideas_file: str | None = None,
     fresh_list_only: bool = False,
+    polish: bool = False,
 ) -> None:
     """Main pipeline orchestrator."""
     # Override master ideas path if --ideas-file was given
@@ -1784,6 +1916,22 @@ def run_pipeline(
     print(f"  Budget:   {base_budget}min base, {phase_budget}min/phase")
     if fresh_list_only:
         print(f"  Mode:     FRESH LIST ONLY — skipping all stray/in-progress projects")
+    if polish:
+        print(f"  Mode:     POLISH - resuming complete projects with missing phases")
+
+    # Polish mode: reset complete-but-incomplete projects and queue them, then
+    # fall through to normal pipeline startup so agents actually process them.
+    if polish:
+        _polish_path = pathlib.Path(ideas_file).resolve() if ideas_file else PROJECT_ROOT.resolve() / "polish_queue.md"
+        bus = MessageBus()
+        init_pipeline_dirs()
+        n = _run_polish_mode(bus, ideas_path=_polish_path)
+        if n == 0:
+            return
+        # Fall through — treat queued polish items as normal has_work
+        has_work = True
+        from_list = True  # keep seeding next polish item when current finishes
+        bus = MessageBus()  # re-use same bus instance in the logic below
 
     # Determine what to work on
     has_work = False
@@ -2358,12 +2506,16 @@ def main():
     parser.add_argument("--fresh-list-only", action="store_true",
                         help="Skip all stray/in-progress projects. Only work from --ideas-file "
                              "(or master_ideas.md). Use for a clean second instance.")
+    parser.add_argument("--polish", action="store_true",
+                        help="Resume complete projects with missing phases, reading from "
+                             "polish_queue.md (auto-generated if missing). "
+                             "Use with --ideas-file to specify an alternate polish list.")
 
     args = parser.parse_args()
 
-    if not args.idea and not args.from_list and not args.resume:
+    if not args.idea and not args.from_list and not args.resume and not args.polish:
         parser.print_help()
-        print("\nProvide an idea, use --from-list, or --resume.")
+        print("\nProvide an idea, use --from-list, --resume, or --polish.")
         sys.exit(1)
 
     run_pipeline(
@@ -2377,6 +2529,7 @@ def main():
         phase_budget=args.phase_budget,
         ideas_file=args.ideas_file,
         fresh_list_only=args.fresh_list_only,
+        polish=args.polish,
     )
 
 
