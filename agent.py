@@ -231,9 +231,10 @@ def run_agent(
     system_prompt_addon: str = "",
     verbose: bool = True,
     pipeline_mode: bool = False,
+    slug: str = "",
 ) -> AgentResult:
     bootstrap_agent_dir()
-    llm = get_llm(provider, model, temperature=temperature, think=think, num_ctx=num_ctx)
+    llm = get_llm(provider, model, temperature=temperature, think=think, num_ctx=num_ctx, slug=slug)
 
     # --- Initialize governance ---
     constitution = load_constitution()

@@ -260,6 +260,20 @@ class AgentProcess:
 
             existing["status"] = status
 
+            # Invalidate rolling context when phase boundary is crossed
+            # (new phase = fresh workspace state; prior exchanges no longer relevant)
+            old_status = existing.get("status", "")
+            if (
+                old_status != status
+                and "_planning" in status
+                and "_planning" not in old_status
+            ):
+                try:
+                    from pipeline.rolling_context import get_context_store
+                    get_context_store().invalidate(self._current_slug)
+                except Exception:
+                    pass
+
             # Optionally count task progress — ONLY for the current phase
             if phase_num is not None:
                 import re as _re
@@ -390,9 +404,37 @@ class AgentProcess:
         max_steps: int | None = None,
         verbose: bool = False,
     ) -> "AgentResult":
-        """Run the core ReAct loop from agent.py with per-role LLM settings."""
+        """Run the core ReAct loop from agent.py with per-role LLM settings.
+
+        Enhancements over the bare run_agent() call:
+        - Injects the last 3 exchanges (rolling context) as a compact context
+          block so the model has continuity without re-reading workspace files.
+        - Saves the prompt+response pair after each call so future calls can
+          reference them via the same rolling context window.
+        - Invalidates the rolling context when the project phase changes.
+        """
         from agent import run_agent
-        return run_agent(
+
+        # --- Rolling context: inject prior exchanges ---
+        try:
+            from pipeline.rolling_context import get_context_store
+            _rc_store = get_context_store(n=3)
+            prior = _rc_store.format_for_prompt(
+                slug=self._current_slug,
+                role=self.role,
+                n=3,
+            )
+            if prior:
+                prior_block = (
+                    "\n\n## Prior Exchanges (this project, this role — most recent last)\n"
+                    + prior
+                    + "\n(End of prior exchanges. Continue from where you left off.)"
+                )
+                system_prompt_addon = (system_prompt_addon + prior_block) if system_prompt_addon else prior_block
+        except Exception:
+            pass  # non-critical — never break the agent for a context load failure
+
+        result = run_agent(
             task=task,
             provider=self.provider,
             model=self.model,
@@ -403,7 +445,24 @@ class AgentProcess:
             system_prompt_addon=system_prompt_addon,
             verbose=verbose,
             pipeline_mode=True,  # skip repo file tree + shared .agent/ memory
+            slug=self._current_slug,  # enables Ollama KV-cache reuse per project
         )
+
+        # --- Rolling context: save this exchange ---
+        try:
+            from pipeline.rolling_context import get_context_store
+            _rc_store = get_context_store(n=3)
+            _rc_store.push(
+                slug=self._current_slug,
+                role=self.role,
+                prompt=task[:4000],          # cap to avoid bloat
+                response=result.answer[:4000],
+                metadata={"steps": result.steps_used, "tokens": result.tokens_used},
+            )
+        except Exception:
+            pass  # non-critical
+
+        return result
 
     # --- Helper: read/write per-idea project state files ---
 

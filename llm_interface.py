@@ -256,12 +256,17 @@ class OllamaAdapter(LLMBase):
         base_url: str | None = None,
         num_ctx: int = 16384,
         think: bool | None = None,
+        slug: str = "",
     ):
         self.model = model
         self.temperature = temperature
         self.base_url = (base_url or "http://localhost:11434").rstrip("/")
         self.num_ctx = num_ctx
         self.think = think   # None=model default, False=no CoT, True=force CoT
+        self.slug = slug     # project slug for KV-cache namespacing; "" = no cache
+        # Per-adapter context store: {cache_key -> context list}
+        # Populated by kv_cache module; lives for the lifetime of this adapter instance.
+        self._kv_slug_active: bool = bool(slug)
 
     def _normalize_messages(self, messages: list[dict]) -> list[dict]:
         """
@@ -354,48 +359,101 @@ class OllamaAdapter(LLMBase):
 
         data = _json.dumps(payload).encode("utf-8")
 
+        # --------------- KV-cache fast path --------------------------------
+        # When a project slug is set and the request has no tool calls in the
+        # message history, use /api/generate with context reuse instead of
+        # /api/chat.  This skips re-tokenising the static system prefix on
+        # every step of the ReAct loop (~30-40% of prompt tokens).
+        #
+        # We fall back to /api/chat (no cache) when:
+        #   - No slug is set (standalone usage)
+        #   - The messages contain tool_calls (multi-turn tool history needs
+        #     the full message structure that /api/generate doesn't support)
+        _has_tool_history = any(
+            m.get("role") == "tool" or (m.get("role") == "assistant" and m.get("tool_calls"))
+            for m in messages
+        )
+        _use_kv_cache = self._kv_slug_active and not _has_tool_history and not tools
+        _kv_resp: dict | None = None
+
+        if _use_kv_cache:
+            try:
+                from pipeline.kv_cache import get_cache as _get_kv_cache
+                _cache = _get_kv_cache()
+                # Extract system + last user message for /api/generate
+                _system = next(
+                    (m["content"] for m in messages if m.get("role") == "system"), ""
+                )
+                _user = next(
+                    (m["content"] for m in reversed(messages) if m.get("role") == "user"), ""
+                )
+                _kv_opts = {
+                    "temperature": self.temperature,
+                    "num_ctx": self.num_ctx,
+                }
+                if self.think is not None:
+                    _kv_opts["think"] = self.think  # type: ignore[assignment]
+                _kv_resp = _cache.generate(
+                    model=self.model,
+                    system=_system,
+                    prompt=_user,
+                    slug=self.slug,
+                    options=_kv_opts,
+                    timeout=300,
+                )
+            except Exception:
+                _kv_resp = None  # fall back to /api/chat on any error
+
         # Retry with exponential backoff for transient Ollama failures (OOM/EOF/500)
         max_retries = 5
         backoff = 30  # seconds — start at 30s, double each attempt
         last_error: Exception | None = None
 
-        for attempt in range(max_retries + 1):
-            req = urllib.request.Request(
-                f"{self.base_url}/api/chat",
-                data=data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            try:
-                with urllib.request.urlopen(req, timeout=300) as resp:
-                    raw = _json.loads(resp.read().decode("utf-8"))
-                break  # success — exit retry loop
-
-            except urllib.error.HTTPError as e:
-                body = e.read().decode("utf-8", errors="replace")[:400]
-                last_error = RuntimeError(f"Ollama HTTP {e.code}: {body}")
-                # Only retry on 500 (crash/OOM) — surface 4xx immediately
-                if e.code != 500:
-                    raise last_error from e
-
-            except urllib.error.URLError as e:
-                last_error = RuntimeError(f"Ollama connection failed: {e}")
-
-            # Retry path — check health and wait
-            if attempt < max_retries:
-                wait = min(backoff * (2 ** attempt), 300)  # cap at 5 min
-                log.warning(
-                    "OllamaAdapter: attempt %d/%d failed (%s) — waiting %ds before retry",
-                    attempt + 1, max_retries, last_error, wait,
+        # If KV-cache path returned a result, skip the /api/chat round-trip
+        if _kv_resp is not None:
+            raw = _kv_resp
+            # /api/generate wraps the response in 'response' (string), not 'message'
+            # Normalise to the same structure that the /api/chat path produces.
+            raw["message"] = {"content": raw.get("response", ""), "role": "assistant"}
+        else:
+            for attempt in range(max_retries + 1):
+                req = urllib.request.Request(
+                    f"{self.base_url}/api/chat",
+                    data=data,
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
                 )
-                time.sleep(wait)
-                if not self._ollama_is_alive():
-                    log.warning("OllamaAdapter: Ollama appears down — attempting restart")
-                    self._try_restart_ollama()
-                    # Wait for model to load back into VRAM
-                    time.sleep(15)
-            else:
-                raise last_error  # all retries exhausted
+                try:
+                    with urllib.request.urlopen(req, timeout=300) as resp:
+                        raw = _json.loads(resp.read().decode("utf-8"))
+                    break  # success — exit retry loop
+
+                except urllib.error.HTTPError as e:
+                    body = e.read().decode("utf-8", errors="replace")[:400]
+                    last_error = RuntimeError(f"Ollama HTTP {e.code}: {body}")
+                    # Only retry on 500 (crash/OOM) — surface 4xx immediately
+                    if e.code != 500:
+                        raise last_error from e
+
+                except urllib.error.URLError as e:
+                    last_error = RuntimeError(f"Ollama connection failed: {e}")
+
+                # Retry path — check health and wait
+                if attempt < max_retries:
+                    wait = min(backoff * (2 ** attempt), 300)  # cap at 5 min
+                    log.warning(
+                        "OllamaAdapter: attempt %d/%d failed (%s) — waiting %ds before retry",
+                        attempt + 1, max_retries, last_error, wait,
+                    )
+                    time.sleep(wait)
+                    if not self._ollama_is_alive():
+                        log.warning("OllamaAdapter: Ollama appears down — attempting restart")
+                        self._try_restart_ollama()
+                        # Wait for model to load back into VRAM
+                        time.sleep(15)
+                else:
+                    raise last_error  # all retries exhausted
+
 
         msg = raw.get("message", {})
         # For thinking models (Qwen3, DeepSeek-R1), the visible response may be
@@ -586,6 +644,7 @@ def get_llm(
     base_url: str | None = None,
     num_ctx: int = 16384,
     think: bool | None = None,
+    slug: str = "",
 ) -> LLMBase:
     """
     Return a model-agnostic LLM adapter.
@@ -614,5 +673,7 @@ def get_llm(
         kwargs["num_ctx"] = num_ctx
         if think is not None:
             kwargs["think"] = think
+        if slug:
+            kwargs["slug"] = slug
     return cls(**kwargs)
 
