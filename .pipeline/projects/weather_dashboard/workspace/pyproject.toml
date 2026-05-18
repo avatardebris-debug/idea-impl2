@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "weather_dashboard"
+version = "0.1.0"
+description = "Local terminal weather dashboard"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+weather_dashboard = "weather_dashboard.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["weather_dashboard*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
