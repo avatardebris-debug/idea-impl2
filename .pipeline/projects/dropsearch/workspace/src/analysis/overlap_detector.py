@@ -20,7 +20,7 @@ class OverlapDetector:
         """
         self.threshold = threshold
 
-    def detect_overlaps(self, stores: List[StoreAnalysis]) -> List[dict]:
+    def detect(self, stores: List[StoreAnalysis]) -> List[dict]:
         """Detect products that appear in multiple stores.
 
         Args:
@@ -37,10 +37,15 @@ class OverlapDetector:
 
         for store in stores:
             for product in store.products:
-                name = product.get("name", "").strip()
+                if isinstance(product, dict):
+                    name = product.get("name", "").strip()
+                    price = product.get("price", 0)
+                else:
+                    name = getattr(product, "name", "").strip()
+                    price = getattr(product, "price", 0)
+                
                 if not name:
                     continue
-                price = product.get("price", 0)
                 if name not in product_map:
                     product_map[name] = []
                 product_map[name].append((store.stores_url, price))

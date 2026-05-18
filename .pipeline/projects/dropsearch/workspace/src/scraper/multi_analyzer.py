@@ -95,7 +95,7 @@ class MultiStoreAnalyzer:
         overlap_detector = OverlapDetector()
         margin_analyzer = MarginAnalyzer()
 
-        overlaps = overlap_detector.detect_overlaps(stores)
+        overlaps = overlap_detector.detect(stores)
         margins = margin_analyzer.analyze(stores)
 
         # Compute price gaps

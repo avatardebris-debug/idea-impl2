@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Observability Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --border-card: rgba(255, 255, 255, 0.1);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-green: #34d399;
+            --accent-red: #f87171;
+            --accent-yellow: #fbbf24;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 2rem;
+            background-image: radial-gradient(circle at top right, rgba(56, 189, 248, 0.1), transparent 40%),
+                              radial-gradient(circle at bottom left, rgba(52, 211, 153, 0.05), transparent 40%);
+            min-height: 100vh;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin: 0;
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .status-badge {
+            background: rgba(52, 211, 153, 0.2);
+            color: var(--accent-green);
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badge::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 1.5rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        .metric-title {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .metric-cost { color: var(--accent-yellow); }
+        .metric-active { color: var(--accent-blue); }
+        .metric-blocked { color: var(--accent-red); }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-card);
+            backdrop-filter: blur(12px);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 1rem 1.5rem;
+            text-align: left;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.02);
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.95rem;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .project-name { font-weight: 600; color: var(--accent-blue); }
+        .idea-name { color: var(--text-muted); font-size: 0.85rem; display: block; margin-top: 0.25rem;}
+        
+        .tag {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .tag-active { background: rgba(56, 189, 248, 0.1); color: var(--accent-blue); border: 1px solid rgba(56, 189, 248, 0.2); }
+        .tag-blocked { background: rgba(248, 113, 113, 0.1); color: var(--accent-red); border: 1px solid rgba(248, 113, 113, 0.2); }
+        .tag-completed { background: rgba(52, 211, 153, 0.1); color: var(--accent-green); border: 1px solid rgba(52, 211, 153, 0.2); }
+
+        .cost-col { font-family: monospace; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Pipeline Observability Dashboard</h1>
+        <div class="status-badge" id="conn-status">Live</div>
+    </div>
+
+    <div class="metrics-grid">
+        <div class="card">
+            <div class="metric-title">Total Projects</div>
+            <div class="metric-value" id="val-total">-</div>
+        </div>
+        <div class="card">
+            <div class="metric-title">Active / Executing</div>
+            <div class="metric-value metric-active" id="val-active">-</div>
+        </div>
+        <div class="card">
+            <div class="metric-title">Blocked / Failed</div>
+            <div class="metric-value metric-blocked" id="val-blocked">-</div>
+        </div>
+        <div class="card">
+            <div class="metric-title">Est. Token Spend</div>
+            <div class="metric-value metric-cost" id="val-cost">$-</div>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Project</th>
+                <th>Phase</th>
+                <th>Status</th>
+                <th>Error Rate</th>
+                <th>Est. Cost</th>
+            </tr>
+        </thead>
+        <tbody id="project-list">
+            <!-- Populated via JS -->
+            <tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Loading telemetry...</td></tr>
+        </tbody>
+    </table>
+
+    <script>
+        async function fetchMetrics() {
+            try {
+                const res = await fetch('/api/metrics');
+                if (!res.ok) throw new Error('Network response was not ok');
+                const data = await res.json();
+                
+                // Update global metrics
+                document.getElementById('val-total').innerText = data.global.total_projects;
+                document.getElementById('val-active').innerText = data.global.active_projects;
+                document.getElementById('val-blocked').innerText = data.global.blocked_projects;
+                document.getElementById('val-cost').innerText = '$' + data.global.total_cost_estimate.toFixed(2);
+                
+                // Update projects table
+                const tbody = document.getElementById('project-list');
+                tbody.innerHTML = '';
+                
+                // Sort by cost descending
+                const sortedProjects = data.projects.sort((a, b) => b.cost_estimate - a.cost_estimate);
+                
+                sortedProjects.forEach(p => {
+                    // Determine primary tag status based on current phase and retries
+                    let tagClass = "tag-active";
+                    let tagText = "ACTIVE";
+                    
+                    if (p.phases && p.phases.length > 0) {
+                        const current = p.phases.find(ph => ph.name === p.current_phase);
+                        if (current) {
+                            if (current.status === "blocked" || (current.max_retries > 0 && current.retries >= current.max_retries)) {
+                                tagClass = "tag-blocked";
+                                tagText = "BLOCKED";
+                            } else if (current.status === "completed" && p.phases.every(ph => ph.status === "completed")) {
+                                tagClass = "tag-completed";
+                                tagText = "COMPLETED";
+                            }
+                        }
+                    }
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>
+                            <span class="project-name">${p.project_name}</span>
+                            <span class="idea-name">${p.idea_name || 'No idea linked'}</span>
+                        </td>
+                        <td>${p.current_phase || 'Unstarted'}</td>
+                        <td><span class="tag ${tagClass}">${tagText}</span></td>
+                        <td>${(p.error_rate * 100).toFixed(1)}%</td>
+                        <td class="cost-col">$${p.cost_estimate.toFixed(4)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                
+                document.getElementById('conn-status').style.color = 'var(--accent-green)';
+                document.getElementById('conn-status').innerText = 'Live';
+                
+            } catch (err) {
+                console.error(err);
+                document.getElementById('conn-status').style.color = 'var(--accent-red)';
+                document.getElementById('conn-status').innerText = 'Disconnected';
+            }
+        }
+
+        // Initial fetch
+        fetchMetrics();
+        // Poll every 5 seconds
+        setInterval(fetchMetrics, 5000);
+    </script>
+</body>
+</html>

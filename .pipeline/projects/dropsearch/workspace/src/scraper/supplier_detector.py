@@ -65,6 +65,10 @@ class SupplierDetector:
             "domains": [r"dhgate\.com"],
             "confidence": 0.7,
         },
+        "Printful": {
+            "domains": [r"printful\.com"],
+            "confidence": 0.8,
+        },
     }
 
     # Patterns for hidden supplier prices in data attributes

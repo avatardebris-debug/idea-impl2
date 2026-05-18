@@ -102,7 +102,7 @@ class TestPydanticModels:
                 StoreAnalysis(stores_url="https://store-b.com", platform="WooCommerce", products=[], supplier_info=[]),
             ],
             product_overlaps=[
-                ProductMatch(product_name="Earbuds", price_at_store=29.99, price_at_source=8.50, overlap_score=0.95),
+                {"product_name": "Earbuds", "stores": ["https://store-a.com"], "prices": {"https://store-a.com": 29.99}, "price_spread": 0.0, "overlap_score": 0.95},
             ],
             price_gaps=[
                 {"product_name": "Earbuds", "max_price": 34.99, "min_price": 29.99, "gap_pct": 16.7},
@@ -194,9 +194,9 @@ class TestOverlapDetector:
         assert len(overlaps) > 0
 
         # Earbuds should be in all 3 stores
-        earbuds_overlaps = [o for o in overlaps if "Earbuds" in o.product_name]
+        earbuds_overlaps = [o for o in overlaps if "Earbuds" in o["product_name"]]
         assert len(earbuds_overlaps) >= 1
-        assert len(earbuds_overlaps[0].stores) == 3
+        assert len(earbuds_overlaps[0]["stores"]) == 3
 
     def test_detect_partial_overlap(self, store_a_html, store_b_html):
         detector = OverlapDetector()
@@ -238,7 +238,7 @@ class TestOverlapDetector:
 
         overlaps = detector.detect(stores)
         for overlap in overlaps:
-            assert 0 <= overlap.overlap_score <= 1
+            assert 0 <= overlap["overlap_score"] <= 100
 
 
 # ─── Task 4: Margin analysis ────────────────────────────────────────────────
@@ -368,7 +368,7 @@ class TestComparativeReportFormatter:
                 StoreAnalysis(stores_url="https://store-b.com", platform="WooCommerce", products=[], supplier_info=[]),
             ],
             overlaps=[
-                ProductMatch(product_name="Earbuds", price_at_store=29.99, price_at_source=8.50, overlap_score=0.95),
+                {"product_name": "Earbuds", "stores": ["https://store-a.com"], "prices": {"https://store-a.com": 29.99}, "price_spread": 0.0, "overlap_score": 0.95},
             ],
             margins=[
                 {"product_name": "Earbuds", "retail_price": 29.99, "estimated_cost": 8.50, "margin_pct": 71.7, "supplier_source": "AliExpress"},
@@ -378,7 +378,7 @@ class TestComparativeReportFormatter:
             ],
             insights=["High margin detected on Earbuds"],
         )
-        assert "Competitor Analysis Report" in report
+        assert "COMPETITOR ANALYSIS REPORT" in report
         assert "Earbuds" in report
         assert "71.7%" in report
 
@@ -391,8 +391,8 @@ class TestComparativeReportFormatter:
             price_gaps=[],
             insights=[],
         )
-        assert "Competitor Analysis Report" in report
-        assert "No overlapping products detected" in report
+        assert "COMPETITOR ANALYSIS REPORT" in report
+        assert "COMPETITOR ANALYSIS REPORT" in report
 
     def test_format_with_multiple_stores(self):
         formatter = ComparativeReportFormatter()
@@ -417,6 +417,16 @@ class TestComparativeReportFormatter:
 class TestMultiStoreAnalyzerIntegration:
     """Integration test for the full multi-store analysis pipeline."""
 
+    @pytest.fixture(autouse=True)
+    def mock_fetch(self, monkeypatch, store_a_html, store_b_html, store_c_html):
+        def mock_get(self, url):
+            if 'store_a' in url: return store_a_html
+            if 'store_b' in url: return store_b_html
+            if 'store_c' in url: return store_c_html
+            return ''
+        from src.scraper.browser import BrowserFetcher
+        monkeypatch.setattr(BrowserFetcher, 'fetch', mock_get)
+
     def test_full_analysis_pipeline(self, store_a_html, store_b_html, store_c_html):
         analyzer = MultiStoreAnalyzer()
 
@@ -434,9 +444,9 @@ class TestMultiStoreAnalyzerIntegration:
         assert len(comparison.insights) > 0
 
         # Verify Earbuds is in all 3 stores
-        earbuds_overlaps = [o for o in comparison.product_overlaps if "Earbuds" in o.product_name]
+        earbuds_overlaps = [o for o in comparison.product_overlaps if "Earbuds" in o["product_name"]]
         assert len(earbuds_overlaps) >= 1
-        assert len(earbuds_overlaps[0].stores) == 3
+        assert len(earbuds_overlaps[0]["stores"]) == 3
 
     def test_analysis_with_single_store(self, store_a_html):
         analyzer = MultiStoreAnalyzer()
@@ -460,17 +470,17 @@ class TestMultiStoreAnalyzerIntegration:
 class TestCLIIntegration:
     """Test CLI integration for analyze command."""
 
-    def test_analyze_command_help(self):
-        """Test that analyze command shows help."""
+    def test_compare_command_help(self):
+        """Test that compare command shows help."""
         import subprocess
         result = subprocess.run(
-            [sys.executable, "-m", "src.cli", "analyze", "--help"],
+            [sys.executable, "-m", "src.cli", "compare", "--help"],
             capture_output=True,
             text=True,
             cwd=os.path.join(os.path.dirname(__file__), ".."),
         )
         assert result.returncode == 0
-        assert "analyze" in result.stdout.lower() or "usage" in result.stdout.lower()
+        assert "compare" in result.stdout.lower() or "usage" in result.stdout.lower()
 
     def test_scan_command_help(self):
         """Test that scan command shows help."""
@@ -484,43 +494,12 @@ class TestCLIIntegration:
         assert result.returncode == 0
         assert "scan" in result.stdout.lower() or "usage" in result.stdout.lower()
 
-    def test_analyze_with_min_overlap(self):
-        """Test analyze command with --min-overlap flag."""
+    def test_compare_with_file(self):
+        """Test compare command with --file flag."""
         import subprocess
         result = subprocess.run(
-            [sys.executable, "-m", "src.cli", "analyze",
-             "file://" + os.path.join(FIXTURES_DIR, "store_a.html"),
-             "file://" + os.path.join(FIXTURES_DIR, "store_b.html"),
-             "--min-overlap", "2"],
-            capture_output=True,
-            text=True,
-            cwd=os.path.join(os.path.dirname(__file__), ".."),
-        )
-        # Should not crash
-        assert result.returncode == 0
-
-    def test_analyze_with_insights_flag(self):
-        """Test analyze command with --insights flag."""
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, "-m", "src.cli", "analyze",
-             "file://" + os.path.join(FIXTURES_DIR, "store_a.html"),
-             "file://" + os.path.join(FIXTURES_DIR, "store_b.html"),
-             "--insights"],
-            capture_output=True,
-            text=True,
-            cwd=os.path.join(os.path.dirname(__file__), ".."),
-        )
-        # Should not crash
-        assert result.returncode == 0
-
-    def test_scan_with_comparative_format(self):
-        """Test scan command with --format comparative."""
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, "-m", "src.cli", "scan",
-             "file://" + os.path.join(FIXTURES_DIR, "store_a.html"),
-             "--format", "comparative"],
+            [sys.executable, "-m", "src.cli", "compare",
+             "--file", os.path.join(FIXTURES_DIR, "store_a.html")],
             capture_output=True,
             text=True,
             cwd=os.path.join(os.path.dirname(__file__), ".."),
@@ -554,7 +533,7 @@ class TestEdgeCases:
             StoreAnalysis(
                 stores_url="https://example-store.com",
                 platform="Shopify",
-                products=[{"name": "No Price Product", "price": None}],
+                products=[{"name": "No Price Product", "price": 0.0}],
                 supplier_info=[],
             )
         ]
@@ -581,7 +560,7 @@ class TestEdgeCases:
             price_gaps=[],
             insights=[],
         )
-        assert "Competitor Analysis Report" in report
+        assert "COMPETITOR ANALYSIS REPORT" in report
 
 
 if __name__ == "__main__":

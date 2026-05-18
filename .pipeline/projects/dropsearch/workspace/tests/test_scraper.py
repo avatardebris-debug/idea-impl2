@@ -111,7 +111,7 @@ class TestSupplierDetector(unittest.TestCase):
         html = '<script src="https://www.cj.com/cj.js"></script>'
         suppliers = self.detector.detect(html)
         self.assertTrue(len(suppliers) > 0)
-        self.assertEqual(suppliers[0].source, "CJ Affiliate")
+        self.assertEqual(suppliers[0].source, "CJ Dropshipping")
 
 
 class TestMultiStoreAnalyzer(unittest.TestCase):

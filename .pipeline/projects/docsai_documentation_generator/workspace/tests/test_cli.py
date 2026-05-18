@@ -100,21 +100,19 @@ class TestCLI:
         assert "symbols" in data
         output_path.unlink()  # Cleanup
 
-    @patch("docsai.cli.spec.load_config")
-    def test_spec_command_invalid_language(self, mock_load_config, sample_project_dir):
+    def test_spec_command_invalid_language(self, sample_project_dir):
         """Test the spec command with an unsupported language."""
-        mock_load_config.return_value = {
-            "output_format": "yaml",
-            "languages": ["rust"],
-            "output_path": str(sample_project_dir / "output.yaml"),
-        }
+        config_path = sample_project_dir / "invalid_config.yaml"
+        with open(config_path, "w") as f:
+            f.write('output_format: "yaml"\n')
+            f.write('languages:\n  - "rust"\n')
+            f.write(f'output_path: "{(sample_project_dir / "output.yaml").as_posix()}"\n')
 
         result = subprocess.run(
             [
                 sys.executable, "-m", "docsai.cli", "spec",
                 "--input-dir", str(sample_project_dir),
-                "--output-format", "yaml",
-                "--output-path", str(sample_project_dir / "output.yaml"),
+                "--config", str(config_path),
             ],
             capture_output=True,
             text=True,

@@ -23,18 +23,19 @@ def _resolve_option(value, default):
     return value
 
 
-@spec_app.command()
+@spec_app.command(help="Generate API specification from source code.")
 def spec(
-    source_dir: str = typer.Argument(..., help="Directory containing source files to document."),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path for the API spec."),
-    format: Optional[str] = typer.Option(None, "--format", "-f", help="Output format: yaml or json."),
+    input_dir: str = typer.Option(".", "--input-dir", "-i", help="Directory containing source files to document."),
+    output_path: Optional[str] = typer.Option(None, "--output-path", "-o", help="Output file path for the API spec."),
+    output_format: Optional[str] = typer.Option(None, "--output-format", "-f", help="Output format: yaml or json."),
     config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to docsai.yaml config file."),
 ):
-    """Generate an API specification from source code files."""
+    """Generate API specification from source code."""
     # Resolve typer.Option defaults (which are OptionInfo objects when called directly)
-    output_path = _resolve_option(output, None)
-    output_format = _resolve_option(format, None)
+    output_path = _resolve_option(output_path, None)
+    output_format = _resolve_option(output_format, None)
     config_path = _resolve_option(config, None)
+    source_dir = _resolve_option(input_dir, ".")
 
     # Load config
     cfg = load_config(config_path)
@@ -57,6 +58,9 @@ def spec(
 
     extensions: List[str] = []
     for lang in languages:
+        if lang not in extensions_map:
+            typer.echo(f"Unsupported language: {lang}", err=True)
+            raise typer.Exit(1)
         extensions.extend(extensions_map.get(lang, []))
 
     source_files: List[Path] = []

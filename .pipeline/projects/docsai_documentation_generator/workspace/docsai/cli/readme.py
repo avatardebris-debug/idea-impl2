@@ -12,12 +12,12 @@ from docsai.generators.readme_generator import ReadmeGenerator
 
 readme_app = typer.Typer(
     name="readme",
-    help="Generate a complete README.md for a project",
+    help="Generate README documentation",
 )
 
 
 @readme_app.command()
-def generate(
+def readme(
     project_path: str = typer.Argument(
         ..., help="Path to the project directory to document"
     ),

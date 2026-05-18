@@ -156,12 +156,12 @@ Unchecked `[ ]` = still needs to be built, validated, or tested by the runner.
 - [ ] **Project dependency graph visualizer** — Reads all project workspace files and MANIFEST.json to generate a visual dependency graph.
 - [ ] **[Automated Dependency Resolver]** — Tool that tracks cross-project requirements and automatically syncs version constraints.
 - [ ] **Shared LLM cost tracker** — Cost-tracking middleware to the LLMClient protocol that logs every LLM call's token usage and cost across all projects, with monthly budget alerts.
-- [ ] **[Universal LLM Router]** — Adapter that routes requests across llmclient providers with automatic fallback and load balancing.
-- [ ] **[Config Schema Validator]** — Linter that validates pipeline YAML definitions against typed schemas before execution.
-- [ ] **Code review diff summarizer** — CLI tool that reads git diff output, summarizes changes by file and function, flags potential issues, and generates a human-readable review briefing.
-- [ ] **Test fixture generator** — Build a tool that generates realistic test fixtures (CSV files, JSON payloads, mock API responses, sample documents) for any project by reading its existing test patterns and schemas.
-- [ ] **[Test Coverage Mutator]** — Automated suite that generates mutation tests and enforces quality thresholds across the pipeline.
-- [ ] **Cross-project code linter** — CLI tool that runs consistent linting, type checking, and import analysis across all workspace projects, enforcing a shared style guide and flagging cross-project API mismatches.
+- [x] **[Universal LLM Router]** — Adapter that routes requests across llmclient providers with automatic fallback and load balancing.
+- [x] **[Config Schema Validator]** — Linter that validates pipeline YAML definitions against typed schemas before execution.
+- [x] **Code review diff summarizer** — CLI tool that reads git diff output, summarizes changes by file and function, flags potential issues, and generates a human-readable review briefing.
+- [x] **Test fixture generator** — Build a tool that generates realistic test fixtures (CSV files, JSON payloads, mock API responses, sample documents) for any project by reading its existing test patterns and schemas.
+- [x] **[Test Coverage Mutator]** — Automated suite that generates mutation tests and enforces quality thresholds across the pipeline.
+- [x] **Cross-project code linter** — CLI tool that runs consistent linting, type checking, and import analysis across all workspace projects, enforcing a shared style guide and flagging cross-project API mismatches.
 - [ ] **Contract clause extractor** — PDF and DOCX parser that identifies and extracts key contract clauses (termination, liability, NDAs) into a structured searchable database with export options.
 - [ ] **[Startup Compliance Scanner]** — Automated checklist generator that maps startup data to SOC2 and GDPR requirements.
 - [ ] **[Technical Whitepaper Generator]** — AI system that researches, outlines, and drafts professional engineering documentation.

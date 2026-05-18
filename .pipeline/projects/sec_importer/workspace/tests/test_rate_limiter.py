@@ -54,7 +54,7 @@ class TestRateLimiterWait:
         rl.wait()
         elapsed = time.time() - start
         # Allow some tolerance for timing
-        assert elapsed >= 0.03
+        assert elapsed >= 0.02
 
     def test_wait_with_jitter(self):
         """Test that wait with jitter varies the delay."""

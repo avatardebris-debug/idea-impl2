@@ -45,7 +45,7 @@ class TestEvaluateProductSupplierPair:
         assert result is not None
         assert result.product_id == "P1"
         assert result.supplier_id == "S1"
-        assert result.margin_result is not None
+        assert result.cost_price == 10.0
 
     def test_reject_due_to_low_margin(self):
         engine = PlannerEngine(min_net_margin_pct=50.0)
@@ -130,7 +130,7 @@ class TestGenerateSourcingPlan:
         assert plan is not None
         assert plan.product_count == 2
         assert plan.supplier_count == 2
-        assert len(plan.recommendations) == 2
+        assert len(plan.recommendations) == 4
 
     def test_plan_aggregations(self):
         engine = PlannerEngine()

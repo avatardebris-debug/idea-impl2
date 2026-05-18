@@ -38,9 +38,9 @@ def _run_docsai_spec(output_format: str = "yaml") -> subprocess.CompletedProcess
         [sys.executable, "-c",
          f"""
 import sys
-sys.path.insert(0, "{_ws}")
+sys.path.insert(0, "{_ws.parent.as_posix()}")
 from docsai.cli.spec import spec
-spec("{SAMPLE_PROJECT_DIR}", output="{output_path}", format="{output_format}")
+spec("{SAMPLE_PROJECT_DIR.as_posix()}", output_path="{pathlib.Path(output_path).as_posix()}", output_format="{output_format}")
 """],
         capture_output=True,
         text=True,

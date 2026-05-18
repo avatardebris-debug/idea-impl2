@@ -36,10 +36,16 @@ class WooCommerceParser:
         soup = BeautifulSoup(html, "html.parser")
         products = []
 
-        # Method 1: WooCommerce JSON API data
-        json_data = cls._extract_json_api(html)
-        if json_data:
-            products.extend(json_data)
+        # Method 1.5: JSON-LD
+        json_ld = cls._extract_json_ld(soup)
+        if json_ld:
+            products.extend(json_ld)
+
+        # Method 2: WooCommerce JSON API data
+        if not products:
+            json_data = cls._extract_json_api(html)
+            if json_data:
+                products.extend(json_data)
 
         # Method 2: DOM-based extraction
         if not products:
@@ -50,6 +56,44 @@ class WooCommerceParser:
             products.extend(cls._extract_api_endpoints(html, base_url))
 
         return products
+
+    @classmethod
+    def _extract_json_ld(cls, soup: BeautifulSoup) -> List[Product]:
+        products = []
+        scripts = soup.find_all("script", type="application/ld+json")
+        for script in scripts:
+            try:
+                data = json.loads(script.string)
+                if isinstance(data, dict):
+                    if "@graph" in data:
+                        for item in data["@graph"]:
+                            if isinstance(item, dict) and item.get("@type") == "Product":
+                                products.append(cls._parse_product(item))
+                    elif data.get("@type") == "Product":
+                        products.append(cls._parse_product(data))
+                elif isinstance(data, list):
+                    for item in data:
+                        if isinstance(item, dict) and item.get("@type") == "Product":
+                            products.append(cls._parse_product(item))
+            except (json.JSONDecodeError, AttributeError, TypeError):
+                continue
+        return products
+
+    @classmethod
+    def _parse_product(cls, data: dict) -> Product:
+        name = data.get("name", "Unknown Product")
+        offers = data.get("offers", {})
+        if isinstance(offers, list) and len(offers) > 0:
+            price_str = offers[0].get("price", "0")
+        elif isinstance(offers, dict):
+            price_str = offers.get("price", "0")
+        else:
+            price_str = "0"
+        try:
+            price = float(price_str)
+        except (ValueError, TypeError):
+            price = 0.0
+        return Product(name=name, price=price, url=data.get("url"), source="woocommerce_json_ld")
 
     @classmethod
     def _extract_json_api(cls, html: str) -> List[Product]:
@@ -88,8 +132,8 @@ class WooCommerceParser:
             ("article", "product"),
         ]
 
-        for tag, cls in product_selectors:
-            elements = soup.find_all(tag, class_=re.compile(cls, re.IGNORECASE))
+        for tag, css_class in product_selectors:
+            elements = soup.find_all(tag, class_=re.compile(css_class, re.IGNORECASE))
             for element in elements:
                 name = cls._extract_name(element)
                 price = cls._extract_price(element)
@@ -149,8 +193,8 @@ class WooCommerceParser:
         """Extract product price from WooCommerce element."""
         # Try WooCommerce price classes
         price_classes = ["price", "woocommerce-Price-amount", "amount"]
-        for cls in price_classes:
-            price_el = element.find(class_=re.compile(cls, re.IGNORECASE))
+        for css_class in price_classes:
+            price_el = element.find(class_=re.compile(css_class, re.IGNORECASE))
             if price_el:
                 price_text = price_el.get_text()
                 price = cls._parse_price(price_text)

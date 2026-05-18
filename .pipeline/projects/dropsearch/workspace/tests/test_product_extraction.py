@@ -51,7 +51,7 @@ class TestShopifyParser:
         assert ShopifyParser.is_shopify("<html><body>No Shopify</body></html>") is False
 
     def test_extract_json_ld_products(self, shopify_html: str):
-        products = ShopifyParser.extract(shopify_html)
+        products = ShopifyParser.extract(shopify_html, "http://example.com")
         assert len(products) >= 1
         assert products[0].name == "Test Product 1"
         assert products[0].price == 29.99
@@ -59,37 +59,37 @@ class TestShopifyParser:
     def test_extract_css_products(self, shopify_html: str):
         # JSON-LD products are returned first; verify CSS fallback works
         # by checking that the JSON-LD product is present
-        products = ShopifyParser.extract(shopify_html)
+        products = ShopifyParser.extract(shopify_html, "http://example.com")
         names = [p.name for p in products]
         assert "Test Product 1" in names  # JSON-LD product
         assert len(products) >= 1
 
     def test_extract_returns_product_objects(self, shopify_html: str):
-        products = ShopifyParser.extract(shopify_html)
+        products = ShopifyParser.extract(shopify_html, "http://example.com")
         for p in products:
             assert isinstance(p, Product)
             assert p.name
             assert isinstance(p.price, float)
 
     def test_extract_empty_html(self):
-        products = ShopifyParser.extract("")
+        products = ShopifyParser.extract("", "http://example.com")
         assert products == []
 
     def test_extract_price_formats(self):
         html = '<script type="application/ld+json">{"@type":"Product","name":"P","offers":{"price":"10.50"}}</script>'
-        products = ShopifyParser.extract(html)
+        products = ShopifyParser.extract(html, "http://example.com")
         assert len(products) == 1
         assert products[0].price == 10.5
 
     def test_extract_with_graph(self):
         html = '<script type="application/ld+json">{"@graph":[{"@type":"Product","name":"Graph Product","offers":{"price":"5.00"}}]}</script>'
-        products = ShopifyParser.extract(html)
+        products = ShopifyParser.extract(html, "http://example.com")
         assert len(products) == 1
         assert products[0].name == "Graph Product"
 
     def test_extract_with_list(self):
         html = '<script type="application/ld+json">[{"@type":"Product","name":"List Product","offers":{"price":"7.77"}}]</script>'
-        products = ShopifyParser.extract(html)
+        products = ShopifyParser.extract(html, "http://example.com")
         assert len(products) == 1
         assert products[0].price == 7.77
 
@@ -106,29 +106,29 @@ class TestWooCommerceParser:
         assert WooCommerceParser.is_woocommerce("<html><body>No Woo</body></html>") is False
 
     def test_extract_json_ld_products(self, woocommerce_html: str):
-        products = WooCommerceParser.extract(woocommerce_html)
+        products = WooCommerceParser.extract(woocommerce_html, "http://example.com")
         assert len(products) >= 1
         assert products[0].name == "Woo Product 1"
         assert products[0].price == 39.99
 
     def test_extract_css_products(self, woocommerce_html: str):
         # JSON-LD products are returned first; verify the JSON-LD product is present
-        products = WooCommerceParser.extract(woocommerce_html)
+        products = WooCommerceParser.extract(woocommerce_html, "http://example.com")
         names = [p.name for p in products]
         assert "Woo Product 1" in names  # JSON-LD product
         assert len(products) >= 1
 
     def test_extract_returns_product_objects(self, woocommerce_html: str):
-        products = WooCommerceParser.extract(woocommerce_html)
+        products = WooCommerceParser.extract(woocommerce_html, "http://example.com")
         for p in products:
             assert isinstance(p, Product)
 
     def test_extract_empty_html(self):
-        products = WooCommerceParser.extract("")
+        products = WooCommerceParser.extract("", "http://example.com")
         assert products == []
 
     def test_css_price_parsing(self, woocommerce_html: str):
-        products = WooCommerceParser.extract(woocommerce_html)
+        products = WooCommerceParser.extract(woocommerce_html, "http://example.com")
         # JSON-LD product is returned first
         assert products[0].price == 39.99
 
@@ -139,26 +139,26 @@ class TestGenericParser:
     """Tests for GenericParser."""
 
     def test_detects_generic(self, generic_html: str):
-        products = GenericParser.extract(generic_html)
+        products = GenericParser.extract(generic_html, "http://example.com")
         assert len(products) >= 1
 
     def test_extract_css_products(self, generic_html: str):
-        products = GenericParser.extract(generic_html)
+        products = GenericParser.extract(generic_html, "http://example.com")
         names = [p.name for p in products]
         assert "Generic Product 1" in names
         assert "Generic Product 2" in names
 
     def test_extract_returns_product_objects(self, generic_html: str):
-        products = GenericParser.extract(generic_html)
+        products = GenericParser.extract(generic_html, "http://example.com")
         for p in products:
             assert isinstance(p, Product)
 
     def test_extract_empty_html(self):
-        products = GenericParser.extract("")
+        products = GenericParser.extract("", "http://example.com")
         assert products == []
 
     def test_price_parsing(self, generic_html: str):
-        products = GenericParser.extract(generic_html)
+        products = GenericParser.extract(generic_html, "http://example.com")
         prices = [p.price for p in products]
         assert 15.0 in prices
         assert 22.5 in prices
@@ -171,27 +171,27 @@ class TestProductExtractor:
 
     def test_detects_shopify(self, shopify_html: str):
         extractor = ProductExtractor()
-        products = extractor.extract(shopify_html)
+        products = extractor.extract(shopify_html, "http://example.com")
         assert len(products) >= 1
 
     def test_detects_woocommerce(self, woocommerce_html: str):
         extractor = ProductExtractor()
-        products = extractor.extract(woocommerce_html)
+        products = extractor.extract(woocommerce_html, "http://example.com")
         assert len(products) >= 1
 
     def test_detects_generic(self, generic_html: str):
         extractor = ProductExtractor()
-        products = extractor.extract(generic_html)
+        products = extractor.extract(generic_html, "http://example.com")
         assert len(products) >= 1
 
     def test_empty_html(self):
         extractor = ProductExtractor()
-        products = extractor.extract("")
+        products = extractor.extract("", "http://example.com")
         assert products == []
 
     def test_returns_product_objects(self, shopify_html: str):
         extractor = ProductExtractor()
-        products = extractor.extract(shopify_html)
+        products = extractor.extract(shopify_html, "http://example.com")
         for p in products:
             assert isinstance(p, Product)
 

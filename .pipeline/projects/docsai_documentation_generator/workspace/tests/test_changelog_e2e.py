@@ -31,7 +31,7 @@ def clean_output():
 def _run_docsai_changelog(extra_args: list[str] | None = None) -> subprocess.CompletedProcess:
     """Run the docsai changelog command and return the result."""
     cmd = [
-        sys.executable, str(_ws / "docsai" / "cli" / "__init__.py"), "changelog", "changelog",
+        sys.executable, "-m", "docsai.cli", "changelog",
         "--input-dir", str(SAMPLE_PROJECT_DIR),
         "--output", str(CHANGELOG_OUTPUT),
     ]
@@ -96,7 +96,7 @@ class TestDocsaiChangelogE2E:
     def test_changelog_help_works(self):
         """Test that the changelog subcommand help works."""
         result = subprocess.run(
-            [sys.executable, str(_ws / "docsai" / "cli" / "__init__.py"), "changelog", "--help"],
+            [sys.executable, "-m", "docsai.cli", "changelog", "--help"],
             capture_output=True,
             text=True,
             cwd=str(_ws),

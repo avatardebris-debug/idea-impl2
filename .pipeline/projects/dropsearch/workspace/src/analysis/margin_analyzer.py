@@ -68,7 +68,13 @@ class MarginAnalyzer:
 
         for store in stores:
             for product in store.products:
-                retail_price = product.get("price", 0)
+                if isinstance(product, dict):
+                    retail_price = product.get("price", 0)
+                    name = product.get("name", "Unknown")
+                else:
+                    retail_price = getattr(product, "price", 0)
+                    name = getattr(product, "name", "Unknown")
+                    
                 if not retail_price:
                     continue
 
@@ -83,7 +89,7 @@ class MarginAnalyzer:
                     margin_pct = ((retail_price - estimated_cost) / retail_price) * 100 if retail_price > 0 else 0
 
                     estimate = MarginEstimate(
-                        product_name=product.get("name", "Unknown"),
+                        product_name=name,
                         retail_price=retail_price,
                         estimated_cost=round(estimated_cost, 2),
                         margin_pct=round(margin_pct, 2),
@@ -98,7 +104,7 @@ class MarginAnalyzer:
                     margin_pct = ((retail_price - estimated_cost) / retail_price) * 100 if retail_price > 0 else 0
 
                     estimate = MarginEstimate(
-                        product_name=product.get("name", "Unknown"),
+                        product_name=name,
                         retail_price=retail_price,
                         estimated_cost=round(estimated_cost, 2),
                         margin_pct=round(margin_pct, 2),

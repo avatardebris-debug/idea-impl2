@@ -105,8 +105,8 @@ class GenericParser:
         for pattern in cls.NAME_SELECTORS:
             # Check class names
             classes = element.get("class", [])
-            for cls in classes:
-                if re.search(pattern, cls):
+            for css_class in classes:
+                if re.search(pattern, css_class):
                     text = element.get_text(strip=True)
                     if text and len(text) > 2:
                         return text
@@ -131,8 +131,8 @@ class GenericParser:
         """Extract product price from element."""
         # Check class names for price indicators
         classes = element.get("class", [])
-        for cls in classes:
-            if any(re.search(p, cls) for p in cls.PRICE_SELECTORS):
+        for css_class in classes:
+            if any(re.search(p, css_class) for p in cls.PRICE_SELECTORS):
                 text = element.get_text()
                 price = cls._parse_price(text)
                 if price > 0:

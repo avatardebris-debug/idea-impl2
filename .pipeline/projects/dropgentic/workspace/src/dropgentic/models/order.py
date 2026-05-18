@@ -102,9 +102,6 @@ class Order:
         filtered_data = {k: v for k, v in data.items() if k in known_fields}
         if raw_data:
             filtered_data["raw"] = raw_data
-            # Also set extra fields as direct attributes
-            for k, v in raw_data.items():
-                filtered_data[k] = v
         return cls(**filtered_data)
 
     def __getattr__(self, name: str) -> object:

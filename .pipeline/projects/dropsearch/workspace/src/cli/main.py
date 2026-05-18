@@ -63,7 +63,7 @@ def cmd_scan(args):
     comparison = analyzer.compare(urls)
 
     # Format report
-    formatter = ReportFormatter()
+    formatter = ComparativeReportFormatter()
     report = formatter.format_comparison(
         stores=comparison.stores,
         overlaps=comparison.product_overlaps,
@@ -125,7 +125,7 @@ def cmd_inspect(args):
     analysis = analyzer._analyze_single(args.url)
 
     # Format detailed report
-    formatter = ReportFormatter()
+    formatter = ComparativeReportFormatter()
     report = formatter.format_store_detail(analysis)
 
     if args.output:

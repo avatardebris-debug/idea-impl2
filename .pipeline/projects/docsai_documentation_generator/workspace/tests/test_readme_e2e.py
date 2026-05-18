@@ -34,9 +34,9 @@ def _run_docsai_readme() -> subprocess.CompletedProcess:
         [sys.executable, "-c",
          f"""
 import sys
-sys.path.insert(0, "{_ws}")
+sys.path.insert(0, "{_ws.parent.as_posix()}")
 from docsai.cli.readme import readme
-readme("{SAMPLE_PROJECT_DIR}", output="{OUTPUT_FILE}")
+readme("{SAMPLE_PROJECT_DIR.as_posix()}", output="{OUTPUT_FILE.as_posix()}")
 """],
         capture_output=True,
         text=True,

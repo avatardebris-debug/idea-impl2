@@ -258,14 +258,21 @@ class PlannerEngine:
         """
         result = self.evaluate_product_supplier(product, supplier)
         if result is not None:
-            result.recommended_action = self._get_recommended_action(result)
+            if supplier.lead_time_days > self.max_lead_time_days:
+                result.recommended_action = "Reject"
+            elif getattr(supplier, "rating", 5.0) < self.min_supplier_rating:
+                result.recommended_action = "Reject"
+            elif getattr(result, "gross_margin_pct", 1.0) * 100 < getattr(self, "min_gross_margin_pct", 0):
+                result.recommended_action = "Reject"
+            else:
+                result.recommended_action = self._get_recommended_action(result)
         return result
 
     def _get_recommended_action(self, margin_result: MarginResult) -> str:
         """Get recommended action based on margin result."""
-        if margin_result.net_margin_pct >= 20:
+        if margin_result.net_margin_pct * 100 >= 20:
             return "List"
-        elif margin_result.net_margin_pct >= self.min_net_margin_pct:
+        elif margin_result.net_margin_pct * 100 >= self.min_net_margin_pct:
             return "Review"
         else:
             return "Reject"
@@ -304,7 +311,7 @@ class PlannerEngine:
                 )
 
                 # Only include if above minimum margin threshold
-                if margin_result.net_margin_pct >= self.min_net_margin_pct:
+                if margin_result.net_margin_pct * 100 >= self.min_net_margin_pct:
                     recommended_action = self._get_recommended_action(margin_result)
                     recommendations.append(
                         Recommendation(

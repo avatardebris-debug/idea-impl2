@@ -23,12 +23,14 @@ class SupplierChain(BaseModel):
     estimated_cost: Optional[float] = Field(default=None, description="Estimated supplier cost if detectable")
 
 
+from src.models.product import Product
+
 class StoreAnalysis(BaseModel):
     """Analysis results for a single competitor store."""
 
     stores_url: str = Field(description="The URL of the analyzed store")
     platform: str = Field(description="Detected e-commerce platform (e.g., 'Shopify', 'WooCommerce', 'Generic')")
-    products: List[dict] = Field(default_factory=list, description="List of extracted product dicts with keys: name, price, description, image_url, url")
+    products: List[Product] = Field(default_factory=list, description="List of extracted products")
     supplier_info: List[SupplierChain] = Field(default_factory=list, description="Detected supplier chains")
     raw_html: str = Field(default="", description="Raw HTML content of the store page")
 

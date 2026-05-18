@@ -62,7 +62,11 @@ class ShopifyParser:
             try:
                 data = json.loads(script.string)
                 if isinstance(data, dict):
-                    if data.get("@type") == "Product":
+                    if "@graph" in data:
+                        for item in data["@graph"]:
+                            if isinstance(item, dict) and item.get("@type") == "Product":
+                                products.append(cls._parse_product(item))
+                    elif data.get("@type") == "Product":
                         products.append(cls._parse_product(data))
                     elif data.get("@type") == "ItemList":
                         for item in data.get("itemListElement", []):
