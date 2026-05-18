@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "resume_builder"
+version = "0.1.0"
+description = "Resume and cover letter builder CLI"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+resume_builder = "resume_builder.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["resume_builder*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

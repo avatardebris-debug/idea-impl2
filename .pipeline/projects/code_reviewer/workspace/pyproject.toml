@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "code_reviewer"
+version = "0.1.0"
+description = "CLI tool that summarizes git diffs"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+code_reviewer = "code_reviewer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["code_reviewer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
