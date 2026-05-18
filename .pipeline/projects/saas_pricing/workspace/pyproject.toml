@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "saas_pricing"
+version = "0.1.0"
+description = "Automated SaaS pricing tier optimizer"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+saas_pricing = "saas_pricing.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["saas_pricing*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

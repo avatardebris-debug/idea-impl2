@@ -1,0 +1,33 @@
+"""
+cli.py — saas_pricing CLI.
+"""
+import argparse, json, pathlib, sys
+from saas_pricing.analyzer import analyze_pricing, format_markdown
+
+def main():
+    parser = argparse.ArgumentParser(prog="saas_pricing")
+    parser.add_argument("command", choices=["analyze"])
+    parser.add_argument("--name", required=True, help="Product name")
+    parser.add_argument("--desc", required=True, help="Brief description of the SaaS")
+    parser.add_argument("--competitors", default="", help="Comma separated competitors")
+    parser.add_argument("--output", default=None, help="Output file path (.md or .json)")
+    parser.add_argument("--format", choices=["markdown", "json"], default="markdown")
+    parser.add_argument("--model", default="qwen3:6b")
+
+    args = parser.parse_args()
+
+    print(f"Analyzing pricing strategy for {args.name}...", file=sys.stderr)
+    data = analyze_pricing(args.name, args.desc, args.competitors, model=args.model)
+
+    out_str = json.dumps(data, indent=2) if args.format == "json" else format_markdown(data)
+
+    if args.output:
+        p = pathlib.Path(args.output)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(out_str, encoding="utf-8")
+        print(f"Saved to {p}", file=sys.stderr)
+    else:
+        print(out_str)
+
+if __name__ == "__main__":
+    main()
