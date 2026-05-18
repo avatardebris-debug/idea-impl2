@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "contract_extractor"
+version = "0.1.0"
+description = "Automated PDF/DOCX contract clause extractor"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+contract_extractor = "contract_extractor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["contract_extractor*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
