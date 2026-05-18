@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "meeting_summarizer"
+version = "0.1.0"
+description = "Auto-summarizer for meeting transcripts"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+meeting_summarizer = "meeting_summarizer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["meeting_summarizer*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
