@@ -1,28 +1,23 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "dropsearch"
 version = "0.1.0"
-description = "Extract product catalogs from e-commerce stores (Shopify, WooCommerce, generic)."
-requires-python = ">=3.12"
-dependencies = [
-    "beautifulsoup4>=4.12",
-    "lxml>=5.0",
-    "requests>=2.31",
-]
+description = "Dropship competitor researcher and business gameplan generator"
+requires-python = ">=3.10"
+dependencies = []
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=8.0",
-    "pytest-cov>=4.1",
-    "pytest-mock>=3.12",
-    "pytest-timeout>=2.3",
-]
+dev = ["pytest>=8.0"]
 
 [project.scripts]
-dropsearch = "src.cli:main"
+dropsearch = "dropsearch.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dropsearch*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
