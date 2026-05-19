@@ -119,6 +119,15 @@ class AgentProcess:
     ):
         self.provider = provider
         self.model = model
+
+        # Light-tier model routing: if PIPELINE_LIGHT_MODEL is set and this agent
+        # is marked model_tier="light", use the smaller model automatically.
+        # This lets the 2B model handle planners/manager/validator while the 35B
+        # handles executor/reviewer — zero code changes in the agent subclasses.
+        _light_model = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip()
+        if _light_model and getattr(self, "model_tier", "heavy") == "light":
+            self.model = _light_model
+
         self.bus = bus or MessageBus()
         self._stop_requested = False
         self._current_slug = "unknown"   # set from message payload before each handle()

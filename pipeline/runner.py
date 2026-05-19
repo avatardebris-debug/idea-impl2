@@ -190,18 +190,32 @@ def _check_ollama_model(model: str) -> None:
     # Vast.ai and RunPod templates often pre-load qwen3.5 or other models.
     # Removing them frees VRAM and prevents background processes from
     # accidentally triggering a load (which shows as "modified" in ollama list).
+    # PIPELINE_LIGHT_MODEL is whitelisted so the 2B light-tier model coexists
+    # with the primary heavy model without being evicted.
     try:
         resp = urllib.request.urlopen(f"{base_url}/api/tags", timeout=5)
         tags = json.loads(resp.read()).get("models", [])
         model_base = model.split(":")[0].lower()
+
+        # Build whitelist: primary model + optional light-tier model
+        _light_model = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip().lower()
+        _light_base  = _light_model.split(":")[0] if _light_model else ""
+        allowed_bases = {model_base}
+        if _light_base:
+            allowed_bases.add(_light_base)
+
         for m in tags:
             name = m.get("name", "")
-            if name.lower() != model.lower() and name.split(":")[0].lower() != model_base:
+            name_base = name.split(":")[0].lower()
+            is_primary = name.lower() == model.lower()
+            is_allowed = name_base in allowed_bases
+            if not is_primary and not is_allowed:
                 print(f"  Removing unintended model: {name}")
                 import subprocess
                 subprocess.run(["ollama", "rm", name], capture_output=True)
     except Exception:
         pass  # Non-critical — best effort cleanup
+
 
     return model  # Return canonical model name for caller to use
 
@@ -2061,6 +2075,9 @@ def run_pipeline(
         print(f"  Seeds:    {parallel_seeds} parallel project slots (Strategy 6)")
     if num_executors > 1:
         print(f"  Executors:{num_executors} parallel executor instances")
+    _light_model_env = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip()
+    if _light_model_env:
+        print(f"  Light:    {_light_model_env} (light-tier agents: planner/manager/validator)")
 
     # Polish mode: reset complete-but-incomplete projects and queue them, then
     # fall through to normal pipeline startup so agents actually process them.
