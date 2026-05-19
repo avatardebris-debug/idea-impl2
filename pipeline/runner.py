@@ -2134,8 +2134,10 @@ def run_pipeline(
 
     # Pre-seed additional parallel slots at startup (Tier 1: multi-project seeding).
     # After the first project is queued/rebuilt, immediately fill remaining open slots.
+    # NOTE: _count_active_projects is a nested function defined later in run_pipeline(),
+    # so we use _get_all_active_idea_states (module-level) here to avoid UnboundLocalError.
     if has_work and from_list and parallel_seeds > 1:
-        _already_active = _count_active_projects()
+        _already_active = len(_get_all_active_idea_states(PIPELINE_DIR))
         _queued_now = len(_seeded_this_session)
         _effective_active = max(_already_active, _queued_now)
         _slots_to_fill = max(0, parallel_seeds - _effective_active)
