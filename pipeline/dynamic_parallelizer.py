@@ -368,14 +368,24 @@ class DynamicParallelizer:
             )
 
         # ---- SCALE DOWN: downtrend confirmed ----
+        # Also require GPU to be above the low threshold — if GPU is underutilised,
+        # a bearish EMA crossover means overhead (not contention). Hold.
         if streak_down and current_seeds > self.min_seeds:
+            if gpu_pct < _GPU_LOW_PCT:
+                return TunerDecision(
+                    changed=False, new_seeds=current_seeds, old_seeds=current_seeds,
+                    reason=(
+                        f"→ EMA bearish ({fast:.1f}<{slow:.1f}) but GPU only {gpu_pct:.0f}% "
+                        f"(< {_GPU_LOW_PCT:.0f}% threshold) — overhead not contention, holding"
+                    ),
+                )
             new = max(self.min_seeds, current_seeds - 1)
             return TunerDecision(
                 changed=True, new_seeds=new, old_seeds=current_seeds,
                 reason=(
                     f"🔽 EMA trend bearish {fast:.1f}<{slow:.1f} tok/s "
                     f"({ema_gap_pct:.1f}% gap, {abs(self._crossover_streak)} streak) | "
-                    f"GPU {gpu_pct:.0f}% — "
+                    f"GPU {gpu_pct:.0f}% ≥ {_GPU_LOW_PCT:.0f}% (contention confirmed) — "
                     f"scaling {current_seeds}→{new} seeds"
                 ),
                 confidence=min(0.9, 0.5 + ema_gap_pct / 20),
@@ -426,7 +436,10 @@ class DynamicParallelizer:
         # --- Drop signal ---
         if tps_now < tps_prev * (1 - _TPS_DROP_THRESH) and current_seeds > self.min_seeds:
             itps_also_dropped = itps_now < itps_prev * (1 - _ITPS_DROP_THRESH)
-            if itps_also_dropped:
+            # KEY RULE: never scale down when GPU is underutilised.
+            # Low GPU + low pipeline TPS = overhead noise (phase transitions,
+            # health checks, init) NOT contention. Scaling down makes it worse.
+            if itps_also_dropped and gpu_pct >= _GPU_LOW_PCT:
                 new = max(self.min_seeds, current_seeds - 1)
                 confidence = min(1.0, (tps_prev - tps_now) / (tps_prev + 1e-6))
                 return TunerDecision(
@@ -434,10 +447,19 @@ class DynamicParallelizer:
                     reason=(
                         f"🔽 [bootstrap, {samples_remaining} to EMA] "
                         f"Throughput dropped {tps_prev:.1f}→{tps_now:.1f} tok/s "
-                        f"+ inference {itps_prev:.0f}→{itps_now:.0f} tok/s — "
+                        f"+ inference {itps_prev:.0f}→{itps_now:.0f} tok/s "
+                        f"(GPU {gpu_pct:.0f}% ≥ {_GPU_LOW_PCT:.0f}% — contention confirmed) — "
                         f"scaling {current_seeds}→{new} seeds"
                     ),
                     confidence=confidence,
+                )
+            elif itps_also_dropped and gpu_pct < _GPU_LOW_PCT:
+                return TunerDecision(
+                    changed=False, new_seeds=current_seeds, old_seeds=current_seeds,
+                    reason=(
+                        f"→ [bootstrap] Both TPS signals dropped but GPU only {gpu_pct:.0f}% "
+                        f"(< {_GPU_LOW_PCT:.0f}% threshold) — overhead noise not contention, holding"
+                    ),
                 )
             else:
                 return TunerDecision(

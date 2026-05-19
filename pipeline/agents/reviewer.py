@@ -187,6 +187,29 @@ class ReviewerAgent(AgentProcess):
                 import logging
                 logging.getLogger(__name__).error("[reviewer] Failed to write review verdict: %s", e)
 
+            # --- Fine-tuning data collection (never affects pipeline) ---
+            # Capture a (task list → working code) pair for future SFT training.
+            # fix_cycles=0 means clean first-pass — highest quality training signal.
+            try:
+                from pipeline.finetune_collector import collect_phase_pair
+                _fix_cycles = msg.payload.get("retry_count", 0)
+                _collected = collect_phase_pair(
+                    project_dir=self._project_dir,
+                    phase_num=phase_num,
+                    fix_cycles=_fix_cycles,
+                    model=self.model,
+                    tokens=result.tokens_used,
+                )
+                if _collected:
+                    import logging as _log
+                    _quality = "high" if _fix_cycles == 0 else ("medium" if _fix_cycles <= 2 else "low")
+                    _log.getLogger(__name__).info(
+                        "[reviewer] Fine-tune pair collected: phase=%d fix_cycles=%d quality=%s",
+                        phase_num, _fix_cycles, _quality,
+                    )
+            except Exception:
+                pass  # Data collection must never affect pipeline
+
             return AgentOutput(
                 success=True,
                 answer=result.answer,
@@ -194,6 +217,7 @@ class ReviewerAgent(AgentProcess):
                 tokens_used=result.tokens_used,
                 steps_used=result.steps_used,
             )
+
         else:
             # --- PRE-VALIDATION: Structural review → route to validator or back to executor ---
             retry_count = msg.payload.get("retry_count", 0)

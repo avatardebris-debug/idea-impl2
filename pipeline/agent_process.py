@@ -148,7 +148,8 @@ class AgentProcess:
             msg = self.bus.read_next(self.role)
 
             if msg is None:
-                time.sleep(_poll_wait)
+                if _poll_wait > 0:
+                    time.sleep(_poll_wait)
                 # Ramp up sleep on consecutive misses, cap at max
                 _poll_wait = min(_poll_wait + _POLL_STEP, _POLL_MAX)
                 continue
@@ -246,6 +247,12 @@ class AgentProcess:
                 logger.info("[%s] Completed message %s (success=%s, tokens=%d, steps=%d)",
                             self.role, msg.msg_id, output.success,
                             output.tokens_used, output.steps_used)
+
+                # Executor continuity: immediately try next message without any poll delay.
+                # This eliminates idle time between back-to-back tasks for busy agents.
+                # The back-off will reset to _POLL_MIN at the top of the loop anyway,
+                # but this skips even that minimal delay when there's more work queued.
+                _poll_wait = 0.0
 
             except Exception as e:
                 logger.error("[%s] Failed processing message %s: %s",
