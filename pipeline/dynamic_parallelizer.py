@@ -220,7 +220,10 @@ class DynamicParallelizer:
 
         # --- Rate limiting: only sample every obs_window_s ---
         in_cooldown = (now - self._last_decision_ts) < self.cooldown_s
-        if (now - self._last_sample_ts) < self.obs_window_s:
+        # During calibration (less than 2 history samples), sample much faster (30s)
+        # to avoid keeping the user in a "calibrating..." state indefinitely.
+        _window = 30 if len(self._history) < 2 else self.obs_window_s
+        if (now - self._last_sample_ts) < _window:
             return TunerDecision(changed=False, new_seeds=current_seeds,
                                  old_seeds=current_seeds)
 
@@ -274,10 +277,19 @@ class DynamicParallelizer:
 
     def status_line(self, current_seeds: int) -> str:
         """Return a compact one-line status string for the runner's status output."""
-        if len(self._history) < 2:
-            return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating..."
+        if not self._history:
+            return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating (0/2 samples)..."
 
         last = self._history[-1]
+        if len(self._history) < 2:
+            return (
+                f"⚡ parallelizer: {current_seeds} seed(s) | "
+                f"pipe={last.pipeline_tps:.1f} tok/s | "
+                f"inf={last.inference_tps:.0f} tok/s | "
+                f"{last.gpu_util_pct:.0f}% GPU | "
+                f"calibrating (1/2 samples)..."
+            )
+
         prev = self._history[-2]
 
         # Show EMA crossover state once warmed up
@@ -533,7 +545,9 @@ class DynamicParallelizer:
 
         # Reject if data is stale (not updated in the last 2× obs windows)
         updated_at = data.get("updated_at", 0)
-        if ts - updated_at > self.obs_window_s * 2:
+        _max_stale = (30 * 2) if len(self._history) < 2 else (self.obs_window_s * 2)
+        # At very early startup or during calibration, allow up to 10 minutes (600s) stale margin
+        if ts - updated_at > max(_max_stale, 600.0):
             return None
 
         call_count = data.get("call_count", 0)
@@ -541,9 +555,11 @@ class DynamicParallelizer:
         cum_wall   = data.get("cumulative_wall_s", 1) or 1
         cum_inf    = data.get("cumulative_inference_s", 1) or 1
 
-        # Require minimum LLM call delta since last snapshot
+        # Require minimum LLM call delta since last snapshot.
+        # During calibration, we allow bootstrapping as soon as 1 call has completed.
         prev_calls = self._last_tp_snapshot.get("call_count", 0)
-        if call_count - prev_calls < _MIN_CALLS_FOR_OBS:
+        _min_calls = 1 if len(self._history) < 2 else _MIN_CALLS_FOR_OBS
+        if call_count - prev_calls < _min_calls:
             return None
 
         # Compute delta tps (marginal, not cumulative) for this window

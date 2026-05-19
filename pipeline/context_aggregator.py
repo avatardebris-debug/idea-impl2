@@ -148,20 +148,30 @@ def refresh_project(project_dir: pathlib.Path) -> None:
         pass  # Never crash the caller
 
 
-def refresh_all_projects(pipeline_dir: pathlib.Path) -> int:
+def refresh_all_projects(pipeline_dir: pathlib.Path, active_only: bool = True) -> int:
     """
-    Rebuild context caches for ALL projects under .pipeline/projects/.
+    Rebuild context caches for projects under .pipeline/projects/.
+    If active_only is True (default), skips projects in terminal/inactive states.
     Returns the number of projects refreshed.
-    Called once at pipeline startup.
     """
     projects_dir = pipeline_dir / "projects"
     if not projects_dir.exists():
         return 0
+    INACTIVE = {"complete", "budget_exceeded", "dep_waiting"}
     count = 0
     for proj in projects_dir.iterdir():
-        if proj.is_dir() and (proj / "state" / "current_idea.json").exists():
-            refresh_project(proj)
-            count += 1
+        if proj.is_dir():
+            state_file = proj / "state" / "current_idea.json"
+            if state_file.exists():
+                if active_only:
+                    try:
+                        state_data = json.loads(state_file.read_text(encoding="utf-8"))
+                        if state_data.get("status", "") in INACTIVE:
+                            continue
+                    except Exception:
+                        pass
+                refresh_project(proj)
+                count += 1
     return count
 
 

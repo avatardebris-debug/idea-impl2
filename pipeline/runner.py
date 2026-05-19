@@ -135,36 +135,53 @@ def _check_ollama_model(model: str) -> None:
     os.environ.setdefault("OLLAMA_NO_PULL", "1")
 
     # 3. Warm up: trigger a tiny inference to load model into VRAM.
-    # Use /api/chat with think:false — /api/generate with num_predict:5 returns
-    # empty for thinking models because all tokens go to the <think> block.
-    print(f"  Model:    {model} (warming up...)", end="", flush=True)
+    # Check if the model is already loaded via /api/ps first.
+    already_loaded = False
     try:
-        req = urllib.request.Request(
-            f"{base_url}/api/chat",
-            data=json.dumps({
-                "model": model,
-                "messages": [{"role": "user", "content": "/no_think say OK"}],
-                "stream": False,
-                "think": False,             # disable chain-of-thought for warmup
-                "keep_alive": -1,           # pin model in VRAM after warmup
-                "options": {"num_predict": 30},
-            }).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        resp = urllib.request.urlopen(req, timeout=300)  # 5 min — large models take time
-        result = json.loads(resp.read())
-        # Accept response from either message.content or thinking field
-        content = (
-            result.get("message", {}).get("content", "")
-            or result.get("message", {}).get("thinking", "")
-            or result.get("response", "")
-        )
-        if content.strip():
-            print(" ✅")
-        else:
-            print(" ⚠️  (empty response — model may need restart)")
-    except Exception as e:
-        print(f" ⚠️  warmup failed: {e}")
+        resp = urllib.request.urlopen(f"{base_url}/api/ps", timeout=5)
+        ps_data = json.loads(resp.read())
+        models_loaded = ps_data.get("models", [])
+        for m in models_loaded:
+            loaded_name = m.get("name", "")
+            if loaded_name.lower() == model.lower() or model.lower() in loaded_name.lower() or loaded_name.lower() in model.lower():
+                already_loaded = True
+                break
+    except Exception:
+        pass
+
+    if already_loaded:
+        print(f"  Model:    {model} (already loaded in VRAM) ✅")
+    else:
+        # Use /api/chat with think:false — /api/generate with num_predict:5 returns
+        # empty for thinking models because all tokens go to the <think> block.
+        print(f"  Model:    {model} (warming up...)", end="", flush=True)
+        try:
+            req = urllib.request.Request(
+                f"{base_url}/api/chat",
+                data=json.dumps({
+                    "model": model,
+                    "messages": [{"role": "user", "content": "/no_think say OK"}],
+                    "stream": False,
+                    "think": False,             # disable chain-of-thought for warmup
+                    "keep_alive": -1,           # pin model in VRAM after warmup
+                    "options": {"num_predict": 30},
+                }).encode(),
+                headers={"Content-Type": "application/json"},
+            )
+            resp = urllib.request.urlopen(req, timeout=300)  # 5 min — large models take time
+            result = json.loads(resp.read())
+            # Accept response from either message.content or thinking field
+            content = (
+                result.get("message", {}).get("content", "")
+                or result.get("message", {}).get("thinking", "")
+                or result.get("response", "")
+            )
+            if content.strip():
+                print(" ✅")
+            else:
+                print(" ⚠️  (empty response — model may need restart)")
+        except Exception as e:
+            print(f" ⚠️  warmup failed: {e}")
 
     # 4. Check GPU allocation
     try:
