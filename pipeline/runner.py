@@ -2298,10 +2298,26 @@ def run_pipeline(
                 # --- Per-session budget enforcement ---
                 # If the active project has been running longer than
                 # PROJECT_TIME_BUDGET, force-complete it so we move on.
+                # NOTE: Only use session_started_at — never fall back to started_at.
+                # started_at records project creation (can be days/weeks old).
+                # session_started_at tracks only the current pipeline session.
+                # If session_started_at is missing (manual reset), stamp now so the
+                # project gets a fresh budget window instead of immediately triggering.
                 _active_slug = idea_state.get("_slug", "")
-                _active_started = idea_state.get("session_started_at",
-                                                  idea_state.get("started_at", ""))
-                if _active_slug and _active_started and idea_state.get("status", "") not in ("", "complete", "budget_exceeded"):
+                _active_status_for_budget = idea_state.get("status", "")
+                _active_started = idea_state.get("session_started_at", "")
+                if (_active_slug
+                        and _active_status_for_budget not in ("", "complete", "budget_exceeded")
+                        and not _active_started):
+                    # Missing session_started_at — stamp now for a clean budget window
+                    _active_started = datetime.now(timezone.utc).isoformat()
+                    idea_state["session_started_at"] = _active_started
+                    _stamp_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
+                    try:
+                        _stamp_file.write_text(json.dumps(idea_state, indent=2), encoding="utf-8")
+                    except Exception:
+                        pass
+                if _active_slug and _active_started and _active_status_for_budget not in ("", "complete", "budget_exceeded"):
                     _is_locked = idea_state.get("budget_lock", False)
                     try:
                         _start = datetime.fromisoformat(_active_started)
