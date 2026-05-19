@@ -55,7 +55,8 @@ import os
 _OBS_WINDOW_S      = int(os.environ.get("DP_OBS_WINDOW",     "300"))   # 5 min per sample
 _COOLDOWN_S        = int(os.environ.get("DP_COOLDOWN",        "600"))   # 10 min between decisions
 _MIN_EFFICIENCY    = float(os.environ.get("DP_MIN_EFFICIENCY", "0.05")) # Δtps/seed below this = no gain
-_TPS_DROP_THRESH   = float(os.environ.get("DP_DROP_THRESH",   "0.10")) # 10% tps drop → step down
+_TPS_DROP_THRESH   = float(os.environ.get("DP_DROP_THRESH",   "0.15")) # 15% pipeline drop needed
+_ITPS_DROP_THRESH  = float(os.environ.get("DP_ITPS_DROP",     "0.08")) # 8% inference drop = real contention
 _HISTORY_WINDOW    = int(os.environ.get("DP_HISTORY",          "4"))   # num samples to trend over
 _MIN_CALLS_FOR_OBS = int(os.environ.get("DP_MIN_CALLS",        "5"))   # need ≥N LLM calls in window
 
@@ -68,9 +69,10 @@ class _Sample(NamedTuple):
     ts:             float   # wall-clock timestamp
     seeds:          int     # active parallel seeds at observation time
     pipeline_tps:   float   # tokens / total_wall_s
-    inference_tps:  float   # tokens / inference_s (GPU speed)
+    inference_tps:  float   # tokens / inference_s for THIS window (GPU speed)
     call_count:     int     # cumulative LLM calls (for validity check)
     gpu_loaded:     bool    # model in VRAM?
+    gpu_util_pct:   float   # inference_s / wall_s for this window (0-100)
 
 
 @dataclass
@@ -196,10 +198,12 @@ class DynamicParallelizer:
         prev = self._history[-2]
         delta_tps = last.pipeline_tps - prev.pipeline_tps
         arrow = "↑" if delta_tps > 0 else ("↓" if delta_tps < 0 else "→")
+        gpu_bar = f"{last.gpu_util_pct:.0f}% GPU"
         return (
             f"⚡ parallelizer: {current_seeds} seed(s) | "
             f"pipe={last.pipeline_tps:.1f} tok/s {arrow}{abs(delta_tps):.1f} | "
-            f"gpu={last.inference_tps:.0f} tok/s | "
+            f"inf={last.inference_tps:.0f} tok/s | "
+            f"{gpu_bar} | "
             f"{'🟢 VRAM' if last.gpu_loaded else '🔴 EVICTED'}"
         )
 
@@ -237,23 +241,27 @@ class DynamicParallelizer:
         # Compute delta tps (marginal, not cumulative) for the window
         prev_tok  = self._last_tp_snapshot.get("cumulative_tokens", 0)
         prev_wall = self._last_tp_snapshot.get("cumulative_wall_s", 0)
+        prev_inf  = self._last_tp_snapshot.get("cumulative_inference_s", 0)
         delta_tok  = cum_tok  - prev_tok
         delta_wall = cum_wall - prev_wall
+        delta_inf  = cum_inf  - prev_inf
 
         if delta_wall <= 0 or delta_tok <= 0:
             # Fall back to cumulative
             pipeline_tps  = cum_tok / cum_wall
             inference_tps = cum_tok / cum_inf
+            gpu_util_pct  = (cum_inf / cum_wall) * 100
         else:
             pipeline_tps  = delta_tok / delta_wall
-            inference_tps = data.get("tps", pipeline_tps)  # last-call GPU tok/s
+            # Per-window inference_tps: tokens / pure inference seconds in window
+            # Much better than last-call tps for detecting real GPU contention
+            inference_tps = delta_tok / delta_inf if delta_inf > 0 else data.get("tps", pipeline_tps)
+            gpu_util_pct  = (delta_inf / delta_wall) * 100 if delta_wall > 0 else 0
 
         self._last_tp_snapshot = dict(data)
 
-        # GPU loaded: approximate from inference utilisation ratio
-        # (No direct /api/ps here — caller passes gpu_idle instead)
-        gpu_util = (cum_inf / cum_wall) if cum_wall > 0 else 0
-        gpu_loaded = gpu_util > 0.1  # >10% of wall time is inference = model loaded
+        # GPU loaded: inferred from inference utilisation ratio
+        gpu_loaded = gpu_util_pct > 10  # >10% of wall time is inference = model loaded
 
         return _Sample(
             ts=ts,
@@ -262,6 +270,7 @@ class DynamicParallelizer:
             inference_tps=inference_tps,
             call_count=call_count,
             gpu_loaded=gpu_loaded,
+            gpu_util_pct=min(100.0, gpu_util_pct),
         )
 
     def _evaluate(self, current_seeds: int, now: float) -> TunerDecision:
@@ -275,22 +284,41 @@ class DynamicParallelizer:
         last = self._history[-1]
         prev = self._history[-2]
 
-        tps_now  = last.pipeline_tps
-        tps_prev = prev.pipeline_tps
+        tps_now   = last.pipeline_tps
+        tps_prev  = prev.pipeline_tps
+        itps_now  = last.inference_tps
+        itps_prev = prev.inference_tps
 
-        # --- Drop signal: throughput fell despite same or more seeds ---
+        # --- Drop signal: pipeline_tps fell ---
+        # DUAL-SIGNAL GUARD: Only downscale if inference_tps also dropped.
+        # If inference_tps is stable/growing, the pipeline drop is pure overhead
+        # noise (re-queuing, project init, validation without LLM) — not GPU
+        # contention. Hold seeds in that case.
         if tps_now < tps_prev * (1 - _TPS_DROP_THRESH) and current_seeds > self.min_seeds:
-            new = max(self.min_seeds, current_seeds - 1)
-            confidence = min(1.0, (tps_prev - tps_now) / (tps_prev + 1e-6))
-            return TunerDecision(
-                changed=True, new_seeds=new, old_seeds=current_seeds,
-                reason=(
-                    f"🔽 Throughput dropped {tps_prev:.1f}→{tps_now:.1f} tok/s "
-                    f"({(tps_prev-tps_now)/tps_prev*100:.0f}%) — "
-                    f"scaling {current_seeds}→{new} seeds"
-                ),
-                confidence=confidence,
-            )
+            itps_also_dropped = itps_now < itps_prev * (1 - _ITPS_DROP_THRESH)
+            if itps_also_dropped:
+                # Both signals dropped → real GPU contention, scale down
+                new = max(self.min_seeds, current_seeds - 1)
+                confidence = min(1.0, (tps_prev - tps_now) / (tps_prev + 1e-6))
+                return TunerDecision(
+                    changed=True, new_seeds=new, old_seeds=current_seeds,
+                    reason=(
+                        f"🔽 Throughput dropped {tps_prev:.1f}→{tps_now:.1f} tok/s "
+                        f"({(tps_prev-tps_now)/tps_prev*100:.0f}%) "
+                        f"+ inference {itps_prev:.0f}→{itps_now:.0f} tok/s — "
+                        f"scaling {current_seeds}→{new} seeds"
+                    ),
+                    confidence=confidence,
+                )
+            else:
+                # Pipeline drop is overhead noise — GPU still healthy, hold seeds
+                return TunerDecision(
+                    changed=False, new_seeds=current_seeds, old_seeds=current_seeds,
+                    reason=(
+                        f"→ Pipeline dropped {tps_prev:.1f}→{tps_now:.1f} tok/s "
+                        f"but inference stable ({itps_now:.0f} tok/s) — overhead noise, holding"
+                    ),
+                )
 
         # --- Marginal efficiency: did the last seed increase pay off? ---
         # Compare current seed level vs one fewer (from history if available)
