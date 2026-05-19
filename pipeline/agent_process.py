@@ -587,10 +587,16 @@ class AgentProcess:
     # --- Helper: read/write per-idea project state files ---
 
     def read_state_file(self, relative_path: str) -> str:
-        """Read a file from this idea's project directory."""
+        """Read a file from this idea's project directory with encoding robustness."""
         path = self._project_dir / relative_path
         if path.exists():
-            return path.read_text(encoding="utf-8")
+            try:
+                return path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                try:
+                    return path.read_text(encoding="cp1252")
+                except Exception:
+                    return path.read_text(encoding="utf-8", errors="replace")
         return ""
 
     def write_state_file(self, relative_path: str, content: str) -> None:

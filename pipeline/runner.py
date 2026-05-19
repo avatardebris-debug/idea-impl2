@@ -37,6 +37,23 @@ def _clean(text: str) -> str:
     """Strip ANSI/OSC escape sequences from a string."""
     return _ANSI_ESCAPE.sub('', text)
 
+
+def _read_json_file(path: pathlib.Path) -> dict:
+    """Read a JSON file with encoding robustness (try UTF-8, try CP1252, fallback with replacement)."""
+    if not path.exists():
+        return {}
+    try:
+        content = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        try:
+            content = path.read_text(encoding="cp1252")
+        except Exception:
+            content = path.read_text(encoding="utf-8", errors="replace")
+    try:
+        return json.loads(content)
+    except Exception:
+        return {}
+
 # Ensure project root is on path
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -322,7 +339,7 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
         # Prefer in-progress projects sorted by most recently modified
         def sort_key(p: pathlib.Path):
             try:
-                state = json.loads(p.read_text(encoding="utf-8"))
+                state = _read_json_file(p)
                 is_terminal = state.get("status", "") in INACTIVE
                 return (1 if is_terminal else 0, -p.stat().st_mtime)
             except Exception:
@@ -331,7 +348,7 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
         candidates.sort(key=sort_key)
         for path in candidates:
             try:
-                state = json.loads(path.read_text(encoding="utf-8"))
+                state = _read_json_file(path)
                 state.setdefault("_slug", path.parent.parent.name)
                 return state
             except Exception:
@@ -341,7 +358,7 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
     old_path = pipeline_dir / "state" / "current_idea.json"
     if old_path.exists():
         try:
-            return json.loads(old_path.read_text(encoding="utf-8"))
+            return _read_json_file(old_path)
         except Exception:
             pass
 
@@ -364,7 +381,7 @@ def _get_all_active_idea_states(pipeline_dir: pathlib.Path) -> list[dict]:
 
     for p in projects_dir.glob("*/state/current_idea.json"):
         try:
-            state = json.loads(p.read_text(encoding="utf-8"))
+            state = _read_json_file(p)
             if state.get("status", "") not in INACTIVE:
                 state.setdefault("_slug", p.parent.parent.name)
                 results.append((p.stat().st_mtime, state))

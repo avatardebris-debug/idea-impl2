@@ -84,11 +84,20 @@ def build_context_cache(project_dir: pathlib.Path) -> dict[str, Any]:
 
     # Discover current phase from state file
     current_phase = 1
-    try:
-        ci = json.loads((state_dir / "current_idea.json").read_text(encoding="utf-8"))
-        current_phase = int(ci.get("phase", 1))
-    except Exception:
-        pass
+    state_file = state_dir / "current_idea.json"
+    if state_file.exists():
+        try:
+            content = state_file.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            try:
+                content = state_file.read_text(encoding="cp1252")
+            except Exception:
+                content = state_file.read_text(encoding="utf-8", errors="replace")
+        try:
+            ci = json.loads(content)
+            current_phase = int(ci.get("phase", 1))
+        except Exception:
+            pass
 
     # Paths for this phase
     phase_dir   = phases_dir / f"phase_{current_phase}"
