@@ -2716,6 +2716,39 @@ def run_pipeline(
                                     f"(last: {_age_str})",
                                     flush=True,
                                 )
+
+                            # --- Stall detector ---
+                            # If agents are running but no LLM call in >10 min,
+                            # something is looping silently. Print a visible warning
+                            # showing which roles have messages stuck in 'processing'.
+                            _STALL_THRESHOLD_S = 600  # 10 minutes
+                            _run_elapsed_s = _now - _pipeline_start_ts if '_pipeline_start_ts' in dir() else 9999
+                            if _age_s > _STALL_THRESHOLD_S and running_agents > 0:
+                                print(
+                                    f"  ⚠️  STALL DETECTED: no LLM call in {int(_age_s//60)}m "
+                                    f"({running_agents} agents running)",
+                                    flush=True,
+                                )
+                                # Show which roles have processing-state messages
+                                try:
+                                    _stuck = bus.get_processing_messages()
+                                    if _stuck:
+                                        _by_role: dict[str, int] = {}
+                                        for _sm in _stuck:
+                                            _by_role[_sm.to_agent] = _by_role.get(_sm.to_agent, 0) + 1
+                                        _stuck_str = ", ".join(
+                                            f"{r}×{n}" for r, n in sorted(_by_role.items())
+                                        )
+                                        print(f"     Stuck in processing: {_stuck_str}", flush=True)
+                                    else:
+                                        print(
+                                            f"     No messages in 'processing' — queue empty, "
+                                            f"agents idle (phase transition stall?)",
+                                            flush=True,
+                                        )
+                                except Exception:
+                                    pass
+
                         except Exception:
                             pass
                     _last_tps_print = _now

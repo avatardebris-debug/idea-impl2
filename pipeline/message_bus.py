@@ -337,6 +337,15 @@ class MessageBus:
         conn.commit()
         return cur.rowcount
 
+    def get_processing_messages(self) -> list:
+        """Return all messages currently in 'processing' state (for stall diagnostics)."""
+        conn = _get_conn(self._db)
+        rows = conn.execute(
+            "SELECT * FROM messages WHERE status='processing' ORDER BY created_at"
+        ).fetchall()
+        return [self._row_to_msg(r) for r in rows]
+
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
