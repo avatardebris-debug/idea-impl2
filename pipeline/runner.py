@@ -2357,6 +2357,11 @@ def run_pipeline(
                     compacted = bus.compact_all()
                     if compacted > 0:
                         print(f"  🧹 Compacted {compacted} stale messages from queues")
+                    try:
+                        from pipeline.agent_metrics import trim_old_records
+                        trim_old_records()
+                    except Exception:
+                        pass
 
                 # --- Deterministic self-healing checks (every 5th cycle ≈ 5 min) ---
                 # Pure Python, no LLM calls. Catches and auto-fixes:
@@ -2722,8 +2727,8 @@ def run_pipeline(
                             # something is looping silently. Print a visible warning
                             # showing which roles have messages stuck in 'processing'.
                             _STALL_THRESHOLD_S = 600  # 10 minutes
-                            _run_elapsed_s = _now - _pipeline_start_ts if '_pipeline_start_ts' in dir() else 9999
-                            if _age_s > _STALL_THRESHOLD_S and running_agents > 0:
+                            _run_elapsed_s = _now - start_time
+                            if _run_elapsed_s > _STALL_THRESHOLD_S and _age_s > _STALL_THRESHOLD_S and running_agents > 0:
                                 print(
                                     f"  ⚠️  STALL DETECTED: no LLM call in {int(_age_s//60)}m "
                                     f"({running_agents} agents running)",

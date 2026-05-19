@@ -199,6 +199,7 @@ class ReviewerAgent(AgentProcess):
                     fix_cycles=_fix_cycles,
                     model=self.model,
                     tokens=result.tokens_used,
+                    files_written=files_written,
                 )
                 if _collected:
                     import logging as _log

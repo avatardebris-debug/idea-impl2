@@ -61,6 +61,7 @@ def collect_phase_pair(
     fix_cycles: int = 0,
     model: str = "",
     tokens: int = 0,
+    files_written: list[str] | None = None,
 ) -> bool:
     """
     Capture a (instruction, output) training pair for this completed phase.
@@ -72,6 +73,7 @@ def collect_phase_pair(
                       (0 = clean first-pass, most valuable)
         model:        Model that produced this output
         tokens:       Tokens used in final execution
+        files_written: List of files written during this phase
 
     Returns:
         True if a pair was successfully written, False otherwise.
@@ -109,7 +111,7 @@ def collect_phase_pair(
 
         # --- Read output: all workspace files written this phase ---
         workspace_path = project_dir / "workspace"
-        output = _collect_workspace_output(workspace_path, phase_num, tasks_path)
+        output = _collect_workspace_output(workspace_path, phase_num, tasks_path, files_written)
 
         if not output.strip():
             return False  # No code = nothing to learn from
@@ -191,6 +193,7 @@ def _collect_workspace_output(
     workspace_path: pathlib.Path,
     phase_num: int,
     tasks_path: pathlib.Path,
+    files_written: list[str] | None = None,
 ) -> str:
     """
     Collect all code files written for this phase as a structured output.
@@ -201,6 +204,11 @@ def _collect_workspace_output(
     """
     if not workspace_path.exists():
         return ""
+
+    # Target files to collect: prioritize actual files_written, then fallback to expected_files
+    targets: list[str] = []
+    if files_written:
+        targets.extend(files_written)
 
     # Try to parse expected files from task list
     expected_files: list[str] = []
@@ -217,6 +225,10 @@ def _collect_workspace_output(
             for g in groups:
                 if g and "/" in g or g.endswith((".py", ".ts", ".js", ".tsx", ".jsx")):
                     expected_files.append(g.strip())
+
+    for f in expected_files:
+        if f not in targets:
+            targets.append(f)
 
     # Collect files — prefer expected, fall back to all code files
     code_extensions = {".py", ".ts", ".js", ".tsx", ".jsx", ".json", ".yaml",
@@ -240,14 +252,14 @@ def _collect_workspace_output(
         except Exception:
             return False
 
-    # First pass: expected files
-    for rel_path in expected_files:
+    # First pass: prioritized targets (actual files_written + expected_files)
+    for rel_path in targets:
         fp = workspace_path / rel_path
         if fp.exists():
             _add_file(fp)
 
-    # Second pass: all code files if we have budget left
-    if total_chars < _MAX_CODE_CHARS:
+    # Second pass: fall back to scanning all code files ONLY if we collected nothing so far
+    if not collected and total_chars < _MAX_CODE_CHARS:
         for fp in sorted(workspace_path.rglob("*")):
             if fp.is_file() and fp.suffix in code_extensions:
                 rel = str(fp.relative_to(workspace_path))

@@ -410,6 +410,18 @@ class ValidatorAgent(AgentProcess):
         is_pass = bool(report_content) and "Verdict: PASS" in report_content
 
         if is_pass:
+            # Determine retry count from fix report
+            retry_count = 0
+            try:
+                _fix_report_str = f"phases/phase_{phase_num}/fix_report.md"
+                _existing_report = self.read_state_file(_fix_report_str)
+                if _existing_report:
+                    import re as _re
+                    _att_cnt = len(_re.findall(r"^### Attempt \d+", _existing_report, _re.MULTILINE))
+                    retry_count = max(_att_cnt, 1)
+            except Exception:
+                pass
+
             # Clear validator retry counter for this phase on success
             try:
                 retry_data = self.read_json_state("state/phase_retries.json")
@@ -452,12 +464,6 @@ class ValidatorAgent(AgentProcess):
                     if not fix_summary:
                         fix_summary = "Phase passed after executor fix"
 
-                    # Count how many retry attempts occurred
-                    attempt_count = len(_re.findall(
-                        r"^### Attempt \d+", existing_fix_report, _re.MULTILINE
-                    ))
-                    retry_count = max(attempt_count, 1)
-
                     append_resolution(
                         slug=idea_slug,
                         phase=phase_num,
@@ -485,6 +491,7 @@ class ValidatorAgent(AgentProcess):
                     "validation_report_path": report_path,
                     "review_path": f"phases/phase_{phase_num}/review.md",
                     "idea_slug": idea_slug,
+                    "retry_count": retry_count,
                 },
             )
         else:
@@ -636,6 +643,7 @@ class ValidatorAgent(AgentProcess):
                             "workspace_path": workspace_path,
                             "fix_required": True,
                             "fix_report_path": fix_report_path,
+                            "retry_count": retry_count,
                             "error_summary": (
                                 f"Validation FAILED — attempt {retry_count}, "
                                 f"{current_failures} failures ({progress_note}). "
