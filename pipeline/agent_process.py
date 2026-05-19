@@ -23,7 +23,10 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
+
+if TYPE_CHECKING:
+    from agent import AgentResult  # noqa: F401 — type-checker only
 
 # Ensure project root is on path
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
