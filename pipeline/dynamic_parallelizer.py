@@ -159,6 +159,7 @@ class DynamicParallelizer:
         self._last_sample_ts: float       = 0.0
         self._last_decision_ts: float     = 0.0
         self._last_tp_snapshot: dict      = {}
+        self._last_known_call_count: int  = 0
 
         # EMA state — seeded from first real sample to avoid cold-start bias
         self._ema_fast:   float | None    = None   # EMA-3 of pipeline_tps
@@ -201,6 +202,14 @@ class DynamicParallelizer:
             TunerDecision — .changed=True if seeds should change, else False
         """
         now = time.time()
+
+        # Best-effort call count update from throughput.json on every observe check
+        try:
+            if throughput_path.exists():
+                _data = json.loads(throughput_path.read_text(encoding="utf-8"))
+                self._last_known_call_count = _data.get("call_count", 0)
+        except Exception:
+            pass
 
         # ----------------------------------------------------------------
         # TIER 1 — Hard veto: eviction → immediate downscale
@@ -278,6 +287,8 @@ class DynamicParallelizer:
     def status_line(self, current_seeds: int) -> str:
         """Return a compact one-line status string for the runner's status output."""
         if not self._history:
+            if self._last_known_call_count == 0:
+                return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating (0/2 samples, waiting for LLM calls)..."
             return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating (0/2 samples)..."
 
         last = self._history[-1]

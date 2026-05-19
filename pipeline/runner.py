@@ -97,7 +97,7 @@ DEFAULT_PHASE_BUDGET = 30   # minutes per phase (scales with total_phases)
 # Ollama health checks
 # ---------------------------------------------------------------------------
 
-def _check_ollama_model(model: str) -> None:
+def _check_ollama_model(model: str) -> str:
     """Pre-flight check: verify Ollama is reachable and the model is available.
 
     Catches common misconfigurations (wrong model name, Ollama not running,
@@ -145,6 +145,22 @@ def _check_ollama_model(model: str) -> None:
     if canonical != model:
         print(f"  Model name resolved: '{model}' -> '{canonical}' (using API canonical name)")
         model = canonical  # Use the exact name the API knows about
+
+    # Also check and resolve PIPELINE_LIGHT_MODEL if set
+    _light_model_env = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip()
+    if _light_model_env:
+        _light_canonical = next((m for m in available if m.lower() == _light_model_env.lower()), None)
+        if _light_canonical is None:
+            _light_canonical = next((m for m in available if _light_model_env.lower() in m.lower()), None)
+        
+        if _light_canonical is None:
+            print(f"  ⚠️  Light-tier model '{_light_model_env}' not found in Ollama. Unsetting PIPELINE_LIGHT_MODEL to fallback to primary model '{model}'.")
+            if "PIPELINE_LIGHT_MODEL" in os.environ:
+                del os.environ["PIPELINE_LIGHT_MODEL"]
+        else:
+            if _light_canonical != _light_model_env:
+                print(f"  Light model name resolved: '{_light_model_env}' -> '{_light_canonical}'")
+                os.environ["PIPELINE_LIGHT_MODEL"] = _light_canonical
 
     # Prevent Ollama from auto-pulling models during the pipeline run.
     # Without this, if any agent accidentally uses a wrong model name,
@@ -309,6 +325,14 @@ def init_pipeline_dirs() -> None:
     """Create all pipeline runtime directories."""
     for subdir in ["queues", "state", "projects", "logs"]:
         (PIPELINE_DIR / subdir).mkdir(parents=True, exist_ok=True)
+
+    # Session-Agnostic Throughput Cleanup: clear throughput.json on startup
+    tp_path = PIPELINE_DIR / "state" / "throughput.json"
+    if tp_path.exists():
+        try:
+            tp_path.unlink()
+        except Exception:
+            pass
 
 
 def _slugify(title: str) -> str:
