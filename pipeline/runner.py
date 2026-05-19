@@ -2587,12 +2587,14 @@ def run_pipeline(
 
                 # --- Live tok/s from throughput.json ---
                 _tps_str = ""
+                _live_gpu_pct = 0.0   # will be populated below and passed to tuner
                 try:
                     _tp_live_path = PIPELINE_DIR / "state" / "throughput.json"
                     if _tp_live_path.exists():
                         _tp_live = json.loads(_tp_live_path.read_text(encoding="utf-8"))
                         _live_cum_tok   = _tp_live.get("cumulative_tokens", 0)
                         _live_cum_inf_s = _tp_live.get("cumulative_inference_s", 0.0)
+                        _live_cum_wall  = _tp_live.get("cumulative_wall_s", 0.0)
                         _live_last_tps  = _tp_live.get("tps", 0.0)   # last LLM call
                         _live_age_s     = time.time() - _tp_live.get("updated_at", 0)
                         if _live_cum_tok > 0 and _live_age_s < 600:  # skip if >10m stale
@@ -2601,6 +2603,9 @@ def run_pipeline(
                             # Show: "42t/s last / 54t/s avg"
                             _tps_str = (f" {_live_last_tps:.0f}t/s"
                                         f"/{_live_avg_tps:.0f}avg")
+                            # GPU util % = fraction of wall time spent in inference
+                            if _live_cum_wall > 0:
+                                _live_gpu_pct = min(100.0, _live_cum_inf_s / _live_cum_wall * 100)
                 except Exception:
                     pass
 
@@ -2613,6 +2618,7 @@ def run_pipeline(
                             throughput_path=_tp_path,
                             current_seeds=parallel_seeds,
                             gpu_idle=_gpu_idle,
+                            gpu_util_pct=_live_gpu_pct,
                         )
                         if _decision.changed:
                             parallel_seeds = _decision.new_seeds
