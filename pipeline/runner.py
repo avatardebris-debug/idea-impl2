@@ -317,6 +317,33 @@ def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
     return {}
 
 
+def _get_all_active_idea_states(pipeline_dir: pathlib.Path) -> list[dict]:
+    """Return all non-terminal project states sorted by most recently modified.
+
+    Unlike _get_active_idea_state which returns only the single most-recently-modified
+    project, this returns ALL in-progress projects for multi-project status display
+    and checkpoint-on-interrupt.
+    """
+    INACTIVE = {"complete", "budget_exceeded", "dep_waiting", ""}
+    projects_dir = pipeline_dir / "projects"
+    results: list[tuple[float, dict]] = []
+
+    if not projects_dir.exists():
+        return []
+
+    for p in projects_dir.glob("*/state/current_idea.json"):
+        try:
+            state = json.loads(p.read_text(encoding="utf-8"))
+            if state.get("status", "") not in INACTIVE:
+                state.setdefault("_slug", p.parent.parent.name)
+                results.append((p.stat().st_mtime, state))
+        except Exception:
+            continue
+
+    results.sort(key=lambda x: -x[0])
+    return [s for _, s in results]
+
+
 def save_pipeline_status(status: dict) -> None:
     path = PIPELINE_DIR / "state" / "pipeline_status.json"
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -339,14 +366,19 @@ def load_pipeline_status() -> dict:
 class AgentSupervisor:
     """Manages agent subprocesses."""
 
-    def __init__(self, provider: str, model: str):
+    def __init__(self, provider: str, model: str, num_executors: int = 1):
         self.provider = provider
         self.model = model
+        self.num_executors = max(1, num_executors)
         self.processes: dict[str, subprocess.Popen] = {}
         self._stop_requested = False
 
-    def start_agent(self, role: str) -> subprocess.Popen:
-        """Start an agent as a subprocess."""
+    def start_agent(self, role: str, key_override: str | None = None) -> subprocess.Popen:
+        """Start an agent as a subprocess.
+
+        key_override: if set, use as the registry key instead of role.
+        Used to spawn multiple executor instances (executor_0, executor_1, ...).
+        """
         module_path = AGENTS_DIR / f"{role}.py"
         if not module_path.exists():
             raise FileNotFoundError(f"Agent module not found: {module_path}")
@@ -367,7 +399,8 @@ class AgentSupervisor:
         env["PIPELINE_PROVIDER"] = self.provider
         env["OLLAMA_NO_PULL"] = "1"   # never auto-download a model mid-pipeline
 
-        log_path = PIPELINE_DIR / "logs" / f"{role}.out"
+        _key = key_override or role
+        log_path = PIPELINE_DIR / "logs" / f"{_key}.out"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "a", encoding="utf-8")
 
@@ -382,24 +415,38 @@ class AgentSupervisor:
         )
         log_file.close()  # child inherited the handle; parent must close its copy
 
-        self.processes[role] = proc
+        self.processes[_key] = proc
         return proc
 
     def start_all(self) -> None:
         """Start all agent subprocesses."""
         for role in AGENT_ROLES:
-            self.start_agent(role)
-            print(f"  ✓ Started {role} (PID {self.processes[role].pid})")
-            time.sleep(0.5)  # stagger starts slightly
+            if role == "executor" and self.num_executors > 1:
+                # Spawn multiple executor instances — SQLite bus competing consumers
+                # handles mutual exclusion so they never double-claim the same message.
+                for _ei in range(self.num_executors):
+                    _key = f"executor_{_ei}"
+                    proc = self.start_agent(role, key_override=_key)
+                    print(f"  ✓ Started {_key} (PID {proc.pid})")
+                    time.sleep(0.3)
+            else:
+                self.start_agent(role)
+                print(f"  ✓ Started {role} (PID {self.processes[role].pid})")
+                time.sleep(0.5)  # stagger starts slightly
 
     def stop_all(self) -> None:
         """Gracefully stop all agent subprocesses."""
         self._stop_requested = True
 
-        # Send shutdown signal via message bus
+        # Send shutdown signal via message bus.
+        # Send multiple SHUTDOWN signals to executor if multiple instances running.
         bus = MessageBus()
         for role in AGENT_ROLES:
-            bus.send_signal("runner", role, "SHUTDOWN")
+            if role == "executor" and self.num_executors > 1:
+                for _ in range(self.num_executors):
+                    bus.send_signal("runner", "executor", "SHUTDOWN")
+            else:
+                bus.send_signal("runner", role, "SHUTDOWN")
 
         # Wait up to 10 seconds for graceful shutdown
         deadline = time.time() + 10
@@ -427,11 +474,14 @@ class AgentSupervisor:
     def restart_dead(self) -> list[str]:
         """Restart any agents that have died unexpectedly."""
         restarted = []
-        for role, proc in list(self.processes.items()):
+        for key, proc in list(self.processes.items()):
             if proc.poll() is not None and not self._stop_requested:
-                print(f"  ⚠ {role} died (exit={proc.returncode}), restarting...")
-                self.start_agent(role)
-                restarted.append(role)
+                print(f"  ⚠ {key} died (exit={proc.returncode}), restarting...")
+                # Derive role from key: "executor_0" -> "executor", "manager" -> "manager"
+                role = key.rsplit("_", 1)[0] if key[-1].isdigit() else key
+                key_override = key if key != role else None
+                self.start_agent(role, key_override=key_override)
+                restarted.append(key)
                 time.sleep(1)
         return restarted
 
@@ -1970,6 +2020,7 @@ def run_pipeline(
     parallel_seeds: int = 1,
     auto_tune: bool = False,
     max_seeds: int = 4,
+    num_executors: int = 1,
 ) -> None:
     """Main pipeline orchestrator."""
     # Override master ideas path if --ideas-file was given
@@ -2008,6 +2059,8 @@ def run_pipeline(
         print(f"  Seeds:    auto-tune ON (start={parallel_seeds}, max={max_seeds})")
     elif parallel_seeds > 1:
         print(f"  Seeds:    {parallel_seeds} parallel project slots (Strategy 6)")
+    if num_executors > 1:
+        print(f"  Executors:{num_executors} parallel executor instances")
 
     # Polish mode: reset complete-but-incomplete projects and queue them, then
     # fall through to normal pipeline startup so agents actually process them.
@@ -2079,6 +2132,23 @@ def run_pipeline(
                                                 resume_inprogress=fresh_list_only)
             has_work = seed_result in (_SEED_SEEDED, _SEED_BLOCKED)
 
+    # Pre-seed additional parallel slots at startup (Tier 1: multi-project seeding).
+    # After the first project is queued/rebuilt, immediately fill remaining open slots.
+    if has_work and from_list and parallel_seeds > 1:
+        _already_active = _count_active_projects()
+        _queued_now = len(_seeded_this_session)
+        _effective_active = max(_already_active, _queued_now)
+        _slots_to_fill = max(0, parallel_seeds - _effective_active)
+        if _slots_to_fill > 0:
+            print(f"  🌱 Pre-seeding {_slots_to_fill} additional parallel slot(s)...")
+            for _pi in range(_slots_to_fill):
+                _sr = seed_from_master_list(
+                    bus, ideas_path=_ideas_path,
+                    resume_inprogress=fresh_list_only,
+                )
+                if _sr != _SEED_SEEDED:
+                    break
+
     # Final safety net: if queues have pending messages (from stale-reset or
     # a previous run), there IS work — just start the agents and let them process.
     if not has_work and not fresh_list_only and bus.has_active_work():
@@ -2111,7 +2181,7 @@ def run_pipeline(
 
     # Start all agents
     print(f"\n  Starting agents...")
-    supervisor = AgentSupervisor(provider, model)
+    supervisor = AgentSupervisor(provider, model, num_executors=num_executors)
 
     # Handle Ctrl+C
     stop_requested = False
@@ -2123,9 +2193,26 @@ def run_pipeline(
             print("\n  Force stopping...")
             supervisor.stop_all()
             sys.exit(1)
-        print("\n\n  [Pipeline] Graceful stop requested. Finishing current work...")
-        print("  [Pipeline] Press Ctrl+C again to force stop.")
         stop_requested = True
+        print("\n\n  [Pipeline] Graceful stop — checkpointing all active projects...")
+        # Stamp checkpoint_at on all in-flight projects so resume display is clear
+        try:
+            for _ckpt_state in _get_all_active_idea_states(PIPELINE_DIR):
+                _ckpt_slug = _ckpt_state.get("_slug", "")
+                if not _ckpt_slug:
+                    continue
+                _ckpt_file = (
+                    PIPELINE_DIR / "projects" / _ckpt_slug / "state" / "current_idea.json"
+                )
+                try:
+                    _ckpt_data = json.loads(_ckpt_file.read_text(encoding="utf-8"))
+                    _ckpt_data["checkpoint_at"] = datetime.now(timezone.utc).isoformat()
+                    _ckpt_file.write_text(json.dumps(_ckpt_data, indent=2), encoding="utf-8")
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        print("  Checkpointed. Press Ctrl+C again to force stop.")
 
     signal.signal(signal.SIGINT, _handle_interrupt)
 
@@ -2375,8 +2462,8 @@ def run_pipeline(
                             except Exception as _rv_err:
                                 print(f"  [reviewed] Failed to advance {_active_slug}: {_rv_err}")
 
-                # If active project is budget_exceeded, advance to next project.
-                if idea_state.get("status") == "budget_exceeded":
+                # If active project is budget_exceeded or complete, advance to next project.
+                if idea_state.get("status") in ("budget_exceeded", "complete"):
                     slug = idea_state.get("_slug", "")
                     orphaned = _rebuild_queues_from_state(bus)
                     if orphaned:
@@ -2423,7 +2510,20 @@ def run_pipeline(
                 elapsed_m = (time.time() - start_time) / 60
                 phase = idea_state.get("status", "?")
                 title = idea_state.get("title", "")
-                title_str = f" | [{title[:28]}]" if title else ""
+                # Multi-project title: show all active projects when parallel_seeds > 1
+                if parallel_seeds > 1:
+                    _all_active = _get_all_active_idea_states(PIPELINE_DIR)
+                    if len(_all_active) > 1:
+                        title_str = " | " + " / ".join(
+                            f"[{s.get('title', '?')[:15]}]"
+                            for s in _all_active[:4]
+                        )
+                    elif title:
+                        title_str = f" | [{title[:28]}]"
+                    else:
+                        title_str = ""
+                else:
+                    title_str = f" | [{title[:28]}]" if title else ""
 
                 # --- Live task progress from tasks.md (not stale JSON) ---
                 # The executor only writes tasks_done/tasks_total once at start.
@@ -2845,6 +2945,12 @@ def main():
     parser.add_argument("--max-seeds", type=int, default=4, metavar="M",
                         help="Upper ceiling for --auto-tune (default: 4). Ignored when "
                              "--auto-tune is not set.")
+    parser.add_argument("--executors", type=int, default=1, metavar="N",
+                        help="Number of parallel executor agent instances (default: 1). "
+                             "Each executor independently processes tasks from the shared "
+                             "SQLite queue — no extra config needed. "
+                             "Recommended: 2 when using --parallel-seeds 3+. "
+                             "Example: --parallel-seeds 3 --executors 2")
 
     args = parser.parse_args()
 
@@ -2868,6 +2974,7 @@ def main():
         parallel_seeds=args.parallel_seeds,
         auto_tune=args.auto_tune,
         max_seeds=args.max_seeds,
+        num_executors=args.executors,
     )
 
 

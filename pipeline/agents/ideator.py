@@ -20,6 +20,8 @@ from pipeline.message_bus import Message
 
 class IdeatorAgent(AgentProcess):
     role = "ideator"
+    model_tier = "light"
+    num_ctx = 4096
     max_steps = 20
     temperature = 0.8   # creative brainstorming — high diversity is the goal
     think = True        # chain-of-thought improves ideation quality

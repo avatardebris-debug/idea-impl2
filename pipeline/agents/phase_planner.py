@@ -19,6 +19,8 @@ from pipeline.message_bus import Message
 
 class PhasePlannerAgent(AgentProcess):
     role = "phase_planner"
+    model_tier = "light"
+    num_ctx = 4096
     max_steps = 15
     temperature = 0.4   # slight creativity helps with edge-case task decomposition
     think = True        # reasoning here pays dividends for every downstream agent
@@ -27,6 +29,7 @@ class PhasePlannerAgent(AgentProcess):
         phase_num = msg.payload.get("phase", 1)
         phase_spec = msg.payload.get("phase_spec", "")
         idea_slug = msg.payload.get("idea_slug", self._current_slug)
+        preplan_mode = msg.payload.get("preplan_mode", False)
         tasks_path = f"phases/phase_{phase_num}/tasks.md"
         tasks_full_path = self._project_path(tasks_path)
 
@@ -224,6 +227,21 @@ class PhasePlannerAgent(AgentProcess):
         })
 
         # Send to Executor
+        if preplan_mode:
+            # Preplan mode: only write the spec/plan, don't trigger execution.
+            # The runner's normal phase advancement will start execution when phase N completes.
+            import logging as _log
+            _log.getLogger(__name__).info(
+                "[phase_planner] Preplan mode: wrote phase %d plan, not triggering executor",
+                phase_num,
+            )
+            return AgentOutput(
+                success=True,
+                answer="Preplan complete — phase spec written, awaiting normal advancement.",
+                outgoing=[],
+                tokens_used=result.tokens_used if hasattr(result, 'tokens_used') else 0,
+                steps_used=result.steps_used if hasattr(result, 'steps_used') else 0,
+            )
         out_msg = Message.create(
             from_agent=self.role,
             to_agent="executor",

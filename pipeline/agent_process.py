@@ -170,6 +170,15 @@ class AgentProcess:
                 if msg.type != "signal":
                     self._current_slug = msg.payload.get("idea_slug", self._current_slug)
 
+                # Measure queue wait time (time from message creation to now)
+                try:
+                    from datetime import datetime, timezone
+                    _created = datetime.fromisoformat(msg.created_at)
+                    _queue_wait_s = (datetime.now(timezone.utc) - _created).total_seconds()
+                except Exception:
+                    _queue_wait_s = 0.0
+                _handle_start = time.time()
+
                 # Run handle() in a thread so we can enforce a wall-clock timeout
                 _result: list[Any] = [None]
                 _exc: list[Optional[Exception]] = [None]
@@ -218,6 +227,21 @@ class AgentProcess:
                                 self.role, out_msg.type, out_msg.to_agent)
 
                 self.bus.ack(msg)
+
+                # Record timing metrics
+                try:
+                    _handle_s = time.time() - _handle_start
+                    from pipeline.agent_metrics import record as _record_metric
+                    _record_metric(
+                        role=self.role,
+                        slug=self._current_slug,
+                        queue_wait_s=_queue_wait_s,
+                        handle_s=_handle_s,
+                        tokens=output.tokens_used,
+                        files_written=len(output.files_written),
+                    )
+                except Exception:
+                    pass  # Never crash over metrics
 
                 logger.info("[%s] Completed message %s (success=%s, tokens=%d, steps=%d)",
                             self.role, msg.msg_id, output.success,
@@ -572,6 +596,35 @@ class AgentProcess:
     def write_json_state(self, relative_path: str, data: dict) -> None:
         """Write a JSON state file."""
         self.write_state_file(relative_path, json.dumps(data, indent=2))
+
+    def record_file_changes(
+        self,
+        changed_files: list[str],
+        reason: str,
+    ) -> None:
+        """Append a deferred review notice when files are changed mid-phase.
+
+        The reviewer reads state/pending_review_notes.md at review time
+        and checks for regressions caused by these changes.
+        This is a zero-interrupt, zero-overhead notification pattern.
+        """
+        if not changed_files:
+            return
+        try:
+            from datetime import datetime, timezone
+            notes_path = self._project_dir / "state" / "pending_review_notes.md"
+            existing = notes_path.read_text(encoding="utf-8") if notes_path.exists() else ""
+            new_entry = (
+                f"\n## Change Notice — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
+                f"**Reason:** {reason}\n"
+                f"**Modified files:**\n"
+                + "\n".join(f"- `{f}`" for f in changed_files)
+                + "\n\nVerify these changes don't introduce regressions in dependent code.\n"
+            )
+            notes_path.parent.mkdir(parents=True, exist_ok=True)
+            notes_path.write_text(existing + new_entry, encoding="utf-8")
+        except Exception:
+            pass  # Non-critical
 
     def get_current_phase(self) -> dict:
         """Read current phase state."""

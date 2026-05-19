@@ -20,6 +20,8 @@ from pipeline.message_bus import Message
 
 class ReviewerAgent(AgentProcess):
     role = "reviewer"
+    model_tier = "heavy"
+    num_ctx = 12288
     max_steps = 25
     temperature = 0.3   # structured assessment — slightly creative but mostly deterministic
     think = False       # follows fixed review template — no CoT needed
@@ -51,8 +53,18 @@ class ReviewerAgent(AgentProcess):
         phase_spec = self.read_state_file(f"phases/phase_{phase_num}/spec.md")
         overflow_tasks = self.read_state_file(f"phases/phase_{phase_num}_overflow/tasks.md")
 
+        # Read deferred file-change notices (written when fixes modify files mid-phase)
+        pending_review_notes = self.read_state_file("state/pending_review_notes.md")
+
         # Build context sections
         project_context = ""
+        if pending_review_notes.strip():
+            project_context += (
+                f"## ⚠️ File Change Notices (files modified mid-phase — check for regressions)\n"
+                f"{pending_review_notes[:2000]}\n\n"
+            )
+            # Clear the notes now that reviewer has seen them
+            self.write_state_file("state/pending_review_notes.md", "")
         if master_plan:
             project_context += f"## Project Master Plan (full vision)\n{master_plan[:1500]}\n\n"
         if phase_spec:

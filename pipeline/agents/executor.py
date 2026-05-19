@@ -20,6 +20,8 @@ from pipeline.message_bus import Message
 
 class ExecutorAgent(AgentProcess):
     role = "executor"
+    model_tier = "heavy"
+    num_ctx = 16384
     max_steps = 30
     temperature = 0.2    # deterministic code writing
     think = False        # no chain-of-thought: just execute the task list
@@ -162,6 +164,54 @@ class ExecutorAgent(AgentProcess):
             )
 
         result = self.call_agent(task=task_prompt, verbose=False)
+
+        # --- Phase overlap at 75%: pre-queue planning for next phase ---
+        # When 75%+ of tasks are done, start planning the next phase in the
+        # background so it's ready when this phase completes (zero planning wait).
+        if not fix_required:
+            try:
+                import re as _re
+                _raw_tasks_check = self.read_state_file(tasks_path)
+                _scoped = self._extract_phase_tasks(_raw_tasks_check, phase_num)
+                _total = len(_re.findall(r'^\s*- \[[ xX]\]', _scoped, _re.MULTILINE))
+                _done = len(_re.findall(r'^\s*- \[[xX]\]', _scoped, _re.MULTILINE))
+                _idea_state_check = self.read_json_state("state/current_idea.json")
+                _total_phases = _idea_state_check.get("total_phases", 1)
+                _preplan_sent_key = f"preplan_sent_phase_{phase_num}"
+                _already_sent = _idea_state_check.get(_preplan_sent_key, False)
+
+                if (
+                    _total > 0
+                    and _done / _total >= 0.75
+                    and not _already_sent
+                    and phase_num < _total_phases
+                ):
+                    # Check if next phase spec already exists
+                    _next_spec = self.read_state_file(f"phases/phase_{phase_num + 1}/spec.md")
+                    if not _next_spec:
+                        from pipeline.message_bus import Message as _Msg
+                        _preplan_msg = _Msg.create(
+                            from_agent=self.role,
+                            to_agent="phase_planner",
+                            type="task",
+                            payload={
+                                "phase": phase_num + 1,
+                                "idea_slug": idea_slug,
+                                "preplan_mode": True,
+                            },
+                            priority=2,   # lower priority — don't interrupt current work
+                        )
+                        self.bus.send(_preplan_msg)
+                        # Mark that we sent the preplan to avoid duplicates
+                        _idea_state_check[_preplan_sent_key] = True
+                        self.write_json_state("state/current_idea.json", _idea_state_check)
+                        import logging as _log
+                        _log.getLogger(__name__).info(
+                            "[executor] Pre-queued phase %d planning at %.0f%% completion",
+                            phase_num + 1, (_done/_total*100)
+                        )
+            except Exception:
+                pass  # Non-critical — never break execution over preplan
 
         # --- Strategy 4: Invalidate KV-cache after execution ---
         # The executor's system prompt is different from the validator's.

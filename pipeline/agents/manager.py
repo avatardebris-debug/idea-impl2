@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 class ManagerAgent(AgentProcess):
     role = "manager"
+    model_tier = "light"
+    num_ctx = 4096
     max_steps = 25
     temperature = 0.3   # coordination decisions should be consistent
     think = False       # routing logic is deterministic — CoT not needed
