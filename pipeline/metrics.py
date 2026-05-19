@@ -125,9 +125,11 @@ class ProjectMetric:
     slug: str
     status: str = "in_progress"   # complete | stalled | in_progress
     phases_completed: int = 0
+    tasks_completed: int = 0       # checkboxes marked [x] across all phases
     total_retries: int = 0
     validator_retries: int = 0
     tokens_used: int = 0
+    stall_tokens: int = 0          # tokens burned during 0-task stall periods
     wall_clock_seconds: float = 0
     stall_reason: str = ""
 
@@ -190,6 +192,17 @@ class RunMetrics:
         pm = self.projects.setdefault(slug, ProjectMetric(slug=slug))
         pm.tokens_used += tokens
 
+    def record_task_complete(self, slug: str, count: int = 1) -> None:
+        """Record N tasks marked [x] for a project (called by runner task-count monitor)."""
+        pm = self.projects.setdefault(slug, ProjectMetric(slug=slug))
+        pm.tasks_completed += count
+
+    def record_stall_tokens(self, slug: str, tokens: int) -> None:
+        """Record tokens burned while the executor was in a 0-task stall period."""
+        pm = self.projects.setdefault(slug, ProjectMetric(slug=slug))
+        pm.stall_tokens += tokens
+        pm.tokens_used += tokens
+
     def finish(self) -> pathlib.Path:
         """Finalize metrics and write summary to disk. Returns path to summary."""
         self.finished_at = datetime.now(timezone.utc).isoformat()
@@ -204,6 +217,12 @@ class RunMetrics:
 
         total_retries = sum(p.total_retries for p in all_projects)
         total_tokens = sum(p.tokens_used for p in all_projects)
+        total_tasks  = sum(p.tasks_completed for p in all_projects)
+        total_stall_tokens = sum(p.stall_tokens for p in all_projects)
+
+        # Key efficiency metrics
+        useful_tok_per_task = total_tokens / max(total_tasks, 1)
+        retry_waste_rate    = total_stall_tokens / max(total_tokens, 1)
 
         summary = {
             "run_id": self.run_id,
@@ -219,14 +238,23 @@ class RunMetrics:
             "total_retries": total_retries,
             "avg_retries_per_project": total_retries / max(len(all_projects), 1),
             "total_tokens": total_tokens,
+            "total_tasks_completed": total_tasks,
+            "useful_tok_per_task": round(useful_tok_per_task, 1),
+            "stall_tokens": total_stall_tokens,
+            "retry_waste_rate": round(retry_waste_rate, 4),
             "avg_tokens_per_project": total_tokens / max(len(all_projects), 1),
             "per_project": {
                 slug: {
                     "status": pm.status,
                     "phases_completed": pm.phases_completed,
+                    "tasks_completed": pm.tasks_completed,
                     "total_retries": pm.total_retries,
                     "validator_retries": pm.validator_retries,
                     "tokens_used": pm.tokens_used,
+                    "stall_tokens": pm.stall_tokens,
+                    "useful_tok_per_task": round(
+                        pm.tokens_used / max(pm.tasks_completed, 1), 1
+                    ),
                     "stall_reason": pm.stall_reason,
                 }
                 for slug, pm in self.projects.items()
@@ -257,14 +285,20 @@ class RunMetrics:
             f"| Total Retries | {total_retries} |",
             f"| Avg Retries/Project | {summary['avg_retries_per_project']:.1f} |",
             f"| Total Tokens | {total_tokens:,} |",
+            f"| Tasks Completed | {total_tasks:,} |",
+            f"| **Useful Tok/Task** | **{useful_tok_per_task:,.0f}** |",
+            f"| Stall Tokens Wasted | {total_stall_tokens:,} ({retry_waste_rate:.1%} of total) |",
             f"",
             f"## Per-Project Breakdown",
-            f"| Project | Status | Retries | Tokens |",
-            f"|---------|--------|---------|--------|",
+            f"| Project | Status | Tasks✓ | Retries | Tokens | Useful Tok/Task | Stall Waste |",
+            f"|---------|--------|--------|---------|--------|-----------------|-------------|",
         ]
         for pm in sorted(all_projects, key=lambda p: p.slug):
+            _utp = round(pm.tokens_used / max(pm.tasks_completed, 1))
             report_lines.append(
-                f"| {pm.slug} | {pm.status} | {pm.total_retries} | {pm.tokens_used:,} |"
+                f"| {pm.slug} | {pm.status} | {pm.tasks_completed} "
+                f"| {pm.total_retries} | {pm.tokens_used:,} "
+                f"| {_utp:,} | {pm.stall_tokens:,} |"
             )
 
         if stalled:

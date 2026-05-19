@@ -1,0 +1,10 @@
+{
+  "title": "CSV Data Pipeline Builder",
+  "slug": "csv_data_pipeline_builder",
+  "status": "phase_1_planning",
+  "phase": 1,
+  "total_phases": 3,
+  "depends_on": ["csv_analyzer"],
+  "budget_lock": false,
+  "started_at": "2026-05-18T15:41:00Z"
+}

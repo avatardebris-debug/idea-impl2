@@ -63,16 +63,17 @@ class MultiAgentSOPExecutor:
             client = self._get_client_with_fallback(config)
 
             if client is None:
-                raise RuntimeError(
-                    f"No client available for step {step_index} ({step.name})"
-                )
-
-            # Build prompt
-            prompt = self._build_prompt(sop, step_index, validated, step_outputs)
-
-            # Execute step
-            system_prompt = config.system_prompt_override or ""
-            raw_output = client.call(system_prompt, prompt)
+                if getattr(step, "llm_required", True):
+                    raise RuntimeError(
+                        f"No client available for step {step_index} ({step.name})"
+                    )
+                # Step doesn't require LLM — use a no-op placeholder
+                raw_output = f"[skipped — no LLM client for non-required step '{step.name}']"
+            else:
+                # Build prompt and execute step
+                prompt = self._build_prompt(sop, step_index, validated, step_outputs)
+                system_prompt = config.system_prompt_override or ""
+                raw_output = client.call(system_prompt, prompt)
 
             # Parse output
             result = {

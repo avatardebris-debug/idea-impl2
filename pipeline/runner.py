@@ -42,6 +42,12 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pipeline.message_bus import MessageBus, Message
 from pipeline.metrics import RunMetrics
+from pipeline.context_aggregator import (
+    refresh_all_projects,
+    start_background_refresh,
+    stop_background_refresh,
+    refresh_project,
+)
 
 # Anchor PIPELINE_DIR to where this script lives (project root), not cwd.
 # This prevents /workspace/.pipeline vs /.pipeline splits when the user
@@ -1893,6 +1899,9 @@ def run_pipeline(
     ideas_file: str | None = None,
     fresh_list_only: bool = False,
     polish: bool = False,
+    parallel_seeds: int = 1,
+    auto_tune: bool = False,
+    max_seeds: int = 4,
 ) -> None:
     """Main pipeline orchestrator."""
     # Override master ideas path if --ideas-file was given
@@ -1902,6 +1911,15 @@ def run_pipeline(
         print(f"  Ideas:    {_ideas_path}")
     init_pipeline_dirs()
     bus = MessageBus()
+
+    # One-shot migration: import any legacy JSONL queue files into SQLite.
+    # Safe to call every startup — INSERT OR IGNORE skips already-imported msgs.
+    try:
+        _migrated = bus.migrate_from_jsonl()
+        if _migrated:
+            print(f"  🗄️  Migrated {_migrated} legacy queue message(s) to SQLite bus")
+    except Exception:
+        pass
 
     print("=" * 60)
     print("  🏭 Idea Development Pipeline")
@@ -1918,6 +1936,10 @@ def run_pipeline(
         print(f"  Mode:     FRESH LIST ONLY — skipping all stray/in-progress projects")
     if polish:
         print(f"  Mode:     POLISH - resuming complete projects with missing phases")
+    if auto_tune:
+        print(f"  Seeds:    auto-tune ON (start={parallel_seeds}, max={max_seeds})")
+    elif parallel_seeds > 1:
+        print(f"  Seeds:    {parallel_seeds} parallel project slots (Strategy 6)")
 
     # Polish mode: reset complete-but-incomplete projects and queue them, then
     # fall through to normal pipeline startup so agents actually process them.
@@ -2043,6 +2065,12 @@ def run_pipeline(
         supervisor.start_all()
         supervisor.save_registry()
 
+        # --- Warm context caches for all existing projects ---
+        _ctx_refreshed = refresh_all_projects(PIPELINE_DIR)
+        if _ctx_refreshed:
+            print(f"  📦 Context cache: warmed {_ctx_refreshed} project(s)")
+        start_background_refresh(PIPELINE_DIR, interval_seconds=120)
+
         print(f"\n  🚀 Pipeline running. Press Ctrl+C to stop.\n")
 
         start_time = time.time()
@@ -2051,13 +2079,89 @@ def run_pipeline(
         last_orphan_requeue = 0.0   # rate-limit orphan re-queues to once per 5 min
         ORPHAN_REQUEUE_COOLDOWN = 660  # 11 min — must exceed workspace recency guard (10 min)
         IDEATION_TIMEOUT = 35 * 60    # 35 min — retry if ideator hasn't written ideas yet
-        ZERO_TASK_PHASE_KILL = 75 * 60  # 75 min in _executing with 0 tasks = stuck, skip it
+        ZERO_TASK_PHASE_KILL = 15 * 60  # 15 min in _executing with 0 tasks = stuck, skip it
+        ZERO_TASK_WARN       = 10 * 60  # 10 min — warn before killing
         _status_count = 0  # for throttling non-interactive log output
         _last_tps_print = 0.0  # timestamp of last tok/s status print
         _TPS_PRINT_INTERVAL = 15 * 60  # print throughput every 15 minutes
         ideation_in_progress = False  # True while waiting for Ideator to generate new ideas
         ideation_requested_at = 0.0   # timestamp of last _request_ideation() call
         _zero_progress_since: dict[str, float] = {}  # (slug:phase) -> timestamp first seen 0 tasks
+        _zero_task_warned: set[str] = set()  # keys that have had the 10-min warning printed
+
+        # --- Dynamic Parallelizer (auto-tune) ---
+        _tuner = None
+        _tuner_log_path = PIPELINE_DIR / "state" / "tuner_log.jsonl"
+        if auto_tune:
+            try:
+                from pipeline.dynamic_parallelizer import DynamicParallelizer
+                _tuner = DynamicParallelizer(
+                    min_seeds=1,
+                    max_seeds=max_seeds,
+                )
+            except Exception as _te:
+                print(f"  [tuner] Failed to init DynamicParallelizer: {_te}")
+
+        # --- Strategy 6: Parallel seed slot tracking ---
+        # Count how many distinct non-terminal projects are currently active.
+        # When active_count < parallel_seeds, we can seed another project.
+        def _count_active_projects() -> int:
+            """Count projects that are in-flight (not complete/budget_exceeded)."""
+            pd = PIPELINE_DIR / "projects"
+            if not pd.exists():
+                return 0
+            active = 0
+            for p in pd.iterdir():
+                if not p.is_dir():
+                    continue
+                sf = p / "state" / "current_idea.json"
+                if not sf.exists():
+                    continue
+                try:
+                    s = json.loads(sf.read_text(encoding="utf-8"))
+                    if s.get("status", "") not in ("complete", "budget_exceeded", ""):
+                        active += 1
+                except Exception:
+                    pass
+            return active
+
+        # --- Strategy 7: Environment pooling — pre-warm context caches ---
+        # Mirrors PufferLib's environment pool: spin up N environments before
+        # any training starts.  Here we pre-build context_cache.json for the
+        # next N unstarted ideas so agents start with a warm cache instead of
+        # doing 5-10 file reads on their first turn.
+        def _warm_upcoming_projects(n: int = 3) -> None:
+            """Background thread: pre-build context caches for next N ideas."""
+            try:
+                from pipeline.context_aggregator import get_aggregator
+                agg = get_aggregator()
+                ideas_path = _ideas_path  # closure over outer scope
+                if not ideas_path.exists():
+                    return
+                text = ideas_path.read_text(encoding="utf-8")
+                # Extract unchecked items (same logic as seed_from_master_list)
+                import re as _re
+                unchecked = _re.findall(
+                    r'^-\s*\[\s*\]\s+(.+?)\s*$', text, _re.MULTILINE
+                )
+                warmed = 0
+                for raw_title in unchecked[:n]:
+                    slug = _slugify(raw_title.split(".")[0][:50])
+                    agg.build(slug=slug, force=False)  # no-op if cache exists
+                    warmed += 1
+                if warmed:
+                    pass  # silent — background activity
+            except Exception:
+                pass
+
+        # Kick off initial context pre-warming for next batch of ideas
+        if from_list and parallel_seeds > 1:
+            threading.Thread(
+                target=_warm_upcoming_projects,
+                args=(parallel_seeds + 2,),
+                daemon=True,
+                name="env-pool-warmup",
+            ).start()
 
         while not stop_requested:
             # Time limit check
@@ -2179,20 +2283,36 @@ def run_pipeline(
                     if orphaned:
                         print(f"  ▶️  Advancing past '{slug}' → {orphaned} project(s) queued")
                     if from_list and not bus.has_active_work():
-                        seeded = seed_from_master_list(bus, silent=ideation_in_progress,
-                                                        ideas_path=_ideas_path, resume_inprogress=fresh_list_only)
-                        if seeded == _SEED_SEEDED:
-                            ideation_in_progress = False
-                            ideation_requested_at = 0.0
-                        elif seeded == _SEED_EMPTY and not ideation_in_progress:
-                            _request_ideation(bus)
-                            ideation_in_progress = True
-                            ideation_requested_at = time.time()
-                        elif seeded == _SEED_EMPTY and time.time() - ideation_requested_at > IDEATION_TIMEOUT:
-                            print("  ⏰ Ideation timed out — retrying...")
-                            ideation_in_progress = False
-                            ideation_requested_at = 0.0
-                        # _SEED_BLOCKED — deps pending, just wait
+                        # --- Strategy 6: Parallel seeding ---
+                        # Try to fill all open slots up to parallel_seeds.
+                        active_now = _count_active_projects()
+                        slots_free = max(1, parallel_seeds - active_now)
+                        for _seed_i in range(slots_free):
+                            seeded = seed_from_master_list(bus, silent=ideation_in_progress,
+                                                            ideas_path=_ideas_path, resume_inprogress=fresh_list_only)
+                            if seeded == _SEED_SEEDED:
+                                ideation_in_progress = False
+                                ideation_requested_at = 0.0
+                                # After seeding, pre-warm next batch (Strategy 7)
+                                if parallel_seeds > 1:
+                                    threading.Thread(
+                                        target=_warm_upcoming_projects,
+                                        args=(parallel_seeds,),
+                                        daemon=True,
+                                        name="env-pool-refill",
+                                    ).start()
+                            elif seeded == _SEED_EMPTY and not ideation_in_progress:
+                                _request_ideation(bus)
+                                ideation_in_progress = True
+                                ideation_requested_at = time.time()
+                                break
+                            elif seeded == _SEED_EMPTY and time.time() - ideation_requested_at > IDEATION_TIMEOUT:
+                                print("  ⏰ Ideation timed out — retrying...")
+                                ideation_in_progress = False
+                                ideation_requested_at = 0.0
+                                break
+                            else:
+                                break  # _SEED_BLOCKED or no more ideas
                     elif from_list and not orphaned:
                         seed_from_master_list(bus, silent=True, ideas_path=_ideas_path,
                                               resume_inprogress=fresh_list_only)
@@ -2230,15 +2350,68 @@ def run_pipeline(
                     pass
                 task_str = f" {tasks_done}/{tasks_total}✓" if tasks_total else ""
 
+                # --- Workspace activity signal (used by stall-kill guard below) ---
+                # Measures file-write activity independently of checkbox state.
+                # The executor often writes files for 10-15 min before marking any [x].
+                _ws_file_count = 0
+                _ws_last_mtime = 0.0
+                try:
+                    if _active_slug:
+                        _ws_dir = PIPELINE_DIR / "projects" / _active_slug / "workspace"
+                        if _ws_dir.exists():
+                            for _wf in _ws_dir.rglob("*"):
+                                if _wf.is_file() and not _wf.name.startswith("."):
+                                    _ws_file_count += 1
+                                    _mt = _wf.stat().st_mtime
+                                    if _mt > _ws_last_mtime:
+                                        _ws_last_mtime = _mt
+                except Exception:
+                    pass
+
+                # Improve display: when 0 checkboxes but files exist, show file count
+                if tasks_total and tasks_done == 0 and _ws_file_count > 0:
+                    task_str = f" 0/{tasks_total}✓ ({_ws_file_count} files)"
+
                 # Ollama GPU heartbeat (checks every 5 min, cached otherwise)
                 gpu_str = ""
+                _gpu_idle = False
                 if provider == "ollama":
                     gpu_status = _check_ollama_heartbeat(model)
                     if gpu_status:
                         if "IDLE" in gpu_status or "ERR" in gpu_status:
                             gpu_str = f" ⚠️ {gpu_status} — model evicted from VRAM!"
+                            _gpu_idle = True
                         else:
                             gpu_str = f" {gpu_status}"
+
+                # --- Dynamic Parallelizer: observe & adjust ---
+                _tuner_str = ""
+                if _tuner is not None:
+                    try:
+                        _tp_path = PIPELINE_DIR / "state" / "throughput.json"
+                        _decision = _tuner.observe(
+                            throughput_path=_tp_path,
+                            current_seeds=parallel_seeds,
+                            gpu_idle=_gpu_idle,
+                        )
+                        if _decision.changed:
+                            parallel_seeds = _decision.new_seeds
+                            print(f"  {_decision.reason} [conf={_decision.confidence:.0%}]")
+                            try:
+                                with open(_tuner_log_path, "a", encoding="utf-8") as _tlf:
+                                    _tlf.write(json.dumps({
+                                        "ts": time.time(),
+                                        "old_seeds": _decision.old_seeds,
+                                        "new_seeds": _decision.new_seeds,
+                                        "reason": _decision.reason,
+                                        "confidence": round(_decision.confidence, 3),
+                                    }) + "\n")
+                            except Exception:
+                                pass
+                        if _status_count % 4 == 0:
+                            _tuner_str = f"  {_tuner.status_line(parallel_seeds)}"
+                    except Exception:
+                        pass  # Never crash the loop on tuner errors
 
                 status_line = _clean(
                     f"  [{elapsed_m:.0f}m] agents={running_agents}/{len(AGENT_ROLES)} "
@@ -2248,6 +2421,8 @@ def run_pipeline(
                 # Throttle to every 4 checks (~4 min) to keep output readable.
                 if _status_count % 4 == 0:
                     print(status_line, flush=True)
+                    if _tuner_str:
+                        print(_tuner_str, flush=True)
                 _status_count += 1
 
                 # Print full throughput breakdown every 15 minutes
@@ -2312,32 +2487,60 @@ def run_pipeline(
                         and _active_slug
                         and not _is_locked
                         and idea_state.get("status", "") not in ("complete", "budget_exceeded")):
-                    if _zpk not in _zero_progress_since:
-                        _zero_progress_since[_zpk] = time.time()
-                    elif time.time() - _zero_progress_since[_zpk] > ZERO_TASK_PHASE_KILL:
-                        _proj_file = (PIPELINE_DIR / "projects" / _active_slug
-                                      / "state" / "current_idea.json")
-                        try:
-                            _st = json.loads(_proj_file.read_text(encoding="utf-8"))
-                            if _st.get("status", "") not in ("complete", "budget_exceeded"):
-                                _st["status"] = "budget_exceeded"
-                                _st["budget_note"] = (
-                                    f"Phase {idea_state.get('phase',1)} stuck: "
-                                    f"0/{tasks_total} tasks after {ZERO_TASK_PHASE_KILL//60}m"
-                                )
-                                _proj_file.write_text(json.dumps(_st, indent=2), encoding="utf-8")
-                                print(
-                                    f"  ⏰ Zero-task timeout: '{idea_state.get('title', _active_slug)}' "
-                                    f"phase {idea_state.get('phase',1)} — "
-                                    f"0/{tasks_total} tasks in {ZERO_TASK_PHASE_KILL//60}m → budget_exceeded"
-                                )
-                                for _role in AGENT_ROLES:
-                                    bus.clear_queue(_role)
-                        except Exception:
-                            pass
+                    # Guard: if workspace files were written recently the executor IS
+                    # making progress — it just hasn't ticked checkboxes yet (0→N pattern).
+                    # Reset the stall timer so we don't kill a productive executor.
+                    _ACTIVITY_WINDOW = 8 * 60  # 8 min — executor marks boxes at end
+                    _ws_active = (
+                        _ws_last_mtime > 0
+                        and (time.time() - _ws_last_mtime) < _ACTIVITY_WINDOW
+                    )
+                    if _ws_active:
+                        # Files modified recently → reset stall clock silently
                         _zero_progress_since.pop(_zpk, None)
+                        _zero_task_warned.discard(_zpk)
+                    elif _zpk not in _zero_progress_since:
+                        _zero_progress_since[_zpk] = time.time()
+                    else:
+                        _stall_secs = time.time() - _zero_progress_since[_zpk]
+                        # 10-min warning
+                        if _stall_secs > ZERO_TASK_WARN and _zpk not in _zero_task_warned:
+                            _zero_task_warned.add(_zpk)
+                            print(
+                                f"  ⚠️  Zero-task stall: '{idea_state.get('title', _active_slug)}' "
+                                f"phase {idea_state.get('phase',1)} — "
+                                f"0/{tasks_total} tasks for {int(_stall_secs//60)}m, "
+                                f"{_ws_file_count} workspace file(s), "
+                                f"last write {int((time.time()-_ws_last_mtime)//60) if _ws_last_mtime else '?'}m ago "
+                                f"(kill in {(ZERO_TASK_PHASE_KILL - _stall_secs)//60:.0f}m)"
+                            )
+                        # 15-min kill — only fires if no recent file activity either
+                        if _stall_secs > ZERO_TASK_PHASE_KILL:
+                            _proj_file = (PIPELINE_DIR / "projects" / _active_slug
+                                          / "state" / "current_idea.json")
+                            try:
+                                _st = json.loads(_proj_file.read_text(encoding="utf-8"))
+                                if _st.get("status", "") not in ("complete", "budget_exceeded"):
+                                    _st["status"] = "budget_exceeded"
+                                    _st["budget_note"] = (
+                                        f"Phase {idea_state.get('phase',1)} stuck: "
+                                        f"0/{tasks_total} tasks after {ZERO_TASK_PHASE_KILL//60}m"
+                                    )
+                                    _proj_file.write_text(json.dumps(_st, indent=2), encoding="utf-8")
+                                    print(
+                                        f"  ⏰ Zero-task timeout: '{idea_state.get('title', _active_slug)}' "
+                                        f"phase {idea_state.get('phase',1)} — "
+                                        f"0/{tasks_total} tasks in {ZERO_TASK_PHASE_KILL//60}m → budget_exceeded"
+                                    )
+                                    for _role in AGENT_ROLES:
+                                        bus.clear_queue(_role)
+                            except Exception:
+                                pass
+                            _zero_progress_since.pop(_zpk, None)
+                            _zero_task_warned.discard(_zpk)
                 else:
                     _zero_progress_since.pop(_zpk, None)  # reset when tasks progress or phase changes
+                    _zero_task_warned.discard(_zpk)
 
                 if all_empty and not from_list:
                     # Single idea mode — might be done
@@ -2433,6 +2636,7 @@ def run_pipeline(
             time.sleep(2)
 
     finally:
+        stop_background_refresh()
         print("\n  Stopping agents...")
         supervisor.stop_all()
         supervisor.save_registry()
@@ -2510,6 +2714,18 @@ def main():
                         help="Resume complete projects with missing phases, reading from "
                              "polish_queue.md (auto-generated if missing). "
                              "Use with --ideas-file to specify an alternate polish list.")
+    parser.add_argument("--parallel-seeds", type=int, default=1, metavar="N",
+                        help="Seed up to N independent projects simultaneously. "
+                             "With --auto-tune this becomes the starting value (default: 1). "
+                             "Example: --parallel-seeds 2")
+    parser.add_argument("--auto-tune", action="store_true",
+                        help="Enable the DynamicParallelizer: automatically detects diminishing "
+                             "returns and adjusts parallel seeds to maximise throughput. "
+                             "Starts at --parallel-seeds N and self-adjusts up to --max-seeds M. "
+                             "Example: --auto-tune --parallel-seeds 1 --max-seeds 4")
+    parser.add_argument("--max-seeds", type=int, default=4, metavar="M",
+                        help="Upper ceiling for --auto-tune (default: 4). Ignored when "
+                             "--auto-tune is not set.")
 
     args = parser.parse_args()
 
@@ -2530,6 +2746,9 @@ def main():
         ideas_file=args.ideas_file,
         fresh_list_only=args.fresh_list_only,
         polish=args.polish,
+        parallel_seeds=args.parallel_seeds,
+        auto_tune=args.auto_tune,
+        max_seeds=args.max_seeds,
     )
 
 

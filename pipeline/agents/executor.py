@@ -103,12 +103,14 @@ class ExecutorAgent(AgentProcess):
                 f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
                 + "## Instructions\n"
+                  "**FOCUS RULE: Fix ONLY what the Fix Report says is broken. "
+                  "Do NOT refactor, explore alternatives, or add features.**\n"
                   "1. Read the Fix Report above carefully — especially Previous Attempts.\n"
                   "2. Do NOT repeat a fix that was already tried and failed.\n"
                   f"3. Use `list_tree` then `read_file` on each relevant source file.\n"
                   "4. Fix ONLY the blocking issues described. Don't rewrite working code.\n"
                   "5. If the report mentions file path issues, verify your workspace path first.\n"
-                  f"6. Update tasks file at `{tasks_full_path}` if any task status changes.\n"
+                  f"6. Update tasks file at `{tasks_full_path}` marking fixed tasks [x].\n"
                   "7. Say DONE and list every file you changed.\n"
             )
         elif not tasks_content:
@@ -132,14 +134,21 @@ class ExecutorAgent(AgentProcess):
                 + f"## Master Plan\n{master_plan[:2000]}\n\n"
                 f"## Phase {phase_num} Tasks\n{tasks_content}\n\n"
                 "## Instructions\n"
-                f"0a. CHECK SHARED LIBS FIRST: run `list_tree` on `{shared_libs_path}`.\n"
+                "**EXECUTION RULES — follow strictly:**\n"
+                "- Work ONLY through the tasks listed below, in order.\n"
+                "- Do NOT explore alternative designs, refactor unrelated code, or add features\n"
+                "  not in the task list. Every tool call must serve the current task.\n"
+                "- After completing each task, immediately mark it [x] in the tasks file.\n"
+                "- Do NOT call list_tree or read_file repeatedly on the same path.\n"
+                "  Read a file once, then act on it.\n"
+                f"0a. CHECK SHARED LIBS FIRST: run `list_tree` on `{shared_libs_path}` (once).\n"
                 "    If any existing library is relevant, read and reuse it — don't reimplement.\n"
                 "    The 'Reusable Tools Index' and 'Shared Libraries' sections above list what exists.\n"
                 "0b. INSTALL DEPENDENCIES: identify every third-party Python package needed.\n"
                 "    Run `pip install <pkg1> <pkg2> ...` via run_shell BEFORE writing any code.\n"
                 "    Common mappings: bs4→beautifulsoup4, PIL→Pillow, cv2→opencv-python,\n"
                 "    yaml→pyyaml, dotenv→python-dotenv, sklearn→scikit-learn.\n"
-                "1. Work through each unchecked task in order.\n"
+                "1. Work through each unchecked task in order. One task at a time.\n"
                 f"2. WORKSPACE PATH (use this EXACT absolute path for ALL files):\n"
                 f"   {workspace}\n"
                 f"   ⚠️  CRITICAL: NEVER create a directory called 'workspace/' — the path above\n"
@@ -148,7 +157,7 @@ class ExecutorAgent(AgentProcess):
                 f"   WRONG: workspace/email_tool/parser.py\n"
                 f"   RIGHT: {workspace}/email_tool/parser.py\n"
                 "3. After completing each task, update the tasks file at "
-                f"`{tasks_full_path}` marking it [x].\n"
+                f"`{tasks_full_path}` marking it [x]. Do this immediately after each task.\n"
                 "4. When ALL tasks are complete, say DONE and list every file you created.\n"
             )
 
@@ -282,6 +291,13 @@ class ExecutorAgent(AgentProcess):
                             )
         except Exception:
             pass  # Non-critical — validator will catch real failures
+
+        # --- Sync task counts back to current_idea.json immediately ---
+        # The auto-mark above wrote [x] to disk but current_idea.json still has
+        # tasks_done=0 from the start-of-execution snapshot.  Update it now so
+        # the runner's next status tick shows the real count (e.g. 6/6 not 0/6)
+        # and the stall-kill guard sees fresh data.
+        self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
         # Route: reviewer on first execution + even retries, validator on odd retries
         # This gives structural review coverage every other pass:

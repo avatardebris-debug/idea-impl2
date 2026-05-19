@@ -33,6 +33,21 @@ from pipeline.message_bus import MessageBus, Message
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Strategy 1: Pipeline role ordering — used by async double-buffering
+# Maps each agent to the role most likely to receive its output next.
+# Preloading context for that role while current LLM generates = zero wait.
+# ---------------------------------------------------------------------------
+_NEXT_ROLE_MAP: dict[str, str] = {
+    "idea_planner":  "phase_planner",
+    "phase_planner": "executor",
+    "executor":      "reviewer",
+    "reviewer":      "validator",
+    "validator":     "executor",   # retries go back to executor
+    "manager":       "phase_planner",
+    "documenter":    "manager",
+}
+
 # Single source of truth for the default model.
 # The runner sets PIPELINE_MODEL env var before spawning agents so all
 # subprocesses automatically use the same model without hardcoding.
@@ -120,12 +135,23 @@ class AgentProcess:
         logger.info("[%s] Starting agent loop (provider=%s, model=%s)",
                     self.role, self.provider, self.model)
 
+        # Adaptive poll back-off: immediately re-poll after work, ramp to max on idle.
+        _POLL_MIN  = 0.1   # seconds — retry immediately after a hit
+        _POLL_MAX  = 2.0   # seconds — cap on idle sleep
+        _POLL_STEP = 0.25  # seconds — additive back-off increment per miss
+        _poll_wait = _POLL_MIN
+
         while not self._stop_requested:
             msg = self.bus.read_next(self.role)
 
             if msg is None:
-                time.sleep(self.poll_interval)
+                time.sleep(_poll_wait)
+                # Ramp up sleep on consecutive misses, cap at max
+                _poll_wait = min(_poll_wait + _POLL_STEP, _POLL_MAX)
                 continue
+
+            # Got a message — reset back-off so next check is immediate
+            _poll_wait = _POLL_MIN
 
             # Handle signals specially
             if msg.type == "signal":
@@ -412,8 +438,25 @@ class AgentProcess:
         - Saves the prompt+response pair after each call so future calls can
           reference them via the same rolling context window.
         - Invalidates the rolling context when the project phase changes.
+        - Strategy 1: Launches a daemon thread that pre-warms the context
+          aggregator cache for the NEXT likely agent while this LLM generates.
+        - Strategy 5: Injects a compact prompt header (role/project/phase ref)
+          so the model skips re-reading boilerplate on KV-cache hits.
         """
         from agent import run_agent
+
+        # --- Strategy 5: Compact prompt header (reference, not repetition) ---
+        # On KV-cache hits the static system prompt is already tokenised.
+        # Prepend a tiny [ROLE:x][PROJECT:y][PHASE:z] header so the model
+        # immediately knows its context without re-reading the full preamble.
+        try:
+            _state = self.read_json_state("state/current_idea.json")
+            _phase_n = _state.get("phase", "?")
+            _slug_ref = self._current_slug
+            _hdr = f"[ROLE:{self.role}] [PROJECT:{_slug_ref}] [PHASE:{_phase_n}]\n"
+            task = _hdr + task
+        except Exception:
+            pass
 
         # --- Rolling context: inject prior exchanges ---
         try:
@@ -434,6 +477,36 @@ class AgentProcess:
         except Exception:
             pass  # non-critical — never break the agent for a context load failure
 
+        # --- Strategy 1: Async double-buffering — pre-warm next agent's context ---
+        # While this call_agent() runs the LLM, a daemon thread pre-loads the
+        # context aggregator cache for the next role in the pipeline.  By the
+        # time this agent finishes and the message arrives at the next agent,
+        # its context read (tasks.md, workspace tree, validation_report) is
+        # already in memory — zero extra I/O wait on the critical path.
+        _preload_thread: threading.Thread | None = None
+        try:
+            _next_role = _NEXT_ROLE_MAP.get(self.role, "")
+            if _next_role and self._current_slug:
+                _slug_for_preload = self._current_slug
+
+                def _preload_next_context() -> None:
+                    """Background preload — errors silently swallowed."""
+                    try:
+                        from pipeline.context_aggregator import get_aggregator
+                        agg = get_aggregator()
+                        agg.build(slug=_slug_for_preload, force=False)
+                    except Exception:
+                        pass
+
+                _preload_thread = threading.Thread(
+                    target=_preload_next_context,
+                    daemon=True,
+                    name=f"ctx-preload-{_next_role}-{_slug_for_preload[:8]}",
+                )
+                _preload_thread.start()
+        except Exception:
+            pass
+
         result = run_agent(
             task=task,
             provider=self.provider,
@@ -447,6 +520,10 @@ class AgentProcess:
             pipeline_mode=True,  # skip repo file tree + shared .agent/ memory
             slug=self._current_slug,  # enables Ollama KV-cache reuse per project
         )
+
+        # Preload thread is daemon — no need to join; it will finish naturally.
+        # If it's still running when we return, the context build completes in
+        # the background before the next agent polls.
 
         # --- Rolling context: save this exchange ---
         try:

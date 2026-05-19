@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "real-estate-listing-analyzer"
+version = "0.1.0"
+description = "CLI tool that fetches property listings, analyzes price trends, and generates comparative market reports"
+requires-python = ">=3.10"
+dependencies = []  # urllib only for Phase 1; matplotlib added in Phase 3
+
+[project.optional-dependencies]
+pdf = ["matplotlib>=3.8"]
+dev = ["pytest>=7", "pytest-cov"]
+
+[project.scripts]
+real-estate-analyzer = "real_estate_listing_analyzer.cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
