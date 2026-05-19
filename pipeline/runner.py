@@ -22,6 +22,7 @@ import signal
 import subprocess
 import sys
 import textwrap
+import threading
 import time
 from datetime import datetime, timezone
 
@@ -663,9 +664,10 @@ def _request_ideation(bus: MessageBus) -> None:
 
 
 # Return values for seed_from_master_list
-_SEED_SEEDED  = "seeded"   # started a new project
-_SEED_BLOCKED = "blocked"  # ideas exist but all deps pending — wait, don't ideate
-_SEED_EMPTY   = "empty"    # list truly exhausted — safe to trigger ideation
+_SEED_SEEDED      = "seeded"       # started a new project
+_SEED_BLOCKED     = "blocked"      # ideas exist but all deps pending — wait, don't ideate
+_SEED_EMPTY       = "empty"        # list truly exhausted — safe to trigger ideation
+_SEED_GOAL_QUEUED = "goal_queued"  # --goal decomposed and children injected
 
 
 def seed_from_master_list(
@@ -785,6 +787,64 @@ def seed_from_master_list(
         # Strip outer brackets from description if present: [text] -> text
         if description_raw.startswith("[") and description_raw.endswith("]"):
             description_raw = description_raw[1:-1].strip()
+
+        # --- Detect --goal tag: decompose into subgoals instead of seeding ---
+        if re.search(r'\s--goal\s*$', line, re.IGNORECASE):
+            # Strip the --goal tag from description before passing to decomposer
+            goal_description = re.sub(r'\s--goal\s*$', '', description_raw, flags=re.IGNORECASE).strip()
+            try:
+                from pipeline.goal_decomposer import process_goal_line
+                injected = process_goal_line(
+                    goal_title=title,
+                    goal_description=goal_description,
+                    mi_path=mi_path,
+                )
+                if injected:
+                    _seeded_this_session.add(title)
+                    return _SEED_SEEDED  # children are now in list; runner will pick them up next tick
+                else:
+                    # Decomposer returned nothing — mark as skipped to avoid infinite retry
+                    print(f"  ⚠  --goal '{title}' decomposed 0 branches; skipping")
+                    _seeded_this_session.add(title)
+                    continue
+            except Exception as _ge:
+                print(f"  ✗ --goal decomposer failed for '{title}': {_ge}")
+                _seeded_this_session.add(title)
+                continue
+
+        # --- Detect --hermes tag: run via Hermes Worker+Critic instead of pipeline ---
+        if re.search(r'\s--hermes\s*$', line, re.IGNORECASE):
+            hermes_description = re.sub(r'\s--hermes\s*$', '', description_raw, flags=re.IGNORECASE).strip()
+            # Parse optional hermes_goal_check from description: [goal_check: ...]
+            _hgc_match = re.search(r'goal_check:\s*([^\.\]]+)', hermes_description, re.IGNORECASE)
+            hermes_goal_check = _hgc_match.group(1).strip() if _hgc_match else f"Has the task '{title}' been completed?"
+            print(f"\n  🤖 Routing to Hermes: {title}")
+            _seeded_this_session.add(title)
+            try:
+                from pipeline.hermes_runner import HermesGoalRunner
+                _hr = HermesGoalRunner()
+                _hr_result = _hr.run(
+                    prompt=hermes_description,
+                    goal_check=hermes_goal_check,
+                    time_budget_min=60,
+                    branch_id=_slugify(title),
+                )
+                print(f"  🤖 Hermes '{title}': {_hr_result['status']} ({_hr_result['attempts']} attempts)")
+                # Mark the line as done in master_ideas.md
+                try:
+                    _mi_content = mi_path.read_text(encoding="utf-8")
+                    _mi_content = _mi_content.replace(
+                        f"- [ ] **[{title}]",
+                        f"- [x] **[{title}]",
+                        1,
+                    )
+                    mi_path.write_text(_mi_content, encoding="utf-8")
+                except Exception:
+                    pass
+            except Exception as _he:
+                print(f"  ✗ Hermes runner failed for '{title}': {_he}")
+            return _SEED_SEEDED
+
 
         # --- Parse '[lock]' tag — prevents budget_exceeded from ever firing ---
         locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
@@ -1705,6 +1765,14 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
         if updated != content:
             mi_path.write_text(updated, encoding="utf-8")
 
+    # --- Fine-tune corpus: emit training pairs for this completed project ---
+    try:
+        from pipeline.corpus_collector import collect_project_on_complete
+        collect_project_on_complete(project_dir, state)
+    except Exception as _cc_err:
+        import logging as _log
+        _log.getLogger(__name__).debug("corpus_collector skipped (non-critical): %s", _cc_err)
+
 
 def _write_state(project_dir: pathlib.Path, state: dict, new_status: str) -> None:
     """Update status in current_idea.json."""
@@ -2206,6 +2274,21 @@ def run_pipeline(
                             write_health_report(hc_results, PIPELINE_DIR)
                     except Exception as _hc_err:
                         print(f"  [health] Check failed: {_hc_err}")
+
+                # --- Constitutional patcher: auto-patch prompts from recurring failures ---
+                # Runs every 30 health-check cycles (~30 min) — non-critical, never blocks.
+                # Finds patterns in bug_resolutions.jsonl that recur across 3+ projects
+                # and permanently injects guardrails into the relevant prompts/*.md file.
+                if _status_count > 0 and _status_count % 30 == 0:
+                    try:
+                        from pipeline.constitutional_patcher import run_patcher as _const_patch
+                        _patches = _const_patch(min_projects=3, dry_run=False, verbose=False)
+                        if _patches:
+                            _patch_roles = ", ".join(set(p.role for p in _patches))
+                            print(f"  [constitutional] {len(_patches)} new guardrail(s) "
+                                  f"patched into prompts: {_patch_roles}")
+                    except Exception as _cp_err:
+                        pass  # Never crash the runner over a patcher error
 
                 # Check if all queues are empty AND all ideas done
                 all_empty = bus.all_queues_empty()

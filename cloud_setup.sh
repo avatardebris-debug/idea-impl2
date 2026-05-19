@@ -38,15 +38,60 @@ echo "[3/6] Starting Ollama server..."
 pkill ollama 2>/dev/null || true
 sleep 1
 
+# ── VRAM-aware parallelism ────────────────────────────────────────────────────
+# Detect VRAM now (may already be set from step 4 preview, but do it early)
+_VRAM_MB_FOR_PARALLEL=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -d ' ' || echo 0)
+_VRAM_GB_INT=$(( _VRAM_MB_FOR_PARALLEL / 1024 ))
+
+# Model footprint heuristic (MoE 30-35B at Q4_K_M ~ 18-20 GB)
+_MODEL_VRAM_GB=20
+case "${MODEL:-qwen3.6:35b-a3b-q4_K_M}" in
+  *235b*)  _MODEL_VRAM_GB=120 ;;
+  *72b*|*70b*) _MODEL_VRAM_GB=40 ;;
+  *32b*)   _MODEL_VRAM_GB=20  ;;
+  *30b*|*35b*) _MODEL_VRAM_GB=18 ;;
+  *14b*)   _MODEL_VRAM_GB=9   ;;
+  *8b*)    _MODEL_VRAM_GB=5   ;;
+  *4b*)    _MODEL_VRAM_GB=3   ;;
+esac
+
+# KV cache per concurrent slot (GB)
+_KV_PER_SLOT=4
+case "${MODEL:-qwen3.6:35b-a3b-q4_K_M}" in
+  *8b*|*4b*|*1.7b*) _KV_PER_SLOT=2 ;;
+  *14b*)             _KV_PER_SLOT=3 ;;
+esac
+
+_HEADROOM=$(( _VRAM_GB_INT - _MODEL_VRAM_GB - 2 ))   # -2 OS/Ollama overhead
+[[ $_HEADROOM -lt 0 ]] && _HEADROOM=0
+_OLLAMA_PARALLEL=$(( _HEADROOM / _KV_PER_SLOT ))
+[[ $_OLLAMA_PARALLEL -lt 1 ]] && _OLLAMA_PARALLEL=1
+[[ $_OLLAMA_PARALLEL -gt 4 ]] && _OLLAMA_PARALLEL=4
+
+# Runner seeds: 1 more than Ollama slots (extras do CPU work while LLM is busy)
+_PARALLEL_SEEDS=$(( _OLLAMA_PARALLEL + 1 ))
+_MAX_SEEDS=$(( _OLLAMA_PARALLEL + 2 ))
+[[ $_PARALLEL_SEEDS -gt 6 ]] && _PARALLEL_SEEDS=6
+[[ $_MAX_SEEDS -gt 8 ]]      && _MAX_SEEDS=8
+
+echo "  VRAM detected:       ${_VRAM_GB_INT} GB"
+echo "  Model footprint:     ~${_MODEL_VRAM_GB} GB"
+echo "  OLLAMA_NUM_PARALLEL: ${_OLLAMA_PARALLEL}"
+echo "  --parallel-seeds:    ${_PARALLEL_SEEDS}  --max-seeds: ${_MAX_SEEDS}"
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Start fresh — bind to all interfaces so SSH tunnels work
-OLLAMA_HOST=0.0.0.0:11434 nohup ollama serve > /tmp/ollama.log 2>&1 &
+OLLAMA_HOST=0.0.0.0:11434 \
+OLLAMA_NUM_PARALLEL=${_OLLAMA_PARALLEL} \
+OLLAMA_MAX_LOADED_MODELS=1 \
+nohup ollama serve > /tmp/ollama.log 2>&1 &
 sleep 3
 
 # Verify it's running
 if curl -s http://localhost:11434/api/tags > /dev/null 2>&1; then
-    echo "  ✓ Ollama running on :11434"
+    echo "  Ollama running on :11434 (NUM_PARALLEL=${_OLLAMA_PARALLEL})"
 else
-    echo "  ✗ Ollama failed to start. Check /tmp/ollama.log"
+    echo "  Ollama failed to start. Check /tmp/ollama.log"
     exit 1
 fi
 
@@ -116,34 +161,43 @@ cat > "${AGENT_DIR}/.agent/cloud_config.json" << EOF
 EOF
 
 echo ""
-echo "==========================================="
-echo "  ✓ Setup complete!"
-echo "==========================================="
+echo "=========================================="
+echo "  Setup complete!"
+echo "=========================================="
 echo ""
-echo "  Model:    ${MODEL}"
-echo "  Provider: ollama"
-echo "  Base URL: http://localhost:11434"
+echo "  Model:              ${MODEL}"
+echo "  OLLAMA_NUM_PARALLEL: ${_OLLAMA_PARALLEL}"
+echo "  Provider:           ollama"
+echo "  Base URL:           http://localhost:11434"
 echo ""
 echo "  Quick smoke test (single idea):"
 echo ""
 echo "    source .venv/bin/activate"
-echo "    cd /path/to/idea-impl"
 echo "    python pipeline/runner.py \"Build a Python word counter CLI\""
 echo ""
-echo "  Run from idea backlog (overnight):"
+echo "  Recommended run (VRAM-tuned for ${_VRAM_GB_INT}GB):"
 echo ""
 echo "    python pipeline/runner.py \\"
 echo "        --from-list \\"
 echo "        --provider ollama \\"
 echo "        --model ${MODEL} \\"
-echo "        --time-limit 480"
+echo "        --parallel-seeds ${_PARALLEL_SEEDS} \\"
+echo "        --auto-tune \\"
+echo "        --max-seeds ${_MAX_SEEDS}"
 echo ""
-echo "  Multi-day run (no time limit):"
+echo "  Second instance (unstarted backlog only, no overlap):"
 echo ""
-echo "    nohup python pipeline/runner.py \\"
+echo "    python pipeline/runner.py \\"
 echo "        --from-list \\"
+echo "        --fresh-list-only \\"
 echo "        --provider ollama \\"
 echo "        --model ${MODEL} \\"
-echo "        > pipeline_run.log 2>&1 &"
-echo "    echo \"Pipeline running. tail -f pipeline_run.log to monitor.\""
+echo "        --ideas-file unstarted_projects_backlog.md \\"
+echo "        --parallel-seeds ${_PARALLEL_SEEDS} \\"
+echo "        --auto-tune \\"
+echo "        --max-seeds ${_MAX_SEEDS}"
+echo ""
+echo "  Monitor VRAM:   watch -n 5 nvidia-smi"
+echo "  Ollama logs:    tail -f /tmp/ollama.log"
+echo "  Corpus stats:   python -m pipeline.corpus_collector --stats"
 echo ""
