@@ -1,0 +1,14 @@
+{
+  "harvested_at": "20260519_035539",
+  "status_filter": null,
+  "min_tasks": 2,
+  "track": "task",
+  "sft_pairs": 180,
+  "dpo_pairs": 26,
+  "files": {
+    "sft_raw": "finetune_data\\sft_raw_20260519_035539.jsonl",
+    "sft_alpaca": "finetune_data\\sft_alpaca_20260519_035539.jsonl",
+    "dpo_raw": "finetune_data\\dpo_raw_20260519_035539.jsonl",
+    "dpo_trl": "finetune_data\\dpo_trl_20260519_035539.jsonl"
+  }
+}

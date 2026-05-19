@@ -1,0 +1,155 @@
+# Phase 1 Tasks
+
+- [ ] Task 1: Project Scaffolding & Database Schema
+  - What: Set up the full project structure, install dependencies, configure PostgreSQL + Prisma ORM, and define the initial database schema with multi-tenant support (tenant_id on every table).
+  - Files:
+    - `package.json` (root workspaces: api, admin, storefront)
+    - `api/package.json` — Express, Prisma, bcrypt, jsonwebtoken, stripe, multer, csv-parser
+    - `api/prisma/schema.prisma` — User, Store, Product, ProductVariant, Category, Order, OrderItem, SupplierProduct models
+    - `api/src/config/db.ts` — Prisma client singleton
+    - `api/src/config/env.ts` — Environment variable validation (zod)
+    - `api/.env-sample` and `api/.env-template` — DB_URL, JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+    - `api/prisma/migrations/` — Initial migration for all models
+    - `api/Dockerfile` and `docker-compose.yml` — PostgreSQL + Redis containers
+  - Done when:
+    - `docker-compose up` starts PostgreSQL and Redis successfully
+    - Prisma client generates without errors
+    - All models (User, Store, Product, ProductVariant, Category, Order, OrderItem, SupplierProduct) are in the schema with `tenant_id` foreign keys
+    - Initial migration runs cleanly: `npx prisma migrate dev`
+    - Root `npm install` succeeds with workspace links
+
+- [ ] Task 2: User Authentication System
+  - What: Build sign up, login, password reset, and JWT session management with basic profile management.
+  - Files:
+    - `api/src/routes/auth.routes.ts` — POST /auth/register, POST /auth/login, POST /auth/logout, POST /auth/forgot-password, POST /auth/reset-password
+    - `api/src/services/auth.service.ts` — register, login, logout, forgotPassword, resetPassword logic
+    - `api/src/middleware/auth.middleware.ts` — JWT verify middleware, extract current user from request
+    - `api/src/routes/profile.routes.ts` — GET /profile, PUT /profile
+    - `api/src/services/profile.service.ts` — update user profile
+    - `api/src/utils/jwt.ts` — sign/verify JWT helpers
+    - `api/src/utils/password.ts` — bcrypt hash/compare helpers
+    - `api/src/utils/email.ts` — password reset email sending (SendGrid or nodemailer placeholder)
+    - `admin/src/pages/Login.tsx` — login form with email/password
+    - `admin/src/pages/Register.tsx` — registration form
+    - `admin/src/pages/ForgotPassword.tsx` — password reset request form
+    - `admin/src/pages/ResetPassword.tsx` — password reset confirmation form
+    - `admin/src/context/AuthContext.tsx` — auth state management, token storage, protected route wrapper
+    - `admin/src/api/auth.ts` — axios instance with auth interceptor
+  - Done when:
+    - POST /auth/register creates a user and returns a JWT
+    - POST /auth/login returns a JWT for valid credentials
+    - POST /auth/logout invalidates the session
+    - Password reset flow works end-to-end (request -> email -> reset -> new password)
+    - GET /profile returns current user data when authenticated
+    - Admin login/register pages render forms and submit to API
+    - AuthContext persists token and provides `user`/`isAuthenticated` state
+    - Protected routes redirect unauthenticated users to login
+
+- [ ] Task 3: Store Creation & Management
+  - What: Build store CRUD, basic store settings (name, logo, currency, timezone), store status toggle (active/draft), and subdomain-based storefront routing.
+  - Files:
+    - `api/src/routes/store.routes.ts` — POST /stores, GET /stores, GET /stores/:id, PUT /stores/:id, DELETE /stores/:id, PATCH /stores/:id/status
+    - `api/src/services/store.service.ts` — createStore, getStore, updateStore, deleteStore, toggleStatus
+    - `api/src/middleware/tenant.middleware.ts` — resolve tenant from subdomain or URL path, attach `tenantId` to request
+    - `api/src/routes/store-theme.routes.ts` — GET /stores/:id/theme, PUT /stores/:id/theme
+    - `admin/src/pages/Stores.tsx` — list all stores for the user
+    - `admin/src/pages/CreateStore.tsx` — store creation form (name, slug, currency, timezone)
+    - `admin/src/pages/StoreSettings.tsx` — store settings (name, logo upload, currency, timezone, status toggle)
+    - `admin/src/api/stores.ts` — store API client
+    - `admin/src/components/LogoUpload.tsx` — logo upload component (to S3 placeholder)
+  - Done when:
+    - POST /stores creates a store linked to the authenticated user with a unique slug
+    - GET /stores returns all stores owned by the current user
+    - PUT /stores/:id updates store settings
+    - PATCH /stores/:id/status toggles between active and draft
+    - Store slug is unique per user
+    - Tenant middleware resolves `tenantId` from subdomain (e.g., `mystore.dropify.app`) or fallback path (`/s/{slug}`)
+    - Admin pages render store list, create form, and settings page
+    - Logo upload works (saves URL to store record)
+
+- [ ] Task 4: Product Management (CRUD + Variants + CSV Import)
+  - What: Build full product CRUD with variants (size, color, etc.), categories/tags, image upload, and CSV bulk import.
+  - Files:
+    - `api/src/routes/product.routes.ts` — POST /products, GET /products, GET /products/:id, PUT /products/:id, DELETE /products/:id, POST /products/import-csv
+    - `api/src/services/product.service.ts` — createProduct, getProducts, getProduct, updateProduct, deleteProduct, importCSV
+    - `api/src/services/category.service.ts` — CRUD for categories and tags
+    - `api/src/middleware/upload.middleware.ts` — multer config for image upload
+    - `api/src/utils/csv-parser.ts` — CSV parsing and validation helper
+    - `api/src/routes/image.routes.ts` — POST /images (upload to S3 placeholder), GET /images/:id
+    - `admin/src/pages/Products.tsx` — product list with search/filter
+    - `admin/src/pages/ProductForm.tsx` — create/edit product form (name, description, price, images, inventory, variants)
+    - `admin/src/pages/CSVImport.tsx` — CSV upload and preview component
+    - `admin/src/pages/Categories.tsx` — category management
+    - `admin/src/api/products.ts` — product API client
+    - `admin/src/components/VariantTable.tsx` — dynamic variant rows (name, price delta, SKU, inventory)
+    - `admin/src/components/ImageUploader.tsx` — multi-image upload with preview
+  - Done when:
+    - POST /products creates a product with optional variants and images
+    - GET /products returns paginated products filtered by tenant
+    - PUT /products/:id updates product including variants
+    - DELETE /products/:id removes product and its variants
+    - POST /products/import-csv accepts a CSV file, validates columns, and bulk-creates products
+    - CSV import supports: name, description, price, compareAtPrice, inventory, SKU, category, images (URLs)
+    - Product variants support name (e.g., "Size"), options (e.g., "S, M, L"), price delta, SKU, and inventory per variant
+    - Admin product list shows products with search and filter by category
+    - Product form renders with variant table and image uploader
+    - CSV import shows a preview table before confirming creation
+
+- [ ] Task 5: Storefront Engine (Product Listing, Detail, Cart, Checkout)
+  - What: Build the public storefront with product listing, product detail pages, shopping cart (client-side + localStorage), and Stripe Checkout integration.
+  - Files:
+    - `storefront/next.config.js` — rewrites for dynamic subdomain routing
+    - `storefront/src/middleware.ts` — Next.js middleware to resolve tenant from hostname
+    - `storefront/src/app/[tenant]/layout.tsx` — dynamic tenant layout
+    - `storefront/src/app/[tenant]/page.tsx` — storefront home (product listing)
+    - `storefront/src/app/[tenant]/product/[slug]/page.tsx` — product detail page
+    - `storefront/src/app/[tenant]/cart/page.tsx` — shopping cart page
+    - `storefront/src/app/[tenant]/checkout/page.tsx` — checkout page with Stripe Elements
+    - `storefront/src/app/[tenant]/order-confirmation/[orderId]/page.tsx` — order confirmation page
+    - `storefront/src/components/ProductCard.tsx` — product card component
+    - `storefront/src/components/ProductGrid.tsx` — product grid layout
+    - `storefront/src/components/ProductDetail.tsx` — product detail with variant selector
+    - `storefront/src/components/Cart.tsx` — cart drawer/sidebar
+    - `storefront/src/components/CheckoutForm.tsx` — Stripe Elements checkout form
+    - `storefront/src/lib/cart.ts` — cart state management (localStorage + server sync)
+    - `storefront/src/lib/stripe.ts` — Stripe client-side SDK initialization
+    - `storefront/src/api/products.ts` — storefront product API client
+    - `storefront/src/api/cart.ts` — cart API client (sync to server)
+    - `storefront/src/api/checkout.ts` — create Stripe Checkout session API
+    - `api/src/routes/cart.routes.ts` — POST /cart, GET /cart, PUT /cart/:itemId, DELETE /cart/:itemId
+    - `api/src/services/cart.service.ts` — cart operations (tenant-scoped)
+    - `api/src/routes/checkout.routes.ts` — POST /checkout/create-session, GET /checkout/session/:id, POST /checkout/webhook
+    - `api/src/services/checkout.service.ts` — create Stripe session, handle webhook events (payment succeeded/failed)
+    - `storefront/src/styles/globals.css` — "Essentials" theme styles (minimal, responsive)
+  - Done when:
+    - Visiting `{tenant}.dropify.app` loads the storefront for that tenant
+    - Home page displays all active products for the tenant
+    - Product detail page shows product info, variant selector, and add-to-cart button
+    - Cart persists items in localStorage and syncs to server
+    - Cart page shows items, quantities, and subtotal
+    - Checkout page creates a Stripe Checkout session and redirects to Stripe
+    - After payment, Stripe redirects back to order confirmation page
+    - Order confirmation page displays order details (order ID, items, total)
+    - Stripe webhook updates order status to "paid" in the database
+    - Essentials theme is responsive and loads in < 2.5s LCP on 4G
+
+- [ ] Task 6: Order Management (Admin Panel)
+  - What: Build order listing, order detail view, and order status tracking (pending -> paid -> fulfilled -> shipped) in the admin panel.
+  - Files:
+    - `api/src/routes/order.routes.ts` — GET /orders, GET /orders/:id, PATCH /orders/:id/status
+    - `api/src/services/order.service.ts` — listOrders, getOrder, updateStatus
+    - `admin/src/pages/Orders.tsx` — order list with status filter and search
+    - `admin/src/pages/OrderDetail.tsx` — order detail view (items, totals, customer info, status timeline)
+    - `admin/src/api/orders.ts` — order API client
+    - `admin/src/components/StatusBadge.tsx` — color-coded order status badge
+    - `admin/src/components/StatusTimeline.tsx` — visual status progression
+    - `api/src/services/notification.service.ts` — send order confirmation email to customer
+  - Done when:
+    - GET /orders returns all orders for the authenticated user's stores
+    - GET /orders/:id returns full order details including items, totals, and customer info
+    - PATCH /orders/:id/status updates order status (pending -> paid -> fulfilled -> shipped)
+    - Admin order list shows orders with status badges and filter by status
+    - Order detail page shows item list, totals breakdown, customer info, and status timeline
+    - Status transitions are enforced (e.g., cannot go from pending -> shipped without paid)
+    - Order confirmation email is sent to customer when status changes to "paid"
+    - No orphaned orders — every order has a matching Stripe payment record

@@ -244,6 +244,12 @@ def export_csv(
     tq = TaskQueue()
     rs = ResultsStore()
 
+    try:
+        queue = tq.get_queue(queue_id)
+    except FileNotFoundError:
+        typer.echo(f"Error: queue '{queue_id}' not found.", err=True)
+        raise typer.Exit(1)
+
     results = rs.get_all_results(queue_id)
     if not results:
         typer.echo(f"No results to export for queue '{queue_id}'.")

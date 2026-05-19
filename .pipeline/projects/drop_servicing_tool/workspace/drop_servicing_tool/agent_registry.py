@@ -62,19 +62,11 @@ class AgentRegistry:
             raise ValueError("Agent name cannot be empty")
         self._agents[name] = client
         self._metadata[name] = metadata or {}
-        # Persist to disk — serialize client if it's JSON-serializable (e.g. dict/str),
-        # otherwise store only metadata and a placeholder marker
+        # Persist to disk (metadata only, client is not persisted)
         agent_file = self._agents_dir / f"{name}.json"
-        try:
-            import json as _json
-            _json.dumps(client)  # probe serializability
-            serialized_client = client
-        except (TypeError, ValueError):
-            serialized_client = None  # not serializable — real LLM objects
         agent_data = {
             "name": name,
             "metadata": self._metadata[name],
-            "client": serialized_client,
         }
         agent_file.write_text(json.dumps(agent_data, indent=2), encoding="utf-8")
 

@@ -15,6 +15,38 @@ import sys
 import textwrap
 
 
+def _validate_args(args: argparse.Namespace) -> None:
+    """Validate parsed arguments and exit with error messages if invalid."""
+    # Validate format
+    valid_formats = ("recipe", "steps", "sop")
+    if args.format not in valid_formats:
+        print(
+            f"ERROR: invalid format '{args.format}'. Choose from: {', '.join(valid_formats)}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    # Validate input source
+    if args.input == "-":
+        # stdin will be read later; just ensure it's available
+        pass
+    else:
+        p = pathlib.Path(args.input)
+        if not p.exists():
+            print(f"ERROR: file not found: {p}", file=sys.stderr)
+            sys.exit(2)
+        if not p.is_file():
+            print(f"ERROR: not a regular file: {p}", file=sys.stderr)
+            sys.exit(2)
+
+    # Validate output path if given
+    if args.output:
+        out = pathlib.Path(args.output)
+        if out.exists() and not out.parent.exists():
+            print(f"ERROR: output directory does not exist: {out.parent}", file=sys.stderr)
+            sys.exit(2)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="extraction",
@@ -38,18 +70,19 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Validate arguments
+    _validate_args(args)
+
     # Read input
     if args.input == "-":
         text = sys.stdin.read()
     else:
         p = pathlib.Path(args.input)
-        if not p.exists():
-            print(f"ERROR: file not found: {p}", file=sys.stderr)
-            sys.exit(1)
         text = p.read_text(encoding="utf-8")
 
+    # Validate non-empty text
     if not text.strip():
-        print("ERROR: empty input", file=sys.stderr)
+        print("ERROR: empty input — provide text via file or stdin", file=sys.stderr)
         sys.exit(1)
 
     from extraction.extractor import extract, _fallback_extract

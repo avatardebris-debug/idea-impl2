@@ -415,6 +415,62 @@ class ValidatorAgent(AgentProcess):
                 self.write_json_state("state/phase_retries.json", retry_data)
             except Exception:
                 pass
+
+            # --- Bug Resolution Memory: persist error→fix pair if retries occurred ---
+            # Only write when there were actual failures (fix_report exists),
+            # so we capture genuinely hard-won solutions, not trivial first-passes.
+            try:
+                fix_report_path_str = f"phases/phase_{phase_num}/fix_report.md"
+                existing_fix_report = self.read_state_file(fix_report_path_str)
+                if existing_fix_report:
+                    import re as _re
+                    from pipeline.bug_memory import append_resolution
+
+                    # Extract first failure reason from fix_report
+                    failure_reason = ""
+                    for line in existing_fix_report.splitlines()[:40]:
+                        stripped = line.strip()
+                        if stripped and any(
+                            kw in stripped.lower()
+                            for kw in ("fail", "error", "missing", "wrong",
+                                       "import", "assert", "syntax", "attribute")
+                        ):
+                            failure_reason = stripped[:120]
+                            break
+                    if not failure_reason:
+                        failure_reason = existing_fix_report.splitlines()[0][:120]
+
+                    # Extract fix summary from validation report summary line
+                    fix_summary = ""
+                    for line in report_content.splitlines():
+                        stripped = line.strip()
+                        if stripped and stripped.startswith("- ") and len(stripped) > 10:
+                            fix_summary = stripped.lstrip("- ")[:200]
+                            break
+                    if not fix_summary:
+                        fix_summary = "Phase passed after executor fix"
+
+                    # Count how many retry attempts occurred
+                    attempt_count = len(_re.findall(
+                        r"^### Attempt \d+", existing_fix_report, _re.MULTILINE
+                    ))
+                    retry_count = max(attempt_count, 1)
+
+                    append_resolution(
+                        slug=idea_slug,
+                        phase=phase_num,
+                        failure_reason=failure_reason,
+                        fix_summary=fix_summary,
+                        retry_count=retry_count,
+                    )
+                    logger.info(
+                        "[validator] Bug memory: recorded resolution for %s phase %d "
+                        "(%d retries): %s",
+                        idea_slug, phase_num, retry_count, failure_reason[:60],
+                    )
+            except Exception as _bm_err:
+                logger.warning("[validator] Bug memory write failed (non-critical): %s", _bm_err)
+
             out_msg = Message.create(
                 from_agent=self.role,
                 to_agent="reviewer",

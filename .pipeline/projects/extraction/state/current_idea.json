@@ -1,0 +1,13 @@
+{
+  "title": "[extraction]",
+  "description": "turn source material from summarizer tool into a \"recipe\" or specific step by step sequences and for potential specific skill extraction. Enable button that save's skill",
+  "status": "phase_2_validating",
+  "phase": 2,
+  "total_phases": 3,
+  "started_at": "2026-05-19T00:34:47.894540+00:00",
+  "depends_on": [
+    "summarizer_tool"
+  ],
+  "tasks_done": 2,
+  "tasks_total": 5
+}

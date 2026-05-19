@@ -47,11 +47,7 @@ class TestFillPrompt:
         template = "Items: {{items}}"
         context = {"items": [1, 2, 3]}
         result = fill_prompt(template, context)
-        # json.dumps with indent=2 produces a multiline list
-        assert "1" in result
-        assert "2" in result
-        assert "3" in result
-        assert "Items:" in result
+        assert "[1, 2, 3]" in result
 
     def test_fill_missing_key(self):
         """Test filling with missing key (should leave placeholder)."""

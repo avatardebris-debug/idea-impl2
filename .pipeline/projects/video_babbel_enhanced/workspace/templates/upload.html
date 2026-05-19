@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Babbel Enhanced — Upload</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🎬 Video Babbel Enhanced</h1>
+        <p class="subtitle">Upload a video to extract language-learning clips</p>
+
+        <form id="upload-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="video">Select Video</label>
+                <input type="file" id="video" name="video" accept="video/*" required>
+            </div>
+
+            <div class="form-group">
+                <label for="target_lang">Target Language</label>
+                <select id="target_lang" name="target_lang">
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="zh">Chinese</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="it">Italian</option>
+                    <option value="ru">Russian</option>
+                    <option value="ar">Arabic</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="source_lang">Source Language</label>
+                <select id="source_lang" name="source_lang">
+                    <option value="en">English</option>
+                    <option value="auto">Auto-detect</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="top_n">Number of Clips</label>
+                <input type="number" id="top_n" name="top_n" value="50" min="1" max="200">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Upload & Extract</button>
+        </form>
+
+        <div id="status" class="status" style="display:none;"></div>
+        <div id="result" class="result" style="display:none;">
+            <h2>✅ Extraction Complete!</h2>
+            <p id="result-text"></p>
+            <a href="/clips" class="btn btn-secondary">View Clips</a>
+            <a href="/drill" class="btn btn-secondary">Start Drill</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+</body>
+</html>

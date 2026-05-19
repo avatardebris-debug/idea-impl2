@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Babbel Enhanced — Watch</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Watch Clip</h1>
+        <div class="toolbar">
+            <a href="/clips" class="btn btn-secondary">← Back to Clips</a>
+            <a href="/drill" class="btn btn-primary">Start Drill</a>
+        </div>
+
+        <div class="video-container">
+            <video id="video-player" controls>
+                <source src="" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+
+        <div class="clip-info" id="clip-info">
+            <h2 id="clip-title">Loading...</h2>
+            <p id="clip-transcript"></p>
+            <p id="clip-translation"></p>
+            <p id="clip-freq"></p>
+        </div>
+
+        <div class="review-section">
+            <h3>Rate this clip</h3>
+            <div class="stars" id="stars">
+                <span data-quality="1">☆</span>
+                <span data-quality="2">☆</span>
+                <span data-quality="3">☆</span>
+                <span data-quality="4">☆</span>
+                <span data-quality="5">☆</span>
+            </div>
+            <p id="review-status"></p>
+        </div>
+
+        <div class="lip-sync-section">
+            <h3>Lip Sync</h3>
+            <button id="lipsync-btn" class="btn btn-secondary">Generate Lip Sync</button>
+            <div id="lipsync-result" class="lipsync-result" style="display:none;">
+                <video id="lipsync-video" controls>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/watch.js') }}"></script>
+</body>
+</html>

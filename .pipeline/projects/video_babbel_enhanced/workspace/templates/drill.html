@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Babbel Enhanced — Drill</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 Spaced Repetition Drill</h1>
+        <div class="toolbar">
+            <a href="/clips" class="btn btn-secondary">← Back to Clips</a>
+            <a href="/" class="btn btn-secondary">Upload New</a>
+        </div>
+
+        <div class="drill-setup">
+            <div class="form-group">
+                <label for="drill-mode">Mode</label>
+                <select id="drill-mode">
+                    <option value="translate">Translate (EN → Target)</option>
+                    <option value="reverse">Reverse (Target → EN)</option>
+                    <option value="shadow">Shadowing</option>
+                    <option value="mixed">Mixed</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="drill-limit">Cards</label>
+                <input type="number" id="drill-limit" value="20" min="1" max="100">
+            </div>
+            <button id="start-drill" class="btn btn-primary">Start Drill</button>
+        </div>
+
+        <div id="drill-area" class="drill-area" style="display:none;">
+            <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill"></div>
+            </div>
+            <p id="progress-text">Card 1 of 20</p>
+
+            <div class="card" id="card">
+                <div class="card-front" id="card-front">
+                    <p id="card-text"></p>
+                    <button id="play-audio" class="btn btn-small">🔊 Play Audio</button>
+                </div>
+                <div class="card-back" id="card-back" style="display:none;">
+                    <p id="card-translation"></p>
+                    <button id="show-answer" class="btn btn-small">Show Answer</button>
+                </div>
+            </div>
+
+            <div class="review-buttons">
+                <button class="btn btn-danger" data-quality="1">Again</button>
+                <button class="btn btn-warning" data-quality="2">Hard</button>
+                <button class="btn btn-info" data-quality="3">Good</button>
+                <button class="btn btn-success" data-quality="4">Easy</button>
+            </div>
+        </div>
+
+        <div id="drill-stats" class="drill-stats" style="display:none;">
+            <h2>Drill Complete!</h2>
+            <p id="drill-summary"></p>
+            <a href="/clips" class="btn btn-secondary">Back to Clips</a>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/drill.js') }}"></script>
+</body>
+</html>

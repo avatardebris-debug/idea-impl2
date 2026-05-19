@@ -209,12 +209,39 @@ def main() -> None:
     # fetch-data
     sub.add_parser("fetch-data", help="Download SUBTLEX-US word frequency list")
 
+    # drill
+    p_drill = sub.add_parser("drill", help="Run spaced repetition drill session")
+    p_drill.add_argument("--mode", "-m", choices=["translate", "reverse", "shadow", "mixed"], default="translate", help="Practice mode (default: translate)")
+    p_drill.add_argument("--limit", "-l", type=int, default=20, help="Max cards to review (default: 20)")
+    p_drill.add_argument("--session", "-s", type=str, default=None, help="Session name")
+    p_drill.add_argument("--db", "-d", type=str, default="video_babbel.db", help="Database path")
+
+    # export-anki
+    p_anki = sub.add_parser("export-anki", help="Export clips to Anki deck (.apkg)")
+    p_anki.add_argument("--deck", default="Video Babbel", help="Deck name")
+    p_anki.add_argument("--db", default="video_babbel.db", help="Database path")
+    p_anki.add_argument("--output", default="video_babbel_deck.apkg", help="Output .apkg path")
+
+    # import-clips
+    p_import = sub.add_parser("import-clips", help="Import clip JSON files into the database")
+    p_import.add_argument("clips_dir", help="Directory with clip JSON files")
+    p_import.add_argument("--db", default="video_babbel.db", help="Database path")
+
     args = parser.parse_args()
 
     if args.command == "extract":
         cmd_extract(args)
     elif args.command == "fetch-data":
         cmd_fetch_data()
+    elif args.command == "drill":
+        from video_babbel_enhanced.drill_cli import main as drill_main
+        drill_main([f"--mode={args.mode}", f"--limit={args.limit}"] + (["--session", args.session] if args.session else []) + [f"--db={args.db}"])
+    elif args.command == "export-anki":
+        from video_babbel_enhanced.anki_export import export_anki
+        export_anki(deck_name=args.deck, db_path=args.db, output_path=args.output)
+    elif args.command == "import-clips":
+        from video_babbel_enhanced.clip_extractor import import_clips
+        import_clips(args.clips_dir, args.db)
 
 
 if __name__ == "__main__":

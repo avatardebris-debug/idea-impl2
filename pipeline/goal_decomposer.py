@@ -1,0 +1,378 @@
+"""
+pipeline/goal_decomposer.py
+Goal Decomposer — decomposes a --goal entry into a YAML dependency tree,
+then injects each leaf as a new idea entry into master_ideas.md.
+
+Called by seed_from_master_list() when it encounters a line ending with --goal.
+This module is imported by runner.py — it does NOT run as a subprocess.
+
+Output format:
+  Each leaf becomes a master_ideas.md line:
+    - [ ] **[Title]** — [Description. requires: dep1, dep2]
+  Each compound branch spawns a new --goal entry for recursive decomposition.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import pathlib
+import re
+import sys
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Literal
+
+logger = logging.getLogger(__name__)
+
+PROJECT_ROOT = pathlib.Path(__file__).parent.parent
+PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
+GOALS_DIR = PIPELINE_DIR / "goals"
+
+
+# ---------------------------------------------------------------------------
+# Data model
+# ---------------------------------------------------------------------------
+
+@dataclass
+class GoalBranch:
+    id: str
+    subgoal: str
+    type: Literal["software", "compound", "hermes_task", "robot_skill"]
+    description: str = ""
+    requires: list[str] = field(default_factory=list)
+    hermes_prompt: str = ""
+    hermes_goal_check: str = ""
+    # Runtime state
+    status: str = "pending"  # pending | injected | complete | killed
+    pipeline_slug: str | None = None
+    mirofish_score: float | None = None
+
+
+@dataclass
+class GoalTree:
+    goal_id: str
+    goal_text: str
+    created_at: str
+    parent_goal_id: str | None = None
+    parent_branch_id: str | None = None
+    status: str = "active"  # active | complete | abandoned
+    branches: list[GoalBranch] = field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# LLM decomposition
+# ---------------------------------------------------------------------------
+
+_DECOMPOSE_PROMPT = """\
+You are a Goal Decomposer. Your job is to break a high-level goal into independently
+buildable sub-tasks that can each be completed by an autonomous software pipeline.
+
+GOAL: {goal_text}
+
+## Already-complete projects (reuse these, do NOT re-queue them):
+{completed_projects}
+
+## Currently pending ideas (do NOT duplicate these):
+{pending_ideas}
+
+## Rules:
+1. Classify each branch as one of:
+   - software: A concrete Python tool/library the pipeline can build
+   - compound: Still too big — needs further decomposition (max depth: 2)
+   - hermes_task: Open-ended research/exploration/benchmarking (no fixed output format)
+   - robot_skill: A physical robot movement primitive (only for actual motor control)
+
+2. For software branches: be specific. Name files, classes, I/O formats.
+3. For hermes_task: write a clear `hermes_goal_check` question the critic can evaluate.
+4. Declare dependencies with `requires:` using existing project slugs.
+5. Do NOT include already-complete projects as branches.
+6. Produce 3-8 branches. More is worse — prefer fewer, more specific branches.
+
+## Output format (JSON only, no other text):
+{{
+  "branches": [
+    {{
+      "id": "b001",
+      "subgoal": "Short branch title (3-7 words)",
+      "type": "software",
+      "description": "Detailed description of what to build. Include I/O format, key classes/functions.",
+      "requires": ["existing_slug_if_needed"],
+      "hermes_prompt": "",
+      "hermes_goal_check": ""
+    }},
+    {{
+      "id": "b002",
+      "subgoal": "Research MuJoCo URDF options",
+      "type": "hermes_task",
+      "description": "Find and evaluate robot URDF models for MuJoCo 3.x.",
+      "requires": [],
+      "hermes_prompt": "Find 3 production-quality robot URDF models compatible with MuJoCo 3.x. Evaluate joint count, articulation quality, and license. Write a ranked comparison table to .pipeline/goals/urdf_research.md.",
+      "hermes_goal_check": "Has the agent produced a ranked comparison of at least 3 URDF models with MuJoCo compatibility confirmed and written to .pipeline/goals/urdf_research.md?"
+    }}
+  ]
+}}
+"""
+
+
+def _call_llm(prompt: str) -> str:
+    """Call the LLM synchronously via the existing agent_process infrastructure."""
+    # Import here to avoid circular imports — runner.py imports us, agent_process
+    # imports pipeline.message_bus, so the import chain is fine as long as we
+    # don't import at module level.
+    try:
+        sys.path.insert(0, str(PROJECT_ROOT))
+        from pipeline.agent_process import AgentProcess
+
+        class _TempAgent(AgentProcess):
+            role = "goal_decomposer"
+            max_steps = 5
+            temperature = 0.3
+            think = False
+
+            def handle(self, msg):  # pragma: no cover
+                pass  # not used directly
+
+        agent = _TempAgent.__new__(_TempAgent)
+        AgentProcess.__init__(agent)
+        result = agent.call_agent(task=prompt, verbose=False)
+        return result.raw_output if hasattr(result, "raw_output") else str(result)
+    except Exception as exc:
+        logger.error("LLM call failed in goal_decomposer: %s", exc)
+        return ""
+
+
+# ---------------------------------------------------------------------------
+# Core decomposition logic
+# ---------------------------------------------------------------------------
+
+def _completed_project_slugs() -> list[str]:
+    """Return slugs of all pipeline projects with status=complete."""
+    projects_dir = PIPELINE_DIR / "projects"
+    if not projects_dir.exists():
+        return []
+    slugs = []
+    for p in projects_dir.iterdir():
+        if not p.is_dir():
+            continue
+        sf = p / "state" / "current_idea.json"
+        if sf.exists():
+            try:
+                state = json.loads(sf.read_text(encoding="utf-8"))
+                if state.get("status") == "complete":
+                    slugs.append(p.name)
+            except Exception:
+                pass
+    return slugs
+
+
+def _pending_idea_titles(mi_path: pathlib.Path) -> list[str]:
+    """Return titles of unchecked (not yet done) ideas in master_ideas.md."""
+    if not mi_path.exists():
+        return []
+    titles = []
+    for line in mi_path.read_text(encoding="utf-8").splitlines():
+        m = re.match(r"- \[ \]\s+\*\*(.+?)\*\*", line)
+        if m:
+            titles.append(m.group(1).strip())
+    return titles
+
+
+def _parse_llm_branches(raw: str) -> list[dict]:
+    """Extract the JSON branches list from raw LLM output."""
+    # Strip markdown fences if present
+    raw = re.sub(r"```(?:json)?", "", raw).strip()
+    # Find the first {...} block
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not m:
+        logger.warning("goal_decomposer: no JSON found in LLM output")
+        return []
+    try:
+        data = json.loads(m.group(0))
+        return data.get("branches", [])
+    except json.JSONDecodeError as exc:
+        logger.error("goal_decomposer: JSON parse error: %s", exc)
+        return []
+
+
+def decompose_goal(
+    goal_text: str,
+    goal_title: str,
+    mi_path: pathlib.Path,
+    parent_goal_id: str | None = None,
+    parent_branch_id: str | None = None,
+) -> GoalTree:
+    """Decompose a natural-language goal into a GoalTree and persist to disk."""
+    GOALS_DIR.mkdir(parents=True, exist_ok=True)
+
+    goal_id = re.sub(r"[^\w]", "_", goal_title.lower())[:40].strip("_")
+    ts = datetime.now(timezone.utc).isoformat()
+
+    completed = _completed_project_slugs()
+    pending = _pending_idea_titles(mi_path)
+
+    prompt = _DECOMPOSE_PROMPT.format(
+        goal_text=goal_text,
+        completed_projects=", ".join(completed[:60]) or "(none yet)",
+        pending_ideas=", ".join(pending[:40]) or "(none yet)",
+    )
+
+    raw = _call_llm(prompt)
+    branch_dicts = _parse_llm_branches(raw)
+
+    branches = []
+    for b in branch_dicts:
+        branches.append(GoalBranch(
+            id=b.get("id", f"b{len(branches):03d}"),
+            subgoal=b.get("subgoal", "unknown"),
+            type=b.get("type", "software"),
+            description=b.get("description", ""),
+            requires=b.get("requires", []),
+            hermes_prompt=b.get("hermes_prompt", ""),
+            hermes_goal_check=b.get("hermes_goal_check", ""),
+        ))
+
+    tree = GoalTree(
+        goal_id=goal_id,
+        goal_text=goal_text,
+        created_at=ts,
+        parent_goal_id=parent_goal_id,
+        parent_branch_id=parent_branch_id,
+        branches=branches,
+    )
+
+    _save_goal_tree(tree)
+    logger.info("goal_decomposer: decomposed '%s' → %d branches", goal_title, len(branches))
+    return tree
+
+
+def _save_goal_tree(tree: GoalTree) -> None:
+    """Persist goal tree as JSON for inspection/resume."""
+    path = GOALS_DIR / f"{tree.goal_id}.json"
+    data = {
+        "goal_id": tree.goal_id,
+        "goal_text": tree.goal_text,
+        "created_at": tree.created_at,
+        "parent_goal_id": tree.parent_goal_id,
+        "parent_branch_id": tree.parent_branch_id,
+        "status": tree.status,
+        "branches": [
+            {
+                "id": b.id,
+                "subgoal": b.subgoal,
+                "type": b.type,
+                "description": b.description,
+                "requires": b.requires,
+                "hermes_prompt": b.hermes_prompt,
+                "hermes_goal_check": b.hermes_goal_check,
+                "status": b.status,
+                "pipeline_slug": b.pipeline_slug,
+            }
+            for b in tree.branches
+        ],
+    }
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Injection into master_ideas.md
+# ---------------------------------------------------------------------------
+
+def inject_branches_into_ideas(tree: GoalTree, mi_path: pathlib.Path) -> int:
+    """
+    Write each leaf branch from the goal tree into master_ideas.md as new
+    unchecked idea entries, then mark the original --goal line as [x] done.
+
+    Returns the number of branches injected.
+    """
+    injected = 0
+    new_lines: list[str] = []
+
+    for branch in tree.branches:
+        if branch.type == "compound":
+            # Will be recursively decomposed when the runner picks it up
+            tag = "--goal"
+        elif branch.type == "hermes_task":
+            tag = "--hermes"
+        elif branch.type == "robot_skill":
+            tag = "--robot"
+        else:
+            tag = ""
+
+        requires_clause = ""
+        if branch.requires:
+            requires_clause = f". requires: {', '.join(branch.requires)}"
+
+        line = (
+            f"- [ ] **[{branch.subgoal}]** — "
+            f"[[goal:{tree.goal_id}:{branch.id}] {branch.description}{requires_clause}]"
+        )
+        if tag:
+            line += f" {tag}"
+        new_lines.append(line)
+        injected += 1
+
+    if not new_lines:
+        logger.warning("goal_decomposer: no branches to inject for goal '%s'", tree.goal_id)
+        return 0
+
+    content = mi_path.read_text(encoding="utf-8")
+
+    # Mark the original --goal line as complete
+    goal_title_pattern = re.escape(tree.goal_text[:30])
+    content = re.sub(
+        rf"(- \[ \](\s+\*\*.*?{re.escape(tree.goal_id[:15])}.*?\*\*.*?--goal[^\n]*))",
+        lambda m: m.group(0).replace("- [ ]", "- [x]"),
+        content,
+        flags=re.IGNORECASE,
+    )
+
+    # Append the new entries under a ## Goal Decompositions section
+    section_header = "## Goal Decompositions"
+    if section_header not in content:
+        content += f"\n\n{section_header}\n\n"
+
+    injection_block = (
+        f"\n<!-- goal:{tree.goal_id} decomposed {tree.created_at[:10]} -->\n"
+        + "\n".join(new_lines)
+        + "\n"
+    )
+
+    # Insert before the end of the Goal Decompositions section (or append)
+    if section_header in content:
+        insert_pos = content.rfind(section_header) + len(section_header)
+        content = content[:insert_pos] + injection_block + content[insert_pos:]
+    else:
+        content += injection_block
+
+    mi_path.write_text(content, encoding="utf-8")
+    print(f"  🎯 Goal '{tree.goal_id}': injected {injected} branches into {mi_path.name}")
+    return injected
+
+
+# ---------------------------------------------------------------------------
+# Public entry point called from runner.py
+# ---------------------------------------------------------------------------
+
+def process_goal_line(
+    goal_title: str,
+    goal_description: str,
+    mi_path: pathlib.Path,
+) -> bool:
+    """
+    Full pipeline: decompose a --goal entry and inject children into ideas file.
+    Returns True if at least one branch was injected.
+    """
+    print(f"\n  🎯 Decomposing goal: {goal_title}")
+    tree = decompose_goal(
+        goal_text=goal_description,
+        goal_title=goal_title,
+        mi_path=mi_path,
+    )
+    if not tree.branches:
+        logger.warning("goal_decomposer: LLM produced no branches for '%s'", goal_title)
+        print(f"  ⚠  Goal decomposition returned no branches — check .pipeline/goals/{tree.goal_id}.json")
+        return False
+
+    injected = inject_branches_into_ideas(tree, mi_path)
+    return injected > 0

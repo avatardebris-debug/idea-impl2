@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "video-babbel-enhanced"
@@ -14,6 +14,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-cov"]
+
+[project.scripts]
+video-babbel = "video_babbel_enhanced.cli:main"
+drill = "video_babbel_enhanced.drill_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

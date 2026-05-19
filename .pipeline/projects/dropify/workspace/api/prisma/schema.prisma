@@ -1,0 +1,340 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  SELLER
+  CUSTOMER
+}
+
+enum StoreStatus {
+  ACTIVE
+  DRAFT
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum SupplierType {
+  ALIEXPRESS
+  SPOCKET
+  CJ_DROPSHIPPING
+  DROPSERVING
+  CUSTOM
+}
+
+enum SupplierStatus {
+  ACTIVE
+  INACTIVE
+  PENDING_VERIFICATION
+  SUSPENDED
+}
+
+enum FulfillmentStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  FAILED
+  CANCELLED
+  RETRYING
+}
+
+enum SyncStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  password     String
+  name         String?
+  role         UserRole @default(CUSTOMER)
+  resetToken   String?  @unique
+  resetExpiry  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  stores       Store[]
+  orders       Order[]
+  supplierAccounts SupplierAccount[]
+
+  @@map("users")
+}
+
+model Store {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String?
+  logoUrl     String?
+  currency    String        @default("USD")
+  timezone    String        @default("UTC")
+  status      StoreStatus   @default(DRAFT)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenantId    String        @map("tenant_id")
+  theme       Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  products    Product[]
+  orders      Order[]
+  supplierProducts SupplierProduct[]
+  supplierAccounts SupplierAccount[]
+
+  @@index([userId])
+  @@index([slug])
+  @@index([tenantId])
+  @@map("stores")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  tenantId    String   @map("tenant_id")
+  storeId     String?
+  store       Store?   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  products    Product[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@map("categories")
+}
+
+model Product {
+  id            String         @id @default(uuid())
+  name          String
+  description   String?
+  price         Decimal        @db.Decimal(10, 2)
+  compareAtPrice Decimal?      @db.Decimal(10, 2)
+  sku           String?        @unique
+  inventory     Int            @default(0)
+  status        String         @default("ACTIVE")
+  images        String[]
+  categoryId    String?
+  category      Category?      @relation(fields: [categoryId], references: [id])
+  tenantId      String         @map("tenant_id")
+  storeId       String
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variants      ProductVariant[]
+  supplierProduct SupplierProduct?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("products")
+}
+
+model ProductVariant {
+  id          String   @id @default(uuid())
+  name        String   // e.g., "Size", "Color"
+  option      String   // e.g., "S", "Red"
+  priceDelta  Decimal  @default(0) @db.Decimal(10, 2)
+  sku         String?
+  inventory   Int      @default(0)
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenantId    String   @map("tenant_id")
+
+  @@index([productId])
+  @@index([tenantId])
+  @@map("product_variants")
+}
+
+model Order {
+  id            String       @id @default(uuid())
+  orderNumber   String       @unique
+  status        OrderStatus  @default(PENDING)
+  paymentStatus PaymentStatus @default(PENDING)
+  stripeSessionId String?    @unique
+  subtotal      Decimal      @db.Decimal(10, 2)
+  tax           Decimal      @default(0) @db.Decimal(10, 2)
+  shipping      Decimal      @default(0) @db.Decimal(10, 2)
+  total         Decimal      @db.Decimal(10, 2)
+  customerEmail String
+  customerName  String?
+  shippingAddress Json?
+  tenantId      String       @map("tenant_id")
+  storeId       String
+  store         Store        @relation(fields: [storeId], references: [id])
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id])
+  items         OrderItem[]
+  fulfillment   Fulfillment?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([userId])
+  @@index([stripeSessionId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+  quantity  Int
+  price     Decimal  @db.Decimal(10, 2)
+  tenantId  String   @map("tenant_id")
+
+  @@index([orderId])
+  @@index([tenantId])
+  @@map("order_items")
+}
+
+model Supplier {
+  id          String          @id @default(uuid())
+  name        String
+  type        SupplierType
+  status      SupplierStatus  @default(PENDING_VERIFICATION)
+  apiKey      String?         @unique
+  apiSecret   String?         @unique
+  baseUrl     String?
+  webhookUrl  String?
+  description String?
+  logoUrl     String?
+  contactEmail String?
+  contactPhone String?
+  metadata    Json?
+  tenantId    String          @map("tenant_id")
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  supplierAccounts SupplierAccount[]
+  supplierProducts SupplierProduct[]
+
+  @@index([tenantId])
+  @@index([type])
+  @@map("suppliers")
+}
+
+model SupplierAccount {
+  id          String          @id @default(uuid())
+  supplierId  String
+  supplier    Supplier        @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  storeId     String
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  externalAccountId String?   @unique
+  credentials Json?
+  status      SupplierStatus  @default(PENDING_VERIFICATION)
+  lastSyncAt  DateTime?
+  syncStatus  SyncStatus      @default(PENDING)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([userId])
+  @@map("supplier_accounts")
+}
+
+model SupplierProduct {
+  id          String   @id @default(uuid())
+  supplierId  String
+  supplier    Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplierProductId String @unique
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+  inventory   Int      @default(0)
+  imageUrl    String?
+  sku         String?
+  status      String   @default("ACTIVE")
+  tenantId    String   @map("tenant_id")
+  storeId     String
+  store       Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  localProductId String?
+  localProduct Product? @relation(fields: [localProductId], references: [id])
+  syncStatus  SyncStatus @default(PENDING)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([syncStatus])
+  @@map("supplier_products")
+}
+
+model Fulfillment {
+  id          String           @id @default(uuid())
+  orderId     String
+  order       Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId  String
+  supplier    Supplier         @relation(fields: [supplierId], references: [id])
+  supplierOrderId String?
+  trackingNumber String?
+  trackingUrl String?
+  carrier     String?
+  status      FulfillmentStatus @default(PENDING)
+  cost        Decimal          @default(0) @db.Decimal(10, 2)
+  notes       String?
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([orderId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("fulfillments")
+}
+
+model InventorySync {
+  id          String       @id @default(uuid())
+  supplierProductId String
+  supplierProduct SupplierProduct @relation(fields: [supplierProductId], references: [id], onDelete: Cascade)
+  syncStatus  SyncStatus   @default(PENDING)
+  lastSyncAt  DateTime?
+  error       String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([supplierProductId])
+  @@index([syncStatus])
+  @@map("inventory_syncs")
+}

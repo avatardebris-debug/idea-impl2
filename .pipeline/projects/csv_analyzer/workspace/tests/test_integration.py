@@ -168,8 +168,7 @@ class TestIntegrationEdgeCases:
             "José García,México,México\n"
             "María López,España,España\n"
             "李明，北京，中国\n"
-            "田中太郎，東京，日本\n",
-            encoding="utf-8",
+            "田中太郎，東京，日本\n"
         )
 
         runner = CliRunner()

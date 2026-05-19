@@ -622,38 +622,38 @@ class AgentProcess:
         Also discards any SHUTDOWN signals left in the queue from a previous
         pipeline run — these would otherwise cause agents to immediately exit
         on every restart.
+
+        NOTE: MessageBus is SQLite-backed (Strategy 2). The old file-based
+        _queue_path/_read_lines/_write_lines methods no longer exist.
         """
-        import json as _json
-        path = self.bus._queue_path(self.role)
-        if not path.exists():
-            return
-        from pipeline.message_bus import _FileLock
-        with _FileLock(path):
-            lines = self.bus._read_lines(path)
-            changed = False
-            for i, line in enumerate(lines):
-                try:
-                    d = _json.loads(line)
-                    # Reset stuck processing messages so they can be retried
-                    if d.get("status") == "processing":
-                        d["status"] = "pending"
-                        lines[i] = _json.dumps(d)
-                        changed = True
-                        logger.warning("[%s] Recovered stuck message %s",
-                                       self.role, d.get("msg_id", "?"))
-                    # Discard stale SHUTDOWN signals from previous runs
-                    elif (d.get("status") == "pending"
-                          and d.get("type") == "signal"
-                          and d.get("payload", {}).get("signal") == "SHUTDOWN"):
-                        d["status"] = "done"
-                        lines[i] = _json.dumps(d)
-                        changed = True
-                        logger.info("[%s] Discarded stale SHUTDOWN signal %s",
-                                    self.role, d.get("msg_id", "?"))
-                except _json.JSONDecodeError:
-                    continue
-            if changed:
-                self.bus._write_lines(path, lines)
+        from pipeline.message_bus import _get_conn
+
+        conn = _get_conn(self.bus._db)
+
+        # Reset any messages stuck in 'processing' for THIS agent
+        cur = conn.execute(
+            "UPDATE messages SET status='pending' WHERE to_agent=? AND status='processing'",
+            (self.role,),
+        )
+        recovered = cur.rowcount
+        if recovered:
+            conn.commit()
+            logger.warning("[%s] Recovered %d stuck processing message(s)",
+                           self.role, recovered)
+
+        # Discard stale SHUTDOWN signals left from a previous pipeline run
+        cur = conn.execute(
+            """UPDATE messages SET status='done'
+               WHERE to_agent=? AND status='pending'
+               AND type='signal'
+               AND json_extract(payload, '$.signal')='SHUTDOWN'""",
+            (self.role,),
+        )
+        discarded = cur.rowcount
+        if discarded:
+            conn.commit()
+            logger.info("[%s] Discarded %d stale SHUTDOWN signal(s)",
+                        self.role, discarded)
 
     def _setup_logging(self) -> None:
         """Configure per-agent log file."""

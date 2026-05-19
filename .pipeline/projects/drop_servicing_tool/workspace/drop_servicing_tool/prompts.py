@@ -69,11 +69,7 @@ def build_step_prompt(
     step = sop.steps[step_index]
     template_name = step.prompt_template or "default_step"
 
-    try:
-        template = load_prompt_template(template_name, prompts_dir)
-    except FileNotFoundError:
-        # Fall back to default_step template when custom template is missing
-        template = load_prompt_template("default_step", prompts_dir)
+    template = load_prompt_template(template_name, prompts_dir)
 
     # Build context dict
     previous_output = step_outputs[step_index - 1].get("raw", "N/A") if step_index > 0 else "N/A"

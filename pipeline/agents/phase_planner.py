@@ -38,6 +38,20 @@ class PhasePlannerAgent(AgentProcess):
         # Read existing workspace to know what already exists
         workspace = self.get_workspace_path()
 
+        # --- Bug Resolution Memory: inject relevant past failures as guardrails ---
+        # Query the persistent memory store for resolutions matching this phase's spec.
+        # If found, append them as a guardrail block so the planner can steer the
+        # executor away from known failure patterns before coding begins.
+        bug_memory_block = ""
+        try:
+            from pipeline.bug_memory import format_for_prompt as _bug_fmt
+            bug_memory_block = _bug_fmt(
+                task_text=f"{phase_spec} {master_plan[:500]}",
+                top_n=3,
+            )
+        except Exception:
+            pass  # Non-critical — never block planning over a memory read failure
+
         task_prompt = (
             f"You are planning Phase {phase_num} of a project.\n\n"
             f"## Master Plan\n{master_plan[:3000]}\n\n"
@@ -60,6 +74,11 @@ class PhasePlannerAgent(AgentProcess):
             f"   Do NOT use ## headings for tasks. Do NOT use ✅ or other symbols.\n"
             f"4. Say DONE.\n"
         )
+
+        # Append bug memory guardrails if any were found — placed after instructions
+        # so they are the last thing the model reads before generating tasks.
+        if bug_memory_block:
+            task_prompt += f"\n\n{bug_memory_block}"
 
         result = self.call_agent(task=task_prompt, verbose=False)
 

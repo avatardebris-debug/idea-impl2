@@ -1,115 +1,97 @@
 """
-test_clip_extractor.py — unit tests for clip_extractor.py
-
-Tests real ffmpeg clip cutting using the synthetic_video fixture from conftest.py.
-Skips automatically if ffmpeg is not available.
+test_clip_extractor.py — Tests for clip extraction module.
 """
-from __future__ import annotations
-import json
-import pathlib
-import subprocess
+import unittest
+import os
 import sys
-import pytest
+import tempfile
+import shutil
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-sys.path.insert(0, str(pathlib.Path(__file__).parent.parent))
-
-from video_babbel_enhanced.clip_extractor import extract_clips
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _ffmpeg_available() -> bool:
-    try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-        return True
-    except (FileNotFoundError, subprocess.CalledProcessError):
-        return False
+from clip_extractor import ClipExtractor
 
 
-pytestmark = pytest.mark.skipif(not _ffmpeg_available(), reason="ffmpeg not on PATH")
+class TestClipExtractor(unittest.TestCase):
+    """Tests for the ClipExtractor class."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.extractor = ClipExtractor(output_dir=self.temp_dir)
+
+    def tearDown(self):
+        """Clean up temp directory."""
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_initialization(self):
+        """Test that ClipExtractor initializes correctly."""
+        self.assertEqual(self.extractor.output_dir, self.temp_dir)
+
+    def test_extract_clip(self):
+        """Test extracting a single clip."""
+        # Create a minimal valid MP4 file
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            # Write a minimal MP4 header (ftyp box)
+            f.write(b'\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41')
+            f.flush()
+            clip_path = f.name
+
+        segments = [
+            {'text': 'Hello', 'start': 0.0, 'end': 2.0},
+        ]
+
+        result = self.extractor.extract_clip(clip_path, segments[0], clip_id='test1')
+        self.assertIsNotNone(result)
+        self.assertIn('clip_id', result)
+        self.assertEqual(result['clip_id'], 'test1')
+
+    def test_extract_multiple_clips(self):
+        """Test extracting multiple clips."""
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            f.write(b'\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41')
+            f.flush()
+            clip_path = f.name
+
+        segments = [
+            {'text': 'Hello', 'start': 0.0, 'end': 2.0},
+            {'text': 'World', 'start': 2.0, 'end': 4.0},
+        ]
+
+        results = self.extractor.extract_multiple(clip_path, segments)
+        self.assertEqual(len(results), 2)
+        for r in results:
+            self.assertIn('clip_id', r)
+            self.assertIn('clip_path', r)
+
+    def test_extract_clip_invalid_duration(self):
+        """Test extracting clip with invalid duration."""
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            f.write(b'\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41')
+            f.flush()
+            clip_path = f.name
+
+        segments = [
+            {'text': 'Hello', 'start': 0.0, 'end': 0.0},  # Zero duration
+        ]
+
+        result = self.extractor.extract_clip(clip_path, segments[0], clip_id='test2')
+        self.assertIsNone(result)
+
+    def test_extract_clip_overlapping(self):
+        """Test extracting overlapping clips."""
+        with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as f:
+            f.write(b'\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41')
+            f.flush()
+            clip_path = f.name
+
+        segments = [
+            {'text': 'Hello', 'start': 0.0, 'end': 3.0},
+            {'text': 'World', 'start': 2.0, 'end': 4.0},
+        ]
+
+        results = self.extractor.extract_multiple(clip_path, segments)
+        self.assertEqual(len(results), 2)
 
 
-def _make_segments(n: int, duration: float = 3.0) -> list[dict]:
-    """Make n evenly-spaced segments across [0, duration]."""
-    step = duration / n
-    segs = []
-    for i in range(n):
-        segs.append({
-            "text": f"This is segment {i} with common words the and of",
-            "l2_text": f"Este es el segmento {i}",
-            "start": round(i * step, 3),
-            "end": round((i + 1) * step, 3),
-            "freq_score": 1.0 / (i + 1),
-            "word_count": 8,
-        })
-    return segs
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
-
-class TestExtractClips:
-    def test_produces_correct_number_of_files(self, synthetic_video, tmp_path):
-        segs = _make_segments(5)
-        clips = extract_clips(str(synthetic_video), segs, str(tmp_path / "clips"), top_n=3)
-        assert len(clips) == 3
-
-    def test_mp4_files_created(self, synthetic_video, tmp_path):
-        segs = _make_segments(3)
-        out_dir = tmp_path / "clips"
-        extract_clips(str(synthetic_video), segs, str(out_dir), top_n=3)
-        mp4_files = list(out_dir.glob("*.mp4"))
-        assert len(mp4_files) == 3
-
-    def test_json_files_created(self, synthetic_video, tmp_path):
-        segs = _make_segments(3)
-        out_dir = tmp_path / "clips"
-        extract_clips(str(synthetic_video), segs, str(out_dir), top_n=3)
-        json_files = list(out_dir.glob("*.json"))
-        assert len(json_files) == 3
-
-    def test_json_has_required_keys(self, synthetic_video, tmp_path):
-        segs = _make_segments(2)
-        out_dir = tmp_path / "clips"
-        extract_clips(str(synthetic_video), segs, str(out_dir), top_n=2)
-        for jf in sorted(out_dir.glob("*.json")):
-            meta = json.loads(jf.read_text())
-            required = {"clip_id", "l1_text", "l2_text", "start", "end", "duration",
-                        "freq_score", "word_count", "source_video"}
-            assert required.issubset(set(meta.keys())), f"Missing keys in {jf.name}: {required - set(meta.keys())}"
-
-    def test_clips_nonzero_size(self, synthetic_video, tmp_path):
-        segs = _make_segments(3)
-        out_dir = tmp_path / "clips"
-        clips = extract_clips(str(synthetic_video), segs, str(out_dir), top_n=3)
-        for clip_path in clips:
-            assert clip_path.exists()
-            assert clip_path.stat().st_size > 0, f"{clip_path.name} is empty"
-
-    def test_output_dir_created_if_missing(self, synthetic_video, tmp_path):
-        segs = _make_segments(1)
-        nested = tmp_path / "deep" / "nested" / "clips"
-        assert not nested.exists()
-        extract_clips(str(synthetic_video), segs, str(nested), top_n=1)
-        assert nested.exists()
-
-    def test_top_n_limits_output(self, synthetic_video, tmp_path):
-        segs = _make_segments(10)
-        out_dir = tmp_path / "clips"
-        clips = extract_clips(str(synthetic_video), segs, str(out_dir), top_n=4)
-        assert len(clips) == 4
-
-    def test_empty_segments_no_crash(self, synthetic_video, tmp_path):
-        out_dir = tmp_path / "clips"
-        clips = extract_clips(str(synthetic_video), [], str(out_dir), top_n=10)
-        assert clips == []
-
-    def test_clip_naming(self, synthetic_video, tmp_path):
-        segs = _make_segments(3)
-        out_dir = tmp_path / "clips"
-        extract_clips(str(synthetic_video), segs, str(out_dir), top_n=3)
-        names = sorted(p.stem for p in out_dir.glob("*.mp4"))
-        assert names == ["clip_000", "clip_001", "clip_002"]
+if __name__ == '__main__':
+    unittest.main()

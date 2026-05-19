@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DropStore - Automated Dropshipping Store Builder</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        
+        /* Header */
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 1.5rem; }
+        .header nav a { color: white; text-decoration: none; margin-left: 1.5rem; opacity: 0.8; transition: opacity 0.2s; }
+        .header nav a:hover { opacity: 1; }
+        
+        /* Main Layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        
+        /* Sections */
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* Cards */
+        .card { background: white; border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .card h3 { margin-bottom: 0.5rem; color: #667eea; }
+        
+        /* Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        
+        /* Buttons */
+        .btn { display: inline-block; padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a6fd6; }
+        .btn-success { background: #48bb78; color: white; }
+        .btn-success:hover { background: #38a169; }
+        .btn-danger { background: #f56565; color: white; }
+        .btn-danger:hover { background: #e53e3e; }
+        .btn-secondary { background: #e2e8f0; color: #333; }
+        .btn-secondary:hover { background: #cbd5e0; }
+        
+        /* Forms */
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.3rem; font-weight: 500; }
+        .form-group input, .form-group select { width: 100%; padding: 0.6rem; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; }
+        
+        /* Stats */
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; border-radius: 12px; padding: 1.5rem; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .stat-card .value { font-size: 2rem; font-weight: bold; color: #667eea; }
+        .stat-card .label { color: #718096; font-size: 0.85rem; margin-top: 0.3rem; }
+        
+        /* Product Card */
+        .product-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .product-card:hover { transform: translateY(-4px); }
+        .product-card .image { height: 180px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem; }
+        .product-card .content { padding: 1rem; }
+        .product-card .title { font-weight: 600; margin-bottom: 0.5rem; }
+        .product-card .meta { display: flex; justify-content: space-between; font-size: 0.85rem; color: #718096; }
+        .product-card .margin { color: #48bb78; font-weight: 600; }
+        
+        /* Niche Card */
+        .niche-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; transition: all 0.2s; }
+        .niche-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.15); }
+        .niche-card .score { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
+        .score-high { background: #c6f6d5; color: #276749; }
+        .score-med { background: #fefcbf; color: #975a16; }
+        .score-low { background: #fed7d7; color: #9b2c2c; }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .tab { padding: 0.5rem 1rem; cursor: pointer; border-radius: 8px 8px 0 0; }
+        .tab.active { background: #667eea; color: white; }
+        
+        /* Loading */
+        .loading { text-align: center; padding: 3rem; color: #718096; }
+        .spinner { width: 40px; height: 40px; border: 4px solid #e2e8f0; border-top-color: #667eea; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Badge */
+        .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-success { background: #c6f6d5; color: #276749; }
+        .badge-warning { background: #fefcbf; color: #975a16; }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: repeat(2, 1fr); }
+            .grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛍️ DropStore</h1>
+        <nav>
+            <a href="#" onclick="showSection('niches')">Niches</a>
+            <a href="#" onclick="showSection('products')">Products</a>
+            <a href="#" onclick="showSection('catalog')">Catalog</a>
+            <a href="#" onclick="showSection('shopify')">Shopify</a>
+        </nav>
+    </div>
+
+    <div class="container">
+        <!-- Niches Section -->
+        <div id="niches" class="section active">
+            <h2 style="margin-bottom: 1rem;">Discover Profitable Niches</h2>
+            <div class="form-group">
+                <select id="categoryFilter" onchange="loadNiches()">
+                    <option value="">All Categories</option>
+                    <option value="home">Home & Garden</option>
+                    <option value="fashion">Fashion</option>
+                    <option value="tech">Technology</option>
+                    <option value="health">Health & Wellness</option>
+                    <option value="sports">Sports & Outdoors</option>
+                </select>
+            </div>
+            <div id="nichesList" class="grid"></div>
+        </div>
+
+        <!-- Products Section -->
+        <div id="products" class="section">
+            <h2 style="margin-bottom: 1rem;">Product Suggestions</h2>
+            <div class="form-group">
+                <input type="text" id="searchProducts" placeholder="Search products..." oninput="loadProducts()">
+            </div>
+            <div id="productsList" class="grid"></div>
+        </div>
+
+        <!-- Catalog Section -->
+        <div id="catalog" class="section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>Your Catalog</h2>
+                <button class="btn btn-primary" onclick="createCatalog()">+ New Catalog</button>
+            </div>
+            
+            <div id="catalogStats" class="stats"></div>
+            
+            <div id="catalogList" class="grid"></div>
+            <div id="catalogProducts" class="grid" style="margin-top: 2rem;"></div>
+        </div>
+
+        <!-- Shopify Section -->
+        <div id="shopify" class="section">
+            <h2 style="margin-bottom: 1rem;">Shopify Integration</h2>
+            
+            <div class="card">
+                <h3>Connect Store</h3>
+                <div class="form-group">
+                    <label>Shop Name</label>
+                    <input type="text" id="shopName" placeholder="My Awesome Store">
+                </div>
+                <div class="form-group">
+                    <label>Domain</label>
+                    <input type="text" id="shopDomain" placeholder="my-store.myshopify.com">
+                </div>
+                <div class="form-group">
+                    <label>Access Token</label>
+                    <input type="password" id="shopToken" placeholder="shpat_xxxxxxxxxxxx">
+                </div>
+                <button class="btn btn-success" onclick="connectShopify()">Connect Store</button>
+            </div>
+            
+            <h3 style="margin: 2rem 0 1rem;">Connected Stores</h3>
+            <div id="storesList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let currentCatalog = null;
+
+        // Navigation
+        function showSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            if (sectionId === 'niches') loadNiches();
+            if (sectionId === 'products') loadProducts();
+            if (sectionId === 'catalog') loadCatalog();
+            if (sectionId === 'shopify') loadStores();
+        }
+
+        // API Helper
+        async function api(endpoint, options = {}) {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                headers: { 'Content-Type': 'application/json', ...options.headers },
+                ...options,
+            });
+            if (!response.ok) throw new Error(`API Error: ${response.statusText}`);
+            return response.json();
+        }
+
+        // Niches
+        async function loadNiches() {
+            const category = document.getElementById('categoryFilter').value;
+            const url = category ? `/niches?category=${category}` : '/niches';
+            const niches = await api(url);
+            
+            const container = document.getElementById('nichesList');
+            container.innerHTML = niches.map(n => {
+                const scoreClass = n.demand_score > 70 ? 'score-high' : n.demand_score > 50 ? 'score-med' : 'score-low';
+                return `
+                    <div class="niche-card" onclick="showProductsForNiche('${n.niche_id}')">
+                        <h3>${n.niche_name}</h3>
+                        <p style="color: #718096; font-size: 0.9rem; margin: 0.5rem 0;">${n.description}</p>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                            <span class="score ${scoreClass}">Demand: ${n.demand_score}</span>
+                            <span class="score ${n.supply_score > 70 ? 'score-low' : 'score-high'}">Supply: ${n.supply_score}</span>
+                        </div>
+                        <p style="margin-top: 0.5rem; color: #48bb78; font-weight: 600;">Est. Profit: $${n.estimated_profit}</p>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showProductsForNiche(nicheId) {
+            showSection('products');
+            document.getElementById('searchProducts').value = nicheId;
+            loadProducts(nicheId);
+        }
+
+        // Products
+        async function loadProducts(nicheId = null) {
+            const search = document.getElementById('searchProducts').value;
+            let url = '/niches';
+            if (nicheId) url = `/niches/${nicheId}/products`;
+            
+            const products = await api(url);
+            
+            const container = document.getElementById('productsList');
+            container.innerHTML = products.map(p => `
+                <div class="product-card">
+                    <div class="image">📦</div>
+                    <div class="content">
+                        <div class="title">${p.title}</div>
+                        <div class="meta">
+                            <span>Cost: $${p.estimated_cost}</span>
+                            <span class="margin">${p.margin_pct}% margin</span>
+                        </div>
+                        <div class="meta" style="margin-top: 0.5rem;">
+                            <span>Retail: $${p.suggested_retail}</span>
+                            <span>${p.supplier}</span>
+                        </div>
+                        <button class="btn btn-primary" style="margin-top: 1rem; width: 100%;" onclick="addToCatalog('${p.product_id}')">
+                            Add to Catalog
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Catalog
+        async function createCatalog() {
+            const nicheId = prompt('Enter niche ID:');
+            if (!nicheId) return;
+            
+            const niche = await api(`/niches/${nicheId}`);
+            const catalog = await api('/catalogs', {
+                method: 'POST',
+                body: JSON.stringify({ niche_id: nicheId, niche_name: niche.niche_name }),
+            });
+            
+            alert(`Catalog created: ${catalog.catalog_id}`);
+            loadCatalog();
+        }
+
+        async function loadCatalog() {
+            const stats = await api('/catalogs/stats');
+            document.getElementById('catalogStats').innerHTML = `
+                <div class="stat-card"><div class="value">${stats.total_products}</div><div class="label">Products</div></div>
+                <div class="stat-card"><div class="value">${stats.avg_margin}%</div><div class="label">Avg Margin</div></div>
+                <div class="stat-card"><div class="value">$${stats.avg_cost}</div><div class="label">Avg Cost</div></div>
+                <div class="stat-card"><div class="value">$${stats.potential_profit}</div><div class="label">Potential Profit</div></div>
+            `;
+        }
+
+        async function addToCatalog(productId) {
+            if (!currentCatalog) {
+                alert('Please create a catalog first');
+                return;
+            }
+            
+            await api(`/catalogs/${currentCatalog}/products`, {
+                method: 'POST',
+                body: JSON.stringify({ product_ids: [productId] }),
+            });
+            
+            alert('Product added to catalog!');
+        }
+
+        // Shopify
+        async function connectShopify() {
+            const name = document.getElementById('shopName').value;
+            const domain = document.getElementById('shopDomain').value;
+            const token = document.getElementById('shopToken').value;
+            
+            if (!name || !domain || !token) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const store = await api('/shopify/connect', {
+                method: 'POST',
+                body: JSON.stringify({ shop_name: name, domain, access_token: token }),
+            });
+            
+            alert(`Store connected: ${store.domain}`);
+            loadStores();
+        }
+
+        async function loadStores() {
+            const stores = await api('/shopify/stores');
+            const container = document.getElementById('storesList');
+            
+            if (stores.length === 0) {
+                container.innerHTML = '<p style="color: #718096;">No stores connected yet.</p>';
+                return;
+            }
+            
+            container.innerHTML = stores.map(s => `
+                <div class="card" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3>${s.store_name}</h3>
+                        <p style="color: #718096;">${s.domain}</p>
+                        <span class="badge badge-success">${s.status}</span>
+                    </div>
+                    <button class="btn btn-danger" onclick="disconnectStore('${s.store_id}')">Disconnect</button>
+                </div>
+            `).join('');
+        }
+
+        async function disconnectStore(storeId) {
+            if (!confirm('Are you sure you want to disconnect this store?')) return;
+            
+            await api(`/shopify/stores/${storeId}`, { method: 'DELETE' });
+            loadStores();
+        }
+
+        // Initialize
+        loadNiches();
+    </script>
+</body>
+</html>

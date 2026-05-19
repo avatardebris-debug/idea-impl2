@@ -49,15 +49,46 @@ def _call_ollama(prompt: str, model: str = "qwen3:6b", timeout: int = 120) -> st
         return ""
 
 
-def _parse_json_from_response(text: str) -> dict:
-    """Extract the first JSON object or array from LLM output."""
-    start = text.find("{")
-    end   = text.rfind("}") + 1
-    if start >= 0 and end > start:
-        try:
-            return json.loads(text[start:end])
-        except json.JSONDecodeError:
-            pass
+def _parse_json_from_response(text: str) -> dict | list:
+    """Extract the first JSON object or array from LLM output.
+
+    Returns a dict or list on success, or {} on failure.
+    """
+    # Determine whether to look for an array or object first.
+    # If '[' appears before '{', try array first.
+    first_bracket = text.find("[")
+    first_brace   = text.find("{")
+
+    if first_bracket >= 0 and (first_brace < 0 or first_bracket < first_brace):
+        # Try JSON array first
+        depth = 0
+        for i in range(first_bracket, len(text)):
+            if text[i] == "[":
+                depth += 1
+            elif text[i] == "]":
+                depth -= 1
+                if depth == 0:
+                    end = i + 1
+                    try:
+                        return json.loads(text[first_bracket:end])
+                    except json.JSONDecodeError:
+                        break
+    else:
+        # Try JSON object first
+        if first_brace >= 0:
+            depth = 0
+            for i in range(first_brace, len(text)):
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                    if depth == 0:
+                        end = i + 1
+                        try:
+                            return json.loads(text[first_brace:end])
+                        except json.JSONDecodeError:
+                            break
+
     return {}
 
 
@@ -69,7 +100,7 @@ def _fallback_extract(text: str, topic: str, fmt: str) -> dict:
     step_lines = [l for l in lines if re.match(r"^(\d+[\.\):]|[-•*])\s+", l)]
     if not step_lines:
         # Treat each sentence as a step
-        step_lines = [s.strip() for s in re.split(r"[.!?]\s+", text) if len(s.strip()) > 10][:20]
+        step_lines = [s.strip() for s in re.split(r"[.!?]\s+", text) if len(s.strip()) > 0][:20]
 
     steps = []
     for i, line in enumerate(step_lines, 1):
@@ -154,12 +185,22 @@ def extract(
     response = _call_ollama(prompt, model=model, timeout=180)
     result = _parse_json_from_response(response)
 
-    if not result or "steps" not in result:
+    fallback_used = False
+    if not result:
         result = _fallback_extract(text, topic, fmt)
+        fallback_used = True
+    elif isinstance(result, dict) and "steps" not in result:
+        # Valid JSON but missing required 'steps' key — treat as invalid
+        result = _fallback_extract(text, topic, fmt)
+        fallback_used = True
 
     # Ensure required keys exist
     result.setdefault("title", topic or "Extracted Procedure")
-    result.setdefault("topic", topic)
+    # Topic: user-provided topic overrides LLM's topic; if no user topic, use empty string
+    if topic:
+        result["topic"] = topic
+    else:
+        result["topic"] = ""
     result.setdefault("format", fmt)
     result.setdefault("description", "")
     result.setdefault("components", [])
@@ -167,7 +208,7 @@ def extract(
     result.setdefault("steps", [])
     result["metadata"] = {
         "source_length": len(text),
-        "model": model,
+        "model": "fallback" if fallback_used else model,
         "extracted_at": datetime.now(timezone.utc).isoformat(),
     }
 

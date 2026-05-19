@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Babbel Enhanced — Lip Sync</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>👄 Lip Sync</h1>
+        <div class="toolbar">
+            <a href="/watch/{{ clip_id }}" class="btn btn-secondary">← Back to Clip</a>
+        </div>
+
+        <div class="lipsync-container">
+            <div class="lipsync-status" id="lipsync-status">
+                <p>Generating lip sync for clip <strong>{{ clip_id }}</strong>...</p>
+                <div class="spinner"></div>
+            </div>
+
+            <div class="lipsync-result" id="lipsync-result" style="display:none;">
+                <h3>Original</h3>
+                <video id="original-video" controls>
+                    <source src="" type="video/mp4">
+                </video>
+                <h3>Lip Synced</h3>
+                <video id="lipsync-video" controls>
+                    <source src="" type="video/mp4">
+                </video>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/lipsync.js') }}"></script>
+</body>
+</html>
