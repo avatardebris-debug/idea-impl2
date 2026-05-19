@@ -31,14 +31,15 @@ PufferLib parallel:
 from __future__ import annotations
 
 import hashlib
+import json as _json
 import os
 import pathlib
 import threading
 import time
+import urllib.error
+import urllib.request
 from collections import OrderedDict
 from typing import Any
-
-import requests
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 _PIPELINE_DIR = _PROJECT_ROOT / ".pipeline"
@@ -83,23 +84,26 @@ class OllamaKVCache:
         cached_ctx = self._get_context(cache_key, slug)
 
         payload: dict[str, Any] = {
-            "model": model,
-            "prompt": prompt,
-            "system": system,
-            "stream": stream,
-            "options": options or {},
+            "model":      model,
+            "prompt":     prompt,
+            "system":     system,
+            "stream":     stream,
+            "options":    options or {},
+            "keep_alive": -1,   # pin model in VRAM between steps
         }
         if cached_ctx:
             # Pass cached context → server skips re-encoding the system prefix
             payload["context"] = cached_ctx
 
-        resp = requests.post(
+        raw_bytes = _json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
             f"{self._base}/api/generate",
-            json=payload,
-            timeout=timeout,
+            data=raw_bytes,
+            headers={"Content-Type": "application/json"},
+            method="POST",
         )
-        resp.raise_for_status()
-        data = resp.json()
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            data = _json.loads(r.read().decode("utf-8"))
 
         # Save returned context for next call
         if "context" in data and data["context"]:
@@ -185,3 +189,26 @@ def get_cache() -> OllamaKVCache:
             if _kv_cache is None:
                 _kv_cache = OllamaKVCache()
     return _kv_cache
+
+
+# ---------------------------------------------------------------------------
+# Convenience invalidation hook — call from executor after writing workspace
+# ---------------------------------------------------------------------------
+
+def invalidate_on_write(slug: str) -> None:
+    """
+    Invalidate the KV-cache for a project slug after the executor writes files.
+
+    The validator and reviewer must NOT inherit the executor's cached prefix —
+    their system prompts differ, so they always get a fresh encoding anyway.
+    But we also drop the executor's own entry so the next retry cycle starts
+    with a clean slate (avoids inheriting a prefix from a bad code state).
+
+    Usage in executor (agents/executor.py), after writing workspace files:
+        from pipeline.kv_cache import invalidate_on_write
+        invalidate_on_write(self._current_slug)
+    """
+    try:
+        get_cache().invalidate(slug)
+    except Exception:
+        pass  # non-critical — never block the executor for a cache op

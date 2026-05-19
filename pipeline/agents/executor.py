@@ -163,6 +163,16 @@ class ExecutorAgent(AgentProcess):
 
         result = self.call_agent(task=task_prompt, verbose=False)
 
+        # --- Strategy 4: Invalidate KV-cache after execution ---
+        # The executor's system prompt is different from the validator's.
+        # Drop the cached prefix so the validator gets a clean encoding,
+        # and the next executor retry starts fresh (not from a bad code state).
+        try:
+            from pipeline.kv_cache import invalidate_on_write
+            invalidate_on_write(self._current_slug)
+        except Exception:
+            pass  # non-critical
+
         # --- Post-run stray file rescue ---
         # The LLM frequently writes files to wrong locations. We rescue them
         # into the correct workspace BEFORE reporting results to the validator.
