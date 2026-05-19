@@ -124,7 +124,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Simple Tool]** — [a simple tool with no deps.]
     """)
-    check("seed_from_master_list returns True", result)
+    check("seed_from_master_list returns 'seeded'", result == "seeded")
     check("one message sent to idea_planner",
           len(bus.sent) == 1 and bus.sent[0].to_agent == "idea_planner")
     payload = bus.sent[0].payload if bus.sent else {}
@@ -143,7 +143,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Dependent Tool]** — [depends on suite. requires: suite_tool]
     """)
-    check("seed_from_master_list returns False (nothing seeded)", result == False)
+    check("seed_from_master_list returns 'blocked'", result == "blocked")
     check("no messages sent", len(bus.sent) == 0)
 
 # ── Test 3: Complete dep — seeds and injects workspace ───────────────────────
@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Dependent Tool]** — [depends on suite. requires: suite_tool]
     """)
-    check("seed_from_master_list returns True", result)
+    check("seed_from_master_list returns 'seeded'", result == "seeded")
     check("one message sent", len(bus.sent) == 1)
     payload = bus.sent[0].payload if bus.sent else {}
     check("depends_on contains suite_tool", "suite_tool" in payload.get("depends_on", []))
@@ -178,7 +178,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Beatsheet Generator]** — [beatsheets. requires: suite_tool, movie_idea_generator]
     """)
-    check("seeds when all deps complete", result)
+    check("seeds when all deps complete", result == "seeded")
     payload = bus.sent[0].payload if bus.sent else {}
     check("both deps in depends_on",
           "suite_tool" in payload.get("depends_on", []) and
@@ -197,7 +197,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Beatsheet Generator]** — [beatsheets. requires: suite_tool, movie_idea_generator]
     """)
-    check("blocked when one dep incomplete", result == False)
+    check("blocked when one dep incomplete", result == "blocked")
     check("no messages sent", len(bus.sent) == 0)
 
 # ── Test 6: Skip blocked, seed next available ─────────────────────────────────
@@ -211,7 +211,7 @@ with tempfile.TemporaryDirectory() as tmp:
         - [ ] **[Blocked Tool]** — [blocked. requires: suite_tool]
         - [ ] **[Free Tool]** — [no deps, should seed.]
     """)
-    check("returns True (found a seedable idea)", result)
+    check("returns 'seeded' (found a seedable idea)", result == "seeded")
     check("seeded Free Tool not Blocked Tool",
           "Free Tool" in bus.sent[0].payload.get("title", "") if bus.sent else False)
 
@@ -222,7 +222,7 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Dependent Tool]** — [needs something. requires: nonexistent_suite]
     """)
-    check("blocked when dep has no project dir", result == False)
+    check("blocked when dep has no project dir", result == "blocked")
     check("no messages sent", len(bus.sent) == 0)
 
 # ── Test 8: idea_planner prompt injection ────────────────────────────────────

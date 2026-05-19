@@ -42,19 +42,20 @@ class ReviewerAgent(AgentProcess):
         self._update_idea_status(f"phase_{phase_num}_reviewing")
 
         # Read context
-        tasks_content = self.read_state_file(tasks_path)
-        validation_content = self.read_state_file(validation_path)
+        tasks_content = self.read_state_file(tasks_path) or ""
+        validation_content = self.read_state_file(validation_path) or ""
 
         shared_libs_path = str(self._run_dir / ".pipeline" / "shared_libs")
         reusable_tools_path = str(self._run_dir / ".pipeline" / "state" / "reusable_tools.md")
 
         # Read broader project context for quality review
-        master_plan = self.read_state_file("state/master_plan.md")
-        phase_spec = self.read_state_file(f"phases/phase_{phase_num}/spec.md")
-        overflow_tasks = self.read_state_file(f"phases/phase_{phase_num}_overflow/tasks.md")
+        master_plan = self.read_state_file("state/master_plan.md") or ""
+        phase_spec = self.read_state_file(f"phases/phase_{phase_num}/spec.md") or ""
+        overflow_tasks = self.read_state_file(f"phases/phase_{phase_num}_overflow/tasks.md") or ""
 
         # Read deferred file-change notices (written when fixes modify files mid-phase)
-        pending_review_notes = self.read_state_file("state/pending_review_notes.md")
+        pending_review_notes = self.read_state_file("state/pending_review_notes.md") or ""
+
 
         # Build context sections
         project_context = ""

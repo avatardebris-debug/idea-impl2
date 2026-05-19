@@ -27,8 +27,8 @@ class PhasePlannerAgent(AgentProcess):
 
     def handle(self, msg: Message) -> AgentOutput:
         phase_num = msg.payload.get("phase", 1)
-        phase_spec = msg.payload.get("phase_spec", "")
-        idea_slug = msg.payload.get("idea_slug", self._current_slug)
+        phase_spec = msg.payload.get("phase_spec", "") or ""
+        idea_slug = msg.payload.get("idea_slug", self._current_slug) or self._current_slug
         preplan_mode = msg.payload.get("preplan_mode", False)
         tasks_path = f"phases/phase_{phase_num}/tasks.md"
         tasks_full_path = self._project_path(tasks_path)
@@ -36,7 +36,7 @@ class PhasePlannerAgent(AgentProcess):
         self._update_idea_status(f"phase_{phase_num}_planning")
 
         # Read master plan for full context
-        master_plan = self.read_state_file("state/master_plan.md")
+        master_plan = self.read_state_file("state/master_plan.md") or ""
 
         # Read existing workspace to know what already exists
         workspace = self.get_workspace_path()

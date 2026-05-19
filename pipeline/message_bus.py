@@ -222,8 +222,30 @@ class MessageBus:
         self._set_status(msg.msg_id, "done")
 
     def nack(self, msg: Message) -> None:
-        """Return message to pending for retry."""
-        self._set_status(msg.msg_id, "pending")
+        """Return message to pending for retry. Also increments retry_count in payload if present."""
+        conn = _get_conn(self._db)
+        try:
+            # First fetch the existing payload to ensure we preserve other fields
+            row = conn.execute(
+                "SELECT payload FROM messages WHERE msg_id=?", (msg.msg_id,)
+            ).fetchone()
+            if row:
+                payload = json.loads(row["payload"])
+            else:
+                payload = msg.payload or {}
+            
+            payload["retry_count"] = payload.get("retry_count", 0) + 1
+            msg.payload["retry_count"] = payload["retry_count"]
+            
+            conn.execute(
+                "UPDATE messages SET status='pending', payload=? WHERE msg_id=?",
+                (json.dumps(payload), msg.msg_id)
+            )
+            conn.commit()
+        except Exception:
+            # Fallback to simple set status if anything fails
+            self._set_status(msg.msg_id, "pending")
+
 
     def fail(self, msg: Message) -> None:
         """Mark message permanently failed."""

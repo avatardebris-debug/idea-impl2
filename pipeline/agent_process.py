@@ -119,6 +119,7 @@ class AgentProcess:
     ):
         self.provider = provider
         self.model = model
+        self.heavy_model = model  # Store the primary loaded heavy model
 
         # Light-tier model routing: if PIPELINE_LIGHT_MODEL is set and this agent
         # is marked model_tier="light", use the smaller model automatically.
@@ -266,7 +267,32 @@ class AgentProcess:
             except Exception as e:
                 logger.error("[%s] Failed processing message %s: %s",
                              self.role, msg.msg_id, e, exc_info=True)
-                self.bus.nack(msg)
+                
+                # Check retry count from payload
+                retries = msg.payload.get("retry_count", 0)
+                if retries >= 3:
+                    logger.critical("[%s] Message %s exceeded maximum retries (%d). Marking as failed and escalating.",
+                                    self.role, msg.msg_id, retries)
+                    self.bus.fail(msg)
+                    
+                    # Escalate to manager with PHASE_STUCK signal
+                    stuck_msg = Message.create(
+                        from_agent=self.role,
+                        to_agent="manager",
+                        type="signal",
+                        payload={
+                            "signal": "PHASE_STUCK",
+                            "reason": f"{self.role} repeatedly crashed ({retries}+ times) processing message {msg.msg_id}: {e}",
+                            "phase": msg.payload.get("phase", "?"),
+                            "idea_slug": self._current_slug,
+                        },
+                    )
+                    try:
+                        self.bus.send(stuck_msg)
+                    except Exception as send_err:
+                        logger.error("[%s] Failed to send STUCK escalation to manager: %s", self.role, send_err)
+                else:
+                    self.bus.nack(msg)
                 time.sleep(5)  # back off on failure
 
         logger.info("[%s] Shutting down", self.role)
@@ -550,19 +576,55 @@ class AgentProcess:
         except Exception:
             pass
 
-        result = run_agent(
-            task=task,
-            provider=self.provider,
-            model=self.model,
-            max_steps=max_steps or self.max_steps,
-            temperature=self.temperature,
-            think=self.think,
-            num_ctx=self.num_ctx,
-            system_prompt_addon=system_prompt_addon,
-            verbose=verbose,
-            pipeline_mode=True,  # skip repo file tree + shared .agent/ memory
-            slug=self._current_slug,  # enables Ollama KV-cache reuse per project
-        )
+        try:
+            result = run_agent(
+                task=task,
+                provider=self.provider,
+                model=self.model,
+                max_steps=max_steps or self.max_steps,
+                temperature=self.temperature,
+                think=self.think,
+                num_ctx=self.num_ctx,
+                system_prompt_addon=system_prompt_addon,
+                verbose=verbose,
+                pipeline_mode=True,  # skip repo file tree + shared .agent/ memory
+                slug=self._current_slug,  # enables Ollama KV-cache reuse per project
+            )
+        except Exception as e:
+            if getattr(self, "model_tier", "heavy") == "light" and self.model != self.heavy_model:
+                logger.warning(
+                    "[%s] LLM call failed with light model '%s' (%s). Falling back to heavy model '%s'...",
+                    self.role, self.model, e, self.heavy_model
+                )
+                original_model = self.model
+                original_num_ctx = self.num_ctx
+                self.model = self.heavy_model
+                self.num_ctx = 16384  # Use safe default context window for heavy model fallback
+                
+                try:
+                    result = run_agent(
+                        task=task,
+                        provider=self.provider,
+                        model=self.model,
+                        max_steps=max_steps or self.max_steps,
+                        temperature=self.temperature,
+                        think=self.think,
+                        num_ctx=self.num_ctx,
+                        system_prompt_addon=system_prompt_addon,
+                        verbose=verbose,
+                        pipeline_mode=True,
+                        slug=self._current_slug,
+                    )
+                except Exception as fallback_e:
+                    self.model = original_model
+                    self.num_ctx = original_num_ctx
+                    raise fallback_e
+                
+                self.model = original_model
+                self.num_ctx = original_num_ctx
+            else:
+                raise e
+
 
         # Preload thread is daemon — no need to join; it will finish naturally.
         # If it's still running when we return, the context build completes in
