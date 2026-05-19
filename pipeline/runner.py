@@ -2467,6 +2467,25 @@ def run_pipeline(
                         else:
                             gpu_str = f" {gpu_status}"
 
+                # --- Live tok/s from throughput.json ---
+                _tps_str = ""
+                try:
+                    _tp_live_path = PIPELINE_DIR / "state" / "throughput.json"
+                    if _tp_live_path.exists():
+                        _tp_live = json.loads(_tp_live_path.read_text(encoding="utf-8"))
+                        _live_cum_tok   = _tp_live.get("cumulative_tokens", 0)
+                        _live_cum_inf_s = _tp_live.get("cumulative_inference_s", 0.0)
+                        _live_last_tps  = _tp_live.get("tps", 0.0)   # last LLM call
+                        _live_age_s     = time.time() - _tp_live.get("updated_at", 0)
+                        if _live_cum_tok > 0 and _live_age_s < 600:  # skip if >10m stale
+                            _live_avg_tps = (_live_cum_tok / _live_cum_inf_s
+                                             if _live_cum_inf_s > 0 else 0)
+                            # Show: "42t/s last / 54t/s avg"
+                            _tps_str = (f" {_live_last_tps:.0f}t/s"
+                                        f"/{_live_avg_tps:.0f}avg")
+                except Exception:
+                    pass
+
                 # --- Dynamic Parallelizer: observe & adjust ---
                 _tuner_str = ""
                 if _tuner is not None:
@@ -2498,7 +2517,8 @@ def run_pipeline(
 
                 status_line = _clean(
                     f"  [{elapsed_m:.0f}m] agents={running_agents}/{len(AGENT_ROLES)} "
-                    f"pending={pending_total} phase={phase}{task_str}{gpu_str}{title_str}"
+                    f"pending={pending_total} phase={phase}{task_str}"
+                    f"{gpu_str}{_tps_str}{title_str}"
                 )
                 # Always print on a new line — ’\r’ tricks break on cloud/Windows terminals.
                 # Throttle to every 4 checks (~4 min) to keep output readable.
