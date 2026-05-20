@@ -14,7 +14,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 - [x] **[Ranker architecture]** — [Every tool run through this wrapper enables you to choose weight/preferences or rank or score. The idea is the ranker architecture can accumulate value to determine tastes. This could be provided and integrated with machine learning for various purposes.]
 - [x] **[VASTAI instance initializer]** — [User sets up preset commands for a vast AI terminal, time between commands, number of instances into a database, selects all the settings and so on and clicks run and it initializes according to the user selections]
 - [x] **[pairenv]** — [environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool]
-- [ ] **[agentic mirroring game]** — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life. requires:pairenv]
+- [x] **[agentic mirroring game]** — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life. requires:pairenv]
 - [ ] **[AgentFlow Drophip]** — [Autonomous drop shipping orchestration platform that lets you describe your entire operation and it builds, runs and scales workflows for you using agentic AI.]
 - [x] **[dropsearch]** — [dropship researcher. spy on competitors and come up with a business gameplan in full English describing the entire operation.]
 - [x] **[droppain]** — [dropship marketing campaign. plan and implement a marketing campaign for dropship products integrate with shopify and others]
@@ -23,7 +23,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 - [x] **[dropstore]** — [dropshipping niche or superstore builder and website integration. choose to make compatible with shopify or others if you want.]
 - [x] **[dropify]** — [dropshipping shopify clone]
 - [x] **[Summarizer tool]** — [[lock]from a dashboard use an llm to summarize uploaded pdfs, youtube links, websites, blogs. user share links or download files and click summarize, or prompt agent what is needed from source material. Then agent uses tools/functions to access the sources, extracts, summaries, and presents.]
-- [ ] **[extraction]** — [turn source material from summarizer tool into a "recipe" or specific step by step sequences and for potential specific skill extraction. Enable button that save's skill.  requires:summarizer_tool]
+- [x] **[extraction]** — [turn source material from summarizer tool into a "recipe" or specific step by step sequences and for potential specific skill extraction. Enable button that save's skill.  requires:summarizer_tool]
 - [ ] **[skillify]** — [turn recipe from extraction into claude skill. Also ability to convert claude skill to JSON file for other LLM. "system_prompt": "..." "functions": [ ... ] "examples": [ ... ]. Also, ability to export JSON file or claude skill. requires:summarizer_tool, extraction]
 - [ ] **[skill ninja]** — [container and public facing tool for skillify, extraction, summarizer tool. requires:summarizer_tool, extraction, skillify]
 - [ ] **[JSON skill]** — [This tool is for enabling local AI to run claude skills as JSON files in the format "system_prompt": "..." "functions": [ ... ] "examples": [ ... ]. Any claude code skill converted into a JSON file should be able to run. Should contain a loader, dispatcher and a runtime that injects it into the model]
@@ -95,32 +95,17 @@ dropship/service/ecommerce. autoSEO autometa
 [ ] [Interactive Fiction Engine] — Combine ai_author_suite and advantage_player_cardgame_simulator_training for branching narrative games.
 [ ] [JSON skill] — [This tool is for enabling local AI to run claude skills as JSON files in the format "system_prompt": "..." "functions": [ ... ] "examples": [ ... ]. Any claude code skill converted into a JSON file should be able to run. Should contain a loader, dispatcher and a runtime that injects it into the model]
 [ ] LLMClient bridge for AI Author — Adapter that plugs the LLMClient protocol from drop_servicing_tool into the AI author suite so all modules share the same LLM interface and caching layer. requires: drop_servicing_tool, ai_author_suite
-[ ] [Local Knowledge Graph Builder] — Privacy-focused desktop app that connects personal notes, files, and bookmarks.
-[ ] Local weather dashboard CLI — Python CLI that fetches local weather data from OpenWeatherMap, displays current conditions and 7-day forecast in terminal with color-coded alerts for severe weather.
-[ ] [Manuscript to Docs Bridge] — Formatter that transforms ai_author_suite output into docsai_documentation_generator compatible specs.
+
 [ ] Meeting notes auto-summarizer — Tool that takes raw meeting transcripts or audio recordings, identifies action items, decisions, and key topics, and outputs a structured summary with assignees and deadlines.
 [ ] [newsletter /online profit environment for LLM RL training and sims.] — []
-
-[ ] [PDF Schema Analyzer] — CLI tool that extracts and validates complex structures from unstructured PDF documents.
-[ ] Personal finance tracker CLI — Python CLI that imports bank CSV transactions, categorizes them by merchant patterns, generates monthly budget reports, and alerts on spending anomalies.
-[ ] [Pipeline Observability Dashboard] — Real-time visualization of agent execution, costs, and failure rates across all projects.
-[ ] Project dependency graph visualizer — Tool that reads all project workspace files and MANIFEST.json to generate a visual dependency graph showing which projects depend on which shared tools and ideas.
-
-
 [ ] [Real-Time Market Predictor] — Prediction engine that tracks financial sentiment and forecasts asset price movements.
 [ ] Real estate listing analyzer — CLI tool that pulls property data from public APIs, analyzes price trends, neighborhood metrics, and generates comparative market reports in CSV or PDF. requires: Zillow
 [ ] [research1] — [user provides a topic, then this tool goes through highly credible sources to create a well sourced report User can select "informational" or "recipe" if it's a reciepe it's structured as how to do a particular thing. Ability to choose LLM for response. sources like ARXIV, pub med, wikipedia,crossref, semantic scholar, web of science, scopus, jstor,ssrn,dot gov government domains, biorxiv,medrxiv,openreview,papers with code,nber,fred,data.gov,nist,iso,acm digital library, ieee xplore, rand corporation, bookings institution,,]
-[ ] [research2] — [user provides a topic, then ]
-[ ] [research3] — [description]
-[ ] Resume-to-job-applicant automator — Combines drop_servicing_tool with fiverr job automation tool to analyze job listings, auto-generate tailored applications, and manage bulk outreach campaigns. requires: drop_servicing_tool, fiverr job automation tool
-[ ] Resume and cover letter builder — Python tool that takes a job description and candidate profile, then generates tailored resumes and cover letters using templating and LLM-assisted rewriting. requires: drop_servicing_tool
 [ ] [RL for dropshipping] — [train on cloning successful dropshipping first and then running RL. source deep rl zoo or others from github. use profit, traffic, revenue per cost and autoresearch solutions in simulated market place using MiroFish and then roll out and calibrate to real. Assess risk and manage using 10% kelly criterion strategy based on budget.]
 [ ] [SaaS Pricing Optimizer] — Automated tool that analyzes competitor pricing and recommends optimal subscription tiers.
-[ ] [SEC to CSV Bridge] — Pipeline that converts raw SEC filing XML into standardized CSVs for csv_analyzer ingestion.
 [ ] [See BS] — [news BS filter based on several scott adams techniques. for example the "Scott Alexander rule", the Gellman Amnesia, the suggestion that "who" reports is just as important as what.]
 [ ] Shared LLM cost tracker — Add a cost-tracking middleware to the LLMClient protocol that logs every LLM call's token usage and cost across all projects, with monthly budget alerts and per-project breakdowns.
 [ ] [Simulator Result Aggregator] — Pipeline that collects and normalizes monte_carlo training outputs across multiple game simulators.
-
 [ ] Smart email-to-SOP executor — Combines email_tool with drop_servicing_tool to automatically parse incoming emails, extract task requirements, and trigger SOP-based agentic workflows for execution. requires: email_tool, drop_servicing_tool
 [ ] [social media management/etc] — [airtable like platform or system for managing social media posts and accounts. AI can help generate content and schedule posts and scale]
 [ ] SOP marketplace — Add a marketplace module to the drop servicing tool where users can publish, discover, and license SOPs with version control, ratings, and one-click import. requires: drop_servicing_tool
@@ -129,10 +114,8 @@ dropship/service/ecommerce. autoSEO autometa
 [ ] [Startup Compliance Scanner] — Automated checklist generator that maps startup data to SOC2 and GDPR requirements.
 [ ] [Technical Whitepaper Generator] — AI system that researches, outlines, and drafts professional engineering documentation.
 [ ] [Test Coverage Mutator] — Automated suite that generates mutation tests and enforces quality thresholds across the pipeline.
-[ ] Test fixture generator — Build a tool that generates realistic test fixtures (CSV files, JSON payloads, mock API responses, sample documents) for any project by reading its existing test patterns and schemas.
 [ ] [Universal LLM Router] — Adapter that routes requests across llmclient providers with automatic fallback and load balancing.
 
-[ ] Card composition calculator — Add a deck composition analyzer to the cardgame simulator that calculates card counting advantage, true count, and running count across shuffle patterns. requires: advantage_player_cardgame_simulator_training
 [ ] Card game training course platform — Combines advantage_player_cardgame_simulator_training with tim ferriss learning tool to create interactive poker and blackjack training courses with spaced repetition and progress tracking. requires: advantage_player_cardgame_simulator_training, tim ferriss learning tool
 [ ] [Card Game Variant Expansion] — Add Texas Hold'em and Omaha variants with AI opponent modeling to the simulator.
 [ ] Cardgame simulator output to learning tool — Bridge that exports Monte Carlo training results and strategy metrics from the cardgame simulator into the tim ferriss learning tool format for spaced repetition practice decks. requires: advantage_player_cardgame_simulator_training, tim ferriss learning tool
@@ -140,7 +123,5 @@ dropship/service/ecommerce. autoSEO autometa
 [ ] [Config Schema Validator] — Linter that validates pipeline YAML definitions against typed schemas before execution.
 [ ] Contract clause extractor — PDF and DOCX parser that identifies and extracts key contract clauses (termination, liability, NDAs) into a structured searchable database with export options.
 [ ] Cross-project code linter — CLI tool that runs consistent linting, type checking, and import analysis across all workspace projects, enforcing a shared style guide and flagging cross-project API mismatches.
-[ ] CSV data pipeline builder — Extend CSV analyzer with a visual pipeline builder that chains transformations (filter, join, pivot, aggregate) between multiple CSV files with export to SQL or JSON. requires: csv_analyzer
-
 
 

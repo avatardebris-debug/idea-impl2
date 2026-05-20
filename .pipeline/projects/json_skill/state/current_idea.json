@@ -1,0 +1,13 @@
+{
+  "title": "[JSON skill]",
+  "description": "This tool is for enabling local AI to run claude skills as JSON files in the format \"system_prompt\": \"...\" \"functions\": [ ... ] \"examples\": [ ... ]. Any claude code skill converted into a JSON file should be able to run. Should contain a loader, dispatcher and a runtime that injects it into the model",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-20T09:00:58.279233+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "json_skill",
+  "tasks_done": 0,
+  "tasks_total": 5
+}

@@ -28,7 +28,17 @@ from typing import Any
 _OLLAMA_HOST = "http://localhost:11434"
 
 
+class OllamaConnectionError(Exception):
+    """Raised when Ollama is unreachable or returns an unexpected response."""
+    pass
+
+
 def _call_ollama(prompt: str, model: str = "qwen3:6b", timeout: int = 120) -> str:
+    """Call the Ollama /api/generate endpoint.
+
+    Returns the response text on success, or raises OllamaConnectionError
+    when the server is unreachable, times out, or returns non-JSON.
+    """
     payload = {
         "model": model,
         "prompt": prompt,
@@ -44,9 +54,20 @@ def _call_ollama(prompt: str, model: str = "qwen3:6b", timeout: int = 120) -> st
     )
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return json.loads(resp.read().decode("utf-8")).get("response", "").strip()
-    except Exception:
-        return ""
+            body = resp.read().decode("utf-8")
+            return json.loads(body).get("response", "").strip()
+    except urllib.error.URLError as exc:
+        # Connection refused, DNS failure, timeout, etc.
+        raise OllamaConnectionError(f"Ollama connection failed: {exc.reason}") from exc
+    except urllib.error.HTTPError as exc:
+        # Non-2xx HTTP status from Ollama
+        raise OllamaConnectionError(f"Ollama HTTP error: {exc.code} {exc.reason}") from exc
+    except json.JSONDecodeError as exc:
+        # Ollama returned non-JSON
+        raise OllamaConnectionError(f"Ollama returned invalid JSON: {exc}") from exc
+    except Exception as exc:
+        # Any other unexpected error
+        raise OllamaConnectionError(f"Unexpected Ollama error: {exc}") from exc
 
 
 def _parse_json_from_response(text: str) -> dict | list:
@@ -186,11 +207,11 @@ def extract(
     result = _parse_json_from_response(response)
 
     fallback_used = False
-    if not result:
-        result = _fallback_extract(text, topic, fmt)
-        fallback_used = True
-    elif isinstance(result, dict) and "steps" not in result:
-        # Valid JSON but missing required 'steps' key — treat as invalid
+    # Trigger fallback only when the response is completely invalid
+    # (empty, not a dict, or missing required top-level keys).
+    # Missing optional keys (steps, components, tips) are filled with defaults.
+    required_keys = {"title", "topic", "format", "description"}
+    if not result or not isinstance(result, dict) or not required_keys.issubset(result.keys()):
         result = _fallback_extract(text, topic, fmt)
         fallback_used = True
 

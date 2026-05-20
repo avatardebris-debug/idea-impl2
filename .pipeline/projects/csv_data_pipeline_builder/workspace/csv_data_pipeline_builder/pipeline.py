@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from .nodes import TransformNode, Row
+from .nodes import TransformNode, Row, CsvSink, JsonSink, SqliteSink
 
 
 @dataclass
@@ -26,119 +26,49 @@ class ExecutionReport:
     error: str = ""
 
 
-@dataclass
-class CsvSource:
-    """Load rows from a CSV file."""
-    path: str
-    encoding: str = "utf-8"
-
-    def load(self) -> list[Row]:
-        with open(self.path, encoding=self.encoding, newline="") as f:
-            return list(csv.DictReader(f))
-
-
-@dataclass
-class CsvSink:
-    """Write rows to a CSV file."""
-    path: str
-    encoding: str = "utf-8"
-
-    def write(self, rows: list[Row]) -> None:
-        if not rows:
-            return
-        with open(self.path, "w", encoding=self.encoding, newline="") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            w.writeheader()
-            w.writerows(rows)
-
-
-@dataclass
-class JsonSink:
-    """Write rows to a JSON file."""
-    path: str
-
-    def write(self, rows: list[Row]) -> None:
-        pathlib.Path(self.path).write_text(json.dumps(rows, indent=2), encoding="utf-8")
-
-
-@dataclass
-class SqliteSink:
-    """Write rows to a SQLite table."""
-    path: str
-    table: str = "pipeline_output"
-
-    def write(self, rows: list[Row]) -> None:
-        if not rows:
-            return
-        cols = list(rows[0].keys())
-        conn = sqlite3.connect(self.path)
-        conn.execute(f"DROP TABLE IF EXISTS {self.table}")
-        col_defs = ", ".join(f'"{c}" TEXT' for c in cols)
-        conn.execute(f"CREATE TABLE {self.table} ({col_defs})")
-        placeholders = ", ".join("?" * len(cols))
-        conn.executemany(
-            f"INSERT INTO {self.table} VALUES ({placeholders})",
-            [[str(r.get(c, "")) for c in cols] for r in rows],
-        )
-        conn.commit()
-        conn.close()
-
-
 class Pipeline:
-    """
-    A linear sequence of TransformNodes.
-    (Full DAG support with multiple inputs is Phase 2.)
-    """
+    """Orchestrates a sequence of TransformNodes."""
 
-    def __init__(self, source: CsvSource | None = None) -> None:
-        self.source = source
-        self.nodes: list[TransformNode] = []
-        self.sinks: list[CsvSink | JsonSink | SqliteSink] = []
+    def __init__(self) -> None:
+        self._nodes: list[TransformNode] = []
+        self._reports: list[dict[str, Any]] = []
+
+    @property
+    def reports(self) -> list[dict[str, Any]]:
+        return self._reports
 
     def add_node(self, node: TransformNode) -> "Pipeline":
-        self.nodes.append(node)
+        self._nodes.append(node)
         return self
 
-    def add_sink(self, sink: CsvSink | JsonSink | SqliteSink) -> "Pipeline":
-        self.sinks.append(sink)
+    def add_sink(self, sink: TransformNode) -> "Pipeline":
+        self._nodes.append(sink)
         return self
 
-    def execute(self, rows: list[Row] | None = None) -> tuple[list[Row], list[ExecutionReport]]:
-        """Execute all nodes in sequence. Returns (final_rows, reports)."""
-        if rows is None:
-            if self.source is None:
-                raise ValueError("No source or rows provided")
-            rows = self.source.load()
+    def execute(self, initial_rows: list[Row] | None = None) -> tuple[list[Row], list[dict[str, Any]]]:
+        """Run the pipeline and return (final_rows, reports)."""
+        rows = initial_rows if initial_rows is not None else []
+        self._reports = []
 
-        reports: list[ExecutionReport] = []
-        for node in self.nodes:
-            t0 = time.perf_counter()
-            input_count = len(rows)
-            error = ""
-            try:
-                rows = node.transform(rows)
-            except Exception as e:
-                error = str(e)
-            duration_ms = (time.perf_counter() - t0) * 1000
-            reports.append(ExecutionReport(
-                node_id=node.node_id,
-                input_rows=input_count,
-                output_rows=len(rows),
-                duration_ms=round(duration_ms, 2),
-                error=error,
-            ))
+        for node in self._nodes:
+            rows = node.transform(rows)
+            self._reports.append({
+                "node_id": node.node_id,
+                "rows": len(rows),
+            })
 
-        for sink in self.sinks:
-            sink.write(rows)
+        return rows, self._reports
 
-        return rows, reports
+    def dry_run_schema(self, sample_rows: list[Row]) -> list[str]:
+        """Return the column names that would result from running the pipeline on sample data."""
+        rows = sample_rows
+        for node in self._nodes:
+            rows = node.transform(rows)
+            if not rows:
+                return []
+        return list(rows[0].keys())
 
-    def dry_run_schema(self, sample_rows: list[Row] | None = None) -> list[str]:
-        """Infer output column names without writing to sinks."""
-        rows = sample_rows or (self.source.load()[:5] if self.source else [])
-        for node in self.nodes:
-            try:
-                rows = node.transform(rows)
-            except Exception:
-                pass
-        return list(rows[0].keys()) if rows else []
+
+__all__ = [
+    "Pipeline",
+]

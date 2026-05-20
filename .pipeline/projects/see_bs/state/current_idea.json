@@ -1,0 +1,13 @@
+{
+  "title": "[See BS]",
+  "description": "news BS filter based on several scott adams techniques. for example the \"Scott Alexander rule\", the Gellman Amnesia, the suggestion that \"who\" reports is just as important as what.",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-20T07:36:50.636592+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "see_bs",
+  "tasks_done": 0,
+  "tasks_total": 5
+}

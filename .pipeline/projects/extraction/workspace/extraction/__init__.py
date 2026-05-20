@@ -12,7 +12,8 @@ Usage:
 from __future__ import annotations
 
 from extraction.extractor import extract, _fallback_extract
+from extraction.skill_store import SkillStore
 
 __version__ = "0.1.0"
 
-__all__ = ["extract", "_fallback_extract"]
+__all__ = ["extract", "_fallback_extract", "SkillStore"]

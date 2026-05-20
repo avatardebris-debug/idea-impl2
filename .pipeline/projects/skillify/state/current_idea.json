@@ -1,0 +1,16 @@
+{
+  "title": "[skillify]",
+  "description": "turn recipe from extraction into claude skill. Also ability to convert claude skill to JSON file for other LLM. \"system_prompt\": \"...\" \"functions\": [ ... ] \"examples\": [ ... ]. Also, ability to export JSON file or claude skill",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-20T07:11:27.730231+00:00",
+  "depends_on": [
+    "summarizer_tool",
+    "extraction"
+  ],
+  "priority_tier": 0,
+  "_slug": "skillify",
+  "tasks_done": 0,
+  "tasks_total": 1
+}

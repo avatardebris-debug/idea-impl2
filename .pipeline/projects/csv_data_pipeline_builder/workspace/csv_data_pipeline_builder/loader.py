@@ -3,7 +3,7 @@ csv_data_pipeline_builder/loader.py
 YAML DSL parser — converts a pipeline.yaml into a Pipeline object.
 
 pipeline.yaml format:
------------------------
+---
 sources:
   sales: data/sales.csv
   customers: data/customers.csv
@@ -25,115 +25,149 @@ steps:
     group_by: [region]
     aggregations:
       revenue: sum
-      order_count: count
-
-  - id: select_cols
-    type: select
-    columns: [region, revenue, order_count]
+      id: count
 
 sinks:
-  - type: csv
-    path: output/report.csv
-  - type: sqlite
-    path: output/report.db
-    table: sales_summary
+  - id: output_csv
+    type: csv
+    path: output/result.csv
 """
 from __future__ import annotations
 
 import pathlib
 from typing import Any
 
-from .nodes import FilterNode, SelectNode, AggregateNode, JoinNode, PivotNode
-from .pipeline import Pipeline, CsvSource, CsvSink, JsonSink, SqliteSink
+from .nodes import (
+    FilterNode, SelectNode, AggregateNode, JoinNode, PivotNode,
+    CsvSource, CsvSink, JsonSink, SqliteSink,
+)
+from .pipeline import Pipeline
 
 
-def load_pipeline(yaml_path: str | pathlib.Path, base_dir: str | pathlib.Path | None = None) -> Pipeline:
-    """Parse a pipeline YAML file and return a configured Pipeline."""
-    try:
-        import yaml  # type: ignore[import]
-    except ImportError:
-        raise ImportError("pip install pyyaml  # required for pipeline YAML loading")
+class PipelineLoader:
+    """Parse and validate a pipeline.yaml into a Pipeline object."""
 
-    yaml_path = pathlib.Path(yaml_path)
-    base = pathlib.Path(base_dir) if base_dir else yaml_path.parent
+    def __init__(self):
+        try:
+            import yaml
+            self.yaml = yaml
+        except ImportError:
+            raise ImportError("pyyaml is required for PipelineLoader")
 
-    with open(yaml_path, encoding="utf-8") as f:
-        spec: dict[str, Any] = yaml.safe_load(f)
+    def load(self, path: str | pathlib.Path) -> Pipeline:
+        """Load a pipeline from a YAML file."""
+        path = pathlib.Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Pipeline file not found: {path}")
 
-    # --- Sources ---
-    sources: dict[str, list] = {}
-    for name, path in (spec.get("sources") or {}).items():
-        src = CsvSource(path=str(base / path))
-        sources[name] = src.load()
+        with open(path) as f:
+            data = self.yaml.safe_load(f)
 
-    # Primary source = first declared source
-    primary_name = next(iter(spec.get("sources", {})), None)
-    primary_rows = sources.get(primary_name, []) if primary_name else []
+        if not data or not isinstance(data, dict):
+            raise ValueError("Invalid pipeline YAML: must be a mapping")
 
-    pipeline = Pipeline()
+        pipeline = Pipeline()
 
-    # --- Steps ---
-    for step in spec.get("steps") or []:
-        step_type = step.get("type", "").lower()
-        step_id   = step.get("id", step_type)
+        # Load sources
+        sources = data.get("sources", {}) or {}
+        for name, src_path in sources.items():
+            node = CsvSource(path=str(src_path), node_id=f"source_{name}")
+            pipeline.add_node(node)
+            pipeline.sources[name] = str(src_path)
 
-        if step_type == "filter":
-            node = FilterNode(node_id=step_id, predicate_expr=step.get("predicate", "True"))
+        # Load steps
+        steps = data.get("steps", []) or []
+        for step in steps:
+            node = self._build_node(step, pipeline)
+            pipeline.add_node(node)
 
-        elif step_type == "select":
-            rename = step.get("rename", {})
-            node = SelectNode(node_id=step_id, columns=step.get("columns", []), rename=rename)
+        # Load sinks
+        sinks = data.get("sinks", []) or []
+        for sink in sinks:
+            node = self._build_sink(sink)
+            pipeline.add_node(node)
 
-        elif step_type == "aggregate":
-            node = AggregateNode(
-                node_id=step_id,
-                group_by=step.get("group_by", []),
-                aggregations=step.get("aggregations", {}),
+        # Wire edges: source -> first step, step -> next step, last step -> sink
+        all_nodes = [n for n in pipeline.nodes]
+        for i in range(len(all_nodes) - 1):
+            pipeline.add_edge(all_nodes[i].node_id, all_nodes[i + 1].node_id)
+
+        return pipeline
+
+    def _build_node(self, step: dict[str, Any], pipeline: Pipeline) -> Any:
+        """Build a transform node from a step definition."""
+        node_id = step.get("id", "unnamed")
+        node_type = step.get("type", "")
+
+        if node_type == "filter":
+            return FilterNode(
+                predicate_expr=step.get("predicate", "True"),
+                node_id=node_id,
             )
-
-        elif step_type == "join":
-            right_src = step.get("right_source", "")
-            right_rows = sources.get(right_src, [])
-            node = JoinNode(
-                node_id=step_id,
-                left_key=step.get("left_key", "id"),
-                right_key=step.get("right_key", "id"),
-                how=step.get("how", "inner"),
+        elif node_type == "select":
+            columns = step.get("columns", [])
+            rename = step.get("rename", None)
+            return SelectNode(
+                columns=columns,
+                rename=rename,
+                node_id=node_id,
+            )
+        elif node_type == "aggregate":
+            group_by = step.get("group_by", [])
+            aggregations = step.get("aggregations", {})
+            return AggregateNode(
+                group_by=group_by,
+                aggregations=aggregations,
+                node_id=node_id,
+            )
+        elif node_type == "join":
+            left_key = step.get("left_key", "")
+            right_key = step.get("right_key", "")
+            how = step.get("how", "inner")
+            right_source = step.get("right_source", None)
+            # Resolve right source rows from pipeline sources
+            right_rows: list = []
+            if right_source and right_source in pipeline.sources:
+                src_path = pipeline.sources[right_source]
+                import csv
+                with open(src_path, newline="") as f:
+                    right_rows = list(csv.DictReader(f))
+            return JoinNode(
+                left_key=left_key,
+                right_key=right_key,
+                how=how,
                 right_rows=right_rows,
+                node_id=node_id,
             )
-
-        elif step_type == "pivot":
-            node = PivotNode(
-                node_id=step_id,
-                index=step.get("index", []),
-                columns=step.get("columns", ""),
-                values=step.get("values", ""),
-                agg=step.get("agg", "first"),
+        elif node_type == "pivot":
+            index = step.get("index", [])
+            columns = step.get("columns", "")
+            values = step.get("values", "")
+            agg = step.get("agg", "first")
+            return PivotNode(
+                index=index,
+                columns=columns,
+                values=values,
+                agg=agg,
+                node_id=node_id,
             )
-
         else:
-            raise ValueError(f"Unknown step type: '{step_type}' in step '{step_id}'")
+            raise ValueError(f"Unknown node type: {node_type}")
 
-        pipeline.add_node(node)
+    def _build_sink(self, sink: dict[str, Any]) -> Any:
+        """Build a sink node from a sink definition."""
+        node_id = sink.get("id", "sink")
+        sink_type = sink.get("type", "")
 
-    # Pre-load primary source rows so pipeline.execute() doesn't need a CsvSource
-    pipeline._preloaded_rows = primary_rows  # type: ignore[attr-defined]
-
-    # --- Sinks ---
-    for sink_spec in spec.get("sinks") or []:
-        sink_type = sink_spec.get("type", "").lower()
-        sink_path = str(base / sink_spec["path"]) if "path" in sink_spec else ""
         if sink_type == "csv":
-            pipeline.add_sink(CsvSink(path=sink_path))
+            return CsvSink(path=sink.get("path", "output.csv"), node_id=node_id)
         elif sink_type == "json":
-            pipeline.add_sink(JsonSink(path=sink_path))
+            return JsonSink(path=sink.get("path", "output.json"), node_id=node_id)
         elif sink_type == "sqlite":
-            pipeline.add_sink(SqliteSink(path=sink_path, table=sink_spec.get("table", "output")))
-
-    return pipeline, primary_rows
-
-
-def execute_yaml(yaml_path: str | pathlib.Path, base_dir: str | pathlib.Path | None = None):
-    """Load and execute a pipeline YAML. Returns (rows, reports)."""
-    pipeline, seed_rows = load_pipeline(yaml_path, base_dir)
-    return pipeline.execute(seed_rows)
+            return SqliteSink(
+                path=sink.get("path", "output.db"),
+                table=sink.get("table", "output"),
+                node_id=node_id,
+            )
+        else:
+            raise ValueError(f"Unknown sink type: {sink_type}")

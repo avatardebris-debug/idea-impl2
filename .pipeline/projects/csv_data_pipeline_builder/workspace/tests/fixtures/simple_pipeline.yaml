@@ -1,0 +1,22 @@
+# Simple pipeline: filter sales by year 2024, select columns, aggregate by region
+sources:
+  sales: sales.csv
+
+steps:
+  - id: filter_2024
+    type: filter
+    predicate: "year == '2024'"
+
+  - id: select_cols
+    type: select
+    columns: [id, region, revenue]
+
+  - id: agg_by_region
+    type: aggregate
+    group_by: [region]
+    aggregations:
+      revenue: sum
+
+sinks:
+  - type: csv
+    path: /tmp/test_pipeline_output.csv

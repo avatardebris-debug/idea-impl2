@@ -20,149 +20,330 @@ class TransformNode(ABC):
 
     @abstractmethod
     def transform(self, rows: list[Row]) -> list[Row]:
-        """Apply the transform and return the result rows."""
+        """Apply the transform and return the resulting rows."""
+        ...
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} id={self.node_id}>"
 
 
-@dataclass
 class FilterNode(TransformNode):
-    """Keep only rows matching a predicate.
+    """Row-level predicate filtering using a simple expression DSL.
 
-    predicate_expr: a Python expression string evaluated with the row dict
-    as local variables. E.g. "int(age) > 30 and city == 'Austin'"
+    Supported operators: ==, !=, >, <, >=, <=, and, or, not
+    Column names are looked up in the row dict.
+    String literals are wrapped in quotes: 'value'
+    Numeric literals are bare: 42
     """
-    node_id: str = "filter"
-    predicate_expr: str = "True"
+
+    def __init__(self, predicate_expr: str, node_id: str = "filter"):
+        self.node_id = node_id
+        self.predicate_expr = predicate_expr
+
+    def _eval_expr(self, row: Row, expr: str) -> bool:
+        """Evaluate a simple boolean expression against a row."""
+        expr = expr.strip()
+
+        # Handle 'and'
+        if " and " in expr:
+            parts = expr.split(" and ", 1)
+            return self._eval_expr(row, parts[0]) and self._eval_expr(row, parts[1])
+
+        # Handle 'or'
+        if " or " in expr:
+            parts = expr.split(" or ", 1)
+            return self._eval_expr(row, parts[0]) or self._eval_expr(row, parts[1])
+
+        # Handle 'not'
+        if expr.startswith("not "):
+            return not self._eval_expr(row, expr[4:])
+
+        # Handle comparison operators (order matters: >= before >)
+        for op in [">=", "<=", "!=", "==", ">", "<"]:
+            if op in expr:
+                parts = expr.split(op, 1)
+                if len(parts) == 2:
+                    left = self._parse_value(parts[0].strip(), row)
+                    right = self._parse_value(parts[1].strip(), row)
+                    if op == "==":
+                        return left == right
+                    elif op == "!=":
+                        return left != right
+                    elif op == ">":
+                        return left > right
+                    elif op == "<":
+                        return left < right
+                    elif op == ">=":
+                        return left >= right
+                    elif op == "<=":
+                        return left <= right
+
+        # Bare column name — truthy check
+        val = self._parse_value(expr, row)
+        return bool(val)
+
+    def _parse_value(self, val: str, row: Row) -> Any:
+        """Parse a literal or column reference."""
+        val = val.strip()
+        # String literal
+        if (val.startswith("'") and val.endswith("'")) or (val.startswith('"') and val.endswith('"')):
+            return val[1:-1]
+        # Numeric literal
+        try:
+            if "." in val:
+                return float(val)
+            return int(val)
+        except ValueError:
+            pass
+        # Column reference
+        if val in row:
+            return row[val]
+        return val
 
     def transform(self, rows: list[Row]) -> list[Row]:
-        result = []
-        for row in rows:
-            try:
-                if eval(self.predicate_expr, {"__builtins__": {}}, row):  # noqa: S307
-                    result.append(row)
-            except Exception:
-                pass  # skip rows that fail evaluation
-        return result
+        return [r for r in rows if self._eval_expr(r, self.predicate_expr)]
 
 
-@dataclass
 class SelectNode(TransformNode):
-    """Project and optionally rename columns."""
-    node_id: str = "select"
-    columns: list[str] = field(default_factory=list)         # output column names
-    rename: dict[str, str] = field(default_factory=dict)     # old -> new
+    """Column projection and optional rename."""
+
+    def __init__(self, columns: list[str], rename: dict[str, str] | None = None, node_id: str = "select"):
+        self.node_id = node_id
+        self.columns = columns
+        self.rename = rename or {}
 
     def transform(self, rows: list[Row]) -> list[Row]:
         result = []
-        for row in rows:
-            new_row: Row = {}
+        for r in rows:
+            new_row = {}
             for col in self.columns:
-                src = self.rename.get(col, col)
-                if src in row:
-                    new_row[col] = row[src]
+                # If col is in rename keys, use it as the new key name
+                new_key = col
+                if col in self.rename:
+                    new_key = self.rename[col]
+                new_row[new_key] = r.get(col, "")
             result.append(new_row)
         return result
 
 
-@dataclass
 class AggregateNode(TransformNode):
-    """Group rows and compute aggregations."""
-    node_id: str = "aggregate"
-    group_by: list[str] = field(default_factory=list)
-    aggregations: dict[str, str] = field(default_factory=dict)  # col -> op (sum/mean/count/min/max)
+    """Group-by + aggregation (sum, mean, count, min, max)."""
+
+    def __init__(self, group_by: list[str], aggregations: dict[str, str], node_id: str = "aggregate"):
+        self.node_id = node_id
+        self.group_by = group_by
+        self.aggregations = aggregations  # {column: "sum"|"mean"|"count"|"min"|"max"}
 
     def transform(self, rows: list[Row]) -> list[Row]:
-        from collections import defaultdict
-        groups: dict[tuple, list[Row]] = defaultdict(list)
-        for row in rows:
-            key = tuple(row.get(k, "") for k in self.group_by)
-            groups[key].append(row)
+        groups: dict[tuple, list[Row]] = {}
+        for r in rows:
+            key = tuple(r.get(c, "") for c in self.group_by)
+            groups.setdefault(key, []).append(r)
 
         result = []
         for key, group_rows in groups.items():
-            out: Row = dict(zip(self.group_by, key))
-            for col, op in self.aggregations.items():
-                vals = []
-                for r in group_rows:
+            out: dict[str, Any] = {}
+            for i, col in enumerate(self.group_by):
+                out[col] = key[i]
+            for agg_col, agg_fn in self.aggregations.items():
+                values = []
+                for gr in group_rows:
+                    v = gr.get(agg_col, 0)
                     try:
-                        vals.append(float(r[col]))
-                    except (KeyError, ValueError, TypeError):
-                        pass
-                if op == "sum":
-                    out[col] = sum(vals)
-                elif op == "mean":
-                    out[col] = sum(vals) / len(vals) if vals else 0.0
-                elif op == "count":
-                    out[col] = len(group_rows)
-                elif op == "min":
-                    out[col] = min(vals) if vals else None
-                elif op == "max":
-                    out[col] = max(vals) if vals else None
+                        values.append(float(v))
+                    except (ValueError, TypeError):
+                        values.append(v)
+                if agg_fn == "sum":
+                    out[agg_col] = sum(values) if values else 0
+                elif agg_fn == "mean":
+                    out[agg_col] = sum(values) / len(values) if values else 0
+                elif agg_fn == "count":
+                    out[agg_col] = len(group_rows)
+                elif agg_fn == "min":
+                    out[agg_col] = min(values) if values else 0
+                elif agg_fn == "max":
+                    out[agg_col] = max(values) if values else 0
             result.append(out)
         return result
 
 
-@dataclass
 class JoinNode(TransformNode):
-    """Join two Row streams on a key column."""
-    node_id: str = "join"
-    left_key: str = "id"
-    right_key: str = "id"
-    how: str = "inner"   # inner | left | right
-    right_rows: list[Row] = field(default_factory=list)
+    """Inner / left / right join between two CSV sources on key columns."""
+
+    def __init__(self, left_key: str, right_key: str, how: str = "inner",
+                 right_rows: list[Row] | None = None, node_id: str = "join"):
+        self.node_id = node_id
+        self.left_key = left_key
+        self.right_key = right_key
+        self.how = how
+        self.right_rows = right_rows or []
 
     def transform(self, rows: list[Row]) -> list[Row]:
-        index: dict[Any, list[Row]] = {}
+        # Build index of right rows by key
+        right_index: dict[str, list[Row]] = {}
         for r in self.right_rows:
-            k = r.get(self.right_key)
-            index.setdefault(k, []).append(r)
+            key = str(r.get(self.right_key, ""))
+            right_index.setdefault(key, []).append(r)
 
         result = []
-        for left in rows:
-            k = left.get(self.left_key)
-            matches = index.get(k, [])
-            if matches:
-                for right in matches:
-                    merged = {**left, **right}
+        for left_row in rows:
+            left_val = str(left_row.get(self.left_key, ""))
+            matches = right_index.get(left_val, [])
+            if self.how == "inner":
+                if matches:
+                    for m in matches:
+                        merged = {**left_row, **{k: v for k, v in m.items() if k != self.right_key}}
+                        result.append(merged)
+                # inner: skip if no match
+            elif self.how == "left":
+                if matches:
+                    for m in matches:
+                        merged = {**left_row, **{k: v for k, v in m.items() if k != self.right_key}}
+                        result.append(merged)
+                else:
+                    result.append(left_row)
+            elif self.how == "right":
+                # For right join, we need to also include unmatched right rows
+                matched_keys = set()
+                for m in matches:
+                    merged = {**left_row, **{k: v for k, v in m.items() if k != self.right_key}}
                     result.append(merged)
-            elif self.how in ("left",):
-                result.append(dict(left))
+                    matched_keys.add(str(m.get(self.right_key, "")))
+                # Add unmatched right rows
+                for m in self.right_rows:
+                    rv = str(m.get(self.right_key, ""))
+                    if rv not in matched_keys:
+                        # Check if this right row was already added via another left row
+                        already = any(
+                            str(r.get(self.right_key, "")) == rv for r in result
+                        )
+                        if not already:
+                            result.append(m)
+            else:
+                raise ValueError(f"Unknown join type: {self.how}")
         return result
 
 
-@dataclass
 class PivotNode(TransformNode):
-    """Pivot a long table to wide format."""
-    node_id: str = "pivot"
-    index: list[str] = field(default_factory=list)    # columns to keep as row identity
-    columns: str = ""                                   # column whose unique values become new columns
-    values: str = ""                                    # column to fill the cells with
-    agg: str = "first"                                  # first | sum | mean
+    """Wide ↔ long reshaping.
+
+    Converts long-form data (index, columns, values) into wide-form.
+    """
+
+    def __init__(self, index: list[str], columns: str, values: str,
+                 agg: str = "first", node_id: str = "pivot"):
+        self.node_id = node_id
+        self.index = index
+        self.columns = columns
+        self.values = values
+        self.agg = agg
 
     def transform(self, rows: list[Row]) -> list[Row]:
-        from collections import defaultdict
-        groups: dict[tuple, dict[str, list]] = defaultdict(lambda: defaultdict(list))
-        for row in rows:
-            key = tuple(row.get(k, "") for k in self.index)
-            col_val = str(row.get(self.columns, ""))
-            val = row.get(self.values)
-            groups[key][col_val].append(val)
+        # Collect all unique column values
+        col_values: set[str] = set()
+        # data[(index_tuple, col_val)] = list of values
+        data: dict[tuple, dict[str, list]] = {}
+        for r in rows:
+            idx = tuple(r.get(c, "") for c in self.index)
+            col = r.get(self.columns, "")
+            val = r.get(self.values, "")
+            col_values.add(col)
+            data.setdefault(idx, {}).setdefault(col, []).append(val)
 
+        col_values = sorted(col_values)
         result = []
-        for key, col_map in groups.items():
-            out: Row = dict(zip(self.index, key))
-            for col_val, vals in col_map.items():
-                if self.agg == "first":
-                    out[col_val] = vals[0] if vals else None
+        for idx, col_vals in data.items():
+            out: dict[str, Any] = {}
+            for i, c in enumerate(self.index):
+                out[c] = idx[i]
+            for col in col_values:
+                vals = col_vals.get(col, [])
+                if self.agg == "first" and vals:
+                    out[col] = vals[0]
                 elif self.agg == "sum":
                     try:
-                        out[col_val] = sum(float(v) for v in vals if v is not None)
-                    except (TypeError, ValueError):
-                        out[col_val] = vals[0]
+                        out[col] = sum(float(v) for v in vals)
+                    except (ValueError, TypeError):
+                        out[col] = 0
+                elif self.agg == "count":
+                    out[col] = len(vals)
                 elif self.agg == "mean":
                     try:
-                        nums = [float(v) for v in vals if v is not None]
-                        out[col_val] = sum(nums) / len(nums) if nums else None
-                    except (TypeError, ValueError):
-                        out[col_val] = None
+                        out[col] = sum(float(v) for v in vals) / len(vals) if vals else 0
+                    except (ValueError, TypeError):
+                        out[col] = 0
+                else:
+                    out[col] = vals[0] if vals else ""
             result.append(out)
         return result
+
+
+class CsvSource(TransformNode):
+    """Reads rows from a CSV file."""
+
+    def __init__(self, path: str, node_id: str = "csv_source"):
+        self.node_id = node_id
+        self.path = path
+
+    def transform(self, rows: list[Row] | None = None) -> list[Row]:
+        with open(self.path, newline="") as f:
+            reader = csv.DictReader(f)
+            return list(reader)
+
+
+class CsvSink(TransformNode):
+    """Writes rows to a CSV file."""
+
+    def __init__(self, path: str, node_id: str = "csv_sink"):
+        self.node_id = node_id
+        self.path = path
+
+    def transform(self, rows: list[Row]) -> list[Row]:
+        if not rows:
+            return rows
+        fieldnames = list(rows[0].keys())
+        with open(self.path, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return rows
+
+
+class JsonSink(TransformNode):
+    """Writes rows to a JSON file."""
+
+    def __init__(self, path: str, node_id: str = "json_sink"):
+        self.node_id = node_id
+        self.path = path
+
+    def transform(self, rows: list[Row]) -> list[Row]:
+        import json
+        with open(self.path, "w") as f:
+            json.dump(rows, f, indent=2)
+        return rows
+
+
+class SqliteSink(TransformNode):
+    """Writes rows to a SQLite table."""
+
+    def __init__(self, path: str, table: str, node_id: str = "sqlite_sink"):
+        self.node_id = node_id
+        self.path = path
+        self.table = table
+
+    def transform(self, rows: list[Row]) -> list[Row]:
+        import sqlite3
+        conn = sqlite3.connect(self.path)
+        cursor = conn.cursor()
+        if rows:
+            fieldnames = list(rows[0].keys())
+            placeholders = ", ".join(["?"] * len(fieldnames))
+            col_names = ", ".join(fieldnames)
+            cursor.execute(f"DROP TABLE IF EXISTS {self.table}")
+            cursor.execute(f"CREATE TABLE {self.table} ({', '.join(f'{c} TEXT' for c in fieldnames)})")
+            for r in rows:
+                vals = [str(r.get(c, "")) for c in fieldnames]
+                cursor.execute(f"INSERT INTO {self.table} ({col_names}) VALUES ({placeholders})", vals)
+        conn.commit()
+        conn.close()
+        return rows

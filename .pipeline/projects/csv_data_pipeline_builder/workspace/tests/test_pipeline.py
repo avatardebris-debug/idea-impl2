@@ -32,7 +32,7 @@ def test_select_projects():
     assert all(set(r.keys()) == {"id", "region"} for r in result)
 
 def test_select_rename():
-    node = SelectNode(columns=["order_id", "area"], rename={"order_id": "id", "area": "region"})
+    node = SelectNode(columns=["id", "region"], rename={"id": "order_id", "region": "area"})
     result = node.transform(SALES)
     assert all("order_id" in r for r in result)
 

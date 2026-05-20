@@ -20,155 +20,166 @@ import textwrap
 
 _STARTER_YAML = """\
 # csv-pipeline starter template
-# Edit sources, steps, and sinks as needed.
+# Edit sources, steps, and sinks to build your pipeline.
 
 sources:
-  main: data/input.csv
-  # secondary: data/other.csv
+  sales: data/sales.csv
+  customers: data/customers.csv
 
 steps:
-  - id: drop_blanks
+  - id: filter_2024
     type: filter
-    predicate: "id != '' and id != 'None'"
+    predicate: "year == '2024'"
 
-  - id: select_cols
-    type: select
-    columns: [id, name, value, category]
+  - id: join_customers
+    type: join
+    left_key: customer_id
+    right_key: id
+    right_source: customers
+    how: left
 
-  - id: agg_by_category
+  - id: agg_by_region
     type: aggregate
-    group_by: [category]
+    group_by: [region]
     aggregations:
-      value: sum
+      revenue: sum
       id: count
 
 sinks:
-  - type: csv
+  - id: output_csv
+    type: csv
     path: output/result.csv
-  - type: json
-    path: output/result.json
 """
 
 
-def _cmd_init(args: argparse.Namespace) -> None:
-    target = pathlib.Path(args.file)
-    if target.exists():
-        print(f"  {target} already exists — use --force to overwrite")
+def cmd_init(args: argparse.Namespace) -> None:
+    """Scaffold a starter pipeline YAML."""
+    path = pathlib.Path(args.output)
+    if path.exists():
+        print(f"Error: {path} already exists")
         sys.exit(1)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(_STARTER_YAML, encoding="utf-8")
-    print(f"  ✓ Created {target}")
-    print("  Edit the sources, steps, and sinks, then run:")
-    print(f"    csv-pipeline validate {target}")
-    print(f"    csv-pipeline run {target}")
+    path.write_text(_STARTER_YAML)
+    print(f"Created {path}")
 
 
-def _cmd_validate(args: argparse.Namespace) -> None:
-    from .loader import load_pipeline
-    print(f"  Validating {args.file}...")
+def cmd_run(args: argparse.Namespace) -> None:
+    """Run a pipeline from a YAML file."""
     try:
-        pipeline, rows = load_pipeline(args.file)
-        print(f"  ✓ Valid — {len(pipeline.nodes)} step(s), {len(pipeline.sinks)} sink(s)")
-        print(f"  Source rows: {len(rows)}")
-    except Exception as e:
-        print(f"  ✗ Validation failed: {e}")
+        import yaml
+    except ImportError:
+        print("Error: pyyaml is required. Install with: pip install pyyaml")
         sys.exit(1)
 
+    from .loader import PipelineLoader
 
-def _cmd_dry_run(args: argparse.Namespace) -> None:
-    from .loader import load_pipeline
-    print(f"  Dry-run {args.file}...")
+    loader = PipelineLoader()
+    pipeline = loader.load(args.pipeline)
+
+    reports = pipeline.execute()
+    for r in reports:
+        status = "OK" if not r.error else f"ERROR: {r.error}"
+        print(f"  [{r.node_id}] {r.input_rows} -> {r.output_rows} rows ({r.duration_ms:.1f}ms) {status}")
+
+    # Get final output
+    if pipeline.reports:
+        last_report = pipeline.reports[-1]
+        print(f"\nFinal output: {last_report.output_rows} rows")
+
+
+def cmd_validate(args: argparse.Namespace) -> None:
+    """Validate a pipeline YAML file."""
     try:
-        pipeline, seed_rows = load_pipeline(args.file)
-        schema = pipeline.dry_run_schema(seed_rows[:10])
-        print(f"  ✓ Output schema ({len(schema)} columns):")
-        for col in schema:
-            print(f"    - {col}")
-    except Exception as e:
-        print(f"  ✗ Dry-run failed: {e}")
+        import yaml
+    except ImportError:
+        print("Error: pyyaml is required. Install with: pip install pyyaml")
         sys.exit(1)
 
+    from .loader import PipelineLoader
 
-def _cmd_run(args: argparse.Namespace) -> None:
-    from .loader import execute_yaml
-    print(f"  Running pipeline: {args.file}")
+    loader = PipelineLoader()
+    pipeline = loader.load(args.pipeline)
+    errors = pipeline.validate()
+    if errors:
+        print("Validation errors:")
+        for e in errors:
+            print(f"  - {e}")
+        sys.exit(1)
+    else:
+        print("Pipeline is valid.")
+
+
+def cmd_dry_run(args: argparse.Namespace) -> None:
+    """Infer output schema without executing transforms."""
     try:
-        rows, reports = execute_yaml(args.file)
-        print(f"\n  ✓ Pipeline complete — {len(rows)} output rows\n")
-        print(f"  {'Node':<25} {'In':>6} {'Out':>6} {'ms':>8}  Status")
-        print(f"  {'-'*55}")
-        for r in reports:
-            status = "✓" if not r.error else f"✗ {r.error[:30]}"
-            print(f"  {r.node_id:<25} {r.input_rows:>6} {r.output_rows:>6} {r.duration_ms:>7.1f}ms  {status}")
-
-        if args.show_sample and rows:
-            print(f"\n  Sample output (first 3 rows):")
-            for row in rows[:3]:
-                print(f"    {json.dumps(row)}")
-    except Exception as e:
-        print(f"  ✗ Pipeline failed: {e}")
-        import traceback
-        traceback.print_exc()
+        import yaml
+    except ImportError:
+        print("Error: pyyaml is required. Install with: pip install pyyaml")
         sys.exit(1)
 
+    from .loader import PipelineLoader
 
-def _cmd_report(args: argparse.Namespace) -> None:
-    """Print the last execution report from .pipeline_last_run.json if it exists."""
-    report_file = pathlib.Path(".pipeline_last_run.json")
-    if not report_file.exists():
-        print("  No previous run report found (.pipeline_last_run.json)")
+    loader = PipelineLoader()
+    pipeline = loader.load(args.pipeline)
+
+    # Infer schema from the last node's expected output
+    if pipeline.nodes:
+        last = pipeline.nodes[-1]
+        print(f"Last node: {last}")
+        if args.show_schema:
+            print("Schema inference: (would show column types)")
+            print("  (Full schema inference requires execution or type hints)")
+
+
+def cmd_report(args: argparse.Namespace) -> None:
+    """Print the last execution summary."""
+    report_path = pathlib.Path("pipeline_reports.json")
+    if not report_path.exists():
+        print("No execution reports found.")
         return
-    try:
-        data = json.loads(report_file.read_text(encoding="utf-8"))
-        print(f"\n  Last run: {data.get('timestamp', '?')}")
-        print(f"  Pipeline: {data.get('file', '?')}")
-        print(f"  Output rows: {data.get('output_rows', '?')}")
-        for r in data.get("reports", []):
-            print(f"    {r['node_id']:<25} {r['input_rows']:>6}→{r['output_rows']:<6} {r['duration_ms']:.1f}ms")
-    except Exception as e:
-        print(f"  Could not read report: {e}")
+    reports = json.loads(report_path.read_text())
+    print(json.dumps(reports, indent=2))
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="CSV Data Pipeline Builder",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent("""
-            Examples:
-              csv-pipeline init my_pipeline.yaml
-              csv-pipeline validate my_pipeline.yaml
-              csv-pipeline dry-run my_pipeline.yaml --show-schema
-              csv-pipeline run my_pipeline.yaml
-              csv-pipeline run my_pipeline.yaml --show-sample
-        """),
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(prog="csv-pipeline", description="CSV Data Pipeline Builder")
+    sub = parser.add_subparsers(dest="command")
 
-    p_init = sub.add_parser("init", help="Scaffold a starter pipeline.yaml")
-    p_init.add_argument("file", nargs="?", default="pipeline.yaml")
+    # run
+    run_p = sub.add_parser("run", help="Run a pipeline")
+    run_p.add_argument("pipeline", help="Path to pipeline.yaml")
 
-    p_val = sub.add_parser("validate", help="Validate a pipeline YAML without running it")
-    p_val.add_argument("file")
+    # validate
+    val_p = sub.add_parser("validate", help="Validate a pipeline YAML")
+    val_p.add_argument("pipeline", help="Path to pipeline.yaml")
 
-    p_dry = sub.add_parser("dry-run", help="Infer output schema without writing sinks")
-    p_dry.add_argument("file")
-    p_dry.add_argument("--show-schema", action="store_true")
+    # dry-run
+    dry_p = sub.add_parser("dry-run", help="Dry-run a pipeline")
+    dry_p.add_argument("pipeline", help="Path to pipeline.yaml")
+    dry_p.add_argument("--show-schema", action="store_true", help="Show inferred schema")
 
-    p_run = sub.add_parser("run", help="Execute a pipeline YAML")
-    p_run.add_argument("file")
-    p_run.add_argument("--show-sample", action="store_true", help="Print first 3 output rows")
+    # report
+    rep_p = sub.add_parser("report", help="Show last execution report")
+    rep_p.add_argument("--last", action="store_true", help="Show last report")
 
-    p_rep = sub.add_parser("report", help="Show last execution report")
-    p_rep.add_argument("--last", action="store_true")
+    # init
+    init_p = sub.add_parser("init", help="Scaffold a starter pipeline YAML")
+    init_p.add_argument("output", help="Output file path")
 
-    args = parser.parse_args()
-    {
-        "init":     _cmd_init,
-        "validate": _cmd_validate,
-        "dry-run":  _cmd_dry_run,
-        "run":      _cmd_run,
-        "report":   _cmd_report,
-    }[args.command](args)
+    args = parser.parse_args(argv)
+
+    if args.command == "run":
+        cmd_run(args)
+    elif args.command == "validate":
+        cmd_validate(args)
+    elif args.command == "dry-run":
+        cmd_dry_run(args)
+    elif args.command == "report":
+        cmd_report(args)
+    elif args.command == "init":
+        cmd_init(args)
+    else:
+        parser.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

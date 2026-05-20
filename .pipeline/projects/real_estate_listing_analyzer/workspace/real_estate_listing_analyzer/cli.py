@@ -54,6 +54,16 @@ def _analyze(args: argparse.Namespace) -> None:
         fetcher = ZillowFetcher()
         listings = fetcher.search_by_zip(args.zip, count=40)
 
+    # Apply filters
+    if args.beds is not None:
+        listings = [l for l in listings if l.bedrooms >= args.beds]
+    if args.budget is not None:
+        listings = [l for l in listings if l.price <= args.budget]
+
+    if not listings:
+        print("No listings match the given filters.")
+        sys.exit(1)
+
     analyzer = TrendAnalyzer()
     result = analyzer.analyze(listings, zip_code=args.zip)
 
@@ -82,6 +92,7 @@ def _analyze(args: argparse.Namespace) -> None:
 def _report(args: argparse.Namespace) -> None:
     from .fetcher import ZillowFetcher, load_latest_cache
     from .analyzer import TrendAnalyzer
+    from .report import ReportBuilder, AlertEngine
 
     cached = load_latest_cache(args.zip)
     if cached:
@@ -93,51 +104,32 @@ def _report(args: argparse.Namespace) -> None:
 
     analyzer = TrendAnalyzer()
     result = analyzer.analyze(listings, zip_code=args.zip)
+
+    # Run deal alerts
+    alert_engine = AlertEngine(threshold=5.0)
+    deals = alert_engine.find_deals(listings, result)
+    if deals:
+        print(f"  🏷  {len(deals)} potential deals (>5% below trend):")
+        for d in deals[:5]:
+            print(f"    {d.listing.address}: ${d.listing.price_per_sqft:,.2f}/sqft ({d.discount_pct:.1f}% off)")
+
+    builder = ReportBuilder(trend=result, deals=deals)
     out_path = pathlib.Path(args.out) if args.out else None
 
     if args.format == "csv":
-        rows = [
-            {
-                "address": l.address, "city": l.city, "zip": l.zip_code,
-                "price": l.price, "sqft": l.sqft, "beds": l.bedrooms,
-                "baths": l.bathrooms, "price_per_sqft": l.price_per_sqft,
-                "days_on_market": l.days_on_market, "zestimate": l.zestimate,
-                "below_zestimate_pct": round(
-                    (1 - l.price / l.zestimate) * 100, 1
-                ) if l.zestimate > 0 else "",
-            }
-            for l in listings
-        ]
+        content = builder.build_csv(listings)
         target = out_path or pathlib.Path(f"real_estate_{args.zip}.csv")
-        with open(target, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
-            w.writeheader()
-            w.writerows(rows)
-        print(f"  CSV report written to {target} ({len(rows)} rows)")
+        target.write_text(content, encoding="utf-8")
+        print(f"  CSV report written to {target} ({len(listings)} rows)")
+
+    elif args.format == "pdf":
+        content = builder.build_pdf(listings)
+        target = out_path or pathlib.Path(f"real_estate_{args.zip}.pdf")
+        target.write_bytes(content)
+        print(f"  PDF report written to {target} ({len(content)} bytes)")
 
     elif args.format == "md":
-        lines = [
-            f"# Real Estate Market Report — ZIP {args.zip}",
-            "",
-            f"| Metric | Value |",
-            f"|---|---|",
-            f"| Listings | {result.listing_count} |",
-            f"| Median Price | ${result.median_price:,.0f} |",
-            f"| Median $/sqft | ${result.median_price_per_sqft:,.2f} |",
-            f"| Median DOM | {result.median_dom:.0f} days |",
-            f"| Neighborhood Score | {result.neighborhood_score}/100 |",
-            "",
-            "## Listings",
-            "",
-            "| Address | Price | $/sqft | Beds | Baths | DOM |",
-            "|---|---|---|---|---|---|",
-        ]
-        for l in sorted(listings, key=lambda x: x.price_per_sqft):
-            lines.append(
-                f"| {l.address} | ${l.price:,} | ${l.price_per_sqft:.0f} "
-                f"| {l.bedrooms} | {l.bathrooms} | {l.days_on_market} |"
-            )
-        content = "\n".join(lines) + "\n"
+        content = builder.build_markdown(listings)
         target = out_path or pathlib.Path(f"real_estate_{args.zip}.md")
         target.write_text(content, encoding="utf-8")
         print(f"  Markdown report written to {target}")
@@ -188,11 +180,13 @@ def main() -> None:
     # analyze
     p_analyze = sub.add_parser("analyze", help="Analyze cached or live listings")
     p_analyze.add_argument("--zip", required=True, help="ZIP code")
+    p_analyze.add_argument("--beds", type=int, default=None, help="Min bedrooms filter")
+    p_analyze.add_argument("--budget", type=int, default=None, help="Max price filter")
 
     # report
     p_report = sub.add_parser("report", help="Generate a market report")
     p_report.add_argument("--zip", required=True, help="ZIP code")
-    p_report.add_argument("--format", choices=["csv", "md", "json"], default="csv")
+    p_report.add_argument("--format", choices=["csv", "md", "json", "pdf"], default="csv")
     p_report.add_argument("--out", default=None, help="Output file path")
 
     args = parser.parse_args()

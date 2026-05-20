@@ -130,6 +130,41 @@ class ReviewerAgent(AgentProcess):
                 f"## Verdict\nFAIL — review file was not generated\n"
             )
             self.write_state_file(review_path, review_content)
+
+        # Guard: detect boilerplate/template-only reviews that cause infinite loops.
+        # If the review has no real content (just headings and placeholder text),
+        # overwrite with a conservative FAIL so the runner doesn't loop forever.
+        _BOILERPLATE_PHRASES = [
+            "(bullet list of things",
+            "(ONLY issues that will cause",
+            "(style, naming, future improvements",
+            "(list any self-contained utilities",
+            "your structured review here",
+            "write your review here",
+            "placeholder",
+        ]
+        _real_content_markers = [
+            bool(re.search(r'##\s+Verdict', review_content, re.IGNORECASE)),
+            bool(re.search(r'##\s+Blocking Bugs', review_content, re.IGNORECASE)),
+            len(review_content.strip()) > 200,
+        ]
+        _is_boilerplate = (
+            sum(_real_content_markers) < 2
+            or any(phrase.lower() in review_content.lower() for phrase in _BOILERPLATE_PHRASES)
+        )
+        if _is_boilerplate and "review file was not generated" not in review_content:
+            import logging as _rlog
+            _rlog.getLogger(__name__).warning(
+                "[reviewer] Boilerplate/empty review detected for phase %d — synthesizing FAIL",
+                phase_num,
+            )
+            review_content = (
+                f"# Code Review — Phase {phase_num}\n\n"
+                f"## Blocking Bugs\n- Review contained only boilerplate/template text — no real assessment\n\n"
+                f"## Non-Blocking Notes\nNone\n\n"
+                f"## Verdict\nFAIL — reviewer produced placeholder output\n"
+            )
+            self.write_state_file(review_path, review_content)
         # Count only bullets under '## Blocking Bugs' — non-blocking notes are deferred work
         bugs_section = re.search(
             r'## Blocking Bugs.*?(?=## |$)', review_content, re.DOTALL | re.IGNORECASE

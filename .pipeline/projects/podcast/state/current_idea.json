@@ -1,0 +1,13 @@
+{
+  "title": "[podcast]",
+  "description": "extract lessons from podcast.  Tool identifies from a podcast title or link to the overall page. fast whisper transcript->podcast->LLM process. prompt to find the lessons->repeat for the next podct in sequence, etc. Options for number extracted per run, custom instructions about anything you want, etc. insert API or pull ollama model and run with prompt that descibes which LLM you plan to use.",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-20T10:06:12.964587+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "podcast",
+  "tasks_done": 0,
+  "tasks_total": 1
+}

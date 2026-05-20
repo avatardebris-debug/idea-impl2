@@ -26,6 +26,22 @@ import threading
 import time
 from datetime import datetime, timezone
 
+# ---------------------------------------------------------------------------
+# Auto-load .env file (stdlib only — no python-dotenv needed)
+# Supports: KEY=value, KEY="value", export KEY=value
+# ---------------------------------------------------------------------------
+_ENV_FILE = pathlib.Path(__file__).parent.parent / ".env"
+if _ENV_FILE.exists():
+    _ENV_RE = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*[\"']?(.*?)[\"']?\s*$")
+    for _line in _ENV_FILE.read_text(encoding="utf-8").splitlines():
+        if _line.strip().startswith("#") or not _line.strip():
+            continue
+        _m = _ENV_RE.match(_line)
+        if _m:
+            _key, _val = _m.group(1), _m.group(2)
+            if _key not in os.environ:  # don't override explicit env vars
+                os.environ[_key] = _val
+
 _ANSI_ESCAPE = re.compile(r'(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\))')
 
 # Suppress Jupyter/cloud terminal escape sequences (^[]11;rgb:... etc.)
@@ -1526,6 +1542,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
 # Maximum reviewer->executor round-trips per phase before force-advancing
 # 5 attempts = ~25-35 min max per stuck phase (saves 40+ min vs old limit of 12)
 MAX_PHASE_RETRIES = 5
+MAX_PROJECT_LIFETIME_RETRIES = 80  # absolute cap: force budget_exceeded if a project exceeds this many total retries across ALL phases
 
 
 def _tick_project(
@@ -3114,16 +3131,37 @@ def run_pipeline(
                                 ci = json.loads(ci_path.read_text(encoding="utf-8"))
                                 run_metrics.record_project_start(slug)
                                 st = ci.get("status", "")
+
+                                # Read retry counts from phase_retries.json
+                                retries = 0
+                                pr_path = proj_dir / "state" / "phase_retries.json"
+                                if pr_path.exists():
+                                    try:
+                                        pr_data = json.loads(pr_path.read_text(encoding="utf-8"))
+                                        retries = sum(v for v in pr_data.values() if isinstance(v, int))
+                                    except Exception:
+                                        pass
+
+                                # --- Global lifetime retry cap ---
+                                # If a project has accumulated too many retries across all
+                                # phases, force budget_exceeded to break infinite loops.
+                                if (retries >= MAX_PROJECT_LIFETIME_RETRIES
+                                        and st not in ("complete", "budget_exceeded", "", "dep_waiting")):
+                                    ci["status"] = "budget_exceeded"
+                                    ci["budget_note"] = (
+                                        f"Force-completed: exceeded {MAX_PROJECT_LIFETIME_RETRIES} "
+                                        f"total retries across all phases (actual: {retries})"
+                                    )
+                                    ci_path.write_text(json.dumps(ci, indent=2), encoding="utf-8")
+                                    print(
+                                        f"  \U0001f6d1 Lifetime retry cap hit: '{ci.get('title', slug)}' "
+                                        f"({retries} retries \u2265 {MAX_PROJECT_LIFETIME_RETRIES}) \u2192 budget_exceeded"
+                                    )
+                                    for _role in AGENT_ROLES:
+                                        bus.clear_queue(_role)
+                                    st = "budget_exceeded"  # update local var for metrics
+
                                 if st == "complete":
-                                    # Read retry counts from phase_retries.json
-                                    retries = 0
-                                    pr_path = proj_dir / "state" / "phase_retries.json"
-                                    if pr_path.exists():
-                                        try:
-                                            pr_data = json.loads(pr_path.read_text(encoding="utf-8"))
-                                            retries = sum(v for v in pr_data.values() if isinstance(v, int))
-                                        except Exception:
-                                            pass
                                     run_metrics.record_project_complete(
                                         slug,
                                         phases=ci.get("phase", 0),
@@ -3131,6 +3169,34 @@ def run_pipeline(
                                     )
                 except Exception:
                     pass  # metrics are best-effort, never crash the runner
+
+                # --- Wire token counts from throughput.json into metrics ---
+                # throughput.json is written by the LLM interface on every call.
+                # We snapshot cumulative_tokens here so per-run totals are accurate.
+                try:
+                    _tp_metrics_path = PIPELINE_DIR / "state" / "throughput.json"
+                    if _tp_metrics_path.exists():
+                        _tp_data = json.loads(_tp_metrics_path.read_text(encoding="utf-8"))
+                        _total_tok = _tp_data.get("cumulative_tokens", 0)
+                        # Attribute all tokens to the active project for this tick
+                        if _active_slug and _total_tok > 0:
+                            # Only record the delta since last tick to avoid double-counting
+                            _prev_tok = getattr(run_pipeline, "_last_tok_snapshot", 0)
+                            _delta_tok = max(0, _total_tok - _prev_tok)
+                            if _delta_tok > 0:
+                                run_metrics.record_tokens(_active_slug, _delta_tok)
+                            run_pipeline._last_tok_snapshot = _total_tok
+                        # Record task completions from live tasks.md
+                        if _active_slug and tasks_done > 0:
+                            _prev_tasks = getattr(run_pipeline, "_last_tasks_snapshot", {}).get(_active_slug, 0)
+                            _delta_tasks = max(0, tasks_done - _prev_tasks)
+                            if _delta_tasks > 0:
+                                run_metrics.record_task_complete(_active_slug, _delta_tasks)
+                            if not hasattr(run_pipeline, "_last_tasks_snapshot"):
+                                run_pipeline._last_tasks_snapshot = {}
+                            run_pipeline._last_tasks_snapshot[_active_slug] = tasks_done
+                except Exception:
+                    pass  # Never crash the runner over metrics
 
                 last_health_check = time.time()
 

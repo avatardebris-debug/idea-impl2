@@ -1,0 +1,13 @@
+{
+  "title": "[book researcher]",
+  "description": "find the book people aren't writing but that people want. scan reviews, quora, etc from top selling information books, pdfs, video courses, etc for reviews that are like \"this book was good but I wish it also did X, it didn't explain Y\" and combine for the niche and then LLM deconstructs into a table of contents",
+  "status": "phase_1_executing",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-20T09:49:18.083969+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "book_researcher",
+  "tasks_done": 0,
+  "tasks_total": 6
+}

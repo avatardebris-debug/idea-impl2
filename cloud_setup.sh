@@ -140,9 +140,21 @@ fi
 source "${AGENT_DIR}/.venv/bin/activate"
 
 pip install -q --upgrade pip
-# No external dependencies needed — the pipeline uses only Python stdlib
-# Optionally install openai/anthropic if you want those providers:
-# pip install -q openai anthropic
+pip install -q -r "${AGENT_DIR}/requirements.txt"
+
+# --- API key handling ---
+# If using Gemini (--provider gemini), set GOOGLE_API_KEY before running.
+# You can pass it as an env var when invoking this script:
+#   GOOGLE_API_KEY=AIza... ./cloud_setup.sh
+# Or export it in your shell session after setup.
+if [[ -n "${GOOGLE_API_KEY:-}" ]]; then
+    echo "  GOOGLE_API_KEY is set — Gemini provider ready"
+    # Persist to .env file so the runner can source it on startup
+    echo "export GOOGLE_API_KEY=${GOOGLE_API_KEY}" >> "${AGENT_DIR}/.env"
+    echo "  Saved to ${AGENT_DIR}/.env"
+else
+    echo "  GOOGLE_API_KEY not set — to use Gemini: export GOOGLE_API_KEY=AIza..."
+fi
 
 echo "  ✓ Python environment ready"
 
