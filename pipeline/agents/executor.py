@@ -401,6 +401,11 @@ class ExecutorAgent(AgentProcess):
         _infra_files = {
             "agent.py", "extract.py", "fix_indent.py", "fix_missing_plans.py",
             "fix_stuck_tasks.py", "governance.py", "setup.py",
+            "health_check.py", "import_cloud_zip.py", "import_zip.py",
+            "install_all.py", "llm_interface.py", "quality_scorer.py",
+            "reset_budget_exceeded.py", "sweep_all.py", "test_all.py",
+            "test_dependency_system.py", "test_harness_capabilities.py",
+            "test_priority_eviction_unit.py", "tools.py",
         }
         for _f in _project_root.glob("*.py"):
             if _f.name not in _infra_files and _f.name not in before_files:
