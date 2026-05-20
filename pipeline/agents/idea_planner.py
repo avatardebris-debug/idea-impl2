@@ -23,10 +23,10 @@ from pipeline.message_bus import Message
 class IdeaPlannerAgent(AgentProcess):
     role = "idea_planner"
     model_tier = "light"
-    num_ctx = 4096       # planning tasks don't need large context
+    num_ctx = 8192
     max_steps = 15
     temperature = 0.5   # needs to reason about architecture — moderate creativity
-    think = True        # reasoning helps produce better multi-phase project structures
+    think = False       # thinking burns ctx/steps on local Qwen; plan in prose instead
 
     def handle(self, msg: Message) -> AgentOutput:
         idea_description = msg.payload.get("idea", "")

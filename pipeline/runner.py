@@ -88,6 +88,8 @@ from pipeline.context_aggregator import (
 # starts the runner from different directories.
 PIPELINE_DIR = PROJECT_ROOT.resolve() / ".pipeline"
 AGENTS_DIR = pathlib.Path(__file__).parent / "agents"
+# Set in run_pipeline() when --ideas-file is used; _mark_complete trims this queue
+_RUNNER_IDEAS_PATH: pathlib.Path | None = None
 
 # All agent roles and their module paths
 AGENT_ROLES = [
@@ -832,6 +834,15 @@ def seed_from_master_list(
     if not mi_path.exists():
         print(f"  ✗ {mi_path.name} not found")
         return False
+
+    # Trim ideas already in truth.md / completions.jsonl from the working queue
+    try:
+        from pipeline.ideas_sync import prepare_master_ideas_for_seed
+        n_trim = prepare_master_ideas_for_seed(mi_path, verbose=not silent)
+        if n_trim and not silent:
+            print(f"  [truth] {n_trim} completed idea(s) removed from queue before seed")
+    except Exception:
+        pass
 
     import re
     content = mi_path.read_text(encoding="utf-8")
@@ -1904,23 +1915,30 @@ def _advance_phase(
 
 
 def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_path: pathlib.Path | None = None) -> None:
-    """Mark a project as complete in both state file and master_ideas.md."""
+    """Mark a project as complete in state, registry, and master_ideas.md (slug-aware)."""
     state["status"] = "complete"
     state.pop("review_result", None)
+    slug = state.get("_slug") or project_dir.name
+    state["_slug"] = slug
+    state["completed_at"] = datetime.now(timezone.utc).isoformat()
     _write_state_dict(project_dir, state)
     print(f"  ✅ '{title}' completed all phases!")
 
-    # Mark in master_ideas.md
-    mi_path = ideas_path if ideas_path else PROJECT_ROOT / "master_ideas.md"
-    if mi_path.exists() and title:
-        content = mi_path.read_text(encoding="utf-8")
-        # Handle both [title] and title formats
-        clean_title = title.strip("[]")
-        updated = content.replace(f"- [ ] **{title}**", f"- [x] **{title}**")
-        if updated == content:
-            updated = content.replace(f"- [ ] **[{clean_title}]**", f"- [x] **[{clean_title}]**")
-        if updated != content:
-            mi_path.write_text(updated, encoding="utf-8")
+    mi_path = ideas_path or _RUNNER_IDEAS_PATH or (PROJECT_ROOT / "master_ideas.md")
+    try:
+        from pipeline.ideas_sync import record_completion
+        n = record_completion(
+            slug,
+            title,
+            ideas_path=mi_path if mi_path.exists() else None,
+            description=state.get("description", ""),
+            workspace=str(project_dir / "workspace"),
+        )
+        if n:
+            print(f"  [truth] removed {n} line(s) from {mi_path.name}")
+    except Exception as _is_err:
+        import logging as _log
+        _log.getLogger(__name__).debug("truth/completion record skipped: %s", _is_err)
 
     # --- Fine-tune corpus: emit training pairs for this completed project ---
     try:
@@ -2268,8 +2286,9 @@ def run_pipeline(
 ) -> None:
     """Main pipeline orchestrator."""
     # Override master ideas path if --ideas-file was given
-    global PROJECT_ROOT
+    global PROJECT_ROOT, _RUNNER_IDEAS_PATH
     _ideas_path = pathlib.Path(ideas_file).resolve() if ideas_file else PROJECT_ROOT.resolve() / "master_ideas.md"
+    _RUNNER_IDEAS_PATH = _ideas_path
     if ideas_file:
         print(f"  Ideas:    {_ideas_path}")
     init_pipeline_dirs()

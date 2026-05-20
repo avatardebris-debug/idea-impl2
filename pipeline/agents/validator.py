@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import ast
 import logging
+import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -205,10 +207,9 @@ def auto_install_workspace_deps(workspace: pathlib.Path) -> list[str]:
             logger.warning("[validator] Editable install failed: %s", r.stderr[:400])
 
     # --- Step 3: pyproject.toml explicit deps ---
-
+    if pyproject.exists():
         try:
             content = pyproject.read_text(encoding="utf-8")
-            # Try stdlib tomllib first (Python 3.11+), fall back to toml package
             try:
                 import tomllib  # type: ignore
                 data = tomllib.loads(content)
@@ -225,8 +226,10 @@ def auto_install_workspace_deps(workspace: pathlib.Path) -> list[str]:
             if isinstance(deps, dict):
                 pkgs = [k for k in deps if k.lower() != "python"]
             else:
-                pkgs = [str(d).split(">")[0].split("<")[0].split("=")[0].split("!")[0].strip()
-                        for d in deps]
+                pkgs = [
+                    str(d).split(">")[0].split("<")[0].split("=")[0].split("!")[0].strip()
+                    for d in deps
+                ]
             if pkgs:
                 logger.info("[validator] Installing from pyproject.toml: %s", pkgs)
                 r = subprocess.run(
@@ -301,6 +304,159 @@ def auto_install_workspace_deps(workspace: pathlib.Path) -> list[str]:
     return installed
 
 
+# ---------------------------------------------------------------------------
+# Deterministic pytest runner (no LLM)
+# ---------------------------------------------------------------------------
+
+def _count_py_files(workspace: pathlib.Path) -> int:
+    return sum(1 for p in workspace.rglob("*.py") if p.is_file())
+
+
+def _pytest_timeout_available() -> bool:
+    try:
+        r = subprocess.run(
+            [sys.executable, "-m", "pytest", "--help"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        return "--timeout" in (r.stdout or "")
+    except Exception:
+        return False
+
+
+def run_pytest(workspace: pathlib.Path, timeout_per_test: int = 120) -> dict:
+    """
+    Run pytest in `workspace` and return structured results.
+
+    Exit codes: 0 = pass, 5 = no tests collected (treated as pass).
+    """
+    tests_dir = workspace / "tests"
+    target = "tests/" if tests_dir.exists() and tests_dir.is_dir() else "."
+
+    base_cmd = [sys.executable, "-m", "pytest", target, "-v", "--tb=short", "--no-header"]
+    if _pytest_timeout_available():
+        cmd = base_cmd + [f"--timeout={timeout_per_test}"]
+    else:
+        cmd = base_cmd
+
+    logger.info("[validator] Running pytest in %s (target=%s)", workspace, target)
+    proc = subprocess.run(
+        cmd,
+        cwd=str(workspace),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=600,
+    )
+    combined = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+    # Retry without --timeout if plugin missing (exit 4 + usage error)
+    if proc.returncode == 4 and "unrecognized arguments: --timeout" in combined:
+        proc = subprocess.run(
+            base_cmd,
+            cwd=str(workspace),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=600,
+        )
+    combined = (proc.stdout or "") + ("\n" + proc.stderr if proc.stderr else "")
+    passed = len(re.findall(r"\bPASSED\b", combined))
+    failed = len(re.findall(r"\bFAILED\b", combined))
+    errors = len(re.findall(r"\bERROR\b", combined))
+
+    # Summary footer is authoritative: "71 passed, 1 failed in 8.18s"
+    sm_passed = re.search(r"(\d+)\s+passed", combined, re.IGNORECASE)
+    sm_failed = re.search(r"(\d+)\s+failed", combined, re.IGNORECASE)
+    sm_errors = re.search(r"(\d+)\s+errors?", combined, re.IGNORECASE)
+    if sm_passed:
+        passed = int(sm_passed.group(1))
+    if sm_failed:
+        failed = int(sm_failed.group(1))
+    if sm_errors:
+        errors = int(sm_errors.group(1))
+
+    summary_m = re.search(
+        r"=+\s*([\d\w ,]+)\s+in\s+[\d.]+s\s*=+",
+        combined,
+        re.IGNORECASE,
+    )
+    summary_line = summary_m.group(0).strip() if summary_m else ""
+    no_tests = (
+        proc.returncode == 5
+        or "no tests ran" in combined.lower()
+        or "collected 0 items" in combined.lower()
+    )
+
+    return {
+        "returncode": proc.returncode,
+        "stdout": combined,
+        "passed": passed,
+        "failed": failed,
+        "errors": errors,
+        "no_tests": no_tests,
+        "summary_line": summary_line,
+    }
+
+
+def build_validation_report(
+    phase_num: int,
+    pytest_result: dict,
+    tasks_content: str,
+    workspace: pathlib.Path,
+) -> tuple[str, bool]:
+    """Build validation_report.md content and return (report, is_pass)."""
+    pr = pytest_result
+    py_count = _count_py_files(workspace)
+
+    if pr["no_tests"]:
+        test_line = "- Tests: no tests collected (0 run)"
+        tests_ok = True
+    else:
+        test_line = (
+            f"- Tests: {pr['passed']} passed, {pr['failed']} failed, "
+            f"{pr['errors']} errors"
+        )
+        tests_ok = pr["returncode"] == 0 and pr["failed"] == 0 and pr["errors"] == 0
+
+    files_line = f"- Python files in workspace: {py_count}"
+    has_code = py_count > 0
+
+    if tests_ok and (has_code or pr["no_tests"]):
+        verdict = "Verdict: PASS"
+        is_pass = True
+    elif pr["no_tests"] and not has_code:
+        verdict = "Verdict: FAIL"
+        is_pass = False
+        files_line += " (no .py files found)"
+    else:
+        verdict = "Verdict: FAIL"
+        is_pass = False
+
+    details = ""
+    if not is_pass and pr["stdout"]:
+        # Keep tail of output — failures are usually at the end
+        tail = pr["stdout"][-8000:]
+        details = f"\n## Test Output\n```\n{tail}\n```\n"
+
+    tasks_block = ""
+    if tasks_content.strip():
+        tasks_block = f"\n## Phase {phase_num} Tasks (acceptance scope)\n{tasks_content[:4000]}\n"
+
+    report = (
+        f"# Validation Report — Phase {phase_num}\n\n"
+        f"## Summary\n"
+        f"{test_line}\n"
+        f"{files_line}\n"
+        f"(Deterministic pytest — no LLM validator steps used.)\n"
+        f"{tasks_block}"
+        f"{details}\n"
+        f"## {verdict}\n"
+    )
+    return report, is_pass
+
 
 # ---------------------------------------------------------------------------
 # Agent
@@ -310,9 +466,9 @@ class ValidatorAgent(AgentProcess):
     role = "validator"
     model_tier = "light"
     num_ctx = 8192
-    max_steps = 12  # list_tree + read N files + pytest + ruff + write_file = easily 15+
-    temperature = 0.2   # deterministic test running
-    think = False       # mechanical validation — no CoT needed
+    max_steps = 8   # LLM only when PIPELINE_VALIDATOR_USE_LLM=1 (legacy path)
+    temperature = 0.2
+    think = False
 
     def handle(self, msg: Message) -> AgentOutput:
         phase_num = msg.payload.get("phase", 1)
@@ -344,70 +500,75 @@ class ValidatorAgent(AgentProcess):
         raw_tasks = self.read_state_file(tasks_path)
         tasks_content = self._extract_phase_tasks(raw_tasks, phase_num)
 
-        tests_dir = ws / "tests"
-        pytest_target = " tests/" if tests_dir.exists() and tests_dir.is_dir() else ""
+        use_llm = os.environ.get("PIPELINE_VALIDATOR_USE_LLM", "").strip().lower() in (
+            "1", "true", "yes",
+        )
+        result_answer = ""
+        tokens_used = 0
+        steps_used = 0
 
-        task_prompt = (
-            f"You are validating Phase {phase_num} code output.\n"
-            f"IMPORTANT: You are ONLY validating Phase {phase_num}. "
-            f"Ignore any tasks or acceptance criteria from other phases.\n\n"
-            f"## Workspace\n"
-            f"All code is in: {workspace_path}\n"
-            f"Files written: {', '.join(files_written) if files_written else '(check workspace)'}\n\n"
-            f"## Phase {phase_num} Task List (for acceptance criteria)\n{tasks_content}\n\n"
-            f"## Your Job — BE EFFICIENT (you have limited steps)\n"
-            f"NOTE: Dependencies and a conftest.py (sys.path fix) have already been set up.\n\n"
-            f"STEP 1: Run tests FIRST (most important):\n"
-            f"   `cd {workspace_path} && python -m pytest{pytest_target} -v --tb=short --timeout=120 -p no:timeout 2>&1 || true`\n"
-            f"   The --timeout=120 flag kills any single test that hangs beyond 2 minutes.\n"
-            f"   If pytest-timeout is not installed: `pip install pytest-timeout -q` first, then run.\n"
-            f"   If no test files exist, note 'No tests found'.\n\n"
-            f"STEP 2: Check files with: `find {workspace_path} -name '*.py' | sort`\n"
-            f"   A file is PRESENT if it appears ANYWHERE under the workspace (including subdirs).\n"
-            f"   Do NOT claim a file is missing just because it is not at the workspace root.\n"
-            f"   Only read individual files if tests FAIL and you need to diagnose why.\n\n"
-            f"STEP 3: Write your validation report to `{report_full_path}`.\n"
-            f"   Use this exact format:\n"
-            f"   ```\n"
-            f"   # Validation Report — Phase {phase_num}\n"
-            f"   ## Summary\n"
-            f"   - Tests: X passed, Y failed\n"
-            f"   ## Verdict: PASS\n"
-            f"   ```\n"
-            f"   PASS if tests pass or no tests exist AND core files are present.\n"
-            f"   FAIL only if tests error/fail OR required files are missing.\n\n"
-            f"STEP 4: Say DONE and state your verdict.\n"
-            f"\nCRITICAL: You MUST call write_file to save the report to `{report_full_path}`. "
-            f"Do not just print it — actually write it to the file.\n"
+        if ws.exists():
+            try:
+                pytest_result = run_pytest(ws)
+            except subprocess.TimeoutExpired:
+                pytest_result = {
+                    "returncode": 1,
+                    "stdout": "pytest timed out after 600s",
+                    "passed": 0,
+                    "failed": 0,
+                    "errors": 1,
+                    "no_tests": False,
+                    "summary_line": "",
+                }
+            except Exception as e:
+                logger.warning("[validator] pytest error: %s", e)
+                pytest_result = {
+                    "returncode": 1,
+                    "stdout": f"pytest failed to run: {e}",
+                    "passed": 0,
+                    "failed": 0,
+                    "errors": 1,
+                    "no_tests": False,
+                    "summary_line": "",
+                }
+        else:
+            pytest_result = {
+                "returncode": 1,
+                "stdout": f"Workspace not found: {workspace_path}",
+                "passed": 0,
+                "failed": 0,
+                "errors": 1,
+                "no_tests": False,
+                "summary_line": "",
+            }
+
+        report_content, is_pass = build_validation_report(
+            phase_num, pytest_result, tasks_content, ws if ws.exists() else pathlib.Path(workspace_path),
+        )
+        report_full_path.parent.mkdir(parents=True, exist_ok=True)
+        report_full_path.write_text(report_content, encoding="utf-8")
+        logger.info(
+            "[validator] Deterministic verdict phase %d: %s (rc=%s)",
+            phase_num,
+            "PASS" if is_pass else "FAIL",
+            pytest_result.get("returncode"),
         )
 
-        result = self.call_agent(task=task_prompt, verbose=False)
-
-        # Determine verdict from the structured report
-        report_content = self.read_state_file(report_path)
-
-        # --- Fallback: synthesize report from LLM answer if model forgot write_file ---
-        if not report_content and result.answer:
-            answer_upper = result.answer.upper()
-            if "VERDICT: PASS" in answer_upper or "**VERDICT: PASS**" in answer_upper:
-                synth_verdict = "Verdict: PASS"
-            elif "VERDICT: FAIL" in answer_upper or "**VERDICT: FAIL**" in answer_upper:
-                synth_verdict = "Verdict: FAIL"
-            elif "NO TESTS FOUND" in answer_upper or "NO TEST FILES" in answer_upper:
-                synth_verdict = "Verdict: PASS"  # No tests = pass by convention
-            else:
-                synth_verdict = "Verdict: FAIL"  # Unknown — assume fail, let executor retry
-            report_content = (
-                f"# Validation Report — Phase {phase_num}\n\n"
-                f"## Summary\n(Synthesized from agent response — model did not write file)\n\n"
-                f"## Agent Response\n{result.answer[:3000]}\n\n"
-                f"## {synth_verdict}\n"
+        # Optional legacy LLM path for extra diagnosis on failure
+        if not is_pass and use_llm:
+            task_prompt = (
+                f"Phase {phase_num} tests FAILED. Workspace: {workspace_path}\n\n"
+                f"## Pytest output (already run)\n```\n{pytest_result['stdout'][-6000:]}\n```\n\n"
+                f"## Tasks\n{tasks_content[:3000]}\n\n"
+                f"Add a brief ## Diagnosis section (3-5 bullets) to `{report_full_path}` "
+                f"using patch_file or write_file. Say DONE when done."
             )
-            report_full_path.parent.mkdir(parents=True, exist_ok=True)
-            report_full_path.write_text(report_content, encoding="utf-8")
-            logger.info("[validator] Synthesized report from agent answer (verdict: %s)", synth_verdict)
-
-        is_pass = bool(report_content) and "Verdict: PASS" in report_content
+            result = self.call_agent(task=task_prompt, verbose=False)
+            result_answer = result.answer
+            tokens_used = result.tokens_used
+            steps_used = result.steps_used
+            report_content = self.read_state_file(report_path) or report_content
+            is_pass = "Verdict: PASS" in report_content
 
         if is_pass:
             # Determine retry count from fix report
@@ -430,51 +591,21 @@ class ValidatorAgent(AgentProcess):
             except Exception:
                 pass
 
-            # --- Bug Resolution Memory: persist error→fix pair if retries occurred ---
-            # Only write when there were actual failures (fix_report exists),
-            # so we capture genuinely hard-won solutions, not trivial first-passes.
             try:
+                from pipeline.bug_memory import record_validator_pass
                 fix_report_path_str = f"phases/phase_{phase_num}/fix_report.md"
                 existing_fix_report = self.read_state_file(fix_report_path_str)
-                if existing_fix_report:
-                    import re as _re
-                    from pipeline.bug_memory import append_resolution
-
-                    # Extract first failure reason from fix_report
-                    failure_reason = ""
-                    for line in existing_fix_report.splitlines()[:40]:
-                        stripped = line.strip()
-                        if stripped and any(
-                            kw in stripped.lower()
-                            for kw in ("fail", "error", "missing", "wrong",
-                                       "import", "assert", "syntax", "attribute")
-                        ):
-                            failure_reason = stripped[:120]
-                            break
-                    if not failure_reason:
-                        failure_reason = existing_fix_report.splitlines()[0][:120]
-
-                    # Extract fix summary from validation report summary line
-                    fix_summary = ""
-                    for line in report_content.splitlines():
-                        stripped = line.strip()
-                        if stripped and stripped.startswith("- ") and len(stripped) > 10:
-                            fix_summary = stripped.lstrip("- ")[:200]
-                            break
-                    if not fix_summary:
-                        fix_summary = "Phase passed after executor fix"
-
-                    append_resolution(
-                        slug=idea_slug,
-                        phase=phase_num,
-                        failure_reason=failure_reason,
-                        fix_summary=fix_summary,
-                        retry_count=retry_count,
-                    )
+                record_validator_pass(
+                    idea_slug,
+                    phase_num,
+                    existing_fix_report,
+                    report_content,
+                    retry_count,
+                )
+                if existing_fix_report and retry_count >= 1:
                     logger.info(
-                        "[validator] Bug memory: recorded resolution for %s phase %d "
-                        "(%d retries): %s",
-                        idea_slug, phase_num, retry_count, failure_reason[:60],
+                        "[validator] Bug memory: recorded resolution for %s phase %d (%d retries)",
+                        idea_slug, phase_num, retry_count,
                     )
             except Exception as _bm_err:
                 logger.warning("[validator] Bug memory write failed (non-critical): %s", _bm_err)
@@ -508,21 +639,13 @@ class ValidatorAgent(AgentProcess):
             except Exception:
                 retry_data = {}
 
-            # Count failures in this report (pytest FAILED/ERROR lines + import errors)
-            import re as _re
-            fail_patterns = [
-                r'\bFAILED\b', r'\bERROR\b', r'ImportError', r'ModuleNotFoundError',
-                r'AssertionError', r'SyntaxError', r'Traceback',
-            ]
-            current_failures = sum(
-                len(_re.findall(p, report_content))
-                for p in fail_patterns
+            # Use structured pytest counts (stable; avoids matching ERROR in prose)
+            current_failures = (
+                int(pytest_result.get("failed", 0))
+                + int(pytest_result.get("errors", 0))
             )
-
-            # If report was empty (model didn't write it), treat as MAX failures
-            # so it never looks like 'progress' and no_progress counter increments.
-            if not report_content:
-                current_failures = 999
+            if current_failures == 0 and not is_pass:
+                current_failures = 1  # workspace missing code, etc.
 
             prev_failures  = retry_data.get(prev_fail_key, current_failures + 1)
             no_progress    = retry_data.get(streak_key, 0)
@@ -548,6 +671,14 @@ class ValidatorAgent(AgentProcess):
             retry_data[prev_fail_key] = current_failures
             retry_data[streak_key]    = no_progress
             self.write_json_state("state/phase_retries.json", retry_data)
+
+            try:
+                from pipeline.bug_memory import record_failure_observation
+                record_failure_observation(
+                    idea_slug, phase_num, report_content, retry_count,
+                )
+            except Exception:
+                pass
 
             if retry_count >= MAX_VALIDATOR_ATTEMPTS:
                 # Absolute cap hit — escalate regardless of progress
@@ -657,10 +788,10 @@ class ValidatorAgent(AgentProcess):
 
         return AgentOutput(
             success=is_pass,
-            answer=result.answer,
+            answer=result_answer or ("PASS" if is_pass else "FAIL"),
             outgoing=[out_msg],
-            tokens_used=result.tokens_used,
-            steps_used=result.steps_used,
+            tokens_used=tokens_used,
+            steps_used=steps_used,
         )
 
 

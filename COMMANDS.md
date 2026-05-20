@@ -68,9 +68,13 @@ tail -f /tmp/ollama.log
 ## Running the Pipeline
 
 ```bash
+# Light model for planners/validator/manager; heavy for executor/reviewer
+export PIPELINE_LIGHT_MODEL=qwen3.6:8b-q4_K_M   # optional but recommended
+
 # Standard run (600 min time limit)
 python pipeline/runner.py --from-list --provider ollama \
-    --model qwen3.6:35b-a3b-q4_K_M --time-limit 600
+    --model qwen3.6:35b-a3b-q4_K_M --time-limit 600 \
+    --base-budget 120 --phase-budget 45
 
 # Run with full MoE model (2×A10 recommended)
 python pipeline/runner.py --from-list --provider ollama \
@@ -296,6 +300,36 @@ bus.send(msg)
 print('Queued generate_ideas for ideator')
 "
 ```
+
+---
+
+## Completion truth (`truth.md` + `completions.jsonl`)
+
+**Source of truth:** `truth.md` (readable) and `.pipeline/state/completions.jsonl` (machine).
+
+**Working queue:** `master_ideas.md` — copy/paste from your backup folder as usual.
+
+Before seeding, the runner **removes** lines from `master_ideas.md` that already appear in truth
+(same slug/title). Pasting an old backup will not re-queue finished work.
+
+```bash
+# After copying master_ideas from backup — trim completed lines manually
+python extract.py --pipeline-dir .pipeline --sync-ideas
+
+# Rebuild truth.md from all complete projects + jsonl
+python extract.py --rebuild-truth
+
+# Health check --fix: marks validation_gap complete + updates truth + trims queue
+python health_check.py --fix
+```
+
+On `✅ completed all phases!` the runner appends to truth/jsonl (with **description**) and trims that line from `master_ideas.md`.
+
+**Descriptions:** stored in `completions.jsonl` (full, up to 2000 chars) and a short `desc:` line in `truth.md`.
+Also kept in `.pipeline/projects/<slug>/state/current_idea.json` on disk.
+
+**budget_exceeded:** NOT added to truth and NOT trimmed from `master_ideas.md` — still on your queue.
+Retry with `python reset_budget_exceeded.py --reset-all` (only touches project state, not truth).
 
 ---
 

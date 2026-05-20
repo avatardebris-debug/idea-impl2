@@ -22,7 +22,7 @@ class ExecutorAgent(AgentProcess):
     role = "executor"
     model_tier = "heavy"
     num_ctx = 16384
-    max_steps = 15
+    max_steps = 28
     temperature = 0.2    # deterministic code writing
     think = False        # no chain-of-thought: just execute the task list
 
@@ -206,6 +206,18 @@ class ExecutorAgent(AgentProcess):
                                       or msg.payload.get("fix_instructions", ""))
 
             review_content = self.read_state_file(review_path) if review_path else ""
+            error_summary = msg.payload.get("error_summary", "") or ""
+            bug_memory_block = ""
+            try:
+                from pipeline.bug_memory import format_for_fix_loop
+                bug_memory_block = format_for_fix_loop(
+                    fix_report_content,
+                    review_content,
+                    error_summary,
+                    top_n=5,
+                )
+            except Exception:
+                pass
             pending_section = ""
             if pending_fixes:
                 pending_section = f"## ⚠️ Health Check Findings (fix these FIRST)\n{pending_fixes[:1500]}\n\n"
@@ -216,6 +228,7 @@ class ExecutorAgent(AgentProcess):
                 + f"## Fix Report (read ALL previous attempts before making changes)\n"
                 f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
+                + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
                 + "## Instructions\n"
                   "**FOCUS RULE: Fix ONLY what the Fix Report says is broken. "
                   "Do NOT refactor, explore alternatives, or add features.**\n"

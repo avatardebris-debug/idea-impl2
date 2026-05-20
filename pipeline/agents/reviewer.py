@@ -22,7 +22,7 @@ class ReviewerAgent(AgentProcess):
     role = "reviewer"
     model_tier = "heavy"
     num_ctx = 12288
-    max_steps = 12
+    max_steps = 15
     temperature = 0.3   # structured assessment — slightly creative but mostly deterministic
     think = False       # follows fixed review template — no CoT needed
 
@@ -247,6 +247,19 @@ class ReviewerAgent(AgentProcess):
             except Exception:
                 pass  # Data collection must never affect pipeline
 
+            try:
+                from pipeline.bug_memory import record_reviewer_pass
+                _fix_report = self.read_state_file(f"phases/phase_{phase_num}/fix_report.md")
+                record_reviewer_pass(
+                    idea_slug,
+                    phase_num,
+                    review_content,
+                    _fix_report,
+                    msg.payload.get("retry_count", 0),
+                )
+            except Exception:
+                pass
+
             return AgentOutput(
                 success=True,
                 answer=result.answer,
@@ -271,6 +284,15 @@ class ReviewerAgent(AgentProcess):
                     "[reviewer] Pre-validation: %d blocking bugs → executor (attempt %d/%d)",
                     blocking_count, retry_count + 1, MAX_PRE_VALIDATION_RETRIES,
                 )
+                try:
+                    from pipeline.bug_memory import append_mistake, _extract_blocking_bullets
+                    for bullet in _extract_blocking_bullets(review_content)[:5]:
+                        append_mistake(
+                            idea_slug, phase_num, bullet,
+                            source="reviewer", retry_count=retry_count + 1,
+                        )
+                except Exception:
+                    pass
                 out_msg = Message.create(
                     from_agent=self.role,
                     to_agent="executor",

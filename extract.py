@@ -260,6 +260,21 @@ def main() -> None:
         action="store_true",
         help="Include prompt snapshot, metrics report, and diff from baseline in the zip",
     )
+    parser.add_argument(
+        "--sync-ideas",
+        action="store_true",
+        help="Trim completed ideas from master_ideas.md using truth.md / completions.jsonl (no zip)",
+    )
+    parser.add_argument(
+        "--rebuild-truth",
+        action="store_true",
+        help="Regenerate truth.md from completions registry and complete projects",
+    )
+    parser.add_argument(
+        "--ideas-file",
+        default=None,
+        help="Ideas markdown to sync (default: master_ideas.md next to .pipeline/)",
+    )
     args = parser.parse_args()
 
     # Locate pipeline
@@ -270,6 +285,25 @@ def main() -> None:
 
     print(f"\n  Pipeline dir : {pipeline_dir}")
     projects_dir = pipeline_dir / "projects"
+
+    sys.path.insert(0, str(pipeline_dir.parent))
+
+    if args.rebuild_truth:
+        from pipeline.ideas_sync import rebuild_truth_from_registry
+        n = rebuild_truth_from_registry(projects_dir=projects_dir)
+        print(f"\n  Rebuilt truth.md with {n} completion(s)\n")
+        return
+
+    if args.sync_ideas:
+        ideas_path = (
+            pathlib.Path(args.ideas_file).resolve()
+            if args.ideas_file
+            else pipeline_dir.parent / "master_ideas.md"
+        )
+        from pipeline.ideas_sync import trim_completed_from_master_ideas
+        n = trim_completed_from_master_ideas(ideas_path, projects_dir=projects_dir)
+        print(f"\n  Done — {n} completed idea(s) trimmed from {ideas_path.name}\n")
+        return
 
     summaries = print_summary(projects_dir)
 
@@ -329,6 +363,17 @@ def main() -> None:
     snapshot_note = " (with audit snapshot)" if args.snapshot else ""
     print(f"\n  ✅  {zip_path.name}{snapshot_note}")
     print(f"      {count:,} files  |  {zip_path.stat().st_size / 1024 / 1024:.1f} MB\n")
+
+    # Optional trim after extract (keeps master_ideas queue clean vs truth)
+    ideas_path = pipeline_dir.parent / "master_ideas.md"
+    if ideas_path.exists():
+        try:
+            from pipeline.ideas_sync import trim_completed_from_master_ideas
+            n = trim_completed_from_master_ideas(ideas_path, projects_dir=projects_dir, verbose=False)
+            if n:
+                print(f"  [truth] trimmed {n} completed idea(s) from {ideas_path.name}\n")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

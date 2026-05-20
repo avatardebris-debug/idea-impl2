@@ -3,12 +3,18 @@ pipeline/bug_memory.py
 Persistent bug resolution memory for the autonomous pipeline.
 
 On PASS-after-retries:
-    The validator calls append_resolution() with the failure pattern and fix summary.
-    This writes a compact 3-field record to .pipeline/memory/bug_resolutions.jsonl.
+    Validator calls record_validator_pass() — pytest/fix_report signatures.
+
+On review blocking bugs (pre-validation):
+    Reviewer calls append_mistake() for each blocking bullet.
+
+On executor fix loops:
+    format_for_fix_loop() injects top-N relevant records into the prompt.
 
 On new phase planning:
-    The phase planner calls query_relevant() with keywords from the task spec.
-    Returns the top-N most relevant resolutions as a formatted context block.
+    Phase planner calls format_for_prompt() from the phase spec.
+
+All records: .pipeline/memory/bug_resolutions.jsonl (types: resolution, mistake).
 
 Design principles:
   - Append-only JSONL — never modifies existing records, survives crashes.
@@ -134,6 +140,105 @@ class _SimpleLock:
 
 
 # ---------------------------------------------------------------------------
+# Extraction helpers
+# ---------------------------------------------------------------------------
+
+_ERROR_LINE = re.compile(
+    r"(?:"
+    r"(?:E\s+)?(?:AssertionError|ModuleNotFoundError|ImportError|AttributeError|"
+    r"TypeError|ValueError|SyntaxError|FileNotFoundError|PermissionError|"
+    r"RuntimeError|KeyError|IndexError)"
+    r"[^\n]{0,200}"
+    r"|FAILED\s+[^\n]+"
+    r"|short test summary info[\s\S]{0,400}?FAILED[^\n]+"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def extract_failure_signature(text: str, max_len: int = 120) -> str:
+    """Pull the most useful error line from pytest output or fix_report."""
+    if not text:
+        return ""
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if _ERROR_LINE.search(s) or any(
+            kw in s.lower()
+            for kw in (
+                "assertionerror", "importerror", "modulenotfounderror",
+                "attributeerror", "typeerror", "failed", "error:",
+            )
+        ):
+            return s[:max_len]
+    m = _ERROR_LINE.search(text)
+    if m:
+        return m.group(0).replace("\n", " ")[:max_len]
+    for line in text.splitlines():
+        s = line.strip()
+        if s and len(s) > 20 and not s.startswith("```"):
+            return s[:max_len]
+    return ""
+
+
+def extract_fix_summary(validation_report: str, fix_report: str = "") -> str:
+    """Describe how the phase was fixed (not just 'tests passed')."""
+    if fix_report:
+        attempts = re.findall(r"^### Attempt (\d+)", fix_report, re.MULTILINE)
+        if attempts:
+            return f"Resolved after {len(attempts)} fix attempt(s); see fix_report.md"
+        for line in fix_report.splitlines():
+            s = line.strip().lstrip("- ")
+            if s and any(
+                kw in s.lower()
+                for kw in ("fixed", "added", "updated", "changed", "patched", "renamed")
+            ):
+                return s[:200]
+    for line in (validation_report or "").splitlines():
+        s = line.strip()
+        if "passed" in s.lower() and "failed" not in s.lower():
+            return "All tests passing after executor fixes"
+    return "Phase passed after executor fix"
+
+
+def _is_duplicate(failure_reason: str, source: str) -> bool:
+    """Skip near-duplicate entries in the last 30 records."""
+    if not RESOLUTIONS_PATH.exists() or not failure_reason:
+        return False
+    try:
+        lines = [
+            ln for ln in RESOLUTIONS_PATH.read_text(encoding="utf-8").splitlines()
+            if ln.strip()
+        ][-30:]
+    except OSError:
+        return False
+    key = failure_reason[:80].lower()
+    for line in reversed(lines):
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("source") != source:
+            continue
+        if rec.get("failure_reason", "")[:80].lower() == key:
+            return True
+    return False
+
+
+def _append_record(record: dict) -> None:
+    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    record.setdefault("ts", datetime.now(timezone.utc).isoformat())
+    record.setdefault("keywords", _extract_keywords(
+        f"{record.get('failure_reason', '')} {record.get('fix_summary', '')}"
+    ))
+    with _SimpleLock(RESOLUTIONS_PATH):
+        with RESOLUTIONS_PATH.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        _prune_if_needed()
+
+
+# ---------------------------------------------------------------------------
 # Core API
 # ---------------------------------------------------------------------------
 
@@ -143,39 +248,143 @@ def append_resolution(
     failure_reason: str,
     fix_summary: str,
     retry_count: int,
+    *,
+    source: str = "validator",
+    record_type: str = "resolution",
 ) -> None:
     """
     Append a resolved bug to the persistent memory store.
 
-    Called by the validator when a phase PASSes after one or more retries.
-    Safe to call from multiple processes — uses file locking.
-
-    Args:
-        slug:           project slug (e.g. "csv_analyzer")
-        phase:          phase number (1-based)
-        failure_reason: ≤120-char description of what failed
-        fix_summary:    ≤200-char description of how it was fixed
-        retry_count:    number of failed attempts before final pass
+    Called when a phase PASSes after one or more retries (validator/reviewer).
     """
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    failure_reason = (failure_reason or "Unknown failure")[:120]
+    if _is_duplicate(failure_reason, source):
+        return
+    _append_record({
+        "type": record_type,
+        "source": source,
+        "slug": slug,
+        "phase": phase,
+        "failure_reason": failure_reason,
+        "fix_summary": fix_summary[:200],
+        "retry_count": retry_count,
+    })
 
-    record = {
-        "ts":             datetime.now(timezone.utc).isoformat(),
-        "slug":           slug,
-        "phase":          phase,
-        "failure_reason": failure_reason[:120],
-        "fix_summary":    fix_summary[:200],
-        "keywords":       _extract_keywords(f"{failure_reason} {fix_summary}"),
-        "retry_count":    retry_count,
-    }
 
-    with _SimpleLock(RESOLUTIONS_PATH):
-        # Append new record
-        with RESOLUTIONS_PATH.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+def append_mistake(
+    slug: str,
+    phase: int,
+    pattern: str,
+    *,
+    source: str = "reviewer",
+    retry_count: int = 0,
+) -> None:
+    """Record a recurring coding mistake (review blocking bug, common pytest fail)."""
+    pattern = (pattern or "").strip()[:120]
+    if not pattern or pattern.lower() in ("none", "n/a"):
+        return
+    if _is_duplicate(pattern, source):
+        return
+    _append_record({
+        "type": "mistake",
+        "source": source,
+        "slug": slug,
+        "phase": phase,
+        "failure_reason": pattern,
+        "fix_summary": "Avoid this pattern in future phases",
+        "retry_count": retry_count,
+    })
 
-        # Prune if over limit (keep most recent MAX_RECORDS)
-        _prune_if_needed()
+
+def record_validator_pass(
+    slug: str,
+    phase: int,
+    fix_report: str,
+    validation_report: str,
+    retry_count: int,
+) -> None:
+    """Record a test-fix resolution after validator PASS (post-retry)."""
+    if not fix_report or retry_count < 1:
+        return
+    fail = extract_failure_signature(fix_report) or extract_failure_signature(
+        validation_report
+    )
+    if not fail:
+        fail = "Tests failed before passing"
+    fix = extract_fix_summary(validation_report, fix_report)
+    append_resolution(
+        slug, phase, fail, fix, retry_count,
+        source="validator", record_type="resolution",
+    )
+
+
+def record_reviewer_pass(
+    slug: str,
+    phase: int,
+    review_content: str,
+    fix_report: str,
+    validator_retries: int,
+) -> None:
+    """Record review-driven fixes after post-validation PASS."""
+    if validator_retries < 1 and not fix_report:
+        return
+    blocking = _extract_blocking_bullets(review_content)
+    if blocking:
+        for bullet in blocking[:3]:
+            append_mistake(slug, phase, bullet, source="reviewer", retry_count=validator_retries)
+    if fix_report and validator_retries >= 1:
+        fail = extract_failure_signature(fix_report)
+        if fail and "reviewer" in fix_report.lower():
+            append_resolution(
+                slug, phase, fail,
+                "Fixed review blocking bugs before validation passed",
+                validator_retries,
+                source="reviewer",
+            )
+
+
+def record_failure_observation(
+    slug: str,
+    phase: int,
+    pytest_or_report: str,
+    retry_count: int,
+) -> None:
+    """Log a recurring failure signature while still failing (helps next fix attempt)."""
+    if retry_count < 2:
+        return
+    sig = extract_failure_signature(pytest_or_report)
+    if sig:
+        append_mistake(slug, phase, sig, source="validator", retry_count=retry_count)
+
+
+def _extract_blocking_bullets(review_content: str) -> list[str]:
+    m = re.search(
+        r"##\s*Blocking Bugs.*?(?=##\s|\Z)",
+        review_content,
+        re.DOTALL | re.IGNORECASE,
+    )
+    if not m:
+        return []
+    section = m.group(0)
+    if re.search(r"\bnone\b", section, re.IGNORECASE):
+        return []
+    bullets = []
+    for line in section.splitlines():
+        s = line.strip()
+        if s.startswith(("-", "*")) and len(s) > 4:
+            bullets.append(s.lstrip("-* ").strip()[:120])
+    return bullets
+
+
+def format_for_fix_loop(
+    fix_report: str = "",
+    review_content: str = "",
+    error_summary: str = "",
+    top_n: int = 5,
+) -> str:
+    """Context block for executor fix runs — wider recall than phase planning."""
+    query = f"{fix_report[:4000]} {review_content[:2000]} {error_summary}"
+    return format_for_prompt(query, top_n=top_n)
 
 
 def _prune_if_needed() -> None:
@@ -250,17 +459,22 @@ def format_for_prompt(task_text: str, top_n: int = 3) -> str:
     if not results:
         return ""
 
-    lines = ["## Past Bug Resolutions (from pipeline memory — use as guardrails)"]
+    lines = [
+        "## Pipeline memory (past failures & fixes — do NOT repeat these mistakes)",
+    ]
     for i, rec in enumerate(results, 1):
-        slug  = rec.get("slug", "?")
+        slug = rec.get("slug", "?")
         phase = rec.get("phase", "?")
-        fail  = rec.get("failure_reason", "")
-        fix   = rec.get("fix_summary", "")
+        fail = rec.get("failure_reason", "")
+        fix = rec.get("fix_summary", "")
         retries = rec.get("retry_count", 1)
+        src = rec.get("source", "?")
+        kind = rec.get("type", "resolution")
+        label = "Mistake" if kind == "mistake" else "Resolution"
         lines.append(
-            f"\n**Resolution {i}** (from {slug} phase {phase}, {retries} retries):\n"
-            f"- Failed because: {fail}\n"
-            f"- Fixed by: {fix}"
+            f"\n**{label} {i}** ({src}, {slug} phase {phase}, {retries} retries):\n"
+            f"- Issue: {fail}\n"
+            f"- Guidance: {fix}"
         )
 
     block = "\n".join(lines)
@@ -302,12 +516,19 @@ def print_stats() -> None:
             all_keywords[kw] = all_keywords.get(kw, 0) + 1
 
     top_kw = sorted(all_keywords.items(), key=lambda x: -x[1])[:8]
+    by_type: dict[str, int] = {}
+    by_source: dict[str, int] = {}
+    for r in records:
+        by_type[r.get("type", "resolution")] = by_type.get(r.get("type", "resolution"), 0) + 1
+        by_source[r.get("source", "?")] = by_source.get(r.get("source", "?"), 0) + 1
 
     print(f"\n  Bug Resolution Memory: {RESOLUTIONS_PATH}")
-    print(f"  Total resolutions: {len(records)}")
+    print(f"  Total records:     {len(records)}")
     print(f"  Unique projects:   {unique_slugs}")
     print(f"  Avg retries/fix:   {avg_retries:.1f}")
-    print(f"  Top failure keywords: {', '.join(kw for kw, _ in top_kw)}")
+    print(f"  By type:           {by_type}")
+    print(f"  By source:         {by_source}")
+    print(f"  Top keywords:      {', '.join(kw for kw, _ in top_kw)}")
     print()
 
 

@@ -280,7 +280,22 @@ def apply_fix(finding: Finding) -> bool:
         state = json.loads(state_file.read_text(encoding="utf-8"))
         state["status"] = "complete"
         state["completed_at"] = datetime.now(timezone.utc).isoformat()
+        slug = state.get("_slug") or slug
+        state["_slug"] = slug
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        try:
+            from pipeline.ideas_sync import record_completion
+            title = state.get("title", slug)
+            mi = pathlib.Path(__file__).parent / "master_ideas.md"
+            ws = str((PROJECTS / slug / "workspace"))
+            record_completion(
+                slug, title,
+                ideas_path=mi if mi.exists() else None,
+                description=state.get("description", ""),
+                workspace=ws,
+            )
+        except Exception:
+            pass
         return True
 
     return False
@@ -387,6 +402,17 @@ def main():
 
     if fixable and not args.fix:
         print(f"  Run with --fix to auto-fix {fixable} issue(s).\n")
+
+    if args.fix:
+        try:
+            mi = pathlib.Path(__file__).parent / "master_ideas.md"
+            if mi.exists():
+                from pipeline.ideas_sync import trim_completed_from_master_ideas
+                n = trim_completed_from_master_ideas(mi, verbose=False)
+                if n:
+                    print(f"  [truth] trimmed {n} completed idea(s) from master_ideas.md\n")
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
