@@ -310,7 +310,7 @@ class ValidatorAgent(AgentProcess):
     role = "validator"
     model_tier = "light"
     num_ctx = 8192
-    max_steps = 25  # list_tree + read N files + pytest + ruff + write_file = easily 15+
+    max_steps = 12  # list_tree + read N files + pytest + ruff + write_file = easily 15+
     temperature = 0.2   # deterministic test running
     think = False       # mechanical validation — no CoT needed
 

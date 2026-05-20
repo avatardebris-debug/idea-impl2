@@ -12,8 +12,8 @@ class TestEmpireScore:
 
     def test_territory_contribution(self):
         e = Empire(territory=Territory(tiles_controlled=10, expansion_level=2))
-        # tiles: 10 * 5 = 50, expansion: 2 * 10 = 20
-        assert e.empire_score == 70
+        # tiles: 10 * 5 = 50, expansion: 2 * 10 = 20, population: 10
+        assert e.empire_score == 80
 
     def test_building_contribution(self):
         e = Empire(
@@ -83,7 +83,7 @@ class TestConstructBuilding:
         e.construct_building(Building(name="farm", level=1, resource_production={"food": 5}))
         e.construct_building(Building(name="farm", level=1, resource_production={"food": 3}))
         assert len(e.buildings) == 1
-        assert e.buildings[0].level == 4
+        assert e.buildings[0].level == 3
         assert e.buildings[0].resource_production["food"] == 18
 
 

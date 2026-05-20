@@ -13,8 +13,8 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 - [x] **[Ranker architecture]** — [Every tool run through this wrapper enables you to choose weight/preferences or rank or score. The idea is the ranker architecture can accumulate value to determine tastes. This could be provided and integrated with machine learning for various purposes.]
 - [x] **[VASTAI instance initializer]** — [User sets up preset commands for a vast AI terminal, time between commands, number of instances into a database, selects all the settings and so on and clicks run and it initializes according to the user selections]
-- [ ] **[pairenv]** — [environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool]
-- [x] **[agentic mirroring game]** — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life. requires:pairenv]
+- [x] **[pairenv]** — [environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool]
+- [ ] **[agentic mirroring game]** — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life. requires:pairenv]
 - [ ] **[AgentFlow Drophip]** — [Autonomous drop shipping orchestration platform that lets you describe your entire operation and it builds, runs and scales workflows for you using agentic AI.]
 - [x] **[dropsearch]** — [dropship researcher. spy on competitors and come up with a business gameplan in full English describing the entire operation.]
 - [x] **[droppain]** — [dropship marketing campaign. plan and implement a marketing campaign for dropship products integrate with shopify and others]
@@ -51,7 +51,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 [ ] [dropshipping suite builder] — [description]
 [ ] [dropstore] — [dropshipping niche or superstore builder and website integration. choose to make compatible with shopify or others if you want.]
 
-[ ] [pairenv] — [environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool]
+[x] [pairenv] — [environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool]
 [ ] [extraction] — [turn source material from summarizer tool into a "recipe" or specific step by step sequences and for potential specific skill extraction. Enable button that save's skill.  requires:summarizer_tool]
 [x] [quant developing program for prediction markets, sports, events, weather markets,etc ] — [[lock]Using high level mathematics like Hawkes Process and understanding  market maker spread costs and order flow intensity and branching for market making strategy. Adjusting spread based on VPIN and latency arbitrage. create a suite to run simulations and calculate sharpe ratio of prediction markets based on quant math. Expected value, bayes theorem, kelly criterion, base rate (true positive vs false positive), KL divergence, LMSR. Betting using oversold RSI and other TA like MACD for line changes. Make it possible to plug in LLM or API key or local AI and ask the AI about the setup and give it the harness/ tools it needs to interact with the tool and explain everything. Understand the formulas used by vegas and others to make markets and balance books and offer action to do so. Understand greeks, etc. ]
 [x] [Ranker architecture] — [Every tool run through this wrapper enables you to choose weight/preferences or rank or score. The idea is the ranker architecture can accumulate value to determine tastes. This could be provided and integrated with machine learning for various purposes.]
@@ -61,7 +61,7 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 [ ] [skill ninja] — [container and public facing tool for skillify, extraction, summarizer tool. requires:summarizer_tool, extraction, skillify]
 
 [ ] [AgentFlow Dropship] — [Autonomous drop shipping orchestration platform that lets you describe your entire operation and it builds, runs and scales workflows for you using agentic AI.]
-[x] [agentic mirroring game] — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the epire you build in the gaming environment happens in real life. requires:pairenv]
+[ ] [agentic mirroring game] — [game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the epire you build in the gaming environment happens in real life. requires:pairenv]
 
 [ ] Agent observability dashboard — Build a real-time dashboard that tracks agent execution metrics (steps taken, LLM calls, costs, errors, duration) across all running pipeline projects with alerting on anomalies.
 

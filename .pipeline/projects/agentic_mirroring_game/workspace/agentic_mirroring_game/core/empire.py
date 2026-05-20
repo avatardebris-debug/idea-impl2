@@ -53,9 +53,8 @@ class Empire:
                 for res, amount in building.resource_production.items():
                     existing.resource_production[res] = existing.resource_production.get(res, 0) + amount
                 return True
-        # Create new building and immediately increment its level
-        new_building = Building(name=building.name, level=1, resource_production=dict(building.resource_production))
-        new_building.level += 1
+        # Create new building
+        new_building = Building(name=building.name, level=building.level, resource_production=dict(building.resource_production))
         self.buildings.append(new_building)
         return True
 

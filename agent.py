@@ -243,6 +243,28 @@ def check_preemption(slug: str) -> None:
             pass
 
 
+def prune_message_history(messages: list[dict], preserve_recent_n: int = 2) -> int:
+    """
+    Scans the message history and truncates older tool outputs.
+    Returns the number of characters saved.
+    """
+    saved_chars = 0
+    # Find all tool messages
+    tool_indices = [i for i, m in enumerate(messages) if m.get("role") == "tool"]
+    
+    # Prune all tool messages except the most recent N
+    if len(tool_indices) > preserve_recent_n:
+        to_prune = tool_indices[:-preserve_recent_n]
+        for idx in to_prune:
+            msg = messages[idx]
+            content = msg.get("content", "")
+            if len(content) > 500:
+                truncated_len = len(content) - 500
+                saved_chars += truncated_len
+                msg["content"] = content[:500] + f"\n... [Truncated {truncated_len} characters of old tool output to save context space] ..."
+    return saved_chars
+
+
 def run_agent(
     task: str,
     provider: str = "openai",
@@ -292,6 +314,11 @@ def run_agent(
     for step in range(1, max_steps + 1):
         check_preemption(slug)
         affirmation.tick()
+
+        # --- Context Pruning ---
+        pruned_chars = prune_message_history(messages)
+        if pruned_chars > 0 and verbose:
+            print_step("✂️ CONTEXT PRUNING", f"Truncated {pruned_chars} characters of old tool output.", "yellow")
 
         # --- Affirmation injection ---
         injection = affirmation.get_context_injection()

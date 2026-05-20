@@ -22,7 +22,7 @@ class ExecutorAgent(AgentProcess):
     role = "executor"
     model_tier = "heavy"
     num_ctx = 16384
-    max_steps = 30
+    max_steps = 15
     temperature = 0.2    # deterministic code writing
     think = False        # no chain-of-thought: just execute the task list
 

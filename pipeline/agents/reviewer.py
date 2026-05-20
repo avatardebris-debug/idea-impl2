@@ -22,7 +22,7 @@ class ReviewerAgent(AgentProcess):
     role = "reviewer"
     model_tier = "heavy"
     num_ctx = 12288
-    max_steps = 25
+    max_steps = 12
     temperature = 0.3   # structured assessment — slightly creative but mostly deterministic
     think = False       # follows fixed review template — no CoT needed
 
