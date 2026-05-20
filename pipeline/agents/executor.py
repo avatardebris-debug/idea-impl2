@@ -59,6 +59,118 @@ class ExecutorAgent(AgentProcess):
 
         return "\n\n".join(parts)
 
+    def _save_interrupt_checkpoint(self) -> None:
+        """Snap workspace file sizes & mtimes to state/file_changes.json, and update status to 'evicted'."""
+        try:
+            workspace = self.get_workspace_path()
+            manifest = {}
+            if workspace.exists():
+                for p in workspace.rglob("*"):
+                    if p.is_file() and not p.name.startswith("."):
+                        try:
+                            stat = p.stat()
+                            rel_path = str(p.relative_to(workspace))
+                            manifest[rel_path] = {
+                                "size": stat.st_size,
+                                "mtime": stat.st_mtime
+                            }
+                        except Exception:
+                            pass
+            
+            self.write_json_state("state/file_changes.json", manifest)
+            
+            existing = self.read_json_state("state/current_idea.json")
+            current_status = existing.get("status", "executing")
+            existing["pre_evict_status"] = current_status
+            existing["status"] = "evicted"
+            existing["evict_requested"] = False
+            self.write_json_state("state/current_idea.json", existing)
+            
+            import logging
+            logging.getLogger(__name__).info("[%s] Saved preemption checkpoint for %s with %d files", self.role, self._current_slug, len(manifest))
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("[%s] Failed to save preemption checkpoint: %s", self.role, e)
+
+    def _check_discrepancy_and_build_warning(self) -> str:
+        """Scan workspace, compare with state/file_changes.json, log warnings, delete manifest, return warning prompt."""
+        manifest_path = "state/file_changes.json"
+        manifest = self.read_json_state(manifest_path)
+        if not manifest:
+            return ""
+            
+        added = []
+        modified = []
+        deleted = []
+        
+        workspace = self.get_workspace_path()
+        current_files = {}
+        if workspace.exists():
+            for p in workspace.rglob("*"):
+                if p.is_file() and not p.name.startswith("."):
+                    try:
+                        stat = p.stat()
+                        rel_path = str(p.relative_to(workspace))
+                        current_files[rel_path] = {
+                            "size": stat.st_size,
+                            "mtime": stat.st_mtime
+                        }
+                    except Exception:
+                        pass
+                        
+        for rel_path, info in current_files.items():
+            if rel_path not in manifest:
+                added.append(rel_path)
+            else:
+                old_info = manifest[rel_path]
+                if info["size"] != old_info["size"] or info["mtime"] > old_info["mtime"] + 1.0:
+                    modified.append(rel_path)
+                    
+        for rel_path in manifest.keys():
+            if rel_path not in current_files:
+                deleted.append(rel_path)
+                
+        try:
+            manifest_file_path = self._project_dir / manifest_path
+            if manifest_file_path.exists():
+                manifest_file_path.unlink()
+        except Exception:
+            pass
+            
+        if not (added or modified or deleted):
+            return ""
+            
+        import logging
+        logger_exec = logging.getLogger(__name__)
+        logger_exec.warning("[%s] Resuming project %s: detected external workspace changes since preemption!", self.role, self._current_slug)
+        for f in added:
+            logger_exec.warning("  [ADDED] %s", f)
+        for f in modified:
+            logger_exec.warning("  [MODIFIED] %s", f)
+        for f in deleted:
+            logger_exec.warning("  [DELETED] %s", f)
+            
+        warning_lines = [
+            "[!] WARNING: The project was temporarily preempted/suspended. Since then, the following external changes",
+            "were detected in the workspace:",
+        ]
+        if added:
+            warning_lines.append("Added files:")
+            for f in added:
+                warning_lines.append(f"  - {f}")
+        if modified:
+            warning_lines.append("Modified files:")
+            for f in modified:
+                warning_lines.append(f"  - {f}")
+        if deleted:
+            warning_lines.append("Deleted files:")
+            for f in deleted:
+                warning_lines.append(f"  - {f}")
+        warning_lines.append(
+            "\nVerify the state of these files (e.g. read them if necessary) to ensure you resume correctly without regressions.\n"
+        )
+        return "\n".join(warning_lines)
+
     def handle(self, msg: Message) -> AgentOutput:
         phase_num = msg.payload.get("phase", 1)
         idea_slug = msg.payload.get("idea_slug", self._current_slug)
@@ -163,7 +275,15 @@ class ExecutorAgent(AgentProcess):
                 "4. When ALL tasks are complete, say DONE and list every file you created.\n"
             )
 
-        result = self.call_agent(task=task_prompt, verbose=False)
+        discrepancy_warning = self._check_discrepancy_and_build_warning()
+        if discrepancy_warning:
+            task_prompt = discrepancy_warning + "\n\n" + task_prompt
+
+        try:
+            result = self.call_agent(task=task_prompt, verbose=False)
+        except InterruptedError:
+            self._save_interrupt_checkpoint()
+            raise
 
         # --- Phase overlap at 75%: pre-queue planning for next phase ---
         # When 75%+ of tasks are done, start planning the next phase in the

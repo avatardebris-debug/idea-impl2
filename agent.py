@@ -220,6 +220,29 @@ class AgentResult:
         return self.answer
 
 
+def check_preemption(slug: str) -> None:
+    """Check if the current project is requested to be evicted/preempted."""
+    if not slug:
+        return
+    import json
+    import pathlib
+    idea_path = pathlib.Path(".pipeline") / "projects" / slug / "state" / "current_idea.json"
+    if idea_path.exists():
+        try:
+            # Robust CP1252/UTF-8 fallback reading to avoid silencing/crashes
+            try:
+                content = idea_path.read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                content = idea_path.read_text(encoding="cp1252")
+            state = json.loads(content)
+            if state.get("evict_requested") is True or state.get("evict_requested") == "true":
+                raise InterruptedError("PreemptionInterrupt")
+        except InterruptedError:
+            raise
+        except Exception:
+            pass
+
+
 def run_agent(
     task: str,
     provider: str = "openai",
@@ -267,6 +290,7 @@ def run_agent(
     total_tokens = 0
 
     for step in range(1, max_steps + 1):
+        check_preemption(slug)
         affirmation.tick()
 
         # --- Affirmation injection ---
@@ -308,6 +332,7 @@ def run_agent(
                 name = tc["name"]
                 args = tc["args"]
 
+                check_preemption(slug)
                 # --- GOVERNANCE GATE ---
                 decision = gate.evaluate(name, args)
 

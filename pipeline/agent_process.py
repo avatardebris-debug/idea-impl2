@@ -180,6 +180,17 @@ class AgentProcess:
                 # Bind the current idea slug so all path helpers use the right project dir
                 if msg.type != "signal":
                     self._current_slug = msg.payload.get("idea_slug", self._current_slug)
+                    
+                    # Intercept evicted project status to prevent CPU hot-looping on NACKed messages
+                    try:
+                        _state = self.read_json_state("state/current_idea.json")
+                        if _state.get("status") == "evicted":
+                            logger.info("[%s] Project %s is evicted. NACKing message and sleeping to prevent hot-loop.", self.role, self._current_slug)
+                            self.bus.nack(msg, increment_retry=False)
+                            time.sleep(2.0)
+                            continue
+                    except Exception:
+                        pass
 
                 # Measure queue wait time (time from message creation to now)
                 try:
@@ -264,6 +275,12 @@ class AgentProcess:
                 # but this skips even that minimal delay when there's more work queued.
                 _poll_wait = 0.0
 
+            except InterruptedError as e:
+                logger.info("[%s] Preemption interrupt triggered: %s. Cleanly NACKing message.", self.role, e)
+                try:
+                    self.bus.nack(msg, increment_retry=False)
+                except Exception as nack_err:
+                    logger.error("[%s] Failed to NACK message after interrupt: %s", self.role, nack_err)
             except Exception as e:
                 logger.error("[%s] Failed processing message %s: %s",
                              self.role, msg.msg_id, e, exc_info=True)
@@ -590,6 +607,8 @@ class AgentProcess:
                 pipeline_mode=True,  # skip repo file tree + shared .agent/ memory
                 slug=self._current_slug,  # enables Ollama KV-cache reuse per project
             )
+        except InterruptedError:
+            raise
         except Exception as e:
             if getattr(self, "model_tier", "heavy") == "light" and self.model != self.heavy_model:
                 logger.warning(

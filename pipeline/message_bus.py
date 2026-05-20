@@ -221,8 +221,8 @@ class MessageBus:
         """Mark message done."""
         self._set_status(msg.msg_id, "done")
 
-    def nack(self, msg: Message) -> None:
-        """Return message to pending for retry. Also increments retry_count in payload if present."""
+    def nack(self, msg: Message, increment_retry: bool = True) -> None:
+        """Return message to pending for retry. Optionally increments retry_count in payload."""
         conn = _get_conn(self._db)
         try:
             # First fetch the existing payload to ensure we preserve other fields
@@ -234,8 +234,9 @@ class MessageBus:
             else:
                 payload = msg.payload or {}
             
-            payload["retry_count"] = payload.get("retry_count", 0) + 1
-            msg.payload["retry_count"] = payload["retry_count"]
+            if increment_retry:
+                payload["retry_count"] = payload.get("retry_count", 0) + 1
+                msg.payload["retry_count"] = payload["retry_count"]
             
             conn.execute(
                 "UPDATE messages SET status='pending', payload=? WHERE msg_id=?",

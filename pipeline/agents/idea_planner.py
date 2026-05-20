@@ -32,6 +32,7 @@ class IdeaPlannerAgent(AgentProcess):
         idea_description = msg.payload.get("idea", "")
         idea_title = msg.payload.get("title", "Untitled Idea")
         idea_slug = msg.payload.get("idea_slug", self._current_slug)
+        priority_tier = msg.payload.get("priority_tier", 0)
 
         depends_on: list = msg.payload.get("depends_on", [])
         dep_workspaces: dict = msg.payload.get("dep_workspaces", {})
@@ -112,6 +113,7 @@ class IdeaPlannerAgent(AgentProcess):
             "total_phases": self._count_phases(master_plan),
             "started_at": datetime.now(timezone.utc).isoformat(),
             "depends_on": depends_on,
+            "priority_tier": priority_tier,
         })
 
 

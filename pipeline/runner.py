@@ -657,7 +657,8 @@ _seeded_this_session: set[str] = set()  # titles seeded in this runner invocatio
 
 
 def seed_idea(bus: MessageBus, title: str, description: str,
-              deps: list | None = None, locked: bool = False) -> None:
+              deps: list | None = None, locked: bool = False,
+              priority_tier: int = 0) -> None:
     """Send the initial idea to the Idea Planner to kick off the pipeline."""
     if title in _seeded_this_session:
         return  # already seeded this run — don't duplicate
@@ -684,6 +685,7 @@ def seed_idea(bus: MessageBus, title: str, description: str,
             "status": "phase_1_planning",
             "depends_on": deps or [],
             "budget_lock": locked,
+            "priority_tier": priority_tier,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }, indent=2), encoding="utf-8")
 
@@ -697,6 +699,7 @@ def seed_idea(bus: MessageBus, title: str, description: str,
             "idea_slug": idea_slug,
             "depends_on": deps or [],
             "dep_workspaces": dep_workspaces,
+            "priority_tier": priority_tier,
         },
     )
     bus.send(msg)
@@ -968,6 +971,13 @@ def seed_from_master_list(
             return _SEED_SEEDED
 
 
+        # --- Parse 'priority: N' or 'priority_tier: N' ---
+        priority_match = re.search(r'\b(?:priority|priority_tier):\s*(\d+)', description_raw, re.IGNORECASE)
+        priority_tier = 0
+        if priority_match:
+            priority_tier = int(priority_match.group(1))
+            description_raw = re.sub(r'\s*[,;.-]?\s*\b(?:priority|priority_tier):\s*\d+\s*', '', description_raw, flags=re.IGNORECASE).strip()
+
         # --- Parse '[lock]' tag — prevents budget_exceeded from ever firing ---
         locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
 
@@ -1001,7 +1011,7 @@ def seed_from_master_list(
                 print(f"  [blocked]  '{title}' blocked - waiting for: {', '.join(blocking)}")
                 continue  # try the next idea in the list
 
-        seed_idea(bus, title, description, deps=deps or None, locked=locked)
+        seed_idea(bus, title, description, deps=deps or None, locked=locked, priority_tier=priority_tier)
         return _SEED_SEEDED
 
     if blocked_count > 0:
@@ -1232,6 +1242,14 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         title  = state.get("title", project_dir.name)
         slug   = project_dir.name
 
+        if status == "evicted":
+            pre_status = state.get("pre_evict_status", "phase_1_executing")
+            print(f"  [rebuilt] Restoring evicted project '{title}' status: evicted -> {pre_status}")
+            state["status"] = pre_status
+            state["evict_requested"] = False
+            state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            status = pre_status
+
         if status in ("", "complete", "budget_exceeded", "dep_waiting"):
             continue
 
@@ -1331,7 +1349,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
             )
             bus.send(msg)
             injected += 1
-            print(f"  🔁 Re-queued '{title}' → idea_planner (was: planning)")
+            print(f"  [re-queue] Re-queued '{title}' -> idea_planner (was: planning)")
             continue
         elif not status.startswith("phase_"):
             continue  # Unknown status — skip
@@ -1377,7 +1395,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
                             except OSError:
                                 pass
             if recently_active:
-                print(f"  \u23f3 '{title}' executor active recently — skipping re-queue")
+                print(f"  [skip] '{title}' executor active recently — skipping re-queue")
                 continue
             # Guard: if tasks.md is missing, re-route to phase_planner
             tasks_file_path = project_dir / tasks_path
@@ -1395,7 +1413,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
                     except Exception:
                         pass
                 _write_state(project_dir, state, f"phase_{phase_num}_planning")
-                print(f"  \U0001f4cb '{title}' missing tasks.md \u2192 re-routing to phase_planner")
+                print(f"  [re-route] '{title}' missing tasks.md -> re-routing to phase_planner")
                 agent   = "phase_planner"
                 payload = {"phase": phase_num, "phase_spec": ph_spec[:3000], "idea_slug": slug}
             else:
@@ -1445,7 +1463,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
 
         bus.send(Message.create(from_agent="runner", to_agent=agent,
                                 type="task", payload=payload))
-        print(f"  🔁 Re-queued '{title}' → {agent} (was: {status})")
+        print(f"  [re-queue] Re-queued '{title}' -> {agent} (was: {status})")
         return 1  # One at a time — next project picked up after this one completes
 
     # -----------------------------------------------------------------
@@ -2077,6 +2095,143 @@ def _write_polish_queue_template(path: pathlib.Path) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: pathlib.Path | None = None) -> None:
+    """Eviction Controller: pre-empts lowest priority running project if a higher priority one is ready."""
+    projects_dir = PIPELINE_DIR / "projects"
+    if not projects_dir.exists():
+        return
+
+    # 1. Scan active and evicted projects
+    active_projects = []
+    evicted_projects = []
+    
+    for p in projects_dir.iterdir():
+        if not p.is_dir():
+            continue
+        sf = p / "state" / "current_idea.json"
+        if not sf.exists():
+            continue
+        try:
+            state = json.loads(sf.read_text(encoding="utf-8"))
+            status = state.get("status", "")
+            priority = int(state.get("priority_tier", 0))
+            project_info = {
+                "slug": p.name,
+                "priority": priority,
+                "status": status,
+                "state_file": sf,
+                "state": state
+            }
+            if status in ("complete", "budget_exceeded", "dep_waiting", ""):
+                continue
+            elif status == "evicted":
+                evicted_projects.append(project_info)
+            else:
+                active_projects.append(project_info)
+        except Exception:
+            pass
+
+    active_count = len(active_projects)
+    if active_count < parallel_seeds:
+        return  # Slots not full — no eviction needed
+
+    # 2. Scan ready unseeded projects from master_ideas.md
+    mi_path = ideas_path if ideas_path else PROJECT_ROOT / "master_ideas.md"
+    ready_unseeded = []
+    if mi_path.exists():
+        try:
+            import re
+            content = mi_path.read_text(encoding="utf-8")
+            for line in content.split("\n"):
+                match = re.match(r"- \[ \]\s+\*\*(.+?)\*\*\s*[—–-]\s*(.*)", line)
+                if not match:
+                    continue
+                title = match.group(1).strip()
+                slug = _slugify(title)
+                
+                if (projects_dir / slug / "state" / "current_idea.json").exists():
+                    continue
+
+                description_raw = match.group(2).strip()
+                if description_raw.startswith("[") and description_raw.endswith("]"):
+                    description_raw = description_raw[1:-1].strip()
+
+                priority_match = re.search(r'\b(?:priority|priority_tier):\s*(\d+)', description_raw, re.IGNORECASE)
+                priority_tier = 0
+                if priority_match:
+                    priority_tier = int(priority_match.group(1))
+                    description_raw = re.sub(r'\s*[,;.-]?\s*\b(?:priority|priority_tier):\s*\d+\s*', '', description_raw, flags=re.IGNORECASE).strip()
+
+                locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
+                dep_match = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', description_raw, re.IGNORECASE)
+                deps = []
+                if dep_match:
+                    raw_deps = dep_match.group(1)
+                    deps = [d.strip() for d in re.split(r'[,;]+', raw_deps) if d.strip()]
+
+                blocking = []
+                for dep_slug in deps:
+                    dep_state_file = projects_dir / dep_slug / "state" / "current_idea.json"
+                    if not dep_state_file.exists():
+                        blocking.append(dep_slug)
+                        continue
+                    try:
+                        dep_state = json.loads(dep_state_file.read_text(encoding="utf-8"))
+                        if dep_state.get("status") not in ("complete", "budget_exceeded"):
+                            blocking.append(dep_slug)
+                    except Exception:
+                        blocking.append(dep_slug)
+
+                if not blocking:
+                    ready_unseeded.append({
+                        "slug": slug,
+                        "priority": priority_tier,
+                        "title": title
+                    })
+        except Exception:
+            pass
+
+    waiting_projects = []
+    for ep in evicted_projects:
+        deps = ep["state"].get("depends_on", [])
+        blocking = []
+        for dep_slug in deps:
+            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            if not dep_file.exists():
+                blocking.append(dep_slug)
+                continue
+            try:
+                dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
+                if dep_st.get("status") not in ("complete", "budget_exceeded"):
+                    blocking.append(dep_slug)
+            except Exception:
+                blocking.append(dep_slug)
+        if not blocking:
+            waiting_projects.append(ep)
+
+    for rup in ready_unseeded:
+        waiting_projects.append(rup)
+
+    if not waiting_projects:
+        return
+
+    highest_waiting = max(waiting_projects, key=lambda x: x["priority"])
+    
+    eligible_active = [ap for ap in active_projects if not ap["state"].get("evict_requested")]
+    if not eligible_active:
+        return
+
+    lowest_active = min(eligible_active, key=lambda x: x["priority"])
+
+    if highest_waiting["priority"] > lowest_active["priority"]:
+        print(f"\n  [!] [EVICTION] Higher priority project '{highest_waiting.get('title', highest_waiting['slug'])}' (priority {highest_waiting['priority']}) is ready!")
+        print(f"  [!] [EVICTION] Evicting lower priority active project '{lowest_active['slug']}' (priority {lowest_active['priority']}) to free slot.")
+        
+        state = lowest_active["state"]
+        state["evict_requested"] = True
+        lowest_active["state_file"].write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+
 def run_pipeline(
     idea: str | None = None,
     from_list: bool = False,
@@ -2351,7 +2506,7 @@ def run_pipeline(
                     continue
                 try:
                     s = json.loads(sf.read_text(encoding="utf-8"))
-                    if s.get("status", "") not in ("complete", "budget_exceeded", ""):
+                    if s.get("status", "") not in ("complete", "budget_exceeded", "evicted", ""):
                         active += 1
                 except Exception:
                     pass
@@ -2396,6 +2551,12 @@ def run_pipeline(
             ).start()
 
         while not stop_requested:
+            # Check for priority eviction
+            try:
+                _check_priority_eviction(bus, parallel_seeds, ideas_path=_ideas_path)
+            except Exception as _ee:
+                print(f"  [eviction] Controller error: {_ee}")
+
             # Time limit check
             if time_limit_minutes > 0:
                 elapsed = (time.time() - start_time) / 60
