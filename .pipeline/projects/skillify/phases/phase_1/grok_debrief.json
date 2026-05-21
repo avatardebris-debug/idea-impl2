@@ -1,0 +1,20 @@
+{
+  "slug": "skillify",
+  "phase": 1,
+  "implementer": "grok_build",
+  "session_notes": "",
+  "bugs": [
+    {
+      "type": "resolution",
+      "failure_reason": "e.g. ModuleNotFoundError: no module named foo",
+      "fix_summary": "e.g. Added foo to requirements and __init__.py",
+      "retry_count": 0
+    },
+    {
+      "type": "mistake",
+      "failure_reason": "e.g. Used relative imports outside package root",
+      "fix_summary": "Avoid in future phases",
+      "retry_count": 0
+    }
+  ]
+}

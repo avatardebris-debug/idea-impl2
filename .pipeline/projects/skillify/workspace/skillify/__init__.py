@@ -14,18 +14,27 @@ Skill schema (compatible with Claude skill format + local JSON dispatcher):
   "parameters":  {
     "type": "object",
     "properties": { ... },
-    "required": [...]
+    "required":  [ ... ]
   },
-  "steps": [
-    {"step": 1, "action": str, "detail": str, "tools": [...], "warnings": [...]}
+  "system_prompt": "You are a helpful assistant...",
+  "functions": [
+    {
+      "name":        "execute_skill",
+      "description": "Execute the skill with given parameters",
+      "parameters":  { ... }
+    }
   ],
-  "components": [...],   // ingredients/materials if applicable
-  "tips": [...],
-  "source": {
-    "format": "recipe|steps|sop",
-    "extracted_at": "ISO8601",
-    "model": "model_name"
-  }
+  "examples": [
+    {
+      "input":  { "components": [...], "context": "...", "target_output": "..." },
+      "output": { "result": "..." }
+    }
+  ]
 }
 """
+
 __version__ = "0.1.0"
+
+from skillify.converter import convert, save_skill, load_skill
+
+__all__ = ["convert", "save_skill", "load_skill"]

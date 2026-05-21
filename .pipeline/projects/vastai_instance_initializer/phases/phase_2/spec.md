@@ -1,38 +1,50 @@
-## Phase 2 — Multi-Instance Batch Initialization
+## Phase 2: Multi-Instance Batch Execution & Preset Library
 
-**Goal:** Launch multiple instances from one or more presets with timing control and batch monitoring.
+**Goal:** Users can launch **multiple instances** from a preset with configurable timing, and manage a library of presets.
 
-**Description:**
-- Extend the preset system to support **multi-preset batches**: a user can specify multiple presets in a single launch config.
-- Add a **timing configuration** option: fixed delay between each instance launch (e.g., 30s, 60s, 120s) or staggered by percentage of prior instance status.
-- Add **concurrency control**: max parallel launches to avoid API rate limits.
-- Implement a **batch orchestrator** that:
-  - Queues instances to launch
-  - Respects timing/concurrency settings
-  - Tracks the state of every instance in the batch
-  - Provides a live progress view (CLI spinner/table)
-- Add a **batch status report** on completion (all running, some failed, summary).
-- Support **instance count parameter** in presets (e.g., `count: 5` to launch 5 identical instances).
+**Scope:**
+- Multi-instance support: configure `instance_count` and `instance_delay_ms` in presets
+- Batch scheduler engine that:
+  - Spawns instances sequentially (or in configurable parallel batches)
+  - Waits the configured delay between each instance
+  - Tracks per-instance status independently
+- Preset library UI:
+  - Grid/list view of all saved presets
+  - Duplicate preset (fork)
+  - Import/export presets as JSON files
+- Execution dashboard:
+  - Real-time progress bar (X of N instances running)
+  - Per-instance status cards (pending / running / completed / failed)
+  - Expandable terminal output per instance
+- Stop/pause batch execution mid-flight
 
 **Deliverable:**
-- CLI command `vastai-init batch launch <batch-config>` supporting multi-preset, multi-instance launches.
-- Real-time progress tracking in the terminal.
-- Batch completion report with per-instance status.
+A user can:
+1. Set a preset to launch 5 instances with 30-second delays between each
+2. Click "Run Batch" and watch progress in real-time
+3. See individual instance statuses and terminal output
+4. Stop the batch at any point
+5. Manage a library of presets with import/export
 
 **Dependencies:**
-- Phase 1 (single-instance launcher and preset format)
-- VAST.ai API rate limit documentation
+- Phase 1 (database schema, VAST AI client, preset CRUD, basic execution flow)
 
 **Success Criteria:**
-- [ ] Can define a batch config with multiple presets and instance counts
-- [ ] Instances launch with correct timing between them
-- [ ] Concurrency limits are respected (no API throttling)
-- [ ] Live progress view shows per-instance status
-- [ ] Batch report accurately reflects final state of all instances
-- [ ] Failed instances are clearly flagged with error details
-- [ ] Can pause/resume a batch launch
+- [ ] Batch of N instances launches with correct timing
+- [ ] Each instance tracks its own status independently
+- [ ] User can stop a running batch (cancels remaining instances)
+- [ ] Preset library supports 100+ presets without UI lag
+- [ ] Import/export presets as JSON works correctly
+- [ ] Execution dashboard updates in real-time (< 2s refresh)
+- [ ] No race conditions when launching parallel instances
 
-**Estimated Effort:** 3–4 weeks
+**Risks & Mitigations:**
+| Risk | Mitigation |
+|------|-----------|
+| Concurrent API calls overwhelm VAST AI | Rate-limit concurrent requests; queue-based scheduler |
+| Memory usage with many instances | Stream terminal output; don't buffer everything in memory |
+| Batch cancellation leaves orphaned instances | Implement cleanup on stop; mark instances as "stopped by user" |
+| Preset JSON schema drift | Version the preset schema; migrate on load |
 
 ---
 

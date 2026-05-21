@@ -1,0 +1,47 @@
+{
+    "system_prompt": "You are a helpful assistant that can greet people and perform calculations.",
+    "functions": [
+        {
+            "name": "greet",
+            "description": "Greet a person by name",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "The name of the person to greet"
+                    }
+                },
+                "required": ["name"]
+            }
+        },
+        {
+            "name": "add",
+            "description": "Add two numbers together",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "a": {
+                        "type": "number",
+                        "description": "First number"
+                    },
+                    "b": {
+                        "type": "number",
+                        "description": "Second number"
+                    }
+                },
+                "required": ["a", "b"]
+            }
+        }
+    ],
+    "examples": [
+        {
+            "input": "Say hello to Alice",
+            "output": "Hello, Alice!"
+        },
+        {
+            "input": "What is 2 + 3?",
+            "output": "5"
+        }
+    ]
+}

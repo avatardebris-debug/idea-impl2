@@ -1,15 +1,17 @@
 {
   "title": "Academic Thesis Writer",
   "description": "AI-assisted research paper generator with citation management, literature review synthesis, and academic formatting modules.",
-  "status": "phase_2_reviewing",
-  "phase": 2,
+  "status": "phase_3_reviewing",
+  "phase": 3,
   "total_phases": 3,
-  "started_at": "2026-05-16T06:12:20.512857+00:00",
+  "started_at": "2026-05-21T02:50:21.782382+00:00",
   "depends_on": [],
   "tasks_done": 0,
   "tasks_total": 3,
   "_slug": "academic_thesis_writer",
   "_instance_skip": true,
   "pre_skip_status": "budget_exceeded",
-  "pre_budget_status": "phase_2_reviewing"
+  "pre_budget_status": "phase_2_reviewing",
+  "session_started_at": "2026-05-21T03:56:05.312981+00:00",
+  "checkpoint_at": "2026-05-21T03:56:06.976703+00:00"
 }

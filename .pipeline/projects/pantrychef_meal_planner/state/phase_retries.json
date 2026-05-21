@@ -1,4 +1,5 @@
 {
   "validator_phase_1_prev_failures": 0,
-  "validator_phase_1_no_progress": 0
+  "validator_phase_1_no_progress": 0,
+  "phase_1": 1
 }

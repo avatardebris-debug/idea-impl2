@@ -19,6 +19,10 @@ def _infer_tags(extraction: dict) -> list[str]:
     fmt = extraction.get("format", "steps")
     topic = extraction.get("topic", "").lower()
     tags = [fmt]
+    # Include explicit tags from extraction if provided
+    explicit_tags = extraction.get("tags", [])
+    if explicit_tags:
+        tags.extend(explicit_tags)
     for kw, tag in [
         ("cook", "cooking"), ("recipe", "cooking"), ("bake", "cooking"),
         ("code", "programming"), ("program", "programming"), ("software", "programming"),

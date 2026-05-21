@@ -18,97 +18,98 @@ import time
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="unweb",
-        description="Unmask the connections behind any news story",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent("""
-            Examples:
-              python -m unweb "https://reuters.com/article"
-              python -m unweb "https://..." --output report.md
-              python -m unweb --text-input "story text here..."
-              python -m unweb "https://..." --no-enrich --no-llm
+        description=textwrap.dedent("""\
+            unweb — Unmask the connections behind any news story.
+
+            Given a news story URL or raw text, maps people, organizations,
+            funding sources, and cross-connections into a structured report.
         """),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("source", help="URL or story text (use --text-input for raw text)")
-    parser.add_argument("--text-input", action="store_true",
-                        help="Treat source as raw text, not a URL")
-    parser.add_argument("--output",     default=None,
-                        help="Save report to this file (.md or .json)")
-    parser.add_argument("--format",     choices=["markdown","json"], default="markdown")
-    parser.add_argument("--model",      default="qwen3:6b")
-    parser.add_argument("--no-enrich",  action="store_true",
-                        help="Skip Wikipedia entity enrichment")
-    parser.add_argument("--no-llm",     action="store_true",
-                        help="Use rule-based extraction only (no Ollama needed)")
+    parser.add_argument(
+        "source",
+        nargs="?",
+        help="URL of the article, or raw text (with --text-input).",
+    )
+    parser.add_argument(
+        "--text-input",
+        action="store_true",
+        help="Treat source as raw article text instead of a URL.",
+    )
+    parser.add_argument(
+        "--no-enrich",
+        action="store_true",
+        help="Skip Wikipedia enrichment step.",
+    )
+    parser.add_argument(
+        "--max-entities",
+        type=int,
+        default=10,
+        help="Maximum number of entities to enrich (default: 10).",
+    )
+    parser.add_argument(
+        "--output", "-o",
+        type=str,
+        default=None,
+        help="Write report to this file path.",
+    )
+    parser.add_argument(
+        "--format", "-f",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Output format (default: markdown).",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=15,
+        help="HTTP timeout in seconds (default: 15).",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version="unweb 0.1.0",
+    )
 
     args = parser.parse_args()
 
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"  unweb — Connection Mapper", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    if not args.source:
+        parser.print_help()
+        sys.exit(1)
 
-    # Step 1: Get text
-    if args.text_input:
-        text       = args.source
-        source_url = ""
-        print(f"  [1/3] Using provided text ({len(text)} chars)...", file=sys.stderr)
-    else:
-        print(f"  [1/3] Fetching {args.source[:60]}...", file=sys.stderr, flush=True)
-        t0 = time.time()
-        from unweb.fetcher import fetch_url
-        try:
-            text = fetch_url(args.source)
-        except RuntimeError as e:
-            print(f"ERROR: {e}", file=sys.stderr)
-            sys.exit(1)
-        source_url = args.source
-        print(f"         {len(text)} chars in {time.time()-t0:.1f}s", file=sys.stderr)
+    # Import here to avoid circular imports
+    from unweb.api import run
 
-    # Step 2: Extract connections
-    print("  [2/3] Extracting entities and connections...", file=sys.stderr, flush=True)
-    t0 = time.time()
-    from unweb.extractor import extract_connections, _fallback_extract
-    if args.no_llm:
-        graph = _fallback_extract(text)
-        graph["metadata"] = {
-            "model": "fallback", "source_url": source_url,
-            "text_length": len(text),
-            "extracted_at": __import__("datetime").datetime.now(
-                __import__("datetime").timezone.utc).isoformat(),
-            "n_people": len(graph.get("people",[])),
-            "n_orgs": len(graph.get("orgs",[])),
-            "n_connections": len(graph.get("connections",[])),
-        }
-    else:
-        graph = extract_connections(text, model=args.model, source_url=source_url)
-    print(f"         {graph['metadata']['n_people']} people · "
-          f"{graph['metadata']['n_orgs']} orgs · "
-          f"{graph['metadata']['n_connections']} connections "
-          f"in {time.time()-t0:.1f}s", file=sys.stderr)
+    result = run(
+        args.source,
+        source_type="text" if args.text_input else "url",
+        enrich_entities=not args.no_enrich,
+        max_entities=args.max_entities,
+        output_path=args.output,
+        format=args.format,
+    )
 
-    # Step 3: Enrich with Wikipedia
-    if not args.no_enrich:
-        print("  [3/3] Enriching with Wikipedia...", file=sys.stderr, flush=True)
-        t0 = time.time()
-        from unweb.enricher import enrich
-        graph = enrich(graph)
-        print(f"         Done in {time.time()-t0:.1f}s", file=sys.stderr)
-    else:
-        print("  [3/3] Skipping enrichment (--no-enrich)", file=sys.stderr)
+    # Print report to stdout
+    print(result.report)
 
-    # Output
-    if args.format == "json":
-        output_str = json.dumps(graph, indent=2, ensure_ascii=False)
-    else:
-        from unweb.reporter import build_report
-        output_str = build_report(graph, source=args.source if not args.text_input else "")
+    # Print summary to stderr
+    errors = result.errors
+    enriched = "enriched" if result.enriched else "not enriched"
+    print(
+        f"\n[unweb] Source: {result.source}\n"
+        f"[unweb] Entities: {enriched}\n"
+        f"[unweb] Errors: {len(errors)}",
+        file=sys.stderr,
+    )
+    if errors:
+        for err in errors:
+            print(f"  [unweb]   - {err}", file=sys.stderr)
 
     if args.output:
-        from unweb.reporter import save_report
-        save_report(output_str, args.output)
-    else:
-        print(output_str)
+        print(f"[unweb] Report saved to: {args.output}", file=sys.stderr)
 
-    print(f"\n  Done.", file=sys.stderr)
+    # Exit code: 0 if no errors, 1 if there were errors
+    sys.exit(1 if errors else 0)
 
 
 if __name__ == "__main__":

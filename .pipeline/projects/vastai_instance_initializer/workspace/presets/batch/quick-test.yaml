@@ -1,0 +1,15 @@
+# Quick test batch config
+# Small batch for testing: 2 instances, no delay.
+
+name: "quick-test"
+
+presets:
+  - preset_path: "presets/default.yaml"
+    count: 2
+
+timing:
+  delay_seconds: 0
+  stagger_percent: 0
+
+concurrency: 2
+timeout: 600

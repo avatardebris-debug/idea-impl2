@@ -84,14 +84,12 @@ class LatencyDetector:
 
         # Confidence increases with gap size
         confidence = base + (gap_seconds * multiplier)
-        return min(confidence, self.config.max_confidence)
+        return min(confidence, 1.0)
 
     def _calculate_severity(self, gap_seconds: float) -> SeverityLevel:
         """Calculate severity level based on gap size."""
         thresholds = self.config.severity_thresholds
-        if gap_seconds >= thresholds["critical"]:
-            return SeverityLevel.CRITICAL
-        elif gap_seconds >= thresholds["high"]:
+        if gap_seconds >= thresholds["high"]:
             return SeverityLevel.HIGH
         elif gap_seconds >= thresholds["medium"]:
             return SeverityLevel.MEDIUM
