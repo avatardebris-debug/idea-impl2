@@ -16,6 +16,7 @@ ARCHETYPE_TEMPLATES: Dict[str, Dict[str, str]] = {
     "protagonist": {
         "physical_description": "The protagonist's physical appearance should reflect their inner journey.",
         "personality_traits": ["determined", "flawed", "relatable"],
+        "motivation": "To overcome their core wound and achieve their goal.",
         "voice_notes": "Distinctive speech pattern that sets them apart.",
         "costume_notes": "Clothing that evolves with their character arc.",
         "visual_anchor": "A distinctive visual element that identifies them instantly.",
@@ -25,6 +26,7 @@ ARCHETYPE_TEMPLATES: Dict[str, Dict[str, str]] = {
     "antagonist": {
         "physical_description": "Physically imposing or subtly menacing presence.",
         "personality_traits": ["ruthless", "calculating", "charismatic"],
+        "motivation": "To achieve their goal at any cost, even if it harms others.",
         "voice_notes": "Cold, measured, or unnervingly calm.",
         "costume_notes": "Sharp, dark, or authoritative clothing.",
         "visual_anchor": "A signature prop or visual motif.",
@@ -34,6 +36,7 @@ ARCHETYPE_TEMPLATES: Dict[str, Dict[str, str]] = {
     "mentor": {
         "physical_description": "Weathered, experienced, wise appearance.",
         "personality_traits": ["wise", "patient", "eccentric"],
+        "motivation": "To ensure the protagonist succeeds where they once failed.",
         "voice_notes": "Warm, gravelly, or scholarly tone.",
         "costume_notes": "Practical, worn clothing suggesting experience.",
         "visual_anchor": "A distinctive accessory or mannerism.",
@@ -43,6 +46,7 @@ ARCHETYPE_TEMPLATES: Dict[str, Dict[str, str]] = {
     "ally": {
         "physical_description": "Approachable, friendly appearance.",
         "personality_traits": ["loyal", "humorous", "resourceful"],
+        "motivation": "To help the protagonist succeed and protect their bond.",
         "voice_notes": "Casual, warm, or energetic.",
         "costume_notes": "Casual, practical clothing.",
         "visual_anchor": "A distinctive style or accessory.",
@@ -52,6 +56,7 @@ ARCHETYPE_TEMPLATES: Dict[str, Dict[str, str]] = {
     "sidekick": {
         "physical_description": "Smaller, less imposing than the protagonist.",
         "personality_traits": ["eager", "comic relief", "devoted"],
+        "motivation": "To prove their worth and earn the protagonist's respect.",
         "voice_notes": "Quick, nervous, or enthusiastic.",
         "costume_notes": "Colorful or distinctive clothing.",
         "visual_anchor": "A quirky habit or prop.",
@@ -109,6 +114,7 @@ class CharacterGenerator:
                 role=CharacterRole(role_name),
                 physical_description=archetype["physical_description"],
                 personality_traits=archetype["personality_traits"],
+                motivation=archetype.get("motivation", archetype["backstory"]),
                 voice_notes=archetype["voice_notes"],
                 costume_notes=archetype["costume_notes"],
                 visual_anchor=archetype["visual_anchor"],

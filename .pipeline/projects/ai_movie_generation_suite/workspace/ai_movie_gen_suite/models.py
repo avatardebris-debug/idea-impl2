@@ -71,6 +71,7 @@ class Beat(BaseModel):
 
 class BeatSheet(BaseModel):
     """Collection of 15 Save-the-Cat beats."""
+    title: str = "Untitled"
     logline: str
     genre: str
     beats: List[Beat] = Field(default_factory=list)
@@ -93,6 +94,7 @@ class Character(BaseModel):
     role: CharacterRole
     physical_description: str = ""
     personality_traits: List[str] = Field(default_factory=list)
+    motivation: str = ""
     voice_notes: str = ""
     costume_notes: str = ""
     visual_anchor: str = ""
@@ -223,7 +225,9 @@ class Project(BaseModel):
         if self.beat_sheet:
             d["beat_sheet"] = self.beat_sheet.model_dump()
         if self.character_registry:
-            d["character_registry"] = self.character_registry.model_dump()
+            registry_dump = self.character_registry.model_dump()
+            d["character_registry"] = registry_dump
+            d["characters"] = registry_dump
         if self.script:
             d["script"] = self.script.model_dump()
         if self.scene_descriptions:

@@ -92,6 +92,16 @@ tail -f pipeline_run.log
 python pipeline/runner.py --resume --provider ollama \
     --model qwen3.6:35b-a3b-q4_K_M
 
+# Resume ai_movie_generation_suite (phases 4–7 after prep)
+# State: phase_4_planning, phase=3, total_phases=7 — see
+# .pipeline/projects/ai_movie_generation_suite/state/PROJECT_RESUME.md
+python pipeline/runner.py --resume --provider ollama \
+    --model qwen3.6:35b-a3b-q4_K_M
+
+# Polish mode only works when status is complete/budget_exceeded — not for
+# ai_movie_generation_suite after prep (use --resume above instead):
+# python pipeline/runner.py --polish --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+
 # Single idea (quick test)
 python pipeline/runner.py "Build a Python word counter CLI" \
     --provider ollama --model qwen3.6:35b-a3b-q4_K_M

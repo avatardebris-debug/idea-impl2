@@ -19,8 +19,6 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
   desc: game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life
 - ai_author_suite — [ai author suite] — 
   desc: [niche/topic research, keyword research,book outliner, chapter developer, chapter outliner, detail fill in, deep editor restructure format, cover designer, book cover designer, etc]
-- ai_movie_generation_suite — [AI movie generation suite] — 
-  desc: suite that enables save the cat style screenplay writing, prompts for generating images/storyboard, prompts for describing characters, enable import of character into UE5 (or others) and integration with UE5 (or whichever is best) characters for developing movies. Possibly use GOogle Geenie or develop consistent 3d worlds and enable the development of movies from a combination of tools. At minimum should construct the beatsheet, the script, the detailed description of the scene itself, and the d
 - ai_movie_generation_suite_2 — [AI movie generation suite 2] — 
   desc: core suite. API surface, data models, file formats for movie generation.
 - audiobook_script_pipeline — [Audiobook Script Pipeline] — 

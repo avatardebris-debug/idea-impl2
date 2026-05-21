@@ -229,24 +229,144 @@ project/
 
 ---
 
-## 6. Future Phases (Out of Scope for Initial Release)
+### Phase 4 — Storyboard to Animatic
 
-| Phase | Description |
-|-------|-------------|
-| **Phase 4** — Storyboard to Animatic | Convert storyboard images into a timed animatic with voiceover and music suggestions. |
-| **Phase 5** — AI Voice & Audio | Generate character voice lines from dialogue, with emotion and tone control. |
-| **Phase 6** — AI Video Generation | Integrate with video generation models (Runway, Pika, Sora) to produce actual video clips from storyboard prompts. |
-| **Phase 7** — Collaborative Editing | Multi-user editing with conflict resolution, version branching, and review workflows. |
+**Goal:** Turn storyboard frames and scene metadata into a timed animatic sequence with pacing, transitions, and placeholder audio guidance.
+
+**Description:**
+This phase bridges static storyboards and motion preview:
+1. **Animatic Timeline Builder** — Maps scenes and storyboard frames to a timeline with duration, transition type, and beat alignment.
+2. **Pacing Engine** — Suggests hold times per frame from dialogue length, action beats, and genre/tone presets.
+3. **Transition Planner** — Cut, dissolve, wipe, and match-cut notes derived from scene descriptions and camera notes.
+4. **Audio Placeholder Track** — Music mood and SFX cue suggestions per segment (no full mix required).
+5. **Animatic Export** — Machine-readable animatic spec (JSON) plus optional EDL/XML for editors.
+
+**Deliverable:**
+- `animatic/` — per-project timeline JSON, frame order, durations, transitions
+- `animatic/audio_cues.json` — music/SFX/voiceover placeholder cues per segment
+- CLI command to render a simple preview manifest (frame list + timings) for downstream tools
+
+**Dependencies:**
+- Phase 2 (storyboard prompts and mood boards)
+- Phase 3 optional (3D previz metadata can enrich timing)
+
+**Success Criteria:**
+- [ ] Each scene with storyboard prompts has at least one timed segment on the animatic timeline
+- [ ] Timeline exports as structured JSON with scene_id, duration_ms, transition, and beat_ref
+- [ ] Pacing respects dialogue line count and scene description mood
+- [ ] User can regenerate animatic from updated storyboards without losing manual timing overrides
+- [ ] Downstream phases can read animatic JSON without custom parsing
+
+---
+
+### Phase 5 — AI Voice & Audio
+
+**Goal:** Generate dialogue audio and voice-direction metadata from the screenplay, with per-character voice profiles.
+
+**Description:**
+1. **Voice Profile Registry** — Extends character registry with TTS/voice-clone parameters (pitch, pace, accent, emotion range).
+2. **Dialogue-to-Audio Pipeline** — Converts `DialogueLine` entries to audio segment specs with emotion and delivery tags.
+3. **Batch TTS Integration** — Pluggable provider interface (ElevenLabs, OpenAI TTS, local Piper/Coqui) with BYO API keys.
+4. **Lip-Sync Hints** — Exports phoneme/timing stubs for Phase 6 video or external lip-sync tools.
+5. **Audio Assembly Manifest** — Ordered WAV/MP3 paths or URLs plus mix notes (dialogue vs music vs SFX lanes).
+
+**Deliverable:**
+- `audio/voice_profiles.json` — per-character voice settings
+- `audio/dialogue_segments/` — segment specs and generated clips (when API configured)
+- `audio/assembly_manifest.json` — ordered timeline for animatic sync
+
+**Dependencies:**
+- Phase 1 (script and dialogue)
+- Phase 4 (animatic timing for alignment)
+
+**Success Criteria:**
+- [ ] Every dialogue line in the script has a corresponding audio segment spec
+- [ ] Voice profiles are consistent per character across all scenes
+- [ ] Provider interface works with at least one local/offline fallback (no API required for CI)
+- [ ] Assembly manifest aligns segment start times with animatic timeline
+- [ ] Regenerating a scene's dialogue updates only that scene's audio specs
+
+---
+
+### Phase 6 — AI Video Generation
+
+**Goal:** Produce short video clips or shot lists from storyboard prompts and animatic timing, via pluggable video-generation APIs.
+
+**Description:**
+1. **Shot List Generator** — Breaks each animatic segment into shots with prompt, duration, and camera metadata.
+2. **Video Provider Adapter** — Unified interface for Runway, Pika, Sora-class APIs (configurable, optional).
+3. **Prompt Packaging** — Combines storyboard prompts, character visual anchors, and world bible style into provider-specific payloads.
+4. **Clip Registry** — Tracks generated clip IDs, paths, status, and retry metadata per shot.
+5. **Rough Assembly Export** — Concatenation manifest (FFmpeg-friendly) linking clips to animatic timeline slots.
+
+**Deliverable:**
+- `video/shots.json` — shot list with prompts, durations, and provider params
+- `video/clips/` — generated clips or placeholder stubs when API unavailable
+- `video/assembly.json` — clip order mapped to animatic segments
+
+**Dependencies:**
+- Phase 2 (storyboard prompts)
+- Phase 4 (animatic timing)
+- Phase 5 optional (dialogue audio for mux)
+
+**Success Criteria:**
+- [ ] Each animatic segment has at least one shot definition with a complete generation prompt
+- [ ] Provider adapter runs in dry-run mode without API keys (CI-safe)
+- [ ] Clip registry records success/failure per shot with reproducible prompt hash
+- [ ] Assembly export references animatic segment IDs for sync
+- [ ] User can swap video provider without changing shot list schema
+
+---
+
+### Phase 7 — Collaborative Editing & Review
+
+**Goal:** Enable multi-user review, version branching, and conflict-safe edits on project artifacts.
+
+**Description:**
+1. **Project Version Graph** — Git-friendly branching metadata for beats, script, characters, and animatic overrides.
+2. **Review Workflow** — Comment threads per scene/beat with approve/request-changes states.
+3. **Merge Rules** — Field-level merge for JSON artifacts (characters registry, scene descriptions) with conflict markers.
+4. **Audit Log** — Who changed what, when, and which pipeline phase produced each revision.
+5. **Export for Lock-Chain Ideas** — Stable API surface for movie player, dialog generator, and director/editor dependents.
+
+**Deliverable:**
+- `collab/reviews.json` — review state and comments per artifact path
+- `collab/versions/` — branch pointers and merge resolution records
+- `collab/audit.jsonl` — append-only change log
+- Documented stable export paths under `project/` for downstream `[lock]` ideas
+
+**Dependencies:**
+- Phases 1–6 (full artifact set to review and version)
+
+**Success Criteria:**
+- [ ] Two users can propose edits to the same scene without silent overwrites
+- [ ] Review workflow supports approve and request-changes on beat, scene, and script units
+- [ ] Merged project reloads through existing CLI with no data loss
+- [ ] Audit log captures agent and human edits with timestamps
+- [ ] Project marked `complete` only after Phase 7 validation passes (unblocks `requires: ai_movie_generation_suite`)
+
+---
+
+## 6. Extended Pipeline Notes
+
+Phases 4–7 extend pre-production into timed preview, audio, video clips, and team review. They remain **pre-production** scope: creative assets and planning documents, not final rendered feature films.
+
+| Phase | Focus |
+|-------|--------|
+| 4 | Animatic timing |
+| 5 | Voice & dialogue audio |
+| 6 | AI video clips |
+| 7 | Collaboration & release gate |
 
 ---
 
 ## 7. Implementation Order Summary
 
 ```
-Phase 1 (MVP) ──► Phase 2 ──► Phase 3
-(screenplay core) (characters + visuals) (3D + UE5)
+Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5 ──► Phase 6 ──► Phase 7
+(screenplay) (visuals)   (3D/UE5)   (animatic)  (audio)     (video)     (collab)
 ```
 
-**Total estimated effort:** 3 phases, each building on the previous. Phase 1 is independently shippable. Phases 2 and 3 extend the pipeline with visual and 3D capabilities.
+**Total phases:** 7. Phases 1–3 are complete in workspace; phases 4–7 resume via `--resume` after `total_phases` is set to 7.
 
-**Recommended starting point:** Phase 1, Beat Sheet Generator + Script Writer. These two components deliver immediate value to screenwriters and form the foundation for all downstream phases.
+**Downstream lock-chain:** `movie player`, `dialog generator`, and `director/editor` in `master_ideas.md` require `ai_movie_generation_suite` to reach `complete` after all 7 phases.

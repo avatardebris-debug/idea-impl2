@@ -156,9 +156,11 @@ class IdeaPlannerAgent(AgentProcess):
         return f"Phase {phase_num} — see master plan for details"
 
     def _count_phases(self, master_plan: str) -> int:
-        """Count how many phases are in the master plan."""
-        matches = re.findall(r"##\s+Phase\s+\d+", master_plan, re.IGNORECASE)
-        return len(matches) if matches else 1
+        """Count implementation phases in the master plan (## or ### headings)."""
+        seen: set[int] = set()
+        for match in re.finditer(r"#{2,3}\s+Phase\s+(\d+)", master_plan, re.IGNORECASE):
+            seen.add(int(match.group(1)))
+        return max(seen) if seen else 1
 
 
 def main():

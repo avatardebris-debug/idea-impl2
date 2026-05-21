@@ -4,6 +4,8 @@ Projects marked complete but with missing phases.
 The --polish flag resumes them from their last completed phase.
 Format: `- [ ] **[project-slug]** — notes about what to add`
 
+- [ ] **[AI movie generation suite]** — Finish phases 4-7; phase 2 tests fixed in workspace; total_phases=7. Use `--resume` (status is phase_4_planning, not complete).
+
 - [ ] **[academic_thesis_writer]** — p2/3 budget_exceeded. Continue phases 3-3. Original title: Academic Thesis Writer
 - [ ] **[advantage_player_cardgame_simulator_training]** — p1/6 complete. Continue phases 2-6. Original title: [advantage player cardgame simulator training]
 - [ ] **[agentflow_drophip]** — p2/3 budget_exceeded. Continue phases 3-3. Original title: [AgentFlow Drophip]
