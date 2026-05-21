@@ -1,0 +1,457 @@
+{
+  "title": "The Lying City",
+  "total_duration_ms": 202860,
+  "frame_count": 45,
+  "frames": [
+    {
+      "segment_id": "SEG-5B11F328",
+      "scene_id": "SC-001",
+      "frame_index": 1,
+      "start_ms": 0,
+      "duration_ms": 4410,
+      "end_ms": 4410,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-001_frame_1"
+    },
+    {
+      "segment_id": "SEG-3C3E474E",
+      "scene_id": "SC-001",
+      "frame_index": 2,
+      "start_ms": 4410,
+      "duration_ms": 4410,
+      "end_ms": 8820,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-001_frame_2"
+    },
+    {
+      "segment_id": "SEG-43ABE5EF",
+      "scene_id": "SC-001",
+      "frame_index": 3,
+      "start_ms": 8820,
+      "duration_ms": 4410,
+      "end_ms": 13230,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-001_frame_3"
+    },
+    {
+      "segment_id": "SEG-8D53B05F",
+      "scene_id": "SC-002",
+      "frame_index": 1,
+      "start_ms": 13230,
+      "duration_ms": 4410,
+      "end_ms": 17640,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-002_frame_1"
+    },
+    {
+      "segment_id": "SEG-117A76C0",
+      "scene_id": "SC-002",
+      "frame_index": 2,
+      "start_ms": 17640,
+      "duration_ms": 4410,
+      "end_ms": 22050,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-002_frame_2"
+    },
+    {
+      "segment_id": "SEG-771C628E",
+      "scene_id": "SC-002",
+      "frame_index": 3,
+      "start_ms": 22050,
+      "duration_ms": 4410,
+      "end_ms": 26460,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-002_frame_3"
+    },
+    {
+      "segment_id": "SEG-BBCDE034",
+      "scene_id": "SC-003",
+      "frame_index": 1,
+      "start_ms": 26460,
+      "duration_ms": 4410,
+      "end_ms": 30870,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-003_frame_1"
+    },
+    {
+      "segment_id": "SEG-C5B990E3",
+      "scene_id": "SC-003",
+      "frame_index": 2,
+      "start_ms": 30870,
+      "duration_ms": 4410,
+      "end_ms": 35280,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-003_frame_2"
+    },
+    {
+      "segment_id": "SEG-3141D456",
+      "scene_id": "SC-003",
+      "frame_index": 3,
+      "start_ms": 35280,
+      "duration_ms": 4410,
+      "end_ms": 39690,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-003_frame_3"
+    },
+    {
+      "segment_id": "SEG-8D5B18A0",
+      "scene_id": "SC-004",
+      "frame_index": 1,
+      "start_ms": 39690,
+      "duration_ms": 4410,
+      "end_ms": 44100,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-004_frame_1"
+    },
+    {
+      "segment_id": "SEG-4A040FCF",
+      "scene_id": "SC-004",
+      "frame_index": 2,
+      "start_ms": 44100,
+      "duration_ms": 4410,
+      "end_ms": 48510,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-004_frame_2"
+    },
+    {
+      "segment_id": "SEG-C6E703B8",
+      "scene_id": "SC-004",
+      "frame_index": 3,
+      "start_ms": 48510,
+      "duration_ms": 4410,
+      "end_ms": 52920,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-004_frame_3"
+    },
+    {
+      "segment_id": "SEG-55492D6B",
+      "scene_id": "SC-005",
+      "frame_index": 1,
+      "start_ms": 52920,
+      "duration_ms": 4410,
+      "end_ms": 57330,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-005_frame_1"
+    },
+    {
+      "segment_id": "SEG-78ECDB88",
+      "scene_id": "SC-005",
+      "frame_index": 2,
+      "start_ms": 57330,
+      "duration_ms": 4410,
+      "end_ms": 61740,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-005_frame_2"
+    },
+    {
+      "segment_id": "SEG-A7FA28B4",
+      "scene_id": "SC-005",
+      "frame_index": 3,
+      "start_ms": 61740,
+      "duration_ms": 4410,
+      "end_ms": 66150,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-005_frame_3"
+    },
+    {
+      "segment_id": "SEG-0F3161B0",
+      "scene_id": "SC-006",
+      "frame_index": 1,
+      "start_ms": 66150,
+      "duration_ms": 4410,
+      "end_ms": 70560,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-006_frame_1"
+    },
+    {
+      "segment_id": "SEG-FC1E2129",
+      "scene_id": "SC-006",
+      "frame_index": 2,
+      "start_ms": 70560,
+      "duration_ms": 4410,
+      "end_ms": 74970,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-006_frame_2"
+    },
+    {
+      "segment_id": "SEG-8B57265F",
+      "scene_id": "SC-006",
+      "frame_index": 3,
+      "start_ms": 74970,
+      "duration_ms": 4410,
+      "end_ms": 79380,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-006_frame_3"
+    },
+    {
+      "segment_id": "SEG-D7C82692",
+      "scene_id": "SC-007",
+      "frame_index": 1,
+      "start_ms": 79380,
+      "duration_ms": 4410,
+      "end_ms": 83790,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-007_frame_1"
+    },
+    {
+      "segment_id": "SEG-7C8E446E",
+      "scene_id": "SC-007",
+      "frame_index": 2,
+      "start_ms": 83790,
+      "duration_ms": 4410,
+      "end_ms": 88200,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-007_frame_2"
+    },
+    {
+      "segment_id": "SEG-1E95F991",
+      "scene_id": "SC-007",
+      "frame_index": 3,
+      "start_ms": 88200,
+      "duration_ms": 4410,
+      "end_ms": 92610,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-007_frame_3"
+    },
+    {
+      "segment_id": "SEG-5C4343FA",
+      "scene_id": "SC-008",
+      "frame_index": 1,
+      "start_ms": 92610,
+      "duration_ms": 4410,
+      "end_ms": 97020,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-008_frame_1"
+    },
+    {
+      "segment_id": "SEG-93ED77F4",
+      "scene_id": "SC-008",
+      "frame_index": 2,
+      "start_ms": 97020,
+      "duration_ms": 4410,
+      "end_ms": 101430,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-008_frame_2"
+    },
+    {
+      "segment_id": "SEG-414B91DB",
+      "scene_id": "SC-008",
+      "frame_index": 3,
+      "start_ms": 101430,
+      "duration_ms": 4410,
+      "end_ms": 105840,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-008_frame_3"
+    },
+    {
+      "segment_id": "SEG-E8218AB0",
+      "scene_id": "SC-009",
+      "frame_index": 1,
+      "start_ms": 105840,
+      "duration_ms": 4410,
+      "end_ms": 110250,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-009_frame_1"
+    },
+    {
+      "segment_id": "SEG-88CCE729",
+      "scene_id": "SC-009",
+      "frame_index": 2,
+      "start_ms": 110250,
+      "duration_ms": 4410,
+      "end_ms": 114660,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-009_frame_2"
+    },
+    {
+      "segment_id": "SEG-844FE000",
+      "scene_id": "SC-009",
+      "frame_index": 3,
+      "start_ms": 114660,
+      "duration_ms": 4410,
+      "end_ms": 119070,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-009_frame_3"
+    },
+    {
+      "segment_id": "SEG-0EE3090A",
+      "scene_id": "SC-010",
+      "frame_index": 1,
+      "start_ms": 119070,
+      "duration_ms": 4410,
+      "end_ms": 123480,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-010_frame_1"
+    },
+    {
+      "segment_id": "SEG-52F1B6C8",
+      "scene_id": "SC-010",
+      "frame_index": 2,
+      "start_ms": 123480,
+      "duration_ms": 4410,
+      "end_ms": 127890,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-010_frame_2"
+    },
+    {
+      "segment_id": "SEG-4DBDB9F0",
+      "scene_id": "SC-010",
+      "frame_index": 3,
+      "start_ms": 127890,
+      "duration_ms": 4410,
+      "end_ms": 132300,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-010_frame_3"
+    },
+    {
+      "segment_id": "SEG-88E6F5E0",
+      "scene_id": "SC-011",
+      "frame_index": 1,
+      "start_ms": 132300,
+      "duration_ms": 4410,
+      "end_ms": 136710,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-011_frame_1"
+    },
+    {
+      "segment_id": "SEG-A48899EE",
+      "scene_id": "SC-011",
+      "frame_index": 2,
+      "start_ms": 136710,
+      "duration_ms": 4410,
+      "end_ms": 141120,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-011_frame_2"
+    },
+    {
+      "segment_id": "SEG-80C47B4A",
+      "scene_id": "SC-011",
+      "frame_index": 3,
+      "start_ms": 141120,
+      "duration_ms": 4410,
+      "end_ms": 145530,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-011_frame_3"
+    },
+    {
+      "segment_id": "SEG-2CF81784",
+      "scene_id": "SC-012",
+      "frame_index": 1,
+      "start_ms": 145530,
+      "duration_ms": 5880,
+      "end_ms": 151410,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-012_frame_1"
+    },
+    {
+      "segment_id": "SEG-748F6589",
+      "scene_id": "SC-012",
+      "frame_index": 2,
+      "start_ms": 151410,
+      "duration_ms": 5880,
+      "end_ms": 157290,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-012_frame_2"
+    },
+    {
+      "segment_id": "SEG-A42BFB96",
+      "scene_id": "SC-012",
+      "frame_index": 3,
+      "start_ms": 157290,
+      "duration_ms": 5880,
+      "end_ms": 163170,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-012_frame_3"
+    },
+    {
+      "segment_id": "SEG-FECA83AF",
+      "scene_id": "SC-013",
+      "frame_index": 1,
+      "start_ms": 163170,
+      "duration_ms": 4410,
+      "end_ms": 167580,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-013_frame_1"
+    },
+    {
+      "segment_id": "SEG-4108ECF7",
+      "scene_id": "SC-013",
+      "frame_index": 2,
+      "start_ms": 167580,
+      "duration_ms": 4410,
+      "end_ms": 171990,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-013_frame_2"
+    },
+    {
+      "segment_id": "SEG-0A5D5597",
+      "scene_id": "SC-013",
+      "frame_index": 3,
+      "start_ms": 171990,
+      "duration_ms": 4410,
+      "end_ms": 176400,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-013_frame_3"
+    },
+    {
+      "segment_id": "SEG-8CDEC30C",
+      "scene_id": "SC-014",
+      "frame_index": 1,
+      "start_ms": 176400,
+      "duration_ms": 4410,
+      "end_ms": 180810,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-014_frame_1"
+    },
+    {
+      "segment_id": "SEG-4439AD57",
+      "scene_id": "SC-014",
+      "frame_index": 2,
+      "start_ms": 180810,
+      "duration_ms": 4410,
+      "end_ms": 185220,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-014_frame_2"
+    },
+    {
+      "segment_id": "SEG-283829AA",
+      "scene_id": "SC-014",
+      "frame_index": 3,
+      "start_ms": 185220,
+      "duration_ms": 4410,
+      "end_ms": 189630,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-014_frame_3"
+    },
+    {
+      "segment_id": "SEG-2C686521",
+      "scene_id": "SC-015",
+      "frame_index": 1,
+      "start_ms": 189630,
+      "duration_ms": 4410,
+      "end_ms": 194040,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-015_frame_1"
+    },
+    {
+      "segment_id": "SEG-FC63CF92",
+      "scene_id": "SC-015",
+      "frame_index": 2,
+      "start_ms": 194040,
+      "duration_ms": 4410,
+      "end_ms": 198450,
+      "transition": "dissolve",
+      "storyboard_prompt_ref": "SC-015_frame_2"
+    },
+    {
+      "segment_id": "SEG-25A2DF9F",
+      "scene_id": "SC-015",
+      "frame_index": 3,
+      "start_ms": 198450,
+      "duration_ms": 4410,
+      "end_ms": 202860,
+      "transition": "cut",
+      "storyboard_prompt_ref": "SC-015_frame_3"
+    }
+  ]
+}

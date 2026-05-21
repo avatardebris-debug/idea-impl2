@@ -6,6 +6,7 @@ Orchestrates the sequence: Logline -> Beat Sheet -> Characters -> Script -> Scen
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from ai_movie_gen_suite.formatters.fdx_formatter import FDXFormatter
@@ -21,6 +22,7 @@ from ai_movie_gen_suite.stages.beat_generator import BeatGenerator
 from ai_movie_gen_suite.stages.character_generator import CharacterGenerator
 from ai_movie_gen_suite.stages.script_writer import ScriptWriter
 from ai_movie_gen_suite.stages.scene_description_engine import SceneDescriptionEngine
+from ai_movie_gen_suite.pipeline.project_exporter import ProjectExporter
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +38,8 @@ class PipelineConfig:
         tone: str = "",
         output_format: str = "json",
         output_dir: str = "./output",
+        export_visual: bool = True,
+        export_animatic: bool = True,
         use_llm: bool = False,
         llm_client: Any = None,
     ):
@@ -45,6 +49,8 @@ class PipelineConfig:
         self.tone = tone
         self.output_format = output_format
         self.output_dir = output_dir
+        self.export_visual = export_visual
+        self.export_animatic = export_animatic
         self.use_llm = use_llm
         self.llm_client = llm_client
 
@@ -81,6 +87,10 @@ class MovieGenerationPipeline:
 
         # Step 5: Format output
         self._format_output()
+
+        # Step 6–7: Phase 2 visual artifacts and phase 4 animatic (optional)
+        if self.config.export_visual or self.config.export_animatic:
+            self._export_visual_artifacts()
 
         logger.info("Pipeline complete")
         return self._results
@@ -204,6 +214,41 @@ class MovieGenerationPipeline:
 
         else:
             raise ValueError(f"Unsupported output format: {self.config.output_format}")
+
+    def _export_visual_artifacts(self) -> None:
+        """Export storyboard prompts, mood boards, and animatic timeline."""
+        if not self.script or not self.character_registry or not self.scene_descriptions:
+            logger.warning("Skipping visual export: missing script, characters, or scene descriptions")
+            return
+
+        project_dir = Path(self.config.output_dir)
+        exporter = ProjectExporter(
+            project_dir=project_dir,
+            script=self.script,
+            character_registry=self.character_registry,
+            scene_descriptions=self.scene_descriptions,
+            tone=self.config.tone,
+        )
+
+        storyboards: Dict[str, Any] = {}
+        if self.config.export_visual:
+            logger.info("Step 6: Exporting storyboard prompts and mood boards")
+            storyboards, phase2_meta = exporter.export_phase2()
+            self._results["storyboard_prompts"] = {
+                k: v.model_dump() for k, v in storyboards.items()
+            }
+            self._results["phase2_export"] = {
+                "storyboard_count": len(storyboards),
+                "character_sheet_count": len(phase2_meta.get("character_sheets", [])),
+            }
+
+        if self.config.export_animatic and storyboards:
+            logger.info("Step 7: Building animatic timeline")
+            phase4_meta = exporter.export_phase4(storyboards)
+            self._results["animatic"] = {
+                "segment_count": len(phase4_meta["timeline"].segments),
+                "total_duration_ms": phase4_meta["timeline"].total_duration_ms,
+            }
 
     def get_results(self) -> Dict[str, Any]:
         """Get the pipeline results."""

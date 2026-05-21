@@ -1,0 +1,24 @@
+{
+  "character_id": "4a58c537",
+  "character_name": "Sidekick 5",
+  "character_sheet_prompt": "Character reference sheet, full body and portrait, Sidekick 5. Smaller, less imposing than the protagonist.. Costume: Colorful or distinctive clothing.. Personality: eager, comic relief, devoted. Visual anchor: A quirky habit or prop.. Style: cinematic, 35mm film, anamorphic lens, production still. Tone: Noir Thriller.",
+  "references": [
+    {
+      "label": "character_sheet",
+      "prompt": "Character reference sheet, full body and portrait, Sidekick 5. Smaller, less imposing than the protagonist.. Costume: Colorful or distinctive clothing.. Personality: eager, comic relief, devoted. Visual anchor: A quirky habit or prop.. Style: cinematic, 35mm film, anamorphic lens, production still. Tone: Noir Thriller.",
+      "image_path": null,
+      "notes": "Primary reference for AI image generation"
+    },
+    {
+      "label": "visual_anchor",
+      "prompt": "A quirky habit or prop.",
+      "image_path": null,
+      "notes": "Key visual identifier"
+    }
+  ],
+  "style_tags": [
+    "cinematic",
+    "storyboard",
+    "noir_thriller"
+  ]
+}

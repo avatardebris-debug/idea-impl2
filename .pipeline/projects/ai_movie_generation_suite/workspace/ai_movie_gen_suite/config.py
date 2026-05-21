@@ -50,6 +50,8 @@ class SuiteConfig(BaseModel):
     output_format: str = "json"  # json, yaml
     scenes_dir: str = "scenes"
     storyboard_dir: str = "storyboard_prompts"
+    mood_board_dir: str = "mood_boards"
+    animatic_dir: str = "animatic"
     characters_3d_dir: str = "characters_3d"
     ue5_export_dir: str = "ue5_export"
 

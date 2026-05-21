@@ -1,0 +1,354 @@
+{
+  "cues": [
+    {
+      "segment_id": "SEG-5B11F328",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-3C3E474E",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-43ABE5EF",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-8D53B05F",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-117A76C0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-771C628E",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-BBCDE034",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-C5B990E3",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-3141D456",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-8D5B18A0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-4A040FCF",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-C6E703B8",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-55492D6B",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-78ECDB88",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-A7FA28B4",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-0F3161B0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-FC1E2129",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-8B57265F",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-D7C82692",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-7C8E446E",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-1E95F991",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-5C4343FA",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-93ED77F4",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-414B91DB",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-E8218AB0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-88CCE729",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-844FE000",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-0EE3090A",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-52F1B6C8",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-4DBDB9F0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-88E6F5E0",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-A48899EE",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-80C47B4A",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-2CF81784",
+      "music_mood": "suspense, low strings, sparse percussion",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-748F6589",
+      "music_mood": "suspense, low strings, sparse percussion",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-A42BFB96",
+      "music_mood": "suspense, low strings, sparse percussion",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-FECA83AF",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-4108ECF7",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-0A5D5597",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-8CDEC30C",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-4439AD57",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-283829AA",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-2C686521",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-FC63CF92",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior",
+        "room_tone_low"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    },
+    {
+      "segment_id": "SEG-25A2DF9F",
+      "music_mood": "uplifting, light piano, soft pads",
+      "sfx_cues": [
+        "ambient_exterior"
+      ],
+      "voiceover_note": "Dialogue placeholder (2 lines)"
+    }
+  ]
+}

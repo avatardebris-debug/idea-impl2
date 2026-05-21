@@ -1,0 +1,59 @@
+{
+  "scene_id": "SC-012",
+  "scene_heading": "EXT. DARK_NIGHT_OF_THE_SOUL - DAY",
+  "target_model": "sdxl",
+  "beat_ref": "Dark Night of the Soul",
+  "prompts": [
+    {
+      "frame_index": 1,
+      "prompt": "Storyboard frame, EXT. DARK_NIGHT_OF_THE_SOUL - DAY. EXT. DARK_NIGHT_OF_THE_SOUL - DAY. Lighting: low-key, high contrast, practical lights. Mood: tense, mysterious. Camera: wide shots, establishing shots, crane. Characters: Protagonist 1: The protagonist's physical appearance should reflect their inner journey.; Antagonist 2: Physically imposing or subtly menacing presence.. Style: dark and suspenseful.",
+      "negative_prompt": "blurry, low quality, deformed, watermark, text",
+      "camera": "wide shots, establishing shots, crane",
+      "lighting": "low-key, high contrast, practical lights",
+      "mood": "tense, mysterious",
+      "style": "dark and suspenseful",
+      "characters": [
+        "Protagonist 1",
+        "Antagonist 2"
+      ],
+      "parameters": {
+        "aspect_ratio": "16:9",
+        "shot_type": "establishing"
+      }
+    },
+    {
+      "frame_index": 2,
+      "prompt": "Storyboard frame, EXT. DARK_NIGHT_OF_THE_SOUL - DAY. Medium shot. Protagonist 1: The protagonist's physical appearance should reflect their inner journey.; Antagonist 2: Physically imposing or subtly menacing presence.. Action: [Scene based on beat: Dark Night of the Soul — [Dark Night of the Soul] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the dark night of the soul . Mood: tense, mysterious. Lighting: low-key, high contrast, practical lights. Style: dark and suspenseful.",
+      "negative_prompt": "blurry, low quality, deformed, watermark, text",
+      "camera": "medium shot, eye level",
+      "lighting": "low-key, high contrast, practical lights",
+      "mood": "tense, mysterious",
+      "style": "dark and suspenseful",
+      "characters": [
+        "Protagonist 1",
+        "Antagonist 2"
+      ],
+      "parameters": {
+        "aspect_ratio": "16:9",
+        "shot_type": "medium"
+      }
+    },
+    {
+      "frame_index": 3,
+      "prompt": "Storyboard frame, EXT. DARK_NIGHT_OF_THE_SOUL - DAY. Detail or tension beat. Establish the setting ([Scene based on...); Introduce the conflict (Night of the...). Mood: tense, mysterious. Style: dark and suspenseful.",
+      "negative_prompt": "blurry, low quality, deformed, watermark, text",
+      "camera": "close-up or dutch angle",
+      "lighting": "low-key, high contrast, practical lights",
+      "mood": "tense, mysterious",
+      "style": "dark and suspenseful",
+      "characters": [
+        "Protagonist 1",
+        "Antagonist 2"
+      ],
+      "parameters": {
+        "aspect_ratio": "16:9",
+        "shot_type": "detail"
+      }
+    }
+  ]
+}

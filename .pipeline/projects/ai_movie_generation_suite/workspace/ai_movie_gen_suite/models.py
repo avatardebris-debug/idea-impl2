@@ -233,3 +233,132 @@ class Project(BaseModel):
         if self.scene_descriptions:
             d["scene_descriptions"] = self.scene_descriptions.model_dump()
         return d
+
+
+# ── Phase 2: Visual Planning Models ───────────────────────────────────────────
+
+class ImageModelTarget(str, Enum):
+    """Target AI image generation model."""
+    MIDJOURNEY = "midjourney"
+    DALLE = "dalle"
+    SDXL = "sdxl"
+
+
+class StoryboardFramePrompt(BaseModel):
+    """A single storyboard frame prompt for AI image generation."""
+    frame_index: int
+    prompt: str
+    negative_prompt: str = ""
+    camera: str = ""
+    lighting: str = ""
+    mood: str = ""
+    style: str = ""
+    characters: List[str] = Field(default_factory=list)
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SceneStoryboardPrompts(BaseModel):
+    """Per-scene storyboard prompts (1–3 frames)."""
+    scene_id: str
+    scene_heading: str = ""
+    target_model: ImageModelTarget = ImageModelTarget.SDXL
+    beat_ref: Optional[str] = None
+    prompts: List[StoryboardFramePrompt] = Field(default_factory=list)
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["target_model"] = self.target_model.value
+        d["prompts"] = [p.model_dump() for p in self.prompts]
+        return d
+
+
+class CharacterSheetPrompt(BaseModel):
+    """AI image prompt for a character reference sheet."""
+    character_id: str
+    character_name: str
+    prompt: str
+    negative_prompt: str = ""
+    target_model: ImageModelTarget = ImageModelTarget.SDXL
+    visual_anchor: str = ""
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["target_model"] = self.target_model.value
+        return d
+
+
+class MoodBoardReference(BaseModel):
+    """A reference slot on a mood board (image path or prompt)."""
+    label: str = ""
+    prompt: str = ""
+    image_path: Optional[str] = None
+    notes: str = ""
+
+
+class CharacterMoodBoard(BaseModel):
+    """Visual reference collection for a character."""
+    character_id: str
+    character_name: str
+    character_sheet_prompt: str = ""
+    references: List[MoodBoardReference] = Field(default_factory=list)
+    style_tags: List[str] = Field(default_factory=list)
+
+
+class SceneMoodBoard(BaseModel):
+    """Visual reference collection for a scene."""
+    scene_id: str
+    scene_heading: str = ""
+    storyboard_frame_count: int = 0
+    references: List[MoodBoardReference] = Field(default_factory=list)
+    style_tags: List[str] = Field(default_factory=list)
+
+
+# ── Phase 4: Animatic Models ─────────────────────────────────────────────────
+
+class AnimaticTransition(str, Enum):
+    CUT = "cut"
+    DISSOLVE = "dissolve"
+    WIPE = "wipe"
+    MATCH_CUT = "match_cut"
+
+
+class AnimaticSegment(BaseModel):
+    """One timed segment on the animatic timeline."""
+    segment_id: str
+    scene_id: str
+    frame_index: int = 1
+    duration_ms: int
+    transition: AnimaticTransition = AnimaticTransition.CUT
+    beat_ref: Optional[str] = None
+    storyboard_prompt_ref: Optional[str] = None
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["transition"] = self.transition.value
+        return d
+
+
+class AudioCue(BaseModel):
+    """Placeholder audio guidance for an animatic segment."""
+    segment_id: str
+    music_mood: str = ""
+    sfx_cues: List[str] = Field(default_factory=list)
+    voiceover_note: str = ""
+
+
+class AnimaticTimeline(BaseModel):
+    """Full animatic timeline for a project."""
+    title: str = ""
+    total_duration_ms: int = 0
+    segments: List[AnimaticSegment] = Field(default_factory=list)
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["segments"] = [s.model_dump() for s in self.segments]
+        return d
+
+
+class AnimaticAudioCues(BaseModel):
+    """Music/SFX/voiceover placeholder cues keyed by segment."""
+    cues: List[AudioCue] = Field(default_factory=list)

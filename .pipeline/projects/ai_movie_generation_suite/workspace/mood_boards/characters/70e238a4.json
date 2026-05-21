@@ -1,0 +1,24 @@
+{
+  "character_id": "70e238a4",
+  "character_name": "Mentor 3",
+  "character_sheet_prompt": "Character reference sheet, full body and portrait, Mentor 3. Weathered, experienced, wise appearance.. Costume: Practical, worn clothing suggesting experience.. Personality: wise, patient, eccentric. Visual anchor: A distinctive accessory or mannerism.. Style: cinematic, 35mm film, anamorphic lens, production still. Tone: Noir Thriller.",
+  "references": [
+    {
+      "label": "character_sheet",
+      "prompt": "Character reference sheet, full body and portrait, Mentor 3. Weathered, experienced, wise appearance.. Costume: Practical, worn clothing suggesting experience.. Personality: wise, patient, eccentric. Visual anchor: A distinctive accessory or mannerism.. Style: cinematic, 35mm film, anamorphic lens, production still. Tone: Noir Thriller.",
+      "image_path": null,
+      "notes": "Primary reference for AI image generation"
+    },
+    {
+      "label": "visual_anchor",
+      "prompt": "A distinctive accessory or mannerism.",
+      "image_path": null,
+      "notes": "Key visual identifier"
+    }
+  ],
+  "style_tags": [
+    "cinematic",
+    "storyboard",
+    "noir_thriller"
+  ]
+}

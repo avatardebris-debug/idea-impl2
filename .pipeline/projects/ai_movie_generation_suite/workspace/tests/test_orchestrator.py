@@ -122,3 +122,24 @@ class TestMovieGenerationPipeline:
 
         assert results["scene_descriptions"] is not None
         assert len(results["scene_descriptions"]["descriptions"]) > 0
+
+    def test_pipeline_exports_visual_and_animatic(self):
+        output_dir = tempfile.mkdtemp()
+        config = PipelineConfig(
+            logline="A hero saves the world.",
+            title="Test Script",
+            genre="action",
+            tone="exciting",
+            output_dir=output_dir,
+            export_visual=True,
+            export_animatic=True,
+        )
+        results = MovieGenerationPipeline(config).run()
+
+        assert "storyboard_prompts" in results
+        assert "animatic" in results
+        root = Path(output_dir)
+        assert (root / "storyboard_prompts").is_dir()
+        assert (root / "mood_boards" / "characters").is_dir()
+        assert (root / "animatic" / "timeline.json").exists()
+        assert (root / "animatic" / "audio_cues.json").exists()

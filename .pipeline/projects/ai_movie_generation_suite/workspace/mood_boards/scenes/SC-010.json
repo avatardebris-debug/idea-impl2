@@ -1,0 +1,30 @@
+{
+  "scene_id": "SC-010",
+  "scene_heading": "EXT. BAD_GUYS_CLOSE_IN - DAY",
+  "storyboard_frame_count": 3,
+  "references": [
+    {
+      "label": "frame_1",
+      "prompt": "Storyboard frame, EXT. BAD_GUYS_CLOSE_IN - DAY. EXT. BAD_GUYS_CLOSE_IN - DAY. Lighting: natural, soft, diffused. Mood: bright, hopeful. Camera: wide shots, establishing shots, crane. Characters: Protagonist 1: The protagonist's physical appearance should reflect their inner journey.; Antagonist 2: Physically imposing or subtly menacing presence.. Style: dark and suspenseful.",
+      "image_path": null,
+      "notes": "wide shots, establishing shots, crane | bright, hopeful"
+    },
+    {
+      "label": "frame_2",
+      "prompt": "Storyboard frame, EXT. BAD_GUYS_CLOSE_IN - DAY. Medium shot. Protagonist 1: The protagonist's physical appearance should reflect their inner journey.; Antagonist 2: Physically imposing or subtly menacing presence.. Action: [Scene based on beat: Bad Guys Close In — [Bad Guys Close In] — In the story of 'A detective must solve a murder in a city where everyone lie...', this beat marks the bad guys close in of the narrativ. Mood: bright, hopeful. Lighting: natural, soft, diffused. Style: dark and suspenseful.",
+      "image_path": null,
+      "notes": "medium shot, eye level | bright, hopeful"
+    },
+    {
+      "label": "frame_3",
+      "prompt": "Storyboard frame, EXT. BAD_GUYS_CLOSE_IN - DAY. Detail or tension beat. Establish the setting ([Scene based on...); Introduce the conflict (Guys Close In...). Mood: bright, hopeful. Style: dark and suspenseful.",
+      "image_path": null,
+      "notes": "close-up or dutch angle | bright, hopeful"
+    }
+  ],
+  "style_tags": [
+    "cinematic",
+    "storyboard",
+    "noir_thriller"
+  ]
+}
