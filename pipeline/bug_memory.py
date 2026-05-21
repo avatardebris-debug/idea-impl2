@@ -357,6 +357,45 @@ def record_failure_observation(
         append_mistake(slug, phase, sig, source="validator", retry_count=retry_count)
 
 
+def record_grok_debrief(
+    slug: str,
+    phase: int,
+    entries: list[dict],
+) -> int:
+    """
+    Import bug resolutions from a Grok Build post-phase debrief (JSON list).
+
+    Each entry may include:
+      failure_reason (str), fix_summary (str),
+      type: "resolution" | "mistake" (default resolution),
+      retry_count (int, optional).
+    """
+    written = 0
+    for raw in entries:
+        if not isinstance(raw, dict):
+            continue
+        fail = (raw.get("failure_reason") or raw.get("pattern") or "").strip()
+        fix = (raw.get("fix_summary") or "").strip()
+        if not fail:
+            continue
+        kind = (raw.get("type") or "resolution").strip().lower()
+        retry = int(raw.get("retry_count") or 0)
+        if kind == "mistake":
+            append_mistake(slug, phase, fail, source="grok", retry_count=retry)
+        else:
+            append_resolution(
+                slug,
+                phase,
+                fail,
+                fix or "Fixed during Grok implement session",
+                retry,
+                source="grok",
+                record_type="resolution",
+            )
+        written += 1
+    return written
+
+
 def _extract_blocking_bullets(review_content: str) -> list[str]:
     m = re.search(
         r"##\s*Blocking Bugs.*?(?=##\s|\Z)",

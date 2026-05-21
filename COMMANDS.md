@@ -333,6 +333,36 @@ Retry with `python reset_budget_exceeded.py --reset-all` (only touches project s
 
 ---
 
+## Grok Build sidecar (GPU offload)
+
+Grok handles planning/implement/debrief; the runner keeps **executor on Ollama**.
+Artifacts (`tasks.md`, `workspace/`, `validation_report.md`) stay the harvest + truth contract.
+
+```bash
+# Paths + validation state for a project phase
+python -m pipeline.grok_sidecar status --slug my_project --phase 1
+
+# JSON pack to paste into a Grok session (tasks, plans, reports)
+python -m pipeline.grok_sidecar context --slug my_project --phase 1
+
+# Deterministic pytest (same as validator agent) — no GPU
+python -m pipeline.grok_sidecar validate --slug my_project --phase 1
+
+# After Grok implement: template → fill → import to bug_resolutions.jsonl
+python -m pipeline.grok_sidecar debrief-template --slug my_project --phase 1
+# edit .pipeline/projects/<slug>/phases/phase_1/grok_debrief.json
+python -m pipeline.grok_sidecar record-bugs --slug my_project --phase 1 \
+    --file .pipeline/projects/my_project/phases/phase_1/grok_debrief.json
+
+# Provenance for finetune (input=tasks, output=workspace at PASS)
+python -m pipeline.grok_sidecar provenance --slug my_project --phase 1 --implementer grok_build
+```
+
+**Typical Grok workflow:** `context` → implement in `workspace/` → `validate` → fill debrief → `record-bugs` → `provenance`.
+Runner still owns completions/truth; run `harvest.py` as usual after PASS.
+
+---
+
 ## master_ideas.md Format
 
 ```markdown
