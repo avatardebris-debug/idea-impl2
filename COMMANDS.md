@@ -102,6 +102,12 @@ python pipeline/runner.py --resume --provider ollama \
 # ai_movie_generation_suite after prep (use --resume above instead):
 # python pipeline/runner.py --polish --provider ollama --model qwen3.6:35b-a3b-q4_K_M
 
+# Hermes tasks (--hermes at end of a master_ideas line): auto-clones on first use
+# hermes-agent-main/ is gitignored; runner clones https://github.com/NousResearch/hermes-agent
+# and pip install -e hermes-agent-main unless HERMES_AUTO_INSTALL=0
+# export HERMES_AUTO_INSTALL=0   # fail fast, manual clone instead
+# export HERMES_SKIP_PIP=1       # clone only, you install deps yourself
+
 # Single idea (quick test)
 python pipeline/runner.py "Build a Python word counter CLI" \
     --provider ollama --model qwen3.6:35b-a3b-q4_K_M

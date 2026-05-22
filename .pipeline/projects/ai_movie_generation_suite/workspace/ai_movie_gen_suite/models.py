@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -213,8 +213,8 @@ class Project(BaseModel):
     logline: str
     genre: str
     tone: str = ""
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     beat_sheet: Optional[BeatSheet] = None
     character_registry: Optional[CharacterRegistry] = None
     script: Optional[Script] = None
@@ -362,3 +362,241 @@ class AnimaticTimeline(BaseModel):
 class AnimaticAudioCues(BaseModel):
     """Music/SFX/voiceover placeholder cues keyed by segment."""
     cues: List[AudioCue] = Field(default_factory=list)
+
+
+# ── Phase 5: Audio Models ─────────────────────────────────────────────────
+
+class VoiceProfile(Character):
+    """Character voice profile extending Character with TTS parameters."""
+    pitch: float = 1.0
+    pace: float = 1.0
+    accent: str = ""
+    emotion_range: List[str] = Field(default_factory=lambda: ["neutral", "happy", "sad", "angry"])
+    provider: str = "elevenlabs"
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["role"] = self.role.value
+        return d
+
+
+class VoiceProfileRegistry(BaseModel):
+    """Registry of voice profiles keyed by character_id."""
+    profiles: Dict[str, VoiceProfile] = Field(default_factory=dict)
+
+    def add_profile(self, profile: VoiceProfile) -> None:
+        self.profiles[profile.id] = profile
+
+    def get_profile(self, char_id: str) -> Optional[VoiceProfile]:
+        return self.profiles.get(char_id)
+
+    def get_or_create_default(self, char_id: str, name: str) -> VoiceProfile:
+        if char_id in self.profiles:
+            return self.profiles[char_id]
+        profile = VoiceProfile(
+            id=char_id,
+            name=name,
+            role=CharacterRole.SUPPORTING,
+        )
+        self.profiles[char_id] = profile
+        return profile
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["profiles"] = {k: v.model_dump() for k, v in self.profiles.items()}
+        return d
+
+
+class DialogueSegment(BaseModel):
+    """A single dialogue-to-audio segment."""
+    segment_id: str = Field(default_factory=lambda: f"DS-{uuid.uuid4().hex[:8]}")
+    scene_id: str
+    character_id: str
+    character_name: str
+    text: str
+    emotion: str = "neutral"
+    delivery: Optional[str] = None
+    estimated_duration_ms: int = 0
+    phoneme_stub: str = ""
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        return d
+
+
+class DialogueSegmentCollection(BaseModel):
+    """Collection of dialogue segments for batch management."""
+    segments: List[DialogueSegment] = Field(default_factory=list)
+
+    def add(self, segment: DialogueSegment) -> None:
+        self.segments.append(segment)
+
+    def get_by_scene(self, scene_id: str) -> List[DialogueSegment]:
+        return [s for s in self.segments if s.scene_id == scene_id]
+
+    def get_by_character(self, character_id: str) -> List[DialogueSegment]:
+        return [s for s in self.segments if s.character_id == character_id]
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["segments"] = [s.model_dump() for s in self.segments]
+        return d
+
+
+class SFXCue(BaseModel):
+    """A sound effect cue derived from scene description."""
+    cue_id: str = Field(default_factory=lambda: f"SFX-{uuid.uuid4().hex[:8]}")
+    scene_id: str
+    sfx_type: str
+    description: str = ""
+    start_time_ms: int = 0
+    duration_ms: int = 0
+    volume_db: float = 0.0
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        return d
+
+
+class SFXCollection(BaseModel):
+    """Collection of SFX cues for batch management."""
+    cues: List[SFXCue] = Field(default_factory=list)
+
+    def add(self, cue: SFXCue) -> None:
+        self.cues.append(cue)
+
+    def get_by_scene(self, scene_id: str) -> List[SFXCue]:
+        return [c for c in self.cues if c.scene_id == scene_id]
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["cues"] = [c.model_dump() for c in self.cues]
+        return d
+
+
+class AudioTrack(BaseModel):
+    """A single audio track in the mix."""
+    track_id: str = Field(default_factory=lambda: f"TRK-{uuid.uuid4().hex[:8]}")
+    start_time_ms: int = 0
+    duration_ms: int = 0
+    volume_db: float = 0.0
+    source_type: str  # "dialogue", "sfx", "music"
+    segment_id: Optional[str] = None
+    audio_bytes: Optional[bytes] = None
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["audio_bytes"] = None  # don't serialize raw bytes
+        return d
+
+
+class AudioMixResult(BaseModel):
+    """Result of audio mixing."""
+    tracks: List[AudioTrack] = Field(default_factory=list)
+    total_duration_ms: int = 0
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["tracks"] = [t.model_dump() for t in self.tracks]
+        return d
+
+
+class AudioCompositionResult(BaseModel):
+    """Full audio composition result."""
+    dialogue_tracks: List[AudioTrack] = Field(default_factory=list)
+    sfx_tracks: List[AudioTrack] = Field(default_factory=list)
+    music_tracks: List[AudioTrack] = Field(default_factory=list)
+    total_duration_ms: int = 0
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["dialogue_tracks"] = [t.model_dump() for t in self.dialogue_tracks]
+        d["sfx_tracks"] = [t.model_dump() for t in self.sfx_tracks]
+        d["music_tracks"] = [t.model_dump() for t in self.music_tracks]
+        return d
+
+
+# ── Phase 5: Voice Provider ABC ──────────────────────────────────────
+
+from abc import ABC, abstractmethod
+
+
+class VoiceProvider(ABC):
+    """Abstract base class for TTS voice providers."""
+
+    @abstractmethod
+    def generate(self, text: str, profile: VoiceProfile) -> bytes:
+        """Generate TTS audio bytes for the given text and voice profile."""
+        ...
+
+    @abstractmethod
+    def validate(self) -> bool:
+        """Check if the provider is configured and available."""
+        ...
+
+    @abstractmethod
+    def list_models(self) -> List[str]:
+        """Return list of available voice model IDs."""
+        ...
+
+
+# ── Phase 6: Video Provider & Shot Models ────────────────────────────────
+
+class VideoProvider(str, Enum):
+    """Supported video generation providers."""
+    DRY_RUN = "dry-run"
+    RUNWAY = "runway"
+    PIKA = "pika"
+
+
+class VideoClip(BaseModel):
+    """A generated video clip for a single shot."""
+    clip_id: str
+    shot_id: str
+    status: str  # "pending", "generating", "completed", "failed"
+    error_message: Optional[str] = None
+    provider: str = ""
+    duration_ms: int = 0
+    url: Optional[str] = None
+
+
+class VideoShot(BaseModel):
+    """A single video shot derived from an animatic segment."""
+    shot_id: str = Field(default_factory=lambda: f"SHOT-{uuid.uuid4().hex[:8]}")
+    segment_id: str
+    storyboard_prompt_ref: str
+    duration_ms: int = 0
+    camera_angle: str = "eye-level"
+    camera_movement: str = "static"
+    provider_params: Dict[str, Any] = Field(default_factory=dict)
+    scene_id: str = ""
+    beat_ref: str = ""
+    transition: str = "cut"
+
+
+class VideoShotList(BaseModel):
+    """A collection of video shots for a project."""
+    title: str = ""
+    shots: List[VideoShot] = Field(default_factory=list)
+
+    def add_shot(self, shot: VideoShot) -> None:
+        self.shots.append(shot)
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["shots"] = [s.model_dump() for s in self.shots]
+        return d
+
+
+class VideoClipManifest(BaseModel):
+    """Manifest of all generated video clips."""
+    title: str = ""
+    clips: List[VideoClip] = Field(default_factory=list)
+
+    def add_clip(self, clip: VideoClip) -> None:
+        self.clips.append(clip)
+
+    def model_dump(self, **kwargs) -> Dict[str, Any]:
+        d = super().model_dump(**kwargs)
+        d["clips"] = [c.model_dump() for c in self.clips]
+        return d

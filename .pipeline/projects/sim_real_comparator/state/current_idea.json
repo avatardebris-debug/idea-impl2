@@ -1,0 +1,15 @@
+{
+  "title": "[sim real comparator]",
+  "description": "Given a real video clip and a MuJoCo simulation render of the same task, computes multi-metric similarity: SSIM, perceptual hash, CLIP embedding cosine similarity. Outputs per-frame heatmap + global score in [0,1]. Core evaluation tool for sim-to-real gap measurement. require",
+  "status": "phase_1_planning",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-22T02:16:04.760488+00:00",
+  "depends_on": [
+    "video_ingestor_summary"
+  ],
+  "priority_tier": 0,
+  "_slug": "sim_real_comparator",
+  "session_started_at": "2026-05-22T02:16:33.123262+00:00",
+  "checkpoint_at": "2026-05-22T02:30:18.260898+00:00"
+}

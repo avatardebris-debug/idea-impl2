@@ -1,0 +1,13 @@
+{
+  "title": "[robot primitive vocabulary]",
+  "description": "Design document and shared library module defining ~25-30 canonical atomic robot action primitives. Locomotion: move_to, rotate_to, approach, retreat. Manipulation: grasp, release, push, pull, lift, place, insert, rotate_object. Observation: look_at, scan, measure_distance, detect_object. Force: apply_force, apply_torque, maintain_contact. Control flow: sequence, parallel, repeat_until, conditional, wait, signal_done, request_human. Published as shared_libs/RobotPrimitives/ so all robot projects",
+  "status": "phase_1_planning",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-22T02:03:37.488911+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "robot_primitive_vocabulary",
+  "session_started_at": "2026-05-22T02:04:20.770527+00:00",
+  "checkpoint_at": "2026-05-22T02:30:18.261496+00:00"
+}

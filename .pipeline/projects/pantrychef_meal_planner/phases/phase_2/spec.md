@@ -1,43 +1,39 @@
-# PantryChef Meal Planner — Master Implementation Plan
+## Phase 2 — Shopping Lists + Nutritional Tracking
 
-> **Core Deliverable:** A meal planning tool that ingests pantry inventory, suggests recipes based on available ingredients, generates shopping lists for missing items, and tracks nutritional macros — all tied together in a coherent meal-planning workflow.
+**Goal:** Extend the MVP so users can see what they're missing (shopping list) and understand the nutritional impact of their meal plans.
 
----
+### Description
 
-## Architecture Overview
+Add two critical real-world features:
+1. **Shopping List Generator** — Given a meal plan, compute the delta between pantry inventory and recipe ingredient requirements. Output a deduplicated, grouped shopping list.
+2. **Nutrition Tracker** — For each recipe and meal plan, aggregate nutritional macros (calories, protein, carbs, fat, fiber). Allow the user to query daily/weekly macro totals.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    PantryChef Core                       │
-├──────────┬──────────┬──────────────┬───────────────────┤
-│ Pantry   │ Recipe   │ MealPlan     │ ShoppingList       │
-│ Engine   │ Engine   │ Engine       │ Generator          │
-├──────────┴──────────┴──────────────┴───────────────────┤
-│              NutritionTracker                           │
-├─────────────────────────────────────────────────────────┤
-│              Data Layer (SQLite / JSON)                 │
-├─────────────────────────────────────────────────────────┤
-│              CLI / Web UI Layer                         │
-└─────────────────────────────────────────────────────────┘
-```
+### Deliverable
 
-### Key Design Decisions
+- **`ShoppingListGenerator`** service:
+  - Computes ingredient deltas per recipe.
+  - Deduplicates across recipes (e.g., "2 eggs" + "3 eggs" → "5 eggs").
+  - Groups items by store aisle category (produce, dairy, pantry, etc.).
+  - CLI: `pantrychef shopping-list --date 2025-01-15`
+- **`NutritionTracker`** service:
+  - Stores nutrition data per recipe ingredient.
+  - Aggregates per-meal and per-day totals.
+  - CLI: `pantrychef nutrition --date 2025-01-15`
+- Updated `RecipeStore` to accept nutrition metadata.
+- Integration tests for shopping list deduplication and nutrition aggregation.
 
-| Decision | Rationale |
+### Dependencies
+
+- Phase 1 (`PantryManager`, `RecipeStore`, `RecipeMatcher`, `BasicMealPlanner`) must be stable.
+
+### Success Criteria
+
+| # | Criterion |
 |---|---|
-| SQLite as primary store | ACID guarantees, zero config, queryable for recipe matching |
-| Recipe matching via ingredient overlap scoring | Simple, effective, extensible to weighted scoring later |
-| Modular engine architecture | Each domain (pantry, recipe, nutrition, shopping) is independently testable |
-| CLI-first, web-optional | Lowest barrier to entry; web can be layered on top later |
-
-### Data Model (Core Entities)
-
-- **PantryItem**: `id, name, quantity, unit, category, expiry_date`
-- **Recipe**: `id, name, ingredients[], steps[], servings, prep_time, nutrition[]`
-- **MealPlan**: `id, date, meal_type, recipe_id, servings, notes`
-- **ShoppingItem**: `id, name, quantity, unit, source_recipe_ids[]`
-- **NutritionalInfo**: `calories, protein, carbs, fat, fiber, per_serving`
+| 1 | Shopping list correctly identifies missing ingredients for a 3-recipe meal plan. |
+| 2 | Duplicate ingredients across recipes are properly summed (e.g., 2× "1 cup flour" → "2 cups flour"). |
+| 3 | Nutrition tracker reports accurate daily macro totals for a meal plan. |
+| 4 | Shopping list grouped by category is readable and actionable. |
 
 ---
 
-## Phase 1 — MVP: Pantry Ingestion + Recipe Matching + Basic Meal Plan

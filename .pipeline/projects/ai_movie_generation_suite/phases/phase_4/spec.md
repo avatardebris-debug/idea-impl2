@@ -27,3 +27,5 @@ This phase bridges static storyboards and motion preview:
 - [ ] Downstream phases can read animatic JSON without custom parsing
 
 ---
+
+#

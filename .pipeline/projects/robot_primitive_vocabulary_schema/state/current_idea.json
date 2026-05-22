@@ -1,0 +1,13 @@
+{
+  "title": "[Robot primitive vocabulary schema]",
+  "description": "[goal:bootstrap_robot_training:b001] Create a JSON schema and Python dataclasses for robot motion primitives. Define atomic primitives (grasp, place, slide, push, lift, rotate) with parameters: position (x,y,z), orientation (quaternion), velocity, acceleration, force limits, duration. Output: .pipeline/schemas/primitive_schema.json and .pipeline/code/primitives.py with classes: MotionPrimitive, GraspPrimitive, PlacePrimitive, and validation functions.",
+  "status": "phase_1_planning",
+  "phase": 1,
+  "total_phases": 3,
+  "started_at": "2026-05-22T02:17:00.518985+00:00",
+  "depends_on": [],
+  "priority_tier": 0,
+  "_slug": "robot_primitive_vocabulary_schema",
+  "session_started_at": "2026-05-22T02:17:34.142159+00:00",
+  "checkpoint_at": "2026-05-22T02:30:18.260523+00:00"
+}

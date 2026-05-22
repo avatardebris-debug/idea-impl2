@@ -6,71 +6,45 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 `- [ ] **Title** — Description of what to build`
 
 ## Ideas
-
-
-
-
-
-
-
-
-
 [ ] [movie player] — [[lock] front end player to play the AI movies. requires: ai_movie_generation_suite]
-
 [ ] [dialog generator] — [[lock] generate dialogue between characters. requires: ai_movie_generation_suite]
 [ ] [director/editor] — [[lock] direct and cut using RL. requires: ai_movie_generation_suite]
-[ ] [DocsAI Code Execution Engine] — Add interactive code snippet execution and automatic API reference mapping.
-[ ] [dropshipping suite builder] — [description]
 
-[x] [quant developing program for prediction markets, sports, events, weather markets,etc ] — [[lock]Using high level mathematics like Hawkes Process and understanding  market maker spread costs and order flow intensity and branching for market making strategy. Adjusting spread based on VPIN and latency arbitrage. create a suite to run simulations and calculate sharpe ratio of prediction markets based on quant math. Expected value, bayes theorem, kelly criterion, base rate (true positive vs false positive), KL divergence, LMSR. Betting using oversold RSI and other TA like MACD for line changes. Make it possible to plug in LLM or API key or local AI and ask the AI about the setup and give it the harness/ tools it needs to interact with the tool and explain everything. Understand the formulas used by vegas and others to make markets and balance books and offer action to do so. Understand greeks, etc. ]
+## Robotics & Physical Agency
 
+- [ ] **[Bootstrap Robot Training]** — Design the full robot primitive vocabulary and skill acquisition pipeline, from atomic motion primitives through sim-to-real gap measurement. --goal
 
-[ ] [AgentFlow Dropship] — [Autonomous drop shipping orchestration platform that lets you describe your entire operation and it builds, runs and scales workflows for you using agentic AI.]
+- [ ] **[subgoal generator]** — [General-purpose LLM goal decomposition engine. Takes any high-level goal ("build a house", "make $10k/month", "learn Spanish") and uses an LLM to produce an ordered list of subgoals with dependencies. Each subgoal is formatted as a pipeline idea entry and injected into master_ideas.md for the runner to execute. Operates on any domain: robotics, software, business, learning. The agent's hypothesis and goal-creation layer — enables recursive autonomous expansion of any objective into buildable sub-tasks. The runner processes each subgoal through the normal executor/validator/critic cycle.]
 
-[ ] Agent observability dashboard — Build a real-time dashboard that tracks agent execution metrics (steps taken, LLM calls, costs, errors, duration) across all running pipeline projects with alerting on anomalies.
+- [ ] **[MuJoCo URDF Research]** — Research and compare 3 MuJoCo-compatible robot URDFs (Franka, UR5, Unitree H1). Write a ranked comparison to .pipeline/goals/urdf_research.md covering DOF, contact complexity, and sim stability. goal_check: Has a ranked comparison of ≥3 URDFs been written to .pipeline/goals/urdf_research.md? --hermes
 
-[ ] Automated SEO content factory — Combines ai_author_suite with dropship/service/ecommerce autoSEO autometa to generate SEO-optimized product descriptions and blog content at scale for ecommerce stores. requires: ai_author_suite, 
-[ ] Book content repurposer — Add a module to the AI author suite that takes a completed book and auto-generates blog posts, social media threads, newsletter articles, and course outlines from chapters. requires: ai_author_suite
-[ ] Video content SEO engine — Combines dropship/service/ecommerce autoSEO autometa with youtube workflow tool to generate SEO titles, descriptions, tags, and transcripts for YouTube video catalogs at scale. requires: dropship/service/ecommerce. autoSEO autometa, youtube workflow tool
+- [ ] **[robot primitive vocabulary]** — [[lock] Design document and shared library module defining ~25-30 canonical atomic robot action primitives. Locomotion: move_to, rotate_to, approach, retreat. Manipulation: grasp, release, push, pull, lift, place, insert, rotate_object. Observation: look_at, scan, measure_distance, detect_object. Force: apply_force, apply_torque, maintain_contact. Control flow: sequence, parallel, repeat_until, conditional, wait, signal_done, request_human. Published as shared_libs/RobotPrimitives/ so all robot projects import from one canonical source.]
 
+- [ ] **[video recipe mu]** — [[lock] Takes video_scribe structured scene descriptions and uses an LLM to extract an ordered sequence of atomic actions as a robot recipe. Output JSON: [{step, action, object, xyz_delta, duration_s, preconditions, success_state}]. Any video of a real task becomes a structured skill recipe. requires: video_scribe]
 
-[ ] [AI Author Audiobook Integration] — Add automated narration synthesis and dynamic cover art animation to the suite. requires:ai_author_suite
-[ ] [AI Author Docs Platform] — Merge ai_author_suite and docsai_documentation_generator to publish technical books automatically. requires:ai_author_suite, docsai_documentation_generator
-[ ] [AI Screenplay Writer] — Automated scriptwriting assistant that handles plot structure, dialogue generation, and formatting. requires:ai_author_suite
+- [ ] **[robo primitive mapper]** — [[lock] Maps video_recipe action descriptions to the canonical robot primitive vocabulary. Handles unit conversion, reference frame normalization (world/object/gripper), validates each action maps to a known primitive. Output: robot_program.json ready for mujoco_codegen. requires: video_recipe, robot_primitive_vocabulary]
 
-[ ] API mock server generator — Tool that reads an OpenAPI/Swagger spec and generates a fully functional mock API server with configurable response delays, random data generation, and request logging. ai_author_suite
-[ ] [Automated Dependency Resolver] — Tool that tracks cross-project requirements and automatically syncs version constraints.
-dropship/service/ecommerce. autoSEO autometa
-[ ] [Autonomous Web Vulnerability Scanner] — Continuous security tool that automatically probes and patches public web assets.
+- [ ] **[mujoco codegen]** — [[lock] Generates runnable MuJoCo XML scene files and Python control scripts from robo_primitive_mapper output. Handles object placement, trajectory planning, contact and grasp primitives. Executes simulation and records render video. Output: scene.xml, control.py, render.mp4. requires: robo_primitive_mapper]
 
+- [ ] **[sim real comparator]** — [[lock] Given a real video clip and a MuJoCo simulation render of the same task, computes multi-metric similarity: SSIM, perceptual hash, CLIP embedding cosine similarity. Outputs per-frame heatmap + global score in [0,1]. Core evaluation tool for sim-to-real gap measurement. requires: video_ingestor_summary]
 
-[ ] [Data Docs Generator] — Merge docsai_documentation_generator and csv_analyzer to auto-generate schema and API documentation.
+- [ ] **[sim real discriminator]** — [[lock] GAN-style critic trained to distinguish real robot/human footage from MuJoCo renders. Discriminator score is the RL reward signal driving adversarial sim improvement. Extends video_GAN architecture. Once gap closes past threshold, additional criteria push performance beyond the original demonstration. requires: sim_real_comparator, video_gan]
 
-[ ] Email attachment to CSV pipeline — Connector that extracts CSV attachments from emails processed by the email tool, runs them through the CSV analyzer, and routes results to a configured folder or webhook. requires: email_tool, csv_analyzer
+- [ ] **[pufferlib rl harness]** — [[lock] Wraps MuJoCo robot skill environments with PufferLib (github.com/PufferAI/PufferLib) for vectorized high-throughput RL training. Achieves 10-100x sample efficiency vs naive implementations. Enables training primitive skills on a consumer RTX 4090 instead of A100 cluster. Exposes: train_skill(skill_name, reward_fn, n_envs=512, max_steps=1M). Plugs sim_real_discriminator score in as reward. requires: mujoco_codegen]
 
-[ ] [Figma to Mobile App Generator] — AI pipeline that converts design mockups into production-ready cross-platform code.
-[ ] [Interactive Fiction Engine] — Combine ai_author_suite and advantage_player_cardgame_simulator_training for branching narrative games.
-[ ] LLMClient bridge for AI Author — Adapter that plugs the LLMClient protocol from drop_servicing_tool into the AI author suite so all modules share the same LLM interface and caching layer. requires: drop_servicing_tool, ai_author_suite
+- [ ] **[robot skill library]** — [[lock] SQLite + FAISS vector database of verified robot skill programs. Schema: {skill_id, name, description_embedding, video_example_path, robo_program_path, sim_score, real_score, primitive_tags}. Query by semantic similarity. Reviewer promotes successful skills here after validation. Shared library acts as reviewer: all new skills checked for redundancy and interface consistency before promotion. requires: robo_primitive_mapper]
 
-[ ] Meeting notes auto-summarizer — Tool that takes raw meeting transcripts or audio recordings, identifies action items, decisions, and key topics, and outputs a structured summary with assignees and deadlines.
-[ ] [Real-Time Market Predictor] — Prediction engine that tracks financial sentiment and forecasts asset price movements.
-[ ] [SaaS Pricing Optimizer] — Automated tool that analyzes competitor pricing and recommends optimal subscription tiers.
-[ ] Shared LLM cost tracker — Add a cost-tracking middleware to the LLMClient protocol that logs every LLM call's token usage and cost across all projects, with monthly budget alerts and per-project breakdowns.
-[ ] [Simulator Result Aggregator] — Pipeline that collects and normalizes monte_carlo training outputs across multiple game simulators.
-[ ] Smart email-to-SOP executor — Combines email_tool with drop_servicing_tool to automatically parse incoming emails, extract task requirements, and trigger SOP-based agentic workflows for execution. requires: email_tool, drop_servicing_tool
-[ ] SOP marketplace — Add a marketplace module to the drop servicing tool where users can publish, discover, and license SOPs with version control, ratings, and one-click import. requires: drop_servicing_tool
-[ ] SOP output to YouTube content feed — Bridge that takes SOPStep outputs from the drop servicing tool and formats them into YouTube video scripts, titles, and thumbnail text via the youtube workflow tool pipeline. requires: drop_servicing_tool, youtube workflow tool
-[ ] [Startup Compliance Scanner] — Automated checklist generator that maps startup data to SOC2 and GDPR requirements.
-[ ] [Technical Whitepaper Generator] — AI system that researches, outlines, and drafts professional engineering documentation.
-[ ] [Test Coverage Mutator] — Automated suite that generates mutation tests and enforces quality thresholds across the pipeline.
-[ ] [Universal LLM Router] — Adapter that routes requests across llmclient providers with automatic fallback and load balancing.
+- [ ] **[goal decomposer]** — [[lock] LLM agent that takes any high-level goal and recursively decomposes it into a dependency tree of skills using subgoal_generator. Checks robot_skill_library for each node — found skills reused, gap skills queued as video_recipe jobs. Robot can invoke any software pipeline tool (web scraping, SEO, legal, payments, Airbnb) as subgoals alongside physical skills — unified goal graph across physical and digital domains. requires: robot_skill_library, subgoal_generator]
 
-[ ] Card game training course platform — Combines advantage_player_cardgame_simulator_training with tim ferriss learning tool to create interactive poker and blackjack training courses with spaced repetition and progress tracking. requires: advantage_player_cardgame_simulator_training, tim ferriss learning tool
-[ ] [Card Game Variant Expansion] — Add Texas Hold'em and Omaha variants with AI opponent modeling to the simulator.
-[ ] Cardgame simulator output to learning tool — Bridge that exports Monte Carlo training results and strategy metrics from the cardgame simulator into the tim ferriss learning tool format for spaced repetition practice decks. requires: advantage_player_cardgame_simulator_training, tim ferriss learning tool
-[ ] Code review diff summarizer — CLI tool that reads git diff output, summarizes changes by file and function, flags potential issues, and generates a human-readable review briefing.
-[ ] [Config Schema Validator] — Linter that validates pipeline YAML definitions against typed schemas before execution.
-[ ] Contract clause extractor — PDF and DOCX parser that identifies and extracts key contract clauses (termination, liability, NDAs) into a structured searchable database with export options.
-[ ] Cross-project code linter — CLI tool that runs consistent linting, type checking, and import analysis across all workspace projects, enforcing a shared style guide and flagging cross-project API mismatches.
+- [ ] **[robot pipeline fork]** — [[lock] Fork of the autonomous pipeline with agents retuned for robot skill development: skill_planner, robo_codegen, sim_runner, sim_critic, skill_reviewer. Same runner/message bus/budget management — ~30% new code, ~70% reused. Robot has full LLM access and the current agent harness to develop its own software in addition to robot skill programs. Can spawn any software pipeline tool: websites, SEO, legal, finance, delegate to other robots. shared_libs/RobotPrimitives is the canonical reviewer for all generated robot code. requires: goal_decomposer, pufferlib_rl_harness, sim_real_discriminator, robot_skill_library]
+
+## Goal Decompositions
+<!-- goal:bootstrap_robot_training decomposed 2026-05-21 -->
+- [ ] **[Robot primitive vocabulary schema]** — [[goal:bootstrap_robot_training:b001] Create a JSON schema and Python dataclasses for robot motion primitives. Define atomic primitives (grasp, place, slide, push, lift, rotate) with parameters: position (x,y,z), orientation (quaternion), velocity, acceleration, force limits, duration. Output: .pipeline/schemas/primitive_schema.json and .pipeline/code/primitives.py with classes: MotionPrimitive, GraspPrimitive, PlacePrimitive, and validation functions.]
+- [ ] **[Sim-to-real gap measurement tool]** — [[goal:bootstrap_robot_training:b002] Build a Python tool to quantify sim-to-real transfer gap. Input: simulation trajectories (JSON/CSV) and real-world trajectories (JSON/CSV). Output: gap metrics including position error (RMSE), velocity error, force profile divergence, success rate delta. Key class: SimRealComparator with methods compute_position_error(), compute_success_delta(), generate_gap_report(). Write results to .pipeline/reports/sim_real_gap.md with markdown tables and matplotlib plots saved to .pipeline/figures/.]
+- [ ] **[Skill acquisition pipeline orchestrator]** — [[goal:bootstrap_robot_training:b003] Create an orchestrator that chains primitive execution with skill learning. Input: skill definition JSON (sequence of primitives with parameters). Output: executable skill script in .pipeline/skills/ with logging to .pipeline/logs/skill_execution.log. Key classes: SkillOrchestrator, SkillExecutor, SkillLogger. Supports: replay, parameter tuning, failure recovery. I/O: JSON skill specs, CSV execution logs.]
+- [ ] **[MuJoCo URDF compatibility layer]** — [[goal:bootstrap_robot_training:b004] Build a converter that transforms URDF robot models to MuJoCo-compatible MJCF format. Input: URDF file path. Output: .pipeline/models/converted_robot.xml with validated joint limits, collision geometries, and actuator definitions. Key function: convert_urdf_to_mjcf(urdf_path, output_path) using mujoco-py or mujoco libraries. Include validation: check joint counts, verify collision meshes, test simulation stability.]
+- [ ] **[Robot skill library builder]** — [[goal:bootstrap_robot_training:b005] Build a repository of pre-trained robot skills with standardized interfaces. Requires decomposition into: (1) skill storage format, (2) skill loading/execution API, (3) skill evaluation harness.] --goal
+- [ ] **[Hermes: evaluate sim-to-real transfer methods]** — [[goal:bootstrap_robot_training:b006] Research and benchmark sim-to-real transfer techniques for robot learning. Evaluate domain randomization, system identification, and adversarial domain adaptation.] --hermes
 
 

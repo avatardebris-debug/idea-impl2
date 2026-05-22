@@ -44,6 +44,14 @@ class ProjectConfig(BaseModel):
         return cls(**json.loads(config_path.read_text()))
 
 
+class VoiceConfig(BaseModel):
+    """Configuration for a TTS voice provider."""
+    provider: str = "elevenlabs"  # elevenlabs, openai
+    api_key_env_var: str = "ELEVENLABS_API_KEY"
+    model: str = "eleven_multilingual_v2"
+    base_url: Optional[str] = None
+
+
 class SuiteConfig(BaseModel):
     """Global suite configuration."""
     default_llm: LLMConfig = Field(default_factory=LLMConfig)
@@ -54,6 +62,7 @@ class SuiteConfig(BaseModel):
     animatic_dir: str = "animatic"
     characters_3d_dir: str = "characters_3d"
     ue5_export_dir: str = "ue5_export"
+    voice: VoiceConfig = Field(default_factory=VoiceConfig)
 
     def save(self, path: Optional[Path] = None) -> Path:
         target = path or Path.home() / ".ai_movie_gen" / "config.json"
@@ -67,3 +76,11 @@ class SuiteConfig(BaseModel):
         if not config_path.exists():
             return cls()
         return cls(**json.loads(config_path.read_text()))
+
+
+class VideoProviderConfig(BaseModel):
+    """Configuration for a video generation provider."""
+    provider: str = "dry-run"
+    api_key_env_var: str = "VIDEO_API_KEY"
+    base_url: Optional[str] = None
+    model: str = "default"

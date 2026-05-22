@@ -10,6 +10,8 @@ Each entry below: `- slug — title — completed_at` then an indented descripti
 **Not listed here:** `budget_exceeded` projects — they stay in `master_ideas.md`.
 Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
 
+- academic_thesis_writer — Academic Thesis Writer — 2026-05-21T23:22:48.454273+00:00
+  desc: AI-assisted research paper generator with citation management, literature review synthesis, and academic formatting modules.
 - advantage_player_cardgame_simulator_training — [advantage player cardgame simulator training] — 2026-05-13T20:16:56.620222+00:00
   desc: [monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]
 - agency_sop_automator — Agency SOP Automator — 
@@ -19,6 +21,8 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
   desc: game where you input data and with that can build an empire. When agentic mirroring is turned on and everything is paired, your actions are mirrored in real life and integrated with agentic commerce, robots, etc so that the empire you build in the gaming environment happens in real life
 - ai_author_suite — [ai author suite] — 
   desc: [niche/topic research, keyword research,book outliner, chapter developer, chapter outliner, detail fill in, deep editor restructure format, cover designer, book cover designer, etc]
+- ai_movie_generation_suite — [AI movie generation suite] — 2026-05-22T02:00:16.257880+00:00
+  desc: suite that enables save the cat style screenplay writing, prompts for generating images/storyboard, prompts for describing characters, enable import of character into UE5 (or others) and integration with UE5 (or whichever is best) characters for developing movies. Possibly use GOogle Geenie or develop consistent 3d worlds and enable the development of movies from a combination of tools. At minimum should construct the beatsheet, the script, the detailed description of the scene itself, and the d
 - ai_movie_generation_suite_2 — [AI movie generation suite 2] — 
   desc: core suite. API surface, data models, file formats for movie generation.
 - audiobook_script_pipeline — [Audiobook Script Pipeline] — 
@@ -142,6 +146,8 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
   desc: OSINT for corporate tracking. Uses SEC importer and forensic for data. Thi should also have methods to extract and tracking legal public available shipping manifests, procurement data, government contract databases, corporate registry data, public postings of jobs/etc. correlating companies and relevant objects and locations on maps/sattelites to SEC filings, viewing public satellite feeds and routing. Tracking by land, air and sea. Estimating money flows. Estimating customers. using public data
 - pairenv — [pairenv] — 
   desc: environment enabling the pairing of real world hardware to then assign it to software and send and receive commands and translate English to the necessary format to access the tool
+- pantrychef_meal_planner — [PantryChef Meal Planner] — 2026-05-21T23:03:27.675141+00:00
+  desc: Design a meal planning tool that ingests pantry inventory, suggests recipes, generates shopping lists, and tracks nutritional macros.
 - player_attribute_library — [player attribute library] — 
   desc: Integration for the Football tool above with ability to match with player attributes. requir
 - pocketknife_of_the_internet — [pocketknife of the internet] — 

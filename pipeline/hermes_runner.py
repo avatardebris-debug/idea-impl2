@@ -31,6 +31,7 @@ import logging
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import time
 from typing import Any
@@ -39,6 +40,17 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 HERMES_DIR = PROJECT_ROOT / "hermes-agent-main"
+HERMES_RUN_AGENT = HERMES_DIR / "run_agent.py"
+HERMES_REPO_URL = os.environ.get(
+    "HERMES_REPO_URL",
+    "https://github.com/NousResearch/hermes-agent.git",
+)
+# Set HERMES_AUTO_INSTALL=0 to disable clone/pip bootstrap (fail fast instead).
+HERMES_AUTO_INSTALL = os.environ.get("HERMES_AUTO_INSTALL", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
 
 # ---------------------------------------------------------------------------
 # Provider resolution (mirrors what runner.py uses for pipeline agents)
@@ -127,21 +139,106 @@ def _critic_verdict(
 
 
 # ---------------------------------------------------------------------------
+# Bootstrap: clone + pip when hermes-agent-main/ is missing (gitignored locally)
+# ---------------------------------------------------------------------------
+
+def _hermes_present() -> bool:
+    return HERMES_RUN_AGENT.is_file()
+
+
+def _clone_hermes_repo() -> None:
+    """Shallow-clone Nous Hermes into hermes-agent-main/ (directory is gitignored)."""
+    if HERMES_DIR.exists() and not _hermes_present():
+        import shutil
+
+        print(f"  [hermes] Removing incomplete {HERMES_DIR.name}/ (no run_agent.py)")
+        shutil.rmtree(HERMES_DIR, ignore_errors=True)
+
+    HERMES_DIR.parent.mkdir(parents=True, exist_ok=True)
+    print(f"  [hermes] Cloning {HERMES_REPO_URL} → {HERMES_DIR}")
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            HERMES_REPO_URL,
+            str(HERMES_DIR),
+        ],
+        check=True,
+        cwd=str(PROJECT_ROOT),
+    )
+    if not _hermes_present():
+        raise RuntimeError(
+            f"Clone finished but {HERMES_RUN_AGENT} is missing — check HERMES_REPO_URL"
+        )
+
+
+def _install_hermes_deps() -> None:
+    """Install core Hermes package deps into the active Python (no [all] extras)."""
+    if os.environ.get("HERMES_SKIP_PIP", "").strip().lower() in ("1", "true", "yes"):
+        return
+    marker = HERMES_DIR / ".pipeline_hermes_deps_installed"
+    if marker.is_file():
+        return
+    print(f"  [hermes] Installing dependencies (pip install -e {HERMES_DIR.name})...")
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-e", str(HERMES_DIR)],
+        check=True,
+        cwd=str(PROJECT_ROOT),
+    )
+    marker.write_text("ok\n", encoding="utf-8")
+
+
+def ensure_hermes_available() -> None:
+    """
+    Ensure hermes-agent-main/ exists and run_agent.AIAgent is importable.
+
+    Required on cloud hosts: hermes-agent-main/ is in .gitignore and is not deployed
+    via git pull. First --hermes task triggers clone + pip install automatically
+    unless HERMES_AUTO_INSTALL=0.
+    """
+    if not _hermes_present():
+        if not HERMES_AUTO_INSTALL:
+            raise RuntimeError(
+                f"Hermes not found at {HERMES_DIR}. Set HERMES_AUTO_INSTALL=1 (default) "
+                f"or clone manually: git clone {HERMES_REPO_URL} {HERMES_DIR.name}"
+            )
+        _clone_hermes_repo()
+
+    if str(HERMES_DIR) not in sys.path:
+        sys.path.insert(0, str(HERMES_DIR))
+
+    try:
+        import run_agent  # noqa: F401
+    except ImportError as exc:
+        if not HERMES_AUTO_INSTALL:
+            raise RuntimeError(
+                f"Hermes present at {HERMES_DIR} but import failed: {exc}. "
+                f"Run: pip install -e {HERMES_DIR.name}"
+            ) from exc
+        _install_hermes_deps()
+        try:
+            import run_agent  # noqa: F401
+        except ImportError as exc2:
+            raise RuntimeError(
+                f"Hermes import still failed after pip install: {exc2}"
+            ) from exc2
+
+
+# ---------------------------------------------------------------------------
 # Worker: Hermes AIAgent
 # ---------------------------------------------------------------------------
 
 def _build_worker(base_url: str, model: str, api_key: str, max_iterations: int = 25):
     """Instantiate a Hermes AIAgent configured for pipeline use."""
-    # Add hermes to path temporarily
-    if str(HERMES_DIR) not in sys.path:
-        sys.path.insert(0, str(HERMES_DIR))
+    ensure_hermes_available()
 
     try:
         from run_agent import AIAgent
     except ImportError as exc:
         raise RuntimeError(
-            f"Cannot import Hermes AIAgent from {HERMES_DIR}. "
-            f"Ensure hermes-agent-main/ is present. Error: {exc}"
+            f"Cannot import Hermes AIAgent from {HERMES_DIR}. Error: {exc}"
         ) from exc
 
     worker = AIAgent(

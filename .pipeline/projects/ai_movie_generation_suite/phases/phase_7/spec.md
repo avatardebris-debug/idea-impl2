@@ -26,3 +26,27 @@
 - [ ] Project marked `complete` only after Phase 7 validation passes (unblocks `requires: ai_movie_generation_suite`)
 
 ---
+
+## 6. Extended Pipeline Notes
+
+Phases 4–7 extend pre-production into timed preview, audio, video clips, and team review. They remain **pre-production** scope: creative assets and planning documents, not final rendered feature films.
+
+| Phase | Focus |
+|-------|--------|
+| 4 | Animatic timing |
+| 5 | Voice & dialogue audio |
+| 6 | AI video clips |
+| 7 | Collaboration & release gate |
+
+---
+
+## 7. Implementation Order Summary
+
+```
+Phase 1 ──► Phase 2 ──► Phase 3 ──► Phase 4 ──► Phase 5 ──► Phase 6 ──► Phase 7
+(screenplay) (visuals)   (3D/UE5)   (animatic)  (audio)     (video)     (collab)
+```
+
+**Total phases:** 7. Phases 1–3 are complete in workspace; phases 4–7 resume via `--resume` after `total_phases` is set to 7.
+
+**Downstream lock-chain:** `movie player`, `dialog generator`, and `director/editor` in `master_ideas.md` require `ai_movie_generation_suite` to reach `complete` after all 7 phases.
