@@ -25,21 +25,19 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# Infrastructure files that should NOT be rescued (they belong at project root)
-_INFRA_FILES = {
-    "agent.py", "extract.py", "fix_indent.py", "fix_missing_plans.py",
-    "fix_stuck_tasks.py", "governance.py", "setup.py", "cloud_setup.sh",
-    "harvest.sh", "sync_cloud.sh", "constitution.yaml",
-}
+from pipeline.path_health import (
+    BUILD_ARTIFACT_SUFFIXES,
+    ROOT_INFRA_DIRS,
+    ROOT_INFRA_FILES,
+    find_workspace_shadows,
+    is_root_infra_file,
+    prune_workspace_shadows,
+    rescue_dir_filtered,
+)
 
-_INFRA_DIRS = {
-    "pipeline", ".pipeline", "_archive", "extras", ".git",
-    "master ideas backup sort", "__pycache__", ".ipynb_checkpoints",
-    "node_modules", ".pytest_cache", "build", "dist",
-}
-
-# Build artifacts that should be deleted (not rescued) when found at project root
-_BUILD_ARTIFACT_PATTERNS = {".egg-info", ".dist-info"}
+_INFRA_FILES = ROOT_INFRA_FILES
+_INFRA_DIRS = ROOT_INFRA_DIRS
+_BUILD_ARTIFACT_PATTERNS = BUILD_ARTIFACT_SUFFIXES
 
 
 class HealthCheckResult:
@@ -71,6 +69,7 @@ def run_all_checks(
     results: list[HealthCheckResult] = []
 
     results.extend(check_stray_files(project_root, pipeline_dir, active_slug))
+    results.extend(prune_workspace_shadow_leaks(pipeline_dir, active_slug))
     results.extend(prune_phantom_tests(pipeline_dir, active_slug))
     results.extend(fix_datetime_utcnow(pipeline_dir, active_slug))
     results.extend(check_workspace_imports(pipeline_dir, active_slug))
@@ -145,7 +144,7 @@ def check_stray_files(
     for stray_name in ("src", "tests", "test"):
         stray_dir = project_root / stray_name
         if stray_dir.exists() and stray_dir.is_dir():
-            count = _rescue_dir(stray_dir, workspace / stray_name)
+            count = rescue_dir_filtered(stray_dir, workspace / stray_name)
             if count:
                 rescued_total += count
                 results.append(HealthCheckResult(
@@ -158,7 +157,7 @@ def check_stray_files(
     # Pattern B: slug-named directory at project root
     slug_at_root = project_root / active_slug
     if slug_at_root.exists() and slug_at_root.is_dir():
-        count = _rescue_dir(slug_at_root, workspace)
+        count = rescue_dir_filtered(slug_at_root, workspace)
         if count:
             rescued_total += count
             results.append(HealthCheckResult(
@@ -170,7 +169,7 @@ def check_stray_files(
     # Pattern C: /workspace/workspace/<slug>/
     cloud_stray = pathlib.Path("/workspace/workspace") / active_slug
     if cloud_stray.exists() and cloud_stray.is_dir():
-        count = _rescue_dir(cloud_stray, workspace)
+        count = rescue_dir_filtered(cloud_stray, workspace)
         if count:
             rescued_total += count
             results.append(HealthCheckResult(
@@ -179,10 +178,10 @@ def check_stray_files(
                 auto_fixed=True,
             ))
 
-    # Pattern D: workspace/workspace/ double-nesting
+    # Pattern D: workspace/workspace/ double-nesting (skip infra filenames)
     double_ws = workspace / "workspace"
     if double_ws.exists() and double_ws.is_dir():
-        count = _rescue_dir(double_ws, workspace)
+        count = rescue_dir_filtered(double_ws, workspace)
         if count:
             rescued_total += count
             results.append(HealthCheckResult(
@@ -193,7 +192,7 @@ def check_stray_files(
 
     # Pattern E: loose .py files at project root (not infra)
     for f in project_root.glob("*.py"):
-        if f.name in _INFRA_FILES:
+        if is_root_infra_file(f.name):
             continue
         dst = workspace / f.name
         if not dst.exists():
@@ -233,7 +232,7 @@ def check_stray_files(
         if potential_proj.exists():
             ws = potential_proj / "workspace"
             ws.mkdir(parents=True, exist_ok=True)
-            count = _rescue_dir(d, ws)
+            count = rescue_dir_filtered(d, ws)
             if count:
                 rescued_total += count
                 results.append(HealthCheckResult(
@@ -242,6 +241,34 @@ def check_stray_files(
                     auto_fixed=True,
                 ))
 
+    return results
+
+
+def prune_workspace_shadow_leaks(
+    pipeline_dir: pathlib.Path,
+    active_slug: str,
+) -> list[HealthCheckResult]:
+    """Remove repo infrastructure files leaked into project workspace/."""
+    results: list[HealthCheckResult] = []
+    if not active_slug:
+        return results
+
+    workspace = pipeline_dir / "projects" / active_slug / "workspace"
+    issues = find_workspace_shadows(workspace)
+    if not issues:
+        return results
+
+    actions = prune_workspace_shadows(workspace)
+    if actions:
+        summary = "; ".join(actions[:5])
+        if len(actions) > 5:
+            summary += f" (+{len(actions) - 5} more)"
+        results.append(HealthCheckResult(
+            "workspace_shadows",
+            "warning",
+            f"Pruned {len(actions)} path leak(s) in {active_slug}: {summary}",
+            auto_fixed=True,
+        ))
     return results
 
 
@@ -551,38 +578,8 @@ def check_workspace_file_paths(
 # ---------------------------------------------------------------------------
 
 def _rescue_dir(src_dir: pathlib.Path, dest_base: pathlib.Path) -> int:
-    """Move files from src_dir into dest_base, preserving relative paths.
-    Returns count of files moved.
-    """
-    if not src_dir.exists() or not src_dir.is_dir():
-        return 0
-
-    moved = 0
-    for f in list(src_dir.rglob("*")):
-        if not f.is_file():
-            continue
-        if f.name.startswith(".") or "__pycache__" in str(f):
-            continue
-        try:
-            rel = f.relative_to(src_dir)
-        except ValueError:
-            continue
-        dst = dest_base / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        if not dst.exists():
-            shutil.copy2(str(f), str(dst))
-            moved += 1
-        elif f.stat().st_mtime > dst.stat().st_mtime:
-            shutil.copy2(str(f), str(dst))
-            moved += 1
-
-    if moved:
-        try:
-            shutil.rmtree(str(src_dir))
-        except OSError:
-            pass
-
-    return moved
+    """Backward-compatible alias — skips infra/shadow filenames."""
+    return rescue_dir_filtered(src_dir, dest_base)
 
 
 def write_health_report(

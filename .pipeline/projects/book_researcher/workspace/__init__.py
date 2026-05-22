@@ -1,3 +1,5 @@
-"""Book Researcher — Find underserved book niches by analyzing reviews."""
+"""Book Researcher — find underserved book niches by analyzing reviews."""
 
-__version__ = "0.1.0"
+from book_researcher.models import BookReview, Gap, NicheProfile, TableOfContents
+
+__all__ = ["BookReview", "Gap", "NicheProfile", "TableOfContents"]

@@ -1,310 +1,215 @@
-# Email Tool
+# Email Attachment Processing System
 
-A flexible email processing tool that can parse, match, and dispatch actions on email files based on configurable rules.
+A comprehensive system for extracting, parsing, and indexing email attachments.
 
-## Features
+## Overview
 
-- **Email Parsing**: Parse email files in standard EML format
-- **Rule Matching**: Match emails against configurable rules based on various criteria
-- **Action Dispatching**: Execute actions on matched emails (move, file, label, notify)
-- **Pipeline Architecture**: Modular design with clear separation of concerns
-- **Dry Run Mode**: Test configurations without making actual changes
-- **Progress Tracking**: Monitor processing progress and statistics
+This system provides:
 
-## Installation
+- **Attachment Type Detection**: Automatically identify attachment types from MIME types and filenames
+- **Multi-format Parsing**: Support for PDF, Office documents (DOCX, XLSX, PPTX), and text files (TXT, CSV)
+- **Content Extraction**: Extract text content from various file formats
+- **Metadata Extraction**: Extract file metadata and content statistics
+- **Indexing**: Searchable index of all processed attachments
+- **Staging Management**: Temporary storage and cleanup of attachments
 
-```bash
-# Install dependencies
-pip install -r requirements.txt
+## Architecture
 
-# Or install the package
-pip install -e .
+```
+email_tool/
+├── attachment_types.py          # Attachment type definitions and detection
+├── attachment_parsers/
+│   ├── __init__.py
+│   ├── base.py                  # Abstract base parser
+│   ├── pdf.py                   # PDF parser
+│   ├── office.py                # Office document parser
+│   └── text.py                  # Text file parser
+├── attachment_processor.py      # Main processing logic
+├── attachment_index.py          # Searchable index
+└── tests/
+    └── test_attachment_processing.py
 ```
 
 ## Quick Start
 
-### 1. Create Rules File
-
-Create a JSON file with your rules:
-
-```json
-[
-  {
-    "name": "important_sender",
-    "rule_type": "FROM_EXACT",
-    "pattern": "important@example.com",
-    "priority": 100,
-    "category": "sender",
-    "labels": ["important", "trusted"]
-  },
-  {
-    "name": "newsletter",
-    "rule_type": "SUBJECT_CONTAINS",
-    "pattern": "newsletter",
-    "priority": 50,
-    "category": "content",
-    "labels": ["newsletter"]
-  }
-]
-```
-
-### 2. Create Actions File
-
-Create a JSON file with your actions:
-
-```json
-[
-  {
-    "action_type": "MOVE",
-    "params": {
-      "destination": "./archive/important"
-    }
-  },
-  {
-    "action_type": "FILE",
-    "params": {
-      "format": "md",
-      "destination": "./archive/processed"
-    }
-  }
-]
-```
-
-### 3. Process Emails
-
-```bash
-# Process a single email
-python -m email_tool process email.eml --rules rules.json --actions actions.json
-
-# Process a directory of emails
-python -m email_tool process-dir ./emails --rules rules.json --actions actions.json
-
-# Dry run mode (no changes made)
-python -m email_tool process email.eml --rules rules.json --actions actions.json --dry-run
-```
-
-## Command Line Interface
-
-### Commands
-
-- `process`: Process a single email file
-- `process-dir`: Process all emails in a directory
-- `stats`: View processing statistics
-- `validate`: Validate rules and actions files
-
-### Options
-
-- `--rules, -r`: Path to rules JSON file (required)
-- `--actions, -a`: Path to actions JSON file (required)
-- `--dry-run, -d`: Run in dry-run mode (no changes made)
-- `--output, -o`: Output file for results (JSON format)
-- `--pattern, -p`: File pattern to match (for process-dir)
-
-## Rule Types
-
-| Rule Type | Description | Pattern Format |
-|-----------|-------------|----------------|
-| `FROM_EXACT` | Match exact sender address | Email address |
-| `FROM_CONTAINS` | Match sender containing pattern | Any string |
-| `TO_EXACT` | Match exact recipient address | Email address |
-| `TO_CONTAINS` | Match recipient containing pattern | Any string |
-| `SUBJECT_EXACT` | Match exact subject | Subject string |
-| `SUBJECT_CONTAINS` | Match subject containing pattern | Any string |
-| `BODY_CONTAINS` | Match body containing pattern | Any string |
-| `HAS_ATTACHMENTS` | Match emails with attachments | Empty string |
-| `DATE_RANGE` | Match emails within date range | `YYYY-MM-DD:YYYY-MM-DD` |
-
-## Action Types
-
-| Action Type | Description | Parameters |
-|-------------|-------------|------------|
-| `MOVE` | Move email to destination | `destination` (string) |
-| `FILE` | Save email in specified format | `format` (str), `destination` (string) |
-| `LABEL` | Add labels to email | `labels` (list of strings) |
-| `NOTIFY` | Send notification | `message` (string) |
-
-## Pipeline Architecture
-
-The email processing pipeline consists of several components:
-
-1. **EmailParser**: Parses email files into Email objects
-2. **RuleMatcher**: Matches emails against rules
-3. **Dispatcher**: Dispatches actions based on matches
-4. **ActionExecutor**: Executes actions with retry logic
-5. **EmailProcessor**: Orchestrates the entire pipeline
-
-### Processing Flow
-
-```
-Email File → Parser → Email Object → Matcher → Rule Matches → Dispatcher → Actions → Executor → Results
-```
-
-## Configuration
-
-### EmailProcessor Configuration
-
-```python
-from email_tool.processor import EmailProcessor
-
-processor = EmailProcessor(
-    base_path="./archive",
-    dry_run=False,
-    collision_strategy="rename",
-    max_retries=3,
-    retry_delay=1.0
-)
-```
-
-### PipelineBuilder
-
-Use the builder pattern to configure the pipeline:
-
-```python
-from email_tool.processor import PipelineBuilder
-
-processor = (
-    PipelineBuilder()
-    .set_base_path("/custom/path")
-    .set_dry_run(True)
-    .set_collision_strategy("number")
-    .set_retry_config(max_retries=5, retry_delay=2.0)
-    .add_rule(rule1)
-    .add_rule(rule2)
-    .add_action(action1)
-    .add_action(action2)
-    .build()
-)
-```
-
-## API Usage
-
 ### Basic Usage
 
 ```python
-from email_tool.models import Rule, RuleType, ActionType
-from email_tool.processor import EmailProcessor
-
-# Create rules
-rules = [
-    Rule(
-        name="test_rule",
-        rule_type=RuleType.SUBJECT_EXACT,
-        pattern="test",
-        priority=50,
-        category="general",
-        labels=["important"]
-    )
-]
-
-# Create actions
-actions = [
-    (ActionType.MOVE, {"destination": "./archive"}),
-    (ActionType.LABEL, {"labels": ["processed"]})
-]
+from email_tool import AttachmentProcessor, AttachmentType
 
 # Create processor
-processor = EmailProcessor(base_path="./archive", dry_run=True)
-
-# Process email
-result = processor.process_email("email.eml", rules, actions)
-
-print(f"Success: {result['success']}")
-print(f"Matches: {len(result['matches'])}")
-print(f"Actions: {len(result['actions_performed'])}")
-```
-
-### Batch Processing
-
-```python
-# Process multiple emails
-results = processor.process_batch(
-    email_sources=["email1.eml", "email2.eml"],
-    rules=rules,
-    actions=actions
+processor = AttachmentProcessor(
+    staging_dir="/tmp/attachments",
+    index_dir="/tmp/attachment_index"
 )
 
-# Process directory
-results = processor.process_directory(
-    source_dir="./emails",
-    rules=rules,
-    actions=actions,
-    file_pattern="*.eml"
+# Process an attachment
+attachment = {
+    'filename': 'report.pdf',
+    'content_type': 'application/pdf',
+    'content': b'PDF content here',
+    'size': 1024
+}
+
+result = processor.process_attachment(
+    attachment=attachment,
+    email_id="email-123"
 )
+
+if result.success:
+    print(f"Extracted {len(result.text_content)} characters")
+    print(f"Attachment ID: {result.attachment_id}")
 ```
 
-### Monitoring
+### Searching Processed Attachments
 
 ```python
-from email_tool.processor import PipelineMonitor
+# Find all attachments from an email
+email_attachments = processor.index.find_by_email("email-123")
 
-monitor = PipelineMonitor(processor)
+# Find all PDF attachments
+pdf_attachments = processor.index.find_by_type(AttachmentType.PDF)
 
-# Get status
-status = monitor.get_status()
-print(f"Success rate: {status['success_rate']}%")
+# Search for text content
+important_docs = processor.index.search_text("important", case_sensitive=False)
+```
 
-# Get rule performance
-performance = monitor.get_rule_performance()
-for rule_name, metrics in performance.items():
-    print(f"{rule_name}: {metrics['matches']} matches")
+## Attachment Type Detection
 
-# Get action performance
-action_performance = monitor.get_action_performance()
-for action_type, metrics in action_performance.items():
-    print(f"{action_type}: {metrics['count']} executions")
+The system automatically detects attachment types from:
+
+1. **MIME Type** (highest priority)
+2. **Filename extension** (fallback)
+
+```python
+from email_tool import get_attachment_type, AttachmentType
+
+# From MIME type
+attachment_type = get_attachment_type(mime_type="application/pdf")
+# Returns: AttachmentType.PDF
+
+# From filename
+attachment_type = get_attachment_type(filename="document.docx")
+# Returns: AttachmentType.DOCX
+
+# Priority: MIME > filename
+attachment_type = get_attachment_type(
+    mime_type="application/pdf",
+    filename="document.docx"
+)
+# Returns: AttachmentType.PDF
+```
+
+## Supported File Types
+
+### Documents
+- **PDF** (.pdf) - Full text extraction
+- **Word** (.docx) - Text and metadata extraction
+- **Excel** (.xlsx) - Cell content extraction
+- **PowerPoint** (.pptx) - Slide text extraction
+
+### Text Files
+- **Plain Text** (.txt)
+- **CSV** (.csv)
+- **JSON** (.json)
+- **XML** (.xml)
+
+### Images
+- **PNG**, **JPG**, **JPEG**, **GIF**, **BMP**, **TIFF**
+- (Image parsing can be added as needed)
+
+## Extending the System
+
+### Adding a New Parser
+
+1. Create a new parser class inheriting from `AbstractAttachmentParser`:
+
+```python
+from email_tool.attachment_parsers.base import AbstractAttachmentParser, ParsedAttachment
+from email_tool.attachment_types import AttachmentType
+
+class MyCustomParser(AbstractAttachmentParser):
+    """Parser for custom file format."""
+    
+    SUPPORTED_TYPES = [AttachmentType.CUSTOM]
+    
+    def _parse_content(self, content: bytes) -> ParsedAttachment:
+        """Parse the actual content."""
+        # Your parsing logic here
+        return ParsedAttachment(
+            attachment_id=self.attachment_id,
+            email_id=self.email_id,
+            original_filename=self.original_filename,
+            content_type=self.content_type,
+            size_bytes=self.size_bytes,
+            attachment_type=self.attachment_type,
+            text_content="Extracted text",
+            metadata={"custom_field": "value"},
+            success=True
+        )
+```
+
+2. Register the parser with the processor:
+
+```python
+processor = AttachmentProcessor(staging_dir="/tmp/attachments")
+processor.parsers.append(MyCustomParser())
+```
+
+### Customizing Attachment Type Detection
+
+Extend the MIME type and file extension mappings:
+
+```python
+from email_tool.attachment_types import (
+    MIME_TYPE_TO_ATTACHMENT_TYPE,
+    EXTENSION_TO_ATTACHMENT_TYPE,
+    AttachmentType
+)
+
+# Add new MIME type
+MIME_TYPE_TO_ATTACHMENT_TYPE["application/my-custom-type"] = AttachmentType.CUSTOM
+
+# Add new file extension
+EXTENSION_TO_ATTACHMENT_TYPE[".custom"] = AttachmentType.CUSTOM
 ```
 
 ## Error Handling
 
-The processor handles various error scenarios:
+The system handles errors gracefully:
 
-- **Parsing errors**: Invalid email format
-- **File system errors**: Permission issues, missing directories
-- **Action failures**: Retry logic with configurable max retries
-- **Collision handling**: Configurable strategies for filename conflicts
+```python
+result = processor.process_attachment(
+    attachment=attachment,
+    email_id="email-123"
+)
+
+if not result.success:
+    print(f"Error: {result.error_message}")
+    print(f"Attachment ID: {result.attachment_id}")
+```
+
+Common error scenarios:
+- No parser available for attachment type
+- File format corruption
+- Unsupported file format
+- Processing exceptions
+
+## Performance Considerations
+
+- **Staging Directory**: Automatically cleaned up after 1 hour
+- **Index Persistence**: Saved to disk for fast retrieval
+- **Parallel Processing**: Process multiple attachments concurrently
+- **Memory Efficient**: Streams large files instead of loading entirely
 
 ## Testing
 
+Run the test suite:
+
 ```bash
-# Run all tests
-pytest tests/ -v
-
-# Run specific test file
-pytest tests/test_processor.py -v
-
-# Run with coverage
-pytest tests/ -v --cov=email_tool
-```
-
-## Project Structure
-
-```
-email_tool/
-├── __init__.py
-├── __main__.py
-├── cli.py              # Command-line interface
-├── models.py           # Data models
-├── parser.py           # Email parsing
-├── matcher.py          # Rule matching
-├── dispatcher.py       # Action dispatching
-├── processor.py        # Main pipeline processor
-├── exceptions.py       # Custom exceptions
-├── utils.py            # Utility functions
-└── archive/            # Archive directory
+pytest email_tool/tests/test_attachment_processing.py -v
 ```
 
 ## License
 
 MIT License - See LICENSE file for details.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests for new functionality
-5. Submit a pull request
-
-## Support
-
-For issues and feature requests, please open an issue on the repository.

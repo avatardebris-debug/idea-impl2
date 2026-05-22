@@ -1,190 +1,119 @@
-"""Gap extraction engine with keyword matching and TF-IDF clustering."""
+"""Gap extraction engine that identifies content gaps from reviews."""
 
 from __future__ import annotations
 
-import math
+import logging
+import re
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
+from typing import Any, List
+
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from book_researcher.models import Gap
 
+logger = logging.getLogger(__name__)
 
-class GapExtractor:
-    """Extracts and clusters content gaps from reviews.
+# Gap-indicating phrases and their associated topic hints
+GAP_PHRASES = [
+    r"\bwish\s+it\s+also\s+\w+",
+    r"\bwish\s+for\s+",
+    r"\bwant\s+to\s+see\s+",
+    r"\bneeded\s+more\s+on\s+",
+    r"\bdidn't\s+cover\s+",
+    r"\bmissing\s+(?:a\s+)?chapter\s+on\s+",
+    r"\blacked\s+(?:a\s+)?section\s+on\s+",
+    r"\bcould\s+use\s+more\s+on\s+",
+    r"\bshould\s+have\s+included\s+",
+    r"\bregret\s+that\s+it\s+didn't\s+",
+    r"\bunfortunately\s+didn't\s+cover\s+",
+    r"\bwould\s+have\s+been\s+nice\s+if\s+it\s+covered\s+",
+]
 
-    Uses:
-    1. Keyword/phrase matching for initial gap detection
-    2. TF-IDF clustering for grouping similar gaps
+
+def _extract_topics(text: str) -> List[str]:
+    """Extract potential topics from review text using simple keyword overlap."""
+    topics = [
+        "beginner", "advanced", "intermediate", "practical", "theoretical",
+        "case study", "tutorial", "reference", "fundamentals", "architecture",
+        "deployment", "optimization", "security", "testing", "debugging",
+        "performance", "scalability", "maintenance", "best practices",
+        "real-world", "examples", "exercises", "projects", "assessment",
+        "certification", "interview", "career", "management", "leadership",
+        "communication", "collaboration", "agile", "scrum", "devops",
+        "cloud", "database", "api", "frontend", "backend", "full-stack",
+        "mobile", "web", "desktop", "embedded", "iot", "ml", "dl", "nlp",
+        "cv", "data science", "analytics", "visualization", "statistics",
+        "math", "algorithms", "data structures", "design patterns",
+    ]
+    found = []
+    text_lower = text.lower()
+    for topic in topics:
+        if topic in text_lower:
+            found.append(topic)
+    return found
+
+
+def _extract_gap_text(review_text: str) -> str:
+    """Extract the gap-indicating text from a review."""
+    for phrase in GAP_PHRASES:
+        match = re.search(phrase, review_text, re.IGNORECASE)
+        if match:
+            # Return the full sentence containing the gap phrase
+            sentences = re.split(r'(?<=[.!?])\s+', review_text)
+            for sentence in sentences:
+                if re.search(phrase, sentence, re.IGNORECASE):
+                    return sentence.strip()
+    return ""
+
+
+def extract_gaps(reviews: list[Any], min_gap_length: int = 10) -> list[Gap]:
+    """Extract content gaps from a list of reviews.
+
+    Args:
+        reviews: List of dicts with 'text' key, or BookReview objects.
+        min_gap_length: Minimum length of gap text to include.
+
+    Returns:
+        List of Gap objects.
     """
+    if not reviews:
+        logger.warning("No reviews provided to extract_gaps")
+        return []
 
-    def __init__(self, min_gap_score: float = 0.3):
-        self.min_gap_score = min_gap_score
-        self.stop_words = {
-            "the", "a", "an", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will",
-            "would", "could", "should", "may", "might", "shall", "can",
-            "to", "of", "in", "for", "on", "with", "at", "by", "from",
-            "as", "into", "through", "during", "before", "after", "above",
-            "below", "between", "out", "off", "over", "under", "again",
-            "further", "then", "once", "here", "there", "when", "where",
-            "why", "how", "all", "both", "each", "few", "more", "most",
-            "other", "some", "such", "no", "nor", "not", "only", "own",
-            "same", "so", "than", "too", "very", "s", "t", "just", "don",
-            "now", "i", "me", "my", "myself", "we", "our", "ours", "you",
-            "your", "yours", "he", "him", "his", "she", "her", "it", "its",
-            "they", "them", "their", "what", "which", "who", "whom", "this",
-            "that", "these", "those", "am", "but", "if", "or", "because",
-            "until", "while", "about", "against", "between", "into", "through",
-            "during", "before", "after", "above", "below", "up", "down", "out",
-            "off", "over", "under", "again", "further", "then", "once", "here",
-            "there", "when", "where", "why", "how", "all", "any", "both",
-            "each", "few", "more", "most", "other", "some", "such", "no",
-            "nor", "not", "only", "own", "same", "so", "than", "too", "very",
-        }
+    gaps: list[Gap] = []
+    seen_texts: set[str] = set()
 
-    def extract_gaps(self, reviews: List[dict]) -> List[Gap]:
-        """Extract gaps from reviews."""
-        gaps = []
-        gap_indicators = [
-            "wish", "wanted", "missing", "didn't", "did not",
-            "forgot", "lacked", "hope", "expected", "should have",
-            "need to know", "confusing", "unclear", "not covered",
-            "didn't cover", "didn't explain", "didn't mention",
-            "didn't include", "didn't discuss", "lacking", "unclear",
-            "incomplete", "insufficient", "outdated", "superficial",
-        ]
+    for review in reviews:
+        if isinstance(review, dict):
+            text = review.get("text", "")
+            source = review.get("source", "unknown")
+        else:
+            text = getattr(review, "text", "")
+            source = getattr(review, "source", "unknown")
 
-        for review in reviews:
-            text = review.get("text", "").lower()
-            rating = review.get("rating", 3)
+        if not text:
+            continue
 
-            # Only extract gaps from reviews that express dissatisfaction
-            if rating >= 4:
-                continue
+        gap_text = _extract_gap_text(text)
+        if not gap_text or len(gap_text) < min_gap_length:
+            continue
 
-            for indicator in gap_indicators:
-                if indicator in text:
-                    gap_text = self._extract_gap_text(text, indicator)
-                    if gap_text:
-                        gap = Gap(
-                            text=gap_text,
-                            topic=review.get("topic", "general"),
-                            source=review.get("source", "unknown"),
-                            helpful_votes=review.get("helpful_votes", 0),
-                            confidence=self._calculate_confidence(gap_text, rating),
-                        )
-                        gaps.append(gap)
-                    break  # One gap per review is enough for MVP
+        # Deduplicate similar gaps
+        if gap_text in seen_texts:
+            continue
+        seen_texts.add(gap_text)
 
-        return gaps
+        topics = _extract_topics(text)
+        topic = topics[0] if topics else "general"
 
-    def cluster_gaps(self, gaps: List[Gap], threshold: float = 0.6) -> List[List[Gap]]:
-        """Cluster similar gaps using TF-IDF and cosine similarity."""
-        if not gaps:
-            return []
+        gap = Gap(
+            text=gap_text,
+            source_review=text[:200] + ("..." if len(text) > 200 else ""),
+            topic=topic,
+        )
+        gaps.append(gap)
 
-        # Build vocabulary and document frequency
-        vocabulary = set()
-        doc_freq = defaultdict(int)
-
-        for gap in gaps:
-            words = self._tokenize(gap.text)
-            vocabulary.update(words)
-            for word in words:
-                doc_freq[word] += 1
-
-        # Calculate IDF
-        n_docs = len(gaps)
-        idf = {}
-        for word in vocabulary:
-            idf[word] = math.log(n_docs / (1 + doc_freq[word]))
-
-        # Calculate TF-IDF vectors
-        tfidf_vectors = {}
-        for i, gap in enumerate(gaps):
-            words = self._tokenize(gap.text)
-            tf = defaultdict(int)
-            for word in words:
-                tf[word] += 1
-            # Normalize TF
-            total = len(words) if words else 1
-            tfidf = {}
-            for word, count in tf.items():
-                tfidf[word] = (count / total) * idf.get(word, 0)
-            tfidf_vectors[i] = tfidf
-
-        # Calculate cosine similarities
-        clusters = []
-        assigned = set()
-
-        for i in range(len(gaps)):
-            if i in assigned:
-                continue
-
-            cluster = [gaps[i]]
-            assigned.add(i)
-
-            for j in range(i + 1, len(gaps)):
-                if j in assigned:
-                    continue
-
-                similarity = self._cosine_similarity(tfidf_vectors[i], tfidf_vectors[j])
-                if similarity >= threshold:
-                    cluster.append(gaps[j])
-                    assigned.add(j)
-
-            clusters.append(cluster)
-
-        return clusters
-
-    def prioritize_gaps(self, gaps: List[Gap]) -> List[Gap]:
-        """Prioritize gaps by score (confidence * helpful_votes)."""
-        for gap in gaps:
-            gap.score = gap.confidence * (1 + math.log1p(gap.helpful_votes))
-
-        return sorted(gaps, key=lambda g: g.score, reverse=True)
-
-    def _tokenize(self, text: str) -> List[str]:
-        """Tokenize text into words, removing stop words."""
-        words = text.lower().split()
-        # Remove punctuation
-        words = [w.strip(".,!?;:'\"()[]{}") for w in words]
-        # Remove stop words and short words
-        words = [w for w in words if w not in self.stop_words and len(w) > 2]
-        return words
-
-    def _extract_gap_text(self, text: str, indicator: str) -> Optional[str]:
-        """Extract the gap description from review text."""
-        sentences = text.split(".")
-        for sentence in sentences:
-            if indicator in sentence:
-                gap = sentence.strip().capitalize()
-                if len(gap) > 10:  # Filter out very short gaps
-                    return gap
-        return None
-
-    def _calculate_confidence(self, gap_text: str, rating: int) -> float:
-        """Calculate confidence score for a gap."""
-        base_confidence = 0.5
-        rating_factor = (5 - rating) / 4.0
-        length_factor = min(len(gap_text) / 100.0, 1.0)
-        return min(base_confidence + rating_factor * 0.3 + length_factor * 0.2, 1.0)
-
-    def _cosine_similarity(self, vec1: Dict[str, float], vec2: Dict[str, float]) -> float:
-        """Calculate cosine similarity between two TF-IDF vectors."""
-        # Get common words
-        common_words = set(vec1.keys()) & set(vec2.keys())
-        if not common_words:
-            return 0.0
-
-        # Calculate dot product
-        dot_product = sum(vec1[w] * vec2[w] for w in common_words)
-
-        # Calculate magnitudes
-        mag1 = math.sqrt(sum(v ** 2 for v in vec1.values()))
-        mag2 = math.sqrt(sum(v ** 2 for v in vec2.values()))
-
-        if mag1 == 0 or mag2 == 0:
-            return 0.0
-
-        return dot_product / (mag1 * mag2)
+    logger.info("Extracted %d unique gaps from %d reviews", len(gaps), len(reviews))
+    return gaps

@@ -1,70 +1,74 @@
-"""Email Tool - Email attachment processing and management."""
+"""
+Email Tool - Email processing and management system.
 
-from email_tool.attachment_types import (
-    AttachmentType,
-    get_attachment_type,
-    is_text_attachment,
-    is_image_attachment,
-    is_office_attachment,
-    is_pdf_attachment,
-    get_supported_types,
-)
-
-from email_tool.attachment_parsers.base import (
-    AttachmentMetadata,
-    ParsedAttachment,
-)
-
-from email_tool.attachment_parsers.pdf import PDFAttachmentParser
-from email_tool.attachment_parsers.office import OfficeAttachmentParser
-from email_tool.attachment_parsers.text import TextAttachmentParser
-from email_tool.attachment_parsers.image_parser import ImageAttachmentParser
-from email_tool.attachment_parsers.zip_parser import ZipAttachmentParser
+This package provides tools for parsing, matching, and processing email messages
+according to configurable rules and actions.
+"""
 
 from email_tool.models import (
+    Rule,
+    RuleType,
+    Action,
+    ActionType,
     Email,
+    RuleMatch,
+    RuleMatchType,
+    ActionExecutionResult,
+    EmailMatch,
+    EmailProcessingResult,
+    EmailMetadata,
+    ProcessingStats,
+    RuleSet,
+    ActionSet,
     AttachmentProcessingResult,
+    ProcessingConfig,
+    RuleMatchStrategy,
+    Category,
     EmailAttachmentProcessingResult,
 )
-
-from email_tool.attachment_processor import (
-    AttachmentPipelineConfig,
-    AttachmentProcessor,
-    AttachmentDispatcher,
-    AttachmentActionExecutor,
-    AttachmentPipelineExecutor,
-    AttachmentPipelineMonitor,
-    AttachmentPipelineBuilder,
+from email_tool.parser import EmailParser
+from email_tool.matcher import RuleMatcher
+from email_tool.dispatcher import Dispatcher, ActionBuilder, ActionExecutor
+from email_tool.processor import (
+    EmailProcessor,
+    PipelineBuilder,
+    PipelineExecutor,
+    PipelineMonitor,
+    PipelineConfig,
 )
 
 __version__ = "1.0.0"
 __all__ = [
-    # Attachment types
-    'AttachmentType',
-    'get_attachment_type',
-    'is_text_attachment',
-    'is_image_attachment',
-    'is_office_attachment',
-    'is_pdf_attachment',
-    'get_supported_types',
-    # Parsers
-    'AttachmentMetadata',
-    'ParsedAttachment',
-    'PDFAttachmentParser',
-    'OfficeAttachmentParser',
-    'TextAttachmentParser',
-    'ImageAttachmentParser',
-    'ZipAttachmentParser',
     # Models
-    'Email',
-    'AttachmentProcessingResult',
-    'EmailAttachmentProcessingResult',
-    # Pipeline
-    'AttachmentPipelineConfig',
-    'AttachmentProcessor',
-    'AttachmentDispatcher',
-    'AttachmentActionExecutor',
-    'AttachmentPipelineExecutor',
-    'AttachmentPipelineMonitor',
-    'AttachmentPipelineBuilder',
+    "Rule",
+    "RuleType",
+    "Action",
+    "ActionType",
+    "Email",
+    "RuleMatch",
+    "RuleMatchType",
+    "ActionExecutionResult",
+    "EmailMatch",
+    "EmailProcessingResult",
+    "EmailMetadata",
+    "ProcessingStats",
+    "RuleSet",
+    "ActionSet",
+    "AttachmentProcessingResult",
+    "ProcessingConfig",
+    "RuleMatchStrategy",
+    "Category",
+    "EmailAttachmentProcessingResult",
+    # Components
+    "EmailParser",
+    "RuleMatcher",
+    "Dispatcher",
+    "ActionBuilder",
+    "ActionExecutor",
+    # Processor
+    "EmailProcessor",
+    "PipelineBuilder",
+    "PipelineExecutor",
+    "PipelineMonitor",
+    "PipelineConfig",
 ]

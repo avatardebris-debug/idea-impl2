@@ -1,26 +1,29 @@
-"""pipeline.py — Pipeline orchestration and sink nodes."""
-
+"""
+csv_data_pipeline_builder/pipeline.py
+DAG engine: wire nodes together, validate, and execute.
+"""
 from __future__ import annotations
 
 import csv
+import io
 import json
+import pathlib
 import sqlite3
+import time
+from dataclasses import dataclass, field
 from typing import Any
 
-from .nodes import (
-    AggregateNode,
-    CsvSink,
-    CsvSource,
-    FilterNode,
-    JoinNode,
-    JsonSink,
-    PivotNode,
-    SelectNode,
-    SqliteSink,
-    TransformNode,
-)
+from .nodes import TransformNode, Row, CsvSink, JsonSink, SqliteSink
 
-Row = dict[str, Any]
+
+@dataclass
+class ExecutionReport:
+    """Per-node execution metrics."""
+    node_id: str
+    input_rows: int
+    output_rows: int
+    duration_ms: float
+    error: str = ""
 
 
 class Pipeline:
@@ -68,13 +71,4 @@ class Pipeline:
 
 __all__ = [
     "Pipeline",
-    "CsvSource",
-    "CsvSink",
-    "JsonSink",
-    "SqliteSink",
-    "FilterNode",
-    "SelectNode",
-    "AggregateNode",
-    "JoinNode",
-    "PivotNode",
 ]

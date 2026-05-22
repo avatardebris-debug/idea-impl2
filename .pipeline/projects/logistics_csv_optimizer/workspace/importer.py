@@ -1,58 +1,140 @@
-"""CSV Importer for logistics manifests."""
+"""CSV shipment manifest importer.
+
+Reads CSV files containing shipment data and validates required fields.
+
+Required columns (case-insensitive):
+    - origin:        departure city or location
+    - destination:   arrival city or location
+    - weight:        weight in kg (positive number)
+    - priority:      one of 'standard', 'express', 'overnight'
+
+Optional columns:
+    - length:        length in cm (default 0)
+    - width:         width in cm (default 0)
+    - height:        height in cm (default 0)
+    - description:   free-text description
+"""
 
 import csv
 import os
+import sys
+from typing import Any, Dict, List
+
+
+REQUIRED_COLUMNS = {"origin", "destination", "weight", "priority"}
+OPTIONAL_COLUMNS = {"length", "width", "height", "description"}
+VALID_PRIORITIES = {"standard", "express", "overnight"}
 
 
 class Importer:
-    """Import shipment data from a CSV file."""
+    """Load and validate CSV shipment manifests."""
 
-    REQUIRED_COLUMNS = {"origin", "destination", "priority", "weight"}
-    DIMENSION_COLUMNS = {"length", "width", "height"}
-
-    @classmethod
-    def import_csv(cls, filepath: str) -> list[dict]:
-        """Read a CSV manifest file and return a list of shipment dicts.
+    @staticmethod
+    def load_manifest(filepath: str) -> List[Dict[str, Any]]:
+        """Load a CSV manifest and return a list of validated shipment dicts.
 
         Args:
             filepath: Path to the CSV file.
 
         Returns:
-            List of dicts with shipment data.
+            List of shipment dicts with keys: origin, destination, weight,
+            priority, length, width, height, description.
 
         Raises:
             FileNotFoundError: If the file does not exist.
-            ValueError: If the CSV is missing required columns.
+            ValueError: If required columns are missing or data is invalid.
         """
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"Input file not found: {filepath}")
+        if filepath == "-":
+            return Importer._parse_file_obj(sys.stdin)
 
-        shipments = []
-        with open(filepath, "r", encoding="utf-8") as fh:
-            reader = csv.DictReader(fh)
+        if not os.path.isfile(filepath):
+            raise FileNotFoundError(f"Manifest file not found: {filepath}")
 
-            if reader.fieldnames is None:
-                return []
+        with open(filepath, newline="", encoding="utf-8") as fh:
+            return Importer._parse_file_obj(fh)
 
-            header_set = set(reader.fieldnames)
-            missing = cls.REQUIRED_COLUMNS - header_set
-            if missing:
-                raise ValueError(f"CSV is missing required columns: {missing}")
+    @staticmethod
+    def _parse_file_obj(fh) -> List[Dict[str, Any]]:
+        content = fh.read()
 
-            for row in reader:
-                shipment = {
-                    "origin": row["origin"].strip(),
-                    "destination": row["destination"].strip(),
-                    "priority": row["priority"].strip(),
-                    "weight": float(row["weight"]),
-                }
-                # Add optional dimension fields, defaulting to 0 if missing
-                for col in cls.DIMENSION_COLUMNS:
-                    val = row.get(col)
-                    if val is not None and val.strip():
-                        shipment[col] = int(float(val))
-                    else:
-                        shipment[col] = 0
-                shipments.append(shipment)
+        if not content.strip():
+            return []
 
+        # Re-use content via StringIO to avoid opening file twice
+        from io import StringIO
+        reader = csv.DictReader(StringIO(content))
+
+        if reader.fieldnames is None:
+            return []
+
+        # Normalize column names to lowercase
+        normalized = {name.strip().lower(): name for name in reader.fieldnames}
+
+        missing = REQUIRED_COLUMNS - set(normalized.keys())
+        if missing:
+            raise ValueError(
+                f"Missing required columns: {', '.join(sorted(missing))}"
+            )
+
+        shipments: List[Dict[str, Any]] = []
+        for row_num, row in enumerate(reader, start=2):
+            shipment = _parse_row(row, normalized, row_num)
+            shipments.append(shipment)
         return shipments
+
+    @staticmethod
+    def import_csv(filepath: str) -> List[Dict[str, Any]]:
+        """Alias for load_manifest to match test suite expectations."""
+        return Importer.load_manifest(filepath)
+
+
+def _parse_row(
+    row: Dict[str, str], normalized: Dict[str, str], row_num: int
+) -> Dict[str, Any]:
+    """Parse and validate a single CSV row into a shipment dict."""
+    def get_field(key: str) -> str:
+        raw = row.get(normalized.get(key, key), "")
+        return raw.strip() if raw else ""
+
+    origin = get_field("origin")
+    destination = get_field("destination")
+    weight_str = get_field("weight")
+    priority = get_field("priority").lower()
+
+    # Validate required fields
+    if not origin:
+        raise ValueError(f"Row {row_num}: 'origin' is empty")
+    if not destination:
+        raise ValueError(f"Row {row_num}: 'destination' is empty")
+    if not weight_str:
+        raise ValueError(f"Row {row_num}: 'weight' is empty")
+
+    try:
+        weight = float(weight_str)
+    except ValueError:
+        raise ValueError(f"Row {row_num}: 'weight' must be a number, got '{weight_str}'")
+
+    if weight <= 0:
+        raise ValueError(f"Row {row_num}: 'weight' must be positive, got {weight}")
+
+    if priority not in VALID_PRIORITIES:
+        raise ValueError(
+            f"Row {row_num}: 'priority' must be one of {VALID_PRIORITIES}, got '{priority}'"
+        )
+
+    # Optional fields with defaults
+    length = float(get_field("length") or 0)
+    width = float(get_field("width") or 0)
+    height = float(get_field("height") or 0)
+    description = get_field("description")
+
+    return {
+        "origin": origin,
+        "destination": destination,
+        "weight": weight,
+        "priority": priority,
+        "length": length,
+        "width": width,
+        "height": height,
+        "description": description,
+    }

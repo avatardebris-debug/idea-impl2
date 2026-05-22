@@ -1,98 +1,79 @@
-"""Attachment processor for handling email attachments."""
+"""Attachment processor module for the email processing pipeline."""
 
 import os
 import shutil
-import logging
-from typing import Dict, Any, Optional, List
 from datetime import datetime
-
-from email_tool.attachment_types import (
-    AttachmentType,
-    get_attachment_type,
-    is_text_attachment,
-    is_image_attachment,
-    is_office_attachment,
-    is_pdf_attachment,
+from pathlib import Path
+from typing import List, Optional, Dict, Any
+from email_tool.models import Email, Rule, RuleMatch, ActionType
+from email_tool.attachment_parsers import (
+    PDFAttachmentParser,
+    OfficeAttachmentParser,
+    TextAttachmentParser,
+    ImageAttachmentParser,
+    ZipAttachmentParser
 )
-
-from email_tool.attachment_parsers.base import (
-    AttachmentMetadata,
-    ParsedAttachment,
-)
-
-from email_tool.attachment_parsers.pdf import PDFAttachmentParser
-from email_tool.attachment_parsers.office import OfficeAttachmentParser
-from email_tool.attachment_parsers.text import TextAttachmentParser
-from email_tool.attachment_parsers.image import ImageAttachmentParser
-from email_tool.attachment_parsers.zip import ZipAttachmentParser
-
-from email_tool.models import (
-    Email,
-    AttachmentProcessingResult,
-    EmailAttachmentProcessingResult,
-)
-
-logger = logging.getLogger(__name__)
+from email_tool.attachment_types import AttachmentType, get_attachment_type
+from email_tool.attachment_parsers.base import ParsedAttachment
+from email_tool.models import AttachmentProcessingResult
 
 
 class AttachmentProcessor:
-    """Process email attachments using appropriate parsers."""
+    """
+    Main processor for attachment processing pipeline.
+    
+    Pipeline stages:
+    1. Identify attachment type
+    2. Parse attachment content
+    3. Extract metadata
+    4. Save processed attachments
+    5. Generate processing report
+    """
     
     def __init__(
         self,
-        base_path: str,
+        base_path: str = "./archive",
         dry_run: bool = False,
         collision_strategy: str = "rename",
         max_retries: int = 3,
-        retry_delay: float = 1.0,
-        save_path: Optional[str] = None,
+        retry_delay: float = 1.0
     ):
         """
         Initialize the attachment processor.
         
         Args:
-            base_path: Base path for processing
-            dry_run: If True, don't actually perform file operations
-            collision_strategy: How to handle file collisions (rename, overwrite, skip)
-            max_retries: Maximum retry attempts for failed operations
-            retry_delay: Delay between retries in seconds
-            save_path: Path to save processed files
+            base_path: Base directory for all operations.
+            dry_run: If True, only simulate actions without making changes.
+            collision_strategy: Strategy for handling filename collisions.
+            max_retries: Maximum retry attempts for actions.
+            retry_delay: Delay between retries in seconds.
         """
         self.base_path = base_path
         self.dry_run = dry_run
         self.collision_strategy = collision_strategy
         self.max_retries = max_retries
         self.retry_delay = retry_delay
-        self.save_path = save_path or base_path
         
         # Initialize parsers
         self.parsers = {
-            AttachmentType.PDF: PDFAttachmentParser(base_path),
-            AttachmentType.DOCX: OfficeAttachmentParser(base_path),
-            AttachmentType.XLSX: OfficeAttachmentParser(base_path),
-            AttachmentType.PPTX: OfficeAttachmentParser(base_path),
-            AttachmentType.TXT: TextAttachmentParser(base_path),
-            AttachmentType.CSV: TextAttachmentParser(base_path),
-            AttachmentType.JPG: ImageAttachmentParser(base_path),
-            AttachmentType.PNG: ImageAttachmentParser(base_path),
-            AttachmentType.GIF: ImageAttachmentParser(base_path),
-            AttachmentType.BMP: ImageAttachmentParser(base_path),
-            AttachmentType.ZIP: ZipAttachmentParser(base_path),
-            AttachmentType.UNKNOWN: None,
+            'pdf': PDFAttachmentParser(base_path),
+            'office': OfficeAttachmentParser(base_path),
+            'text': TextAttachmentParser(base_path),
+            'image': ImageAttachmentParser(base_path),
+            'zip': ZipAttachmentParser(base_path)
         }
         
-        # Statistics
+        # Processing statistics
         self.stats = {
             "total_processed": 0,
             "total_successful": 0,
             "total_failed": 0,
             "by_type": {},
-            "by_parser": {},
+            "by_parser": {}
         }
-    
-    def get_parser(self, attachment_type: AttachmentType) -> Optional[Any]:
-        """Get the appropriate parser for an attachment type."""
-        return self.parsers.get(attachment_type)
+        
+        # Store results for monitoring
+        self.results: List[AttachmentProcessingResult] = []
     
     def process_attachment(
         self,
@@ -102,177 +83,159 @@ class AttachmentProcessor:
         original_filename: str,
         content_type: str,
         size_bytes: int,
-        attachment_type: Optional[AttachmentType] = None,
+        attachment_type: AttachmentType
     ) -> AttachmentProcessingResult:
         """
-        Process a single attachment.
+        Process a single attachment through the pipeline.
         
         Args:
-            file_path: Path to the attachment file
-            attachment_id: Unique ID for this attachment
-            email_id: ID of the email containing this attachment
-            original_filename: Original filename of the attachment
-            content_type: MIME type of the attachment
-            size_bytes: Size of the attachment in bytes
-            attachment_type: Type of attachment (will be detected if not provided)
-            
+            file_path: Path to the attachment file.
+            attachment_id: Unique ID for this attachment.
+            email_id: ID of the email this attachment belongs to.
+            original_filename: Original filename of the attachment.
+            content_type: MIME content type of the attachment.
+            size_bytes: Size of the attachment in bytes.
+            attachment_type: Type of the attachment.
+        
         Returns:
-            AttachmentProcessingResult with processing outcome
+            AttachmentProcessingResult with processing details.
         """
-        # Detect attachment type if not provided
-        if attachment_type is None:
-            attachment_type = get_attachment_type(
-                mime_type=content_type,
-                filename=original_filename
-            )
+        result = AttachmentProcessingResult(
+            attachment_id=attachment_id,
+            email_id=email_id,
+            original_filename=original_filename,
+            content_type=content_type,
+            size_bytes=size_bytes,
+            attachment_type=attachment_type,
+            processed_at=datetime.now().isoformat()
+        )
         
-        # Update statistics
-        self.stats["total_processed"] += 1
-        if attachment_type.value not in self.stats["by_type"]:
-            self.stats["by_type"][attachment_type.value] = {"processed": 0, "successful": 0, "failed": 0}
-        
-        # Get appropriate parser
-        parser = self.get_parser(attachment_type)
-        
-        # Handle UNKNOWN attachment type - still process successfully without parsing
-        if attachment_type == AttachmentType.UNKNOWN:
-            self.stats["total_successful"] += 1
-            self.stats["by_type"][attachment_type.value]["successful"] += 1
-            self.stats["by_parser"]["UNKNOWN"] = self.stats["by_parser"].get("UNKNOWN", 0) + 1
-            
-            return AttachmentProcessingResult(
-                success=True,
-                attachment_id=attachment_id,
-                email_id=email_id,
-                attachment_type=attachment_type,
-                text_content=None,
-                metadata=None,
-                processed_at=datetime.now().isoformat(),
-            )
-        
-        if parser is None:
-            result = AttachmentProcessingResult(
-                success=False,
-                attachment_id=attachment_id,
-                email_id=email_id,
-                attachment_type=attachment_type,
-                error_message=f"No parser available for attachment type: {attachment_type.value}",
-                processed_at=datetime.now().isoformat(),
-            )
-            self.stats["total_failed"] += 1
-            self.stats["by_type"][attachment_type.value]["failed"] += 1
-            return result
-        
-        # Parse the attachment
         try:
-            parsed = parser.parse(
-                file_path=file_path,
-                attachment_id=attachment_id,
-                email_id=email_id,
-                original_filename=original_filename,
-                content_type=content_type,
-                size_bytes=size_bytes,
-                attachment_type=attachment_type,
-            )
+            file_path_obj = Path(file_path)
             
-            if parsed.success:
-                self.stats["total_successful"] += 1
-                self.stats["by_type"][attachment_type.value]["successful"] += 1
-                self.stats["by_parser"][type(parser).__name__] = self.stats["by_parser"].get(type(parser).__name__, 0) + 1
-                
-                return AttachmentProcessingResult(
-                    success=True,
+            # Select appropriate parser based on attachment type
+            parser = self._get_parser(attachment_type)
+            
+            if parser:
+                # Parse the attachment
+                parsed = parser.parse(
+                    file_path=file_path_obj,
                     attachment_id=attachment_id,
                     email_id=email_id,
-                    attachment_type=attachment_type,
-                    text_content=parsed.text_content,
-                    metadata=parsed.metadata,
-                    processed_at=datetime.now().isoformat(),
+                    original_filename=original_filename,
+                    content_type=content_type,
+                    size_bytes=size_bytes,
+                    attachment_type=attachment_type
                 )
+                
+                # Update result with parsed data
+                result.text_content = parsed.text_content
+                result.metadata = parsed.metadata
+                result.success = parsed.success
+                
+                if parsed.success:
+                    self.stats["total_successful"] += 1
+                    self.stats["by_parser"][parser.get_parser_name()] = \
+                        self.stats["by_parser"].get(parser.get_parser_name(), 0) + 1
+                else:
+                    self.stats["total_failed"] += 1
+                    result.error_message = parsed.error_message
+                    
             else:
+                # No parser available for this type
+                result.success = False
+                result.error_message = f"No parser available for attachment type: {attachment_type}"
                 self.stats["total_failed"] += 1
-                self.stats["by_type"][attachment_type.value]["failed"] += 1
-                
-                return AttachmentProcessingResult(
-                    success=False,
-                    attachment_id=attachment_id,
-                    email_id=email_id,
-                    attachment_type=attachment_type,
-                    error_message=parsed.error_message,
-                    processed_at=datetime.now().isoformat(),
-                )
-                
-        except Exception as e:
-            logger.error(f"Error processing attachment {attachment_id}: {str(e)}")
-            self.stats["total_failed"] += 1
-            self.stats["by_type"][attachment_type.value]["failed"] += 1
             
-            return AttachmentProcessingResult(
-                success=False,
-                attachment_id=attachment_id,
-                email_id=email_id,
-                attachment_type=attachment_type,
-                error_message=str(e),
-                processed_at=datetime.now().isoformat(),
-            )
+            # Update type statistics
+            type_name = attachment_type.name
+            self.stats["by_type"][type_name] = \
+                self.stats["by_type"].get(type_name, 0) + 1
+            
+            # Store result
+            self.results.append(result)
+            
+        except Exception as e:
+            result.success = False
+            result.error_message = str(e)
+            self.stats["total_failed"] += 1
+            self.results.append(result)
+        
+        # Update total processed
+        self.stats["total_processed"] += 1
+        
+        return result
     
-    def process_attachments(
+    def process_email_attachments(
         self,
         email: Email,
-        attachments: List[str],
-        action_type: str = "process",
+        attachments: List[str]
     ) -> List[AttachmentProcessingResult]:
         """
-        Process multiple attachments for an email.
+        Process all attachments from an email.
         
         Args:
-            email: Email object containing the attachments
-            attachments: List of file paths to process
-            action_type: Type of action to perform
-            
+            email: The email object containing attachments.
+            attachments: List of attachment file paths.
+        
         Returns:
-            List of AttachmentProcessingResult objects
+            List of AttachmentProcessingResult objects.
         """
         results = []
         
-        for file_path in attachments:
-            # Skip non-existent files
-            if not os.path.exists(file_path):
-                logger.warning(f"Attachment file not found: {file_path}")
-                continue
-            
-            # Get attachment info
-            filename = os.path.basename(file_path)
-            size_bytes = os.path.getsize(file_path)
-            content_type = "application/octet-stream"  # Default
+        for i, file_path in enumerate(attachments):
+            # Determine attachment type
+            attachment_type = get_attachment_type(
+                mime_type=email.raw_headers.get('Content-Type', ''),
+                filename=os.path.basename(file_path)
+            )
             
             # Process the attachment
             result = self.process_attachment(
                 file_path=file_path,
-                attachment_id=f"{email.id}_{filename}",
+                attachment_id=f"{email.id}_att_{i+1}",
                 email_id=email.id,
-                original_filename=filename,
-                content_type=content_type,
-                size_bytes=size_bytes,
+                original_filename=os.path.basename(file_path),
+                content_type=email.raw_headers.get('Content-Type', 'application/octet-stream'),
+                size_bytes=os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+                attachment_type=attachment_type
             )
             
             results.append(result)
         
         return results
     
-    def get_stats(self) -> Dict[str, Any]:
-        """Get processing statistics."""
-        return {
-            "total_processed": self.stats["total_processed"],
-            "total_successful": self.stats["total_successful"],
-            "total_failed": self.stats["total_failed"],
-            "success_rate": (
-                self.stats["total_successful"] / self.stats["total_processed"]
-                if self.stats["total_processed"] > 0 else 0.0
-            ),
-            "by_type": self.stats["by_type"],
-            "by_parser": self.stats["by_parser"],
-        }
+    def _get_parser(self, attachment_type: AttachmentType) -> Optional[Any]:
+        """
+        Get the appropriate parser for an attachment type.
+        
+        Args:
+            attachment_type: Type of the attachment.
+        
+        Returns:
+            Parser instance or None if no parser available.
+        """
+        if attachment_type == AttachmentType.PDF:
+            return self.parsers['pdf']
+        elif attachment_type in [AttachmentType.DOCX, AttachmentType.XLSX, AttachmentType.PPTX]:
+            return self.parsers['office']
+        elif attachment_type in [AttachmentType.TXT, AttachmentType.CSV]:
+            return self.parsers['text']
+        elif attachment_type in [AttachmentType.PNG, AttachmentType.JPG, AttachmentType.GIF, AttachmentType.BMP, AttachmentType.TIFF]:
+            return self.parsers['image']
+        elif attachment_type == AttachmentType.ZIP:
+            return self.parsers['zip']
+        else:
+            return None
+    
+    def get_stats(self) -> dict:
+        """
+        Get processing statistics.
+        
+        Returns:
+            Dictionary with processing statistics.
+        """
+        return self.stats.copy()
     
     def reset_stats(self):
         """Reset processing statistics."""
@@ -281,470 +244,660 @@ class AttachmentProcessor:
             "total_successful": 0,
             "total_failed": 0,
             "by_type": {},
-            "by_parser": {},
+            "by_parser": {}
         }
+    
+    def get_results(self) -> List[AttachmentProcessingResult]:
+        """
+        Get all processing results.
+        
+        Returns:
+            List of AttachmentProcessingResult objects.
+        """
+        return self.results.copy()
+    
+    def clear_results(self):
+        """Clear all processing results."""
+        self.results = []
 
 
 class AttachmentDispatcher:
-    """Dispatch attachments to appropriate locations based on action."""
+    """
+    Dispatcher for attachment actions (save, move, etc.).
+    """
     
     def __init__(
         self,
-        base_path: str,
+        base_path: str = "./archive",
         dry_run: bool = False,
-        collision_strategy: str = "rename",
+        collision_strategy: str = "rename"
     ):
         """
         Initialize the attachment dispatcher.
         
         Args:
-            base_path: Base path for operations
-            dry_run: If True, don't actually perform file operations
-            collision_strategy: How to handle file collisions
+            base_path: Base directory for all operations.
+            dry_run: If True, only simulate actions without making changes.
+            collision_strategy: Strategy for handling filename collisions.
         """
         self.base_path = base_path
         self.dry_run = dry_run
         self.collision_strategy = collision_strategy
-    
-    def _resolve_collision(self, target_path: str) -> str:
-        """
-        Resolve file collision based on strategy.
-        
-        Args:
-            target_path: Original target path
-            
-        Returns:
-            Resolved path that doesn't conflict
-        """
-        if not os.path.exists(target_path):
-            return target_path
-        
-        if self.collision_strategy == "overwrite":
-            return target_path
-        
-        elif self.collision_strategy == "skip":
-            # Return None to indicate skip
-            return None
-        
-        elif self.collision_strategy == "rename":
-            # Default: add timestamp or counter
-            base, ext = os.path.splitext(target_path)
-            counter = 1
-            while True:
-                new_path = f"{base}_{counter}{ext}"
-                if not os.path.exists(new_path):
-                    return new_path
-                counter += 1
-        
-        return target_path
+        self.operations_log: List[Dict[str, Any]] = []
     
     def save_attachment(
         self,
         file_path: str,
         target_path: str,
-        attachment_id: str,
+        attachment_id: str
     ) -> Dict[str, Any]:
         """
-        Save an attachment to the target location.
+        Save an attachment to a target location.
         
         Args:
-            file_path: Source file path
-            target_path: Target file path
-            attachment_id: ID of the attachment
-            
-        Returns:
-            Operation result dictionary
-        """
-        if self.dry_run:
-            return {
-                "success": True,
-                "operation": "save",
-                "attachment_id": attachment_id,
-                "source": file_path,
-                "target": target_path,
-                "final_path": target_path,
-                "dry_run": True,
-            }
+            file_path: Source path of the attachment.
+            target_path: Target path for the attachment.
+            attachment_id: ID of the attachment.
         
-        # Resolve collision
-        resolved_path = self._resolve_collision(target_path)
-        if resolved_path is None:
-            return {
-                "success": False,
-                "operation": "save",
-                "attachment_id": attachment_id,
-                "error": "Collision and skip strategy",
-            }
+        Returns:
+            Dictionary with operation result.
+        """
+        operation = {
+            "operation": "save",
+            "attachment_id": attachment_id,
+            "source": file_path,
+            "target": target_path,
+            "dry_run": self.dry_run,
+            "timestamp": datetime.now().isoformat()
+        }
         
         try:
-            # Ensure target directory exists
-            target_dir = os.path.dirname(resolved_path)
-            if target_dir and not os.path.exists(target_dir):
+            # Create target directory if it doesn't exist
+            target_dir = os.path.dirname(target_path)
+            if target_dir and not self.dry_run:
                 os.makedirs(target_dir, exist_ok=True)
             
-            # Copy file
-            shutil.copy2(file_path, resolved_path)
+            # Handle filename collisions
+            if os.path.exists(target_path) and not self.dry_run:
+                target_path = self._handle_collision(target_path)
             
-            return {
-                "success": True,
-                "operation": "save",
-                "attachment_id": attachment_id,
-                "source": file_path,
-                "target": resolved_path,
-                "final_path": resolved_path,
-            }
+            # Copy the file
+            if not self.dry_run:
+                shutil.copy2(file_path, target_path)
+            
+            operation["success"] = True
+            operation["final_path"] = target_path
             
         except Exception as e:
-            logger.error(f"Error saving attachment {attachment_id}: {str(e)}")
-            return {
-                "success": False,
-                "operation": "save",
-                "attachment_id": attachment_id,
-                "error": str(e),
-            }
+            operation["success"] = False
+            operation["error"] = str(e)
+        
+        self.operations_log.append(operation)
+        return operation
     
     def move_attachment(
         self,
         file_path: str,
         target_path: str,
-        attachment_id: str,
+        attachment_id: str
     ) -> Dict[str, Any]:
         """
-        Move an attachment to the target location.
+        Move an attachment to a target location.
         
         Args:
-            file_path: Source file path
-            target_path: Target file path
-            attachment_id: ID of the attachment
-            
-        Returns:
-            Operation result dictionary
-        """
-        if self.dry_run:
-            return {
-                "success": True,
-                "operation": "move",
-                "attachment_id": attachment_id,
-                "source": file_path,
-                "target": target_path,
-                "dry_run": True,
-            }
+            file_path: Source path of the attachment.
+            target_path: Target path for the attachment.
+            attachment_id: ID of the attachment.
         
-        # Resolve collision
-        resolved_path = self._resolve_collision(target_path)
-        if resolved_path is None:
-            return {
-                "success": False,
-                "operation": "move",
-                "attachment_id": attachment_id,
-                "error": "Collision and skip strategy",
-            }
+        Returns:
+            Dictionary with operation result.
+        """
+        operation = {
+            "operation": "move",
+            "attachment_id": attachment_id,
+            "source": file_path,
+            "target": target_path,
+            "dry_run": self.dry_run,
+            "timestamp": datetime.now().isoformat()
+        }
         
         try:
-            # Ensure target directory exists
-            target_dir = os.path.dirname(resolved_path)
-            if target_dir and not os.path.exists(target_dir):
+            # Create target directory if it doesn't exist
+            target_dir = os.path.dirname(target_path)
+            if target_dir and not self.dry_run:
                 os.makedirs(target_dir, exist_ok=True)
             
-            # Move file
-            shutil.move(file_path, resolved_path)
+            # Handle filename collisions
+            if os.path.exists(target_path) and not self.dry_run:
+                target_path = self._handle_collision(target_path)
             
-            return {
-                "success": True,
-                "operation": "move",
-                "attachment_id": attachment_id,
-                "source": file_path,
-                "target": resolved_path,
-                "final_path": resolved_path,
-            }
+            # Move the file
+            if not self.dry_run:
+                shutil.move(file_path, target_path)
+            
+            operation["success"] = True
+            operation["final_path"] = target_path
             
         except Exception as e:
-            logger.error(f"Error moving attachment {attachment_id}: {str(e)}")
-            return {
-                "success": False,
-                "operation": "move",
-                "attachment_id": attachment_id,
-                "error": str(e),
-            }
+            operation["success"] = False
+            operation["error"] = str(e)
+        
+        self.operations_log.append(operation)
+        return operation
     
     def delete_attachment(
         self,
         file_path: str,
-        attachment_id: str,
+        attachment_id: str
     ) -> Dict[str, Any]:
         """
         Delete an attachment.
         
         Args:
-            file_path: Path to file to delete
-            attachment_id: ID of the attachment
-            
+            file_path: Path to the attachment file.
+            attachment_id: ID of the attachment.
+        
         Returns:
-            Operation result dictionary
+            Dictionary with operation result.
         """
-        if self.dry_run:
-            return {
-                "success": True,
-                "operation": "delete",
-                "attachment_id": attachment_id,
-                "file_path": file_path,
-                "dry_run": True,
-            }
+        operation = {
+            "operation": "delete",
+            "attachment_id": attachment_id,
+            "source": file_path,
+            "dry_run": self.dry_run,
+            "timestamp": datetime.now().isoformat()
+        }
         
         try:
-            if os.path.exists(file_path):
+            if not self.dry_run:
                 os.remove(file_path)
             
-            return {
-                "success": True,
-                "operation": "delete",
-                "attachment_id": attachment_id,
-                "file_path": file_path,
-            }
+            operation["success"] = True
             
         except Exception as e:
-            logger.error(f"Error deleting attachment {attachment_id}: {str(e)}")
-            return {
-                "success": False,
-                "operation": "delete",
-                "attachment_id": attachment_id,
-                "error": str(e),
-            }
+            operation["success"] = False
+            operation["error"] = str(e)
+        
+        self.operations_log.append(operation)
+        return operation
+    
+    def _handle_collision(self, target_path: str) -> str:
+        """
+        Handle filename collision based on strategy.
+        
+        Args:
+            target_path: Original target path.
+        
+        Returns:
+            New target path with collision handled.
+        """
+        if self.collision_strategy == "rename":
+            # Add timestamp to filename
+            path_obj = Path(target_path)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_name = f"{path_obj.stem}_{timestamp}{path_obj.suffix}"
+            return str(path_obj.parent / new_name)
+        
+        elif self.collision_strategy == "overwrite":
+            return target_path
+        
+        elif self.collision_strategy == "skip":
+            # Return original path, caller should check if file exists
+            return target_path
+        
+        else:
+            # Default to rename
+            path_obj = Path(target_path)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_name = f"{path_obj.stem}_{timestamp}{path_obj.suffix}"
+            return str(path_obj.parent / new_name)
+    
+    def get_operations_log(self) -> List[Dict[str, Any]]:
+        """
+        Get the operation log.
+        
+        Returns:
+            List of operation results.
+        """
+        return self.operations_log.copy()
+    
+    def clear_operations_log(self):
+        """Clear the operation log."""
+        self.operations_log = []
 
 
 class AttachmentActionExecutor:
-    """Execute actions on attachments based on configuration."""
+    """
+    Executor for attachment actions.
+    """
     
     def __init__(
         self,
         dispatcher: AttachmentDispatcher,
-        processor: AttachmentProcessor,
         max_retries: int = 3,
+        retry_delay: float = 1.0
     ):
         """
-        Initialize the action executor.
+        Initialize the attachment action executor.
         
         Args:
-            dispatcher: Attachment dispatcher for file operations
-            processor: Attachment processor for parsing
-            max_retries: Maximum retry attempts for operations
+            dispatcher: The attachment dispatcher to use.
+            max_retries: Maximum retry attempts for actions.
+            retry_delay: Delay between retries in seconds.
         """
         self.dispatcher = dispatcher
-        self.processor = processor
         self.max_retries = max_retries
+        self.retry_delay = retry_delay
     
-    def execute_action(
+    def execute(
         self,
         file_path: str,
-        attachment_id: str,
-        email_id: str,
         action_type: str,
-        target_path: Optional[str] = None,
+        action_params: Dict[str, Any],
+        attachment_id: str
     ) -> Dict[str, Any]:
         """
-        Execute an action on an attachment.
+        Execute an attachment action.
         
         Args:
-            file_path: Path to the attachment
-            attachment_id: ID of the attachment
-            email_id: ID of the email
-            action_type: Type of action (save, move, delete, process)
-            target_path: Target path for save/move operations
-            
+            file_path: Path to the attachment file.
+            action_type: Type of action to execute.
+            action_params: Parameters for the action.
+            attachment_id: ID of the attachment.
+        
         Returns:
-            Execution result dictionary
+            Dictionary with execution result.
         """
-        if action_type == "save":
-            if target_path is None:
-                target_path = os.path.join(self.dispatcher.base_path, os.path.basename(file_path))
-            
-            return self.dispatcher.save_attachment(
-                file_path=file_path,
-                target_path=target_path,
-                attachment_id=attachment_id,
-            )
+        result = {
+            "action": action_type,
+            "attachment_id": attachment_id,
+            "success": False,
+            "message": "",
+            "details": {}
+        }
         
-        elif action_type == "move":
-            if target_path is None:
-                return {
-                    "success": False,
-                    "error": "Target path required for move operation",
-                }
-            
-            return self.dispatcher.move_attachment(
-                file_path=file_path,
-                target_path=target_path,
-                attachment_id=attachment_id,
-            )
+        attempt = 0
+        while attempt < self.max_retries:
+            try:
+                if action_type == "save":
+                    target_path = action_params.get("target_path", file_path)
+                    operation = self.dispatcher.save_attachment(
+                        file_path=file_path,
+                        target_path=target_path,
+                        attachment_id=attachment_id
+                    )
+                    result["success"] = operation["success"]
+                    result["message"] = "Attachment saved successfully" if operation["success"] else "Failed to save attachment"
+                    result["details"] = {"final_path": operation.get("final_path", "")}
+                
+                elif action_type == "move":
+                    target_path = action_params.get("target_path", file_path)
+                    operation = self.dispatcher.move_attachment(
+                        file_path=file_path,
+                        target_path=target_path,
+                        attachment_id=attachment_id
+                    )
+                    result["success"] = operation["success"]
+                    result["message"] = "Attachment moved successfully" if operation["success"] else "Failed to move attachment"
+                    result["details"] = {"final_path": operation.get("final_path", "")}
+                
+                elif action_type == "delete":
+                    operation = self.dispatcher.delete_attachment(
+                        file_path=file_path,
+                        attachment_id=attachment_id
+                    )
+                    result["success"] = operation["success"]
+                    result["message"] = "Attachment deleted successfully" if operation["success"] else "Failed to delete attachment"
+                
+                else:
+                    result["message"] = f"Unknown action type: {action_type}"
+                
+                if result["success"]:
+                    break
+                
+                attempt += 1
+                if attempt < self.max_retries:
+                    import time
+                    time.sleep(self.retry_delay)
+                
+            except Exception as e:
+                attempt += 1
+                if attempt >= self.max_retries:
+                    result["message"] = f"Action failed after {self.max_retries} attempts: {str(e)}"
+                else:
+                    import time
+                    time.sleep(self.retry_delay)
         
-        elif action_type == "delete":
-            return self.dispatcher.delete_attachment(
-                file_path=file_path,
-                attachment_id=attachment_id,
-            )
+        return result
+
+
+class AttachmentPipelineBuilder:
+    """
+    Builder for constructing attachment processing pipelines.
+    """
+    
+    def __init__(self):
+        """Initialize the attachment pipeline builder."""
+        self.base_path = "./archive"
+        self.dry_run = False
+        self.collision_strategy = "rename"
+        self.max_retries = 3
+        self.retry_delay = 1.0
+        self.save_path: Optional[str] = None
+    
+    def set_base_path(self, path: str) -> 'AttachmentPipelineBuilder':
+        """Set the base path for operations."""
+        self.base_path = path
+        return self
+    
+    def set_base_path_absolute(self, path: str) -> 'AttachmentPipelineBuilder':
+        """Set the base path for operations (absolute path)."""
+        import os
+        self.base_path = os.path.abspath(path)
+        return self
+    
+    def set_dry_run(self, dry_run: bool) -> 'AttachmentPipelineBuilder':
+        """Set dry run mode."""
+        self.dry_run = dry_run
+        return self
+    
+    def set_collision_strategy(self, strategy: str) -> 'AttachmentPipelineBuilder':
+        """Set collision handling strategy."""
+        self.collision_strategy = strategy
+        return self
+    
+    def set_save_path(self, path: str) -> 'AttachmentPipelineBuilder':
+        """Set the save path for processed attachments."""
+        self.save_path = path
+        return self
+    
+    def set_retry_config(
+        self,
+        max_retries: int,
+        retry_delay: float
+    ) -> 'AttachmentPipelineBuilder':
+        """Set retry configuration."""
+        self.max_retries = max_retries
+        self.retry_delay = retry_delay
+        return self
+    
+    def build(self) -> 'AttachmentPipelineExecutor':
+        """
+        Build the attachment pipeline executor.
         
-        elif action_type == "process":
-            # Process the attachment
-            filename = os.path.basename(file_path)
-            size_bytes = os.path.getsize(file_path)
-            
-            result = self.processor.process_attachment(
-                file_path=file_path,
-                attachment_id=attachment_id,
-                email_id=email_id,
-                original_filename=filename,
-                content_type="application/octet-stream",
-                size_bytes=size_bytes,
-            )
-            
-            return {
-                "success": result.success,
-                "operation": "process",
-                "attachment_id": attachment_id,
-                "result": {
-                    "success": result.success,
-                    "attachment_type": result.attachment_type.value,
-                    "text_content": result.text_content,
-                    "metadata": result.metadata,
-                    "error_message": result.error_message,
-                },
-            }
+        Returns:
+            Configured AttachmentPipelineExecutor instance.
+        """
+        processor = AttachmentProcessor(
+            base_path=self.base_path,
+            dry_run=self.dry_run,
+            collision_strategy=self.collision_strategy,
+            max_retries=self.max_retries,
+            retry_delay=self.retry_delay
+        )
         
-        else:
-            return {
-                "success": False,
-                "error": f"Unknown action type: {action_type}",
-            }
+        dispatcher = AttachmentDispatcher(
+            base_path=self.base_path,
+            dry_run=self.dry_run,
+            collision_strategy=self.collision_strategy
+        )
+        
+        executor = AttachmentActionExecutor(
+            dispatcher=dispatcher,
+            max_retries=self.max_retries,
+            retry_delay=self.retry_delay
+        )
+        
+        return AttachmentPipelineExecutor(
+            processor=processor,
+            dispatcher=dispatcher,
+            executor=executor,
+            save_path=self.save_path
+        )
 
 
 class AttachmentPipelineExecutor:
-    """Execute attachment processing pipeline."""
+    """
+    Executes attachment processing pipelines with progress tracking.
+    """
     
     def __init__(
         self,
         processor: AttachmentProcessor,
         dispatcher: AttachmentDispatcher,
         executor: AttachmentActionExecutor,
+        save_path: Optional[str] = None,
+        progress_callback=None
     ):
         """
-        Initialize the pipeline executor.
+        Initialize the attachment pipeline executor.
         
         Args:
-            processor: Attachment processor
-            dispatcher: Attachment dispatcher
-            executor: Action executor
+            processor: The attachment processor to use.
+            dispatcher: The attachment dispatcher to use.
+            executor: The attachment action executor to use.
+            save_path: Path to save processed attachments.
+            progress_callback: Optional callback function for progress updates.
         """
         self.processor = processor
         self.dispatcher = dispatcher
         self.executor = executor
+        self.save_path = save_path
+        self.progress_callback = progress_callback
     
     def execute(
         self,
         email: Email,
         attachments: List[str],
-        action_type: str = "process",
+        action_type: str = "save",
+        action_params: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
-        Execute the pipeline for an email's attachments.
+        Execute the attachment processing pipeline.
         
         Args:
-            email: Email object
-            attachments: List of attachment file paths
-            action_type: Type of action to perform
-            
-        Returns:
-            List of execution results
-        """
-        results = []
+            email: The email object containing attachments.
+            attachments: List of attachment file paths.
+            action_type: Type of action to perform (save, move, delete).
+            action_params: Parameters for the action.
         
-        for file_path in attachments:
-            if not os.path.exists(file_path):
-                logger.warning(f"Attachment file not found: {file_path}")
-                continue
-            
-            attachment_id = f"{email.id}_{os.path.basename(file_path)}"
-            
-            result = self.executor.execute_action(
+        Returns:
+            List of execution results.
+        """
+        if action_params is None:
+            action_params = {}
+        
+        results = []
+        total = len(attachments)
+        
+        for i, file_path in enumerate(attachments):
+            # Process the attachment
+            result = self.processor.process_attachment(
                 file_path=file_path,
-                attachment_id=attachment_id,
+                attachment_id=f"{email.id}_att_{i+1}",
                 email_id=email.id,
-                action_type=action_type,
+                original_filename=os.path.basename(file_path),
+                content_type=email.raw_headers.get('Content-Type', 'application/octet-stream'),
+                size_bytes=os.path.getsize(file_path) if os.path.exists(file_path) else 0,
+                attachment_type=get_attachment_type(
+                    mime_type=email.raw_headers.get('Content-Type', ''),
+                    filename=os.path.basename(file_path)
+                )
             )
             
-            # Add attachment_type to result for all action types
-            if "result" in result:
-                result["attachment_type"] = result["result"].get("attachment_type", "UNKNOWN")
-            elif action_type == "process":
-                # For process action, extract from processor result
-                result["attachment_type"] = result.get("result", {}).get("attachment_type", "UNKNOWN")
-            else:
-                # For save/move/delete, detect attachment type from filename
-                from email_tool.attachment_types import get_attachment_type
-                result["attachment_type"] = get_attachment_type(
-                    mime_type="application/octet-stream",
-                    filename=os.path.basename(file_path)
-                ).value
+            # Execute action if successful
+            if result.success:
+                # Determine target path
+                target_path = action_params.get("target_path", "")
+                if not target_path:
+                    target_path = self._generate_target_path(file_path)
+                
+                action_result = self.executor.execute(
+                    file_path=file_path,
+                    action_type=action_type,
+                    action_params={"target_path": target_path},
+                    attachment_id=result.attachment_id
+                )
+                
+                result.details = action_result.get("details", {})
+                result.success = action_result["success"]
             
-            results.append(result)
+            results.append({
+                "attachment_id": result.attachment_id,
+                "original_filename": result.original_filename,
+                "attachment_type": result.attachment_type.name,
+                "success": result.success,
+                "message": result.error_message or "Success",
+                "details": result.details
+            })
+            
+            # Call progress callback if provided
+            if self.progress_callback:
+                self.progress_callback(i + 1, total, result)
         
         return results
+    
+    def _generate_target_path(self, file_path: str) -> str:
+        """
+        Generate a target path for saving an attachment.
+        
+        Args:
+            file_path: Original file path.
+        
+        Returns:
+            Target path for the attachment.
+        """
+        if self.save_path:
+            return os.path.join(self.save_path, os.path.basename(file_path))
+        
+        # Default to same directory
+        return file_path
 
 
 class AttachmentPipelineMonitor:
-    """Monitor and report on pipeline performance."""
+    """
+    Monitors and reports on attachment processing pipeline execution.
+    """
     
     def __init__(self, processor: AttachmentProcessor):
         """
-        Initialize the pipeline monitor.
+        Initialize the attachment pipeline monitor.
         
         Args:
-            processor: Attachment processor to monitor
+            processor: The attachment processor to monitor.
         """
         self.processor = processor
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get overall pipeline status."""
-        stats = self.processor.get_stats()
-        return {
-            "total_processed": stats["total_processed"],
-            "total_successful": stats["total_successful"],
-            "total_failed": stats["total_failed"],
-            "success_rate": stats["success_rate"],
+        self.stats = {
+            "total_processed": 0,
+            "total_successful": 0,
+            "total_failed": 0,
+            "by_type": {},
+            "by_parser": {}
         }
     
-    def get_parser_performance(self) -> Dict[str, Any]:
-        """Get performance by parser."""
-        stats = self.processor.get_stats()
-        return stats.get("by_parser", {})
+    def update_stats(self, **kwargs):
+        """
+        Update statistics from the processor or with provided values.
+        
+        Args:
+            **kwargs: Optional keyword arguments to update stats.
+        """
+        if kwargs:
+            # Update with provided values
+            for key, value in kwargs.items():
+                if key in self.stats:
+                    self.stats[key] = value
+        else:
+            # Update from processor
+            self.stats = self.processor.get_stats()
     
-    def get_type_performance(self) -> Dict[str, Any]:
-        """Get performance by attachment type."""
-        stats = self.processor.get_stats()
-        return stats.get("by_type", {})
+    def get_status(self) -> dict:
+        """
+        Get current pipeline status.
+        
+        Returns:
+            Dictionary with status information.
+        """
+        self.update_stats()
+        
+        return {
+            "total_processed": self.stats["total_processed"],
+            "total_successful": self.stats["total_successful"],
+            "total_failed": self.stats["total_failed"],
+            "success_rate": self._calculate_success_rate(self.stats),
+            "by_type": self.stats["by_type"],
+            "by_parser": self.stats["by_parser"],
+            "last_updated": datetime.now().isoformat()
+        }
+    
+    def _calculate_success_rate(self, stats: dict) -> float:
+        """Calculate success rate from statistics."""
+        total = stats["total_processed"]
+        if total == 0:
+            return 0.0
+        return (stats["total_successful"] / total) * 100
+    
+    def get_parser_performance(self) -> dict:
+        """
+        Get performance metrics for each parser.
+        
+        Returns:
+            Dictionary with parser performance metrics.
+        """
+        self.update_stats()
+        
+        performance = {}
+        for parser_name, count in self.stats["by_parser"].items():
+            performance[parser_name] = {
+                "processed": count,
+                "percentage": (count / max(self.stats["total_processed"], 1)) * 100
+            }
+        
+        return performance
+    
+    def get_type_performance(self) -> dict:
+        """
+        Get performance metrics for each attachment type.
+        
+        Returns:
+            Dictionary with attachment type performance metrics.
+        """
+        self.update_stats()
+        
+        performance = {}
+        for type_name, count in self.stats["by_type"].items():
+            performance[type_name] = {
+                "processed": count,
+                "percentage": (count / max(self.stats["total_processed"], 1)) * 100
+            }
+        
+        return performance
 
 
 class AttachmentPipelineConfig:
-    """Configuration for attachment processing pipeline."""
+    """
+    Configuration for attachment processing pipeline.
+    """
     
     def __init__(
         self,
-        base_path: str = "",
+        base_path: str = "./archive",
         dry_run: bool = False,
         collision_strategy: str = "rename",
         max_retries: int = 3,
         retry_delay: float = 1.0,
-        save_path: Optional[str] = None,
+        save_path: Optional[str] = None
     ):
         """
-        Initialize pipeline configuration.
+        Initialize attachment pipeline configuration.
         
         Args:
-            base_path: Base path for processing
-            dry_run: If True, don't perform actual operations
-            collision_strategy: How to handle file collisions
-            max_retries: Maximum retry attempts
-            retry_delay: Delay between retries
-            save_path: Path to save processed files
+            base_path: Base directory for operations.
+            dry_run: Enable dry run mode.
+            collision_strategy: Strategy for filename collisions.
+            max_retries: Maximum retry attempts.
+            retry_delay: Delay between retries.
+            save_path: Path to save processed attachments.
         """
         self.base_path = base_path
         self.dry_run = dry_run
@@ -754,105 +907,71 @@ class AttachmentPipelineConfig:
         self.save_path = save_path
     
     def to_executor(self) -> AttachmentPipelineExecutor:
-        """Convert config to pipeline executor."""
+        """
+        Convert configuration to AttachmentPipelineExecutor instance.
+        
+        Returns:
+            Configured AttachmentPipelineExecutor.
+        """
         processor = AttachmentProcessor(
             base_path=self.base_path,
             dry_run=self.dry_run,
             collision_strategy=self.collision_strategy,
             max_retries=self.max_retries,
-            retry_delay=self.retry_delay,
-            save_path=self.save_path,
+            retry_delay=self.retry_delay
         )
         
         dispatcher = AttachmentDispatcher(
             base_path=self.base_path,
             dry_run=self.dry_run,
-            collision_strategy=self.collision_strategy,
+            collision_strategy=self.collision_strategy
         )
         
         executor = AttachmentActionExecutor(
             dispatcher=dispatcher,
-            processor=processor,
             max_retries=self.max_retries,
+            retry_delay=self.retry_delay
         )
         
         return AttachmentPipelineExecutor(
             processor=processor,
             dispatcher=dispatcher,
             executor=executor,
+            save_path=self.save_path
         )
     
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any]) -> 'AttachmentPipelineConfig':
-        """Create config from dictionary."""
+    def from_dict(cls, config_dict: dict) -> 'AttachmentPipelineConfig':
+        """
+        Create configuration from dictionary.
+        
+        Args:
+            config_dict: Dictionary with configuration values.
+        
+        Returns:
+            AttachmentPipelineConfig instance.
+        """
         return cls(
-            base_path=config_dict.get("base_path", ""),
+            base_path=config_dict.get("base_path", "./archive"),
             dry_run=config_dict.get("dry_run", False),
             collision_strategy=config_dict.get("collision_strategy", "rename"),
             max_retries=config_dict.get("max_retries", 3),
             retry_delay=config_dict.get("retry_delay", 1.0),
-            save_path=config_dict.get("save_path"),
+            save_path=config_dict.get("save_path")
         )
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert config to dictionary."""
+    def to_dict(self) -> dict:
+        """
+        Convert configuration to dictionary.
+        
+        Returns:
+            Dictionary with configuration values.
+        """
         return {
             "base_path": self.base_path,
             "dry_run": self.dry_run,
             "collision_strategy": self.collision_strategy,
             "max_retries": self.max_retries,
             "retry_delay": self.retry_delay,
-            "save_path": self.save_path,
+            "save_path": self.save_path
         }
-
-
-class AttachmentPipelineBuilder:
-    """Builder for creating attachment pipeline configurations."""
-    
-    def __init__(self):
-        """Initialize the builder."""
-        self.config = AttachmentPipelineConfig()
-    
-    def set_base_path(self, path: str) -> 'AttachmentPipelineBuilder':
-        """Set the base path for processing."""
-        self.config.base_path = path
-        return self
-    
-    def set_dry_run(self, dry_run: bool) -> 'AttachmentPipelineBuilder':
-        """Set dry run mode."""
-        self.config.dry_run = dry_run
-        return self
-    
-    def set_collision_strategy(self, strategy: str) -> 'AttachmentPipelineBuilder':
-        """Set collision handling strategy."""
-        self.config.collision_strategy = strategy
-        return self
-    
-    def set_max_retries(self, max_retries: int) -> 'AttachmentPipelineBuilder':
-        """Set maximum retry attempts."""
-        self.config.max_retries = max_retries
-        return self
-    
-    def set_retry_delay(self, retry_delay: float) -> 'AttachmentPipelineBuilder':
-        """Set delay between retries."""
-        self.config.retry_delay = retry_delay
-        return self
-    
-    def set_save_path(self, save_path: str) -> 'AttachmentPipelineBuilder':
-        """Set save path for processed files."""
-        self.config.save_path = save_path
-        return self
-    
-    def set_retry_config(self, max_retries: int, retry_delay: float) -> 'AttachmentPipelineBuilder':
-        """Set retry configuration."""
-        self.config.max_retries = max_retries
-        self.config.retry_delay = retry_delay
-        return self
-    
-    def build(self) -> AttachmentPipelineExecutor:
-        """Build and return a pipeline executor."""
-        return self.config.to_executor()
-    
-    def build_config(self) -> AttachmentPipelineConfig:
-        """Build and return a configuration."""
-        return self.config

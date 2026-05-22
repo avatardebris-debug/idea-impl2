@@ -1,111 +1,222 @@
-"""Correlation engine for linking companies and filings."""
+"""Data correlation engine — links entities across data sources."""
 
 from __future__ import annotations
 
-import re
+import logging
+from difflib import SequenceMatcher
 from typing import Any, Optional
 
-from osint_corp.models.entities import Company, Filing
+from osint_corp.models.entities import Company, Filing, Manifest, Relationship
+
+logger = logging.getLogger(__name__)
 
 
-def _normalize(text: str) -> str:
-    """Normalize a string for comparison."""
-    return re.sub(r"[^a-z0-9]", "", text.lower().strip())
+def _normalize_name(name: str) -> str:
+    """Normalize a company name for comparison."""
+    if not name:
+        return ""
+    # Lowercase, strip common suffixes, remove punctuation
+    name = name.lower().strip()
+    name = name.replace("-", " ").replace("_", " ").replace(".", "").replace(",", "")
+    for suffix in (" inc", " incorporated", " llc", " ltd", " corp", " company", " co", " llp", " lp", " plc", " gmbh", " ag", " sa", " s.a", " bv", " nv"):
+        if name.endswith(suffix):
+            name = name[: -len(suffix)]
+    # Remove extra whitespace
+    return " ".join(name.split())
 
 
-def _fuzzy_match(a: str, b: str, threshold: float = 0.8) -> bool:
-    """Simple fuzzy match: check if one string contains the other or they share significant overlap."""
-    a_norm = _normalize(a)
-    b_norm = _normalize(b)
-    if not a_norm or not b_norm:
-        return False
-    if a_norm == b_norm:
-        return True
-    # Check containment
-    if a_norm in b_norm or b_norm in a_norm:
-        return True
-    # Check shared characters ratio
-    if len(a_norm) == 0 or len(b_norm) == 0:
-        return False
-    shared = len(set(a_norm) & set(b_norm))
-    union = len(set(a_norm) | set(b_norm))
-    ratio = shared / union if union > 0 else 0
-    return ratio >= threshold
+def _name_similarity(name1: str, name2: str) -> float:
+    """Calculate similarity between two company names (0.0 to 1.0)."""
+    n1 = _normalize_name(name1)
+    n2 = _normalize_name(name2)
+    if not n1 or not n2:
+        return 0.0
+    if n1 == n2:
+        return 1.0
+    return SequenceMatcher(None, n1, n2).ratio()
 
 
 def correlate(
     companies: list[Company],
     filings: list[Filing],
-    threshold: float = 0.8,
-) -> list[dict[str, Any]]:
-    """Correlate companies with filings based on ticker, CIK, and name matching.
+    threshold: float = 0.7,
+    relationships: Optional[list[Relationship]] = None,
+) -> list[Relationship]:
+    """Correlate companies and filings across data sources.
 
-    Returns a list of relationship dicts with keys:
-      - company_name
-      - filing_accession
-      - match_type (ticker | cik | name)
-      - confidence (float)
+    Args:
+        companies: List of Company entities from various sources.
+        filings: List of Filing entities from SEC and other sources.
+        threshold: Minimum similarity score for name matching (0.0 to 1.0).
+        relationships: Optional pre-existing relationships.
+
+    Returns:
+        Manifest with correlated entities and inferred relationships.
     """
-    relationships: list[dict[str, Any]] = []
+    if relationships is None:
+        relationships = []
+
+    # Build lookup maps
+    company_by_ticker: dict[str, Company] = {}
+    company_by_cik: dict[str, Company] = {}
+    company_by_name: dict[str, Company] = {}
 
     for company in companies:
-        for filing in filings:
-            confidence = 0.0
-            match_type = ""
+        if company.ticker:
+            company_by_ticker[company.ticker.upper()] = company
+        if company.cik:
+            company_by_cik[company.cik] = company
+        if company.name:
+            company_by_name[_normalize_name(company.name)] = company
 
-            # CIK match (highest confidence)
-            if company.cik and filing.cik and company.cik == filing.cik:
-                confidence = 1.0
-                match_type = "cik"
+    # Correlate filings to companies
+    correlated_filings: list[dict[str, Any]] = []
+    for filing in filings:
+        matched_company: Optional[Company] = None
+        best_score = 0.0
 
-            # Ticker match
-            elif company.ticker and filing.ticker and company.ticker.upper() == filing.ticker.upper():
-                confidence = 0.95
-                match_type = "ticker"
+        # Try exact ticker match
+        if filing.ticker and filing.ticker.upper() in company_by_ticker:
+            matched_company = company_by_ticker[filing.ticker.upper()]
+            best_score = 1.0
 
-            # Name fuzzy match
-            elif company.name and filing.company_name:
-                if _fuzzy_match(company.name, filing.company_name, threshold):
-                    confidence = 0.85
-                    match_type = "name"
+        # Try exact CIK match
+        elif filing.cik and filing.cik in company_by_cik:
+            matched_company = company_by_cik[filing.cik]
+            best_score = 1.0
 
-            if confidence >= threshold:
-                relationships.append({
-                    "company_name": company.name,
-                    "filing_accession": filing.accession_number,
-                    "match_type": match_type,
-                    "confidence": confidence,
-                })
+        # Try name similarity
+        elif filing.company_name:
+            best_match_name: Optional[Company] = None
+            best_score_name = 0.0
+            for norm_name, company in company_by_name.items():
+                score = _name_similarity(filing.company_name, company.name or "")
+                if score > best_score_name and score > threshold:
+                    best_score_name = score
+                    best_match_name = company
 
-    return relationships
+            if best_match_name:
+                matched_company = best_match_name
+                best_score = best_score_name
+
+        correlated_filings.append({
+            "filing": filing,
+            "matched_company": matched_company,
+            "confidence": best_score if (matched_company and best_score > threshold) else 0.0,
+        })
+
+        # If we found a match, add a relationship
+        if matched_company and filing.ticker:
+            rel = Relationship(
+                source_type="Filing",
+                source_id=filing.accession_number,
+                target_type="Company",
+                target_id=matched_company.ticker or matched_company.name or "",
+                relationship_type="filed_by",
+                confidence=best_score if best_score > threshold else 0.5,
+                evidence=[f"Name similarity: {_name_similarity(filing.company_name or '', matched_company.name or ''):.2f}"],
+                metadata={"filing_type": filing.filing_type, "filing_date": filing.filing_date},
+            )
+            relationships.append(rel)
+
+    # Infer relationships between companies based on shared filings
+    inferred_relationships: list[Relationship] = []
+    company_filings: dict[str, list[Filing]] = {}
+
+    for cf in correlated_filings:
+        if cf["matched_company"] and cf["matched_company"].ticker:
+            ticker = cf["matched_company"].ticker
+            if ticker not in company_filings:
+                company_filings[ticker] = []
+            company_filings[ticker].append(cf["filing"])
+
+    # Companies that filed in the same period may be related
+    ticker_list = list(company_filings.keys())
+    for i in range(len(ticker_list)):
+        for j in range(i + 1, len(ticker_list)):
+            t1, t2 = ticker_list[i], ticker_list[j]
+            # Check for overlapping filing dates
+            dates1 = {f.filing_date for f in company_filings[t1] if f.filing_date}
+            dates2 = {f.filing_date for f in company_filings[t2] if f.filing_date}
+            overlap = dates1 & dates2
+
+            if overlap:
+                rel = Relationship(
+                    source_type="Company",
+                    source_id=t1,
+                    target_type="Company",
+                    target_id=t2,
+                    relationship_type="co_filer",
+                    confidence=0.3,
+                    evidence=[f"Both filed on: {', '.join(list(overlap)[:3])}"],
+                    metadata={"shared_filing_dates": list(overlap)[:5]},
+                )
+                inferred_relationships.append(rel)
+
+    all_relationships = relationships + inferred_relationships
+
+    logger.info(f"Correlation complete: {len(companies)} companies, {len(filings)} filings, {len(all_relationships)} relationships")
+    return all_relationships
+
+
+def find_companies_by_name(
+    companies: list[Company],
+    name: str,
+    threshold: float = 0.5,
+) -> list[Company]:
+    """Find companies matching a name with similarity score.
+
+    Args:
+        companies: List of companies to search.
+        name: Name to search for.
+        threshold: Minimum similarity score (0.0 to 1.0).
+
+    Returns:
+        List of Company objects sorted by score descending.
+    """
+    results = []
+    norm_target = _normalize_name(name)
+
+    for company in companies:
+        score = _name_similarity(name, company.name or "")
+        if score >= threshold:
+            results.append(company)
+
+    results.sort(key=lambda c: _name_similarity(name, c.name or ""), reverse=True)
+    return results
 
 
 def deduplicate_companies(companies: list[Company]) -> list[Company]:
-    """Remove duplicate companies based on ticker and CIK."""
+    """Deduplicate a list of companies by name/ticker/cik.
+
+    Args:
+        companies: List of Company entities.
+
+    Returns:
+        Deduplicated list of Company entities.
+    """
     seen_tickers: set[str] = set()
     seen_ciks: set[str] = set()
+    seen_names: set[str] = set()
     unique: list[Company] = []
 
     for company in companies:
-        ticker_key = company.ticker.upper() if company.ticker else None
-        cik_key = company.cik if company.cik else None
-
-        if ticker_key and ticker_key in seen_tickers:
+        # Skip if we've seen this ticker
+        if company.ticker and company.ticker.upper() in seen_tickers:
             continue
-        if cik_key and cik_key in seen_ciks:
+        # Skip if we've seen this CIK
+        if company.cik and company.cik in seen_ciks:
+            continue
+        # Skip if we've seen this name
+        norm_name = _normalize_name(company.name or "")
+        if norm_name and norm_name in seen_names:
             continue
 
-        if ticker_key:
-            seen_tickers.add(ticker_key)
-        if cik_key:
-            seen_ciks.add(cik_key)
+        seen_tickers.add(company.ticker.upper()) if company.ticker else None
+        seen_ciks.add(company.cik) if company.cik else None
+        seen_names.add(norm_name) if norm_name else None
 
         unique.append(company)
 
+    logger.info(f"Deduplicated {len(companies)} companies to {len(unique)}")
     return unique
-
-
-def find_companies_by_name(companies: list[Company], query: str) -> list[Company]:
-    """Find companies whose name contains the query (case-insensitive)."""
-    query_lower = query.lower()
-    return [c for c in companies if query_lower in c.name.lower()]

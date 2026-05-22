@@ -1,51 +1,80 @@
-"""Schedule generator for logistics shipments.
+"""Delivery schedule generator.
 
-Generates optimized schedules by:
-- Grouping shipments by destination
-- Sorting within groups by priority (overnight > express > standard)
-- Sorting groups alphabetically by destination
+Produces an ordered delivery schedule sorted by priority (highest first)
+with geographic grouping (shipments sharing the same destination are
+grouped together).
+
+Priority ordering (highest first):
+    overnight > express > standard
+
+Geographic grouping:
+    Shipments with the same destination are grouped together.
+    Within each group, shipments are sorted by priority (highest first),
+    then by origin alphabetically for determinism.
 """
+
+from typing import Any, Dict, List
+
+
+# Priority rank: higher number = higher priority (comes first)
+PRIORITY_RANK = {
+    "overnight": 3,
+    "express": 2,
+    "standard": 1,
+}
 
 
 class ScheduleGenerator:
-    """Generate optimized shipping schedules."""
+    """Generate an optimized delivery schedule from shipments."""
 
-    PRIORITY_ORDER = {
-        "overnight": 0,
-        "express": 1,
-        "standard": 2,
-    }
-
-    @classmethod
-    def generate(cls, entries: list[dict] | None) -> list[dict]:
-        """Generate a schedule from a list of shipment entries.
+    @staticmethod
+    def generate(shipments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Generate a delivery schedule.
 
         Args:
-            entries: List of shipment dicts, or None.
+            shipments: List of shipment dicts (as returned by Importer).
 
         Returns:
-            List of schedule entries sorted by destination (alphabetical),
-            then by priority (overnight > express > standard).
+            List of scheduled delivery dicts, ordered by priority (highest
+            first) with geographic grouping by destination.
         """
-        if not entries:
+        if not shipments:
             return []
 
         # Group by destination
-        groups: dict[str, list[dict]] = {}
-        for entry in entries:
-            dest = entry.get("destination", "Unknown")
-            if dest not in groups:
-                groups[dest] = []
-            groups[dest].append(entry)
+        groups: Dict[str, List[Dict[str, Any]]] = {}
+        for shipment in shipments:
+            dest = shipment["destination"]
+            groups.setdefault(dest, []).append(shipment)
 
-        # Sort destinations alphabetically (case-insensitive)
-        sorted_destinations = sorted(groups.keys(), key=str.lower)
+        # Sort destinations alphabetically for determinism
+        sorted_destinations = sorted(groups.keys())
 
-        result = []
+        schedule: List[Dict[str, Any]] = []
+        stop_number = 0
+
         for dest in sorted_destinations:
             group = groups[dest]
-            # Sort within group by priority, then preserve original order for same priority
-            group.sort(key=lambda e: cls.PRIORITY_ORDER.get(e.get("priority", "standard"), 99))
-            result.extend(group)
+            # Sort within group: highest priority first, then origin alphabetically
+            group.sort(
+                key=lambda s: (
+                    -PRIORITY_RANK.get(s["priority"], 0),
+                    s["origin"].lower(),
+                )
+            )
+            for shipment in group:
+                stop_number += 1
+                schedule.append({
+                    "stop": stop_number,
+                    "destination": dest,
+                    "origin": shipment["origin"],
+                    "priority": shipment["priority"],
+                    "weight": shipment["weight"],
+                    "length": shipment.get("length", 0),
+                    "width": shipment.get("width", 0),
+                    "height": shipment.get("height", 0),
+                    "description": shipment.get("description", ""),
+                    "cost": None,  # populated by CostCalculator when available
+                })
 
-        return result
+        return schedule

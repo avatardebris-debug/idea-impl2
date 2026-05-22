@@ -363,26 +363,13 @@ class ExecutorAgent(AgentProcess):
         _rescued_total = 0
 
         def _rescue_dir(src_dir: pathlib.Path, dest_base: pathlib.Path, label: str) -> int:
-            """Move files from src_dir into dest_base, preserving relative paths."""
+            """Move files from src_dir into dest_base; skip repo infra/shadow names."""
+            from pipeline.path_health import rescue_dir_filtered
+
             if not src_dir.exists() or not src_dir.is_dir():
                 return 0
-            moved = 0
-            for f in list(src_dir.rglob("*")):
-                if f.is_file() and not f.name.startswith("."):
-                    rel = f.relative_to(src_dir)
-                    dst = dest_base / rel
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    if not dst.exists():
-                        _shutil.copy2(str(f), str(dst))
-                        moved += 1
-                    elif f.stat().st_mtime > dst.stat().st_mtime:
-                        _shutil.copy2(str(f), str(dst))
-                        moved += 1
+            moved = rescue_dir_filtered(src_dir, dest_base)
             if moved:
-                try:
-                    _shutil.rmtree(str(src_dir))
-                except OSError:
-                    pass
                 import logging as _log
                 _log.getLogger(__name__).warning(
                     "[executor] Rescued %d file(s) from %s", moved, label
@@ -411,31 +398,38 @@ class ExecutorAgent(AgentProcess):
             _rescued_total += _rescue_dir(_slug_at_root, workspace, f"root {idea_slug}/")
 
         # Pattern 4: loose .py files at project root (not part of pipeline infra)
-        _infra_files = {
-            "agent.py", "extract.py", "fix_indent.py", "fix_missing_plans.py",
-            "fix_stuck_tasks.py", "governance.py", "setup.py",
-            "health_check.py", "import_cloud_zip.py", "import_zip.py",
-            "install_all.py", "llm_interface.py", "quality_scorer.py",
-            "reset_budget_exceeded.py", "sweep_all.py", "test_all.py",
-            "test_dependency_system.py", "test_harness_capabilities.py",
-            "test_priority_eviction_unit.py", "tools.py",
-        }
+        from pipeline.path_health import is_root_infra_file
+
+        _before_names = {p.name for p in before_files}
         for _f in _project_root.glob("*.py"):
-            if _f.name not in _infra_files and _f.name not in before_files:
-                _dst = workspace / _f.name
-                if not _dst.exists():
-                    _dst.parent.mkdir(parents=True, exist_ok=True)
-                    _shutil.copy2(str(_f), str(_dst))
-                    _rescued_total += 1
-                    import logging as _log
-                    _log.getLogger(__name__).warning(
-                        "[executor] Rescued loose file %s from project root", _f.name
-                    )
+            if is_root_infra_file(_f.name) or _f.name in _before_names:
+                continue
+            _dst = workspace / _f.name
+            if not _dst.exists():
+                _dst.parent.mkdir(parents=True, exist_ok=True)
+                _shutil.copy2(str(_f), str(_dst))
+                _rescued_total += 1
+                import logging as _log
+                _log.getLogger(__name__).warning(
+                    "[executor] Rescued loose file %s from project root", _f.name
+                )
 
         # Pattern 5: /workspace/workspace/<slug>/ (cloud double-nesting)
         _cloud_stray = pathlib.Path("/workspace/workspace") / idea_slug
         if _cloud_stray.exists() and _cloud_stray.is_dir():
             _rescued_total += _rescue_dir(_cloud_stray, workspace, f"/workspace/workspace/{idea_slug}/")
+
+        # Pattern 6: prune infra leaks that slipped into workspace during this run
+        try:
+            from pipeline.path_health import prune_workspace_shadows
+            _pruned = prune_workspace_shadows(workspace)
+            if _pruned:
+                import logging as _log
+                _log.getLogger(__name__).warning(
+                    "[executor] Pruned %d workspace path leak(s)", len(_pruned)
+                )
+        except Exception:
+            pass
 
         # Only report files created/changed during THIS call
         after_files = (

@@ -1,87 +1,78 @@
 """CLI entry point for the Logistics CSV Optimizer."""
 
 import argparse
-import json
 import sys
-
-from logistics_csv_optimizer.importer import Importer
-from logistics_csv_optimizer.calculator import CostCalculator
-from logistics_csv_optimizer.scheduler import ScheduleGenerator
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the CLI argument parser.
-
-    Returns:
-        Configured ArgumentParser instance.
-    """
+    """Build and return the argument parser."""
     parser = argparse.ArgumentParser(
-        description="Logistics CSV Optimizer - Import manifests, calculate costs, and generate schedules."
+        prog="logistics_csv_optimizer",
+        description="Import shipment manifests, calculate routing costs, "
+                    "and generate optimized delivery schedules.",
     )
     parser.add_argument(
-        "-i", "--input",
+        "--input", "-i",
         required=True,
-        help="Path to the input CSV manifest file.",
+        help="Path to the input CSV shipment manifest file.",
     )
     parser.add_argument(
-        "-o", "--output",
+        "--output", "-o",
         required=True,
-        help="Path to the output JSON file.",
+        help="Path to the output JSON schedule file.",
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "--verbose", "-v",
         action="store_true",
-        default=False,
-        help="Enable verbose output.",
+        help="Print progress information to stdout.",
     )
     return parser
 
 
-def main(args: list[str] | None = None) -> int:
-    """Run the CLI pipeline.
-
-    Args:
-        args: List of CLI arguments (defaults to sys.argv[1:]).
-
-    Returns:
-        Exit code (0 for success, 1 for error).
-    """
+def main(argv=None) -> int:
+    """Run the CLI workflow. Returns exit code."""
     parser = build_parser()
-    parsed = parser.parse_args(args)
+    args = parser.parse_args(argv)
 
     try:
-        # Run API pipeline
-        from logistics_csv_optimizer.api import run_optimization
-        
-        if parsed.verbose:
-            print(f"Running optimization for: {parsed.input}")
-            
-        output = run_optimization(parsed.input)
-        
-        if parsed.verbose:
-            print(f"Generated schedule with {len(output['schedule'])} entries.")
-            print(f"Total cost: {output['total_cost']}")
+        from logistics_csv_optimizer.importer import Importer
+        from logistics_csv_optimizer.calculator import CostCalculator
+        from logistics_csv_optimizer.scheduler import ScheduleGenerator
+        import json
 
-        # Step 4: Write output JSON
-        if parsed.output == "-":
-            json.dump(output, sys.stdout, indent=2, ensure_ascii=False)
-            sys.stdout.write("\n")
-        else:
-            with open(parsed.output, "w", encoding="utf-8") as fh:
-                json.dump(output, fh, indent=2, ensure_ascii=False)
-            if parsed.verbose:
-                print(f"Output written to: {parsed.output}")
+        if args.verbose:
+            print(f"[1/3] Loading manifest from {args.input} ...")
+
+        shipments = Importer.load_manifest(args.input)
+        if not shipments:
+            print("Warning: No shipments found in the manifest.", file=sys.stderr)
+
+        if args.verbose:
+            print(f"[2/3] Calculating costs for {len(shipments)} shipments ...")
+
+        cost_results = CostCalculator.calculate(shipments)
+
+        if args.verbose:
+            print("[3/3] Generating optimized delivery schedule ...")
+
+        schedule = ScheduleGenerator.generate(shipments)
+
+        output = {
+            "shipments": cost_results["per_shipment"],
+            "total_cost": cost_results["total_cost"],
+            "schedule": schedule,
+        }
+
+        with open(args.output, "w", encoding="utf-8") as fh:
+            json.dump(output, fh, indent=2)
+
+        if args.verbose:
+            print(f"Schedule written to {args.output}")
 
         return 0
 
-    except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         return 1
 
 

@@ -1,450 +1,447 @@
-"""Tests for the formatter module."""
+"""Tests for the Formatter module."""
 
-import os
 import pytest
+import os
+import tempfile
 from datetime import datetime
-from email_tool.models import Email
 from email_tool.formatter import Formatter, BatchFormatter
+from email_tool.models import Email
 
 
-class TestFormatter:
-    """Test cases for Formatter class."""
+class TestFormatterToEML:
+    """Tests for Formatter.to_eml() method."""
     
-    @pytest.fixture
-    def sample_email(self):
-        """Create a sample email for testing."""
-        return Email(
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com", "other@test.com"],
-            subject="Test Subject: Hello World!",
-            date=datetime(2024, 3, 15, 10, 30, 0),
-            body_plain="This is a test email body.\n\nWith multiple lines.",
-            body_html="<html><body><p>This is HTML body.</p></body></html>",
-            attachments=["file1.pdf", "file2.docx"],
-            raw_headers={"Message-ID": "<12345@example.com>", "X-Priority": "1"}
+            to_addrs=["recipient@example.com"],
+            subject="Test Subject",
+            body_plain="This is the plain text body.",
+            date=datetime(2024, 1, 15, 10, 30, 0)
         )
+        self.formatter = Formatter(self.email)
     
-    def test_to_eml_basic(self, sample_email):
-        """Test basic EML export."""
-        formatter = Formatter(sample_email)
-        eml = formatter.to_eml()
+    def test_to_eml_basic(self):
+        """Test basic to_eml conversion."""
+        result = self.formatter.to_eml()
         
-        assert "From: sender@example.com" in eml
-        assert "To: recipient@test.com, other@test.com" in eml
-        assert "Subject: Test Subject: Hello World!" in eml
-        assert "This is a test email body." in eml
+        assert "From: sender@example.com" in result
+        assert "To: recipient@example.com" in result
+        assert "Subject: Test Subject" in result
+        assert "This is the plain text body." in result
     
-    def test_to_eml_with_date(self, sample_email):
-        """Test EML export includes date."""
-        formatter = Formatter(sample_email)
-        eml = formatter.to_eml()
-        
-        assert "2024" in eml
-        assert "Mar" in eml
-    
-    def test_to_eml_empty_body(self):
-        """Test EML export with empty body."""
+    def test_to_eml_with_html(self):
+        """Test to_eml with HTML body."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain=None,
-            body_html=None,
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="HTML Email",
+            body_html="<p>HTML body</p>"
         )
-        
         formatter = Formatter(email)
-        eml = formatter.to_eml()
         
-        assert "From: sender@example.com" in eml
-        assert "Test" in eml
-    
-    def test_to_eml_attachments(self, sample_email):
-        """Test EML export includes attachments."""
-        formatter = Formatter(sample_email)
-        eml = formatter.to_eml()
+        result = formatter.to_eml()
         
-        assert "Attachments:" in eml
-        assert "file1.pdf" in eml
-        assert "file2.docx" in eml
+        assert "<p>HTML body</p>" in result
+        assert "text/html" in result
     
-    def test_to_markdown_basic(self, sample_email):
-        """Test basic markdown export."""
-        formatter = Formatter(sample_email)
-        md = formatter.to_markdown()
-        
-        assert "# Email: Test Subject: Hello World!" in md
-        assert "## Metadata" in md
-        assert "## Body" in md
-        assert "## Attachments" in md
-    
-    def test_to_markdown_from_field(self, sample_email):
-        """Test markdown includes from field."""
-        formatter = Formatter(sample_email)
-        md = formatter.to_markdown()
-        
-        assert "**From:** sender@example.com" in md
-    
-    def test_to_markdown_to_field(self, sample_email):
-        """Test markdown includes to field."""
-        formatter = Formatter(sample_email)
-        md = formatter.to_markdown()
-        
-        assert "**To:** recipient@test.com, other@test.com" in md
-    
-    def test_to_markdown_date_field(self, sample_email):
-        """Test markdown includes date field."""
-        formatter = Formatter(sample_email)
-        md = formatter.to_markdown()
-        
-        assert "2024-03-15" in md
-    
-    def test_to_markdown_no_attachments(self):
-        """Test markdown without attachments section."""
+    def test_to_eml_with_attachments(self):
+        """Test to_eml with attachments."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain="Body content",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="Email with Attachment",
+            attachments=["document.pdf", "image.png"]
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "## Attachments" not in md
+        result = formatter.to_eml()
+        
+        assert "document.pdf" in result
+        assert "image.png" in result
     
-    def test_to_markdown_no_body(self):
-        """Test markdown with no body content."""
+    def test_to_eml_with_custom_headers(self):
+        """Test to_eml with custom headers."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain=None,
-            body_html=None,
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="Custom Headers",
+            raw_headers={"X-Priority": "1", "X-Mailer": "TestMailer"}
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "*No body content*" in md
-    
-    def test_to_markdown_raw_headers(self, sample_email):
-        """Test markdown includes raw headers."""
-        formatter = Formatter(sample_email)
-        md = formatter.to_markdown()
+        result = formatter.to_eml()
         
-        assert "## Raw Headers" in md
-        assert "`Message-ID`" in md
-        assert "`X-Priority`" in md
+        assert "X-Priority: 1" in result
+        assert "X-Mailer: TestMailer" in result
+
+
+class TestFormatterToMarkdown:
+    """Tests for Formatter.to_markdown() method."""
     
-    def test_to_markdown_html_body(self):
-        """Test markdown with HTML body."""
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.email = Email(
+            from_addr="sender@example.com",
+            to_addrs=["recipient@example.com"],
+            subject="Test Subject",
+            body_plain="This is the plain text body.",
+            date=datetime(2024, 1, 15, 10, 30, 0)
+        )
+        self.formatter = Formatter(self.email)
+    
+    def test_to_markdown_basic(self):
+        """Test basic markdown conversion."""
+        result = self.formatter.to_markdown()
+        
+        assert "# Email: Test Subject" in result
+        assert "## Metadata" in result
+        assert "## Body" in result
+        assert "**From:** sender@example.com" in result
+        assert "This is the plain text body." in result
+    
+    def test_to_markdown_with_html(self):
+        """Test markdown conversion with HTML body."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain=None,
-            body_html="<html><body><p>HTML content</p></body></html>",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="HTML Email",
+            body_html="<p>HTML body</p>"
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "HTML content" in md
-        assert "<html>" not in md
+        result = formatter.to_markdown()
+        
+        assert "HTML body" in result
+        assert "<p>" not in result  # HTML tags should be stripped
     
-    def test_to_markdown_no_subject(self):
-        """Test markdown with no subject."""
+    def test_to_markdown_with_attachments(self):
+        """Test markdown conversion with attachments."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject=None,
-            date=datetime(2024, 3, 15),
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="Email with Attachment",
+            attachments=["document.pdf"]
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "# Email: No Subject" in md
+        result = formatter.to_markdown()
+        
+        assert "## Attachments" in result
+        assert "- document.pdf" in result
     
-    def test_strip_html(self):
-        """Test HTML stripping."""
-        formatter = Formatter(Email(
+    def test_to_markdown_with_raw_headers(self):
+        """Test markdown conversion with raw headers."""
+        email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain=None,
-            body_html="<p>Test <b>bold</b> text</p>",
-            attachments=[],
-            raw_headers={}
-        ))
+            to_addrs=["recipient@example.com"],
+            subject="Custom Headers",
+            raw_headers={"X-Priority": "1"}
+        )
+        formatter = Formatter(email)
         
-        text = formatter._strip_html("<p>Test <b>bold</b> text</p>")
+        result = formatter.to_markdown()
         
-        assert "<p>" not in text
-        assert "<b>" not in text
-        assert "Test bold text" in text
+        assert "## Raw Headers" in result
+        assert "X-Priority" in result
+
+
+class TestFormatterToPDF:
+    """Tests for Formatter.to_pdf() method."""
     
-    def test_strip_html_entities(self):
-        """Test HTML entity conversion."""
-        formatter = Formatter(Email(
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain=None,
-            body_html="Test &nbsp; &amp; &lt; &gt;",
-            attachments=[],
-            raw_headers={}
-        ))
-        
-        text = formatter._strip_html("Test &nbsp; &amp; &lt; &gt;")
-        
-        # html.unescape converts &nbsp; to non-breaking space (\xa0), &amp; to &, etc.
-        assert "&" in text
-        assert "<" in text
-        assert ">" in text
+            to_addrs=["recipient@example.com"],
+            subject="Test Subject",
+            body_plain="This is the plain text body.",
+            date=datetime(2024, 1, 15, 10, 30, 0)
+        )
     
-    def test_format_eml(self, sample_email):
-        """Test format method with EML."""
-        formatter = Formatter(sample_email)
+    def test_to_pdf_basic(self):
+        """Test basic PDF conversion."""
+        formatter = Formatter(self.email)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "test.pdf")
+            result = formatter.to_pdf(output_path)
+            
+            assert result is True
+            assert os.path.exists(output_path)
+    
+    def test_to_pdf_with_custom_title(self):
+        """Test PDF conversion with custom title."""
+        formatter = Formatter(self.email)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = os.path.join(temp_dir, "test.pdf")
+            result = formatter.to_pdf(output_path, title="Custom Title")
+            
+            assert result is True
+            assert os.path.exists(output_path)
+    
+    def test_to_pdf_without_fpdf(self):
+        """Test PDF conversion when fpdf is not installed."""
+        # Temporarily hide fpdf
+        import sys
+        original_fpdc = sys.modules.get('fpdf')
+        sys.modules['fpdf'] = None
+        
+        try:
+            formatter = Formatter(self.email)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                output_path = os.path.join(temp_dir, "test.pdf")
+                result = formatter.to_pdf(output_path)
+                
+                assert result is False
+        finally:
+            # Restore fpdf
+            if original_fpdc:
+                sys.modules['fpdf'] = original_fpdc
+            elif 'fpdf' in sys.modules:
+                del sys.modules['fpdf']
+    
+    def test_to_pdf_creates_directory(self):
+        """Test that PDF conversion creates directory if needed."""
+        formatter = Formatter(self.email)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            subdir = os.path.join(temp_dir, "subdir", "nested")
+            output_path = os.path.join(subdir, "test.pdf")
+            result = formatter.to_pdf(output_path)
+            
+            assert result is True
+            assert os.path.exists(output_path)
+
+
+class TestFormatterFormat:
+    """Tests for Formatter.format() method."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.email = Email(
+            from_addr="sender@example.com",
+            to_addrs=["recipient@example.com"],
+            subject="Test Subject",
+            body_plain="Test body"
+        )
+    
+    def test_format_eml(self):
+        """Test format method with EML output."""
+        formatter = Formatter(self.email)
+        
         result = formatter.format("eml")
         
         assert "From: sender@example.com" in result
+        assert isinstance(result, str)
     
-    def test_format_markdown(self, sample_email):
-        """Test format method with Markdown."""
-        formatter = Formatter(sample_email)
+    def test_format_markdown(self):
+        """Test format method with Markdown output."""
+        formatter = Formatter(self.email)
+        
         result = formatter.format("md")
         
-        assert "# Email: Test Subject: Hello World!" in result
+        assert "# Email: Test Subject" in result
+        assert isinstance(result, str)
     
-    def test_format_pdf_without_path(self, sample_email):
-        """Test format method with PDF without path."""
-        formatter = Formatter(sample_email)
+    def test_format_pdf_requires_path(self):
+        """Test that PDF format requires output path."""
+        formatter = Formatter(self.email)
         
-        with pytest.raises(ValueError, match="output_path required"):
+        with pytest.raises(ValueError):
             formatter.format("pdf")
     
-    def test_format_unknown_format(self, sample_email):
-        """Test format method with unknown format."""
-        formatter = Formatter(sample_email)
+    def test_format_invalid_format(self):
+        """Test format method with invalid format."""
+        formatter = Formatter(self.email)
         
-        with pytest.raises(ValueError, match="Unknown output format"):
-            formatter.format("unknown")
+        with pytest.raises(ValueError):
+            formatter.format("invalid")
 
 
 class TestBatchFormatter:
-    """Test cases for BatchFormatter class."""
+    """Tests for BatchFormatter class."""
     
-    @pytest.fixture
-    def sample_emails(self):
-        """Create sample emails for testing."""
-        return [
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.emails = [
             Email(
                 from_addr="sender1@example.com",
-                to_addrs=["recipient@test.com"],
+                to_addrs=["recipient@example.com"],
                 subject="Email 1",
-                date=datetime(2024, 3, 15),
-                body_plain="Body 1",
-                attachments=[],
-                raw_headers={}
+                body_plain="Body 1"
             ),
             Email(
                 from_addr="sender2@example.com",
-                to_addrs=["recipient@test.com"],
+                to_addrs=["recipient@example.com"],
                 subject="Email 2",
-                date=datetime(2024, 3, 16),
-                body_plain="Body 2",
-                attachments=["file.pdf"],
-                raw_headers={}
-            ),
+                body_plain="Body 2"
+            )
         ]
     
-    def test_format_all_eml(self, sample_emails, tmp_path):
+    def test_format_all_eml(self):
         """Test batch formatting to EML."""
-        batch_formatter = BatchFormatter(sample_emails)
+        batch_formatter = BatchFormatter(self.emails)
         
-        paths = batch_formatter.format_all(
-            output_format="eml",
-            base_path=str(tmp_path)
-        )
-        
-        assert len(paths) == 2
-        for path in paths:
-            assert os.path.exists(path)
-            assert path.endswith(".eml")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="eml",
+                base_path=temp_dir
+            )
+            
+            assert len(paths) == 2
+            for path in paths:
+                assert os.path.exists(path)
+                assert path.endswith(".eml")
     
-    def test_format_all_markdown(self, sample_emails, tmp_path):
+    def test_format_all_markdown(self):
         """Test batch formatting to Markdown."""
-        batch_formatter = BatchFormatter(sample_emails)
+        batch_formatter = BatchFormatter(self.emails)
         
-        paths = batch_formatter.format_all(
-            output_format="md",
-            base_path=str(tmp_path)
-        )
-        
-        assert len(paths) == 2
-        for path in paths:
-            assert os.path.exists(path)
-            assert path.endswith(".md")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="md",
+                base_path=temp_dir
+            )
+            
+            assert len(paths) == 2
+            for path in paths:
+                assert os.path.exists(path)
+                assert path.endswith(".md")
     
-    def test_format_all_pdf(self, sample_emails, tmp_path):
+    def test_format_all_pdf(self):
         """Test batch formatting to PDF."""
-        pytest.importorskip("fpdf")
-        batch_formatter = BatchFormatter(sample_emails)
+        batch_formatter = BatchFormatter(self.emails)
         
-        paths = batch_formatter.format_all(
-            output_format="pdf",
-            base_path=str(tmp_path)
-        )
-        
-        assert len(paths) == 2
-        for path in paths:
-            assert os.path.exists(path)
-            assert path.endswith(".pdf")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="pdf",
+                base_path=temp_dir
+            )
+            
+            assert len(paths) == 2
+            for path in paths:
+                assert os.path.exists(path)
+                assert path.endswith(".pdf")
     
-    def test_format_all_custom_filename(self, sample_emails, tmp_path):
+    def test_format_all_with_filename_template(self):
         """Test batch formatting with custom filename template."""
-        batch_formatter = BatchFormatter(sample_emails)
+        batch_formatter = BatchFormatter(self.emails)
         
-        paths = batch_formatter.format_all(
-            output_format="eml",
-            base_path=str(tmp_path),
-            filename_template="{{from_domain}}_{{subject_sanitized}}.{ext}"
-        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="md",
+                base_path=temp_dir,
+                filename_template="{{subject_sanitized}}.md"
+            )
+            
+            assert len(paths) == 2
+            # Files should be named after subjects
+            filenames = [os.path.basename(p) for p in paths]
+            assert "Email_1.md" in filenames
+            assert "Email_2.md" in filenames
+    
+    def test_format_all_with_custom_extension(self):
+        """Test batch formatting with custom file extension."""
+        batch_formatter = BatchFormatter(self.emails)
         
-        assert len(paths) == 2
-        # Check that filenames contain domain
-        for path in paths:
-            assert "example.com" in path
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="md",
+                base_path=temp_dir,
+                file_extension="txt"
+            )
+            
+            assert len(paths) == 2
+            for path in paths:
+                assert path.endswith(".txt")
+    
+    def test_format_all_invalid_format(self):
+        """Test batch formatting with invalid format."""
+        batch_formatter = BatchFormatter(self.emails)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            with pytest.raises(ValueError):
+                batch_formatter.format_all(
+                    output_format="invalid",
+                    base_path=temp_dir
+                )
+    
+    def test_format_all_empty_list(self):
+        """Test batch formatting with empty email list."""
+        batch_formatter = BatchFormatter([])
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            paths = batch_formatter.format_all(
+                output_format="md",
+                base_path=temp_dir
+            )
+            
+            assert paths == []
 
 
 class TestFormatterEdgeCases:
-    """Edge case tests for Formatter."""
+    """Tests for edge cases in Formatter."""
     
-    def test_email_with_special_chars_in_subject(self):
-        """Test formatting with special characters in subject."""
+    def test_formatter_with_empty_email(self):
+        """Test formatter with minimal email."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject='Test<>:"/\\|?*?',
-            date=datetime(2024, 3, 15),
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject=""
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "Test<>:" in md  # Markdown preserves special chars in title
+        result = formatter.to_markdown()
+        
+        assert "Email:" in result
+        assert isinstance(result, str)
     
-    def test_email_with_unicode_body(self):
-        """Test formatting with unicode characters."""
+    def test_formatter_with_unicode(self):
+        """Test formatter with unicode characters."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain="你好世界 世界你好",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="Unicode: 你好世界 🌍",
+            body_plain="Body: Привет мир مرحبا"
         )
-        
         formatter = Formatter(email)
-        md = formatter.to_markdown()
         
-        assert "你好" in md
-        assert "世界" in md
+        result = formatter.to_markdown()
+        
+        assert "你好世界" in result
+        assert "Привет мир" in result
     
-    def test_email_with_empty_from(self):
-        """Test formatting with empty from address."""
-        email = Email(
-            from_addr="",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
-        )
-        
-        formatter = Formatter(email)
-        eml = formatter.to_eml()
-        
-        assert "From: Unknown" in eml
-    
-    def test_email_with_empty_to(self):
-        """Test formatting with empty to addresses."""
+    def test_formatter_with_special_characters(self):
+        """Test formatter with special characters."""
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=[],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject="Special: @#$%^&*()",
+            body_plain="Body: <>&\"'"
         )
-        
         formatter = Formatter(email)
-        eml = formatter.to_eml()
         
-        assert "To:" not in eml or "To: " not in eml
+        result = formatter.to_markdown()
+        
+        assert "@#$%^&*()" in result
+        assert "<>&\"'" in result
     
-    def test_email_with_no_date(self):
-        """Test formatting with no date."""
+    def test_formatter_with_long_subject(self):
+        """Test formatter with very long subject."""
+        long_subject = "A" * 1000
         email = Email(
             from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=None,
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
+            to_addrs=["recipient@example.com"],
+            subject=long_subject
         )
-        
         formatter = Formatter(email)
-        eml = formatter.to_eml()
         
-        assert "Date:" not in eml
-    
-    def test_pdf_creation_failure(self):
-        """Test PDF creation when fpdf is not available."""
-        email = Email(
-            from_addr="sender@example.com",
-            to_addrs=["recipient@test.com"],
-            subject="Test",
-            date=datetime(2024, 3, 15),
-            body_plain="Body",
-            attachments=[],
-            raw_headers={}
-        )
+        result = formatter.to_markdown()
         
-        formatter = Formatter(email)
-        result = formatter.to_pdf("/tmp/test.pdf")
-        
-        # Should return False if fpdf is not available
-        try:
-            import fpdf
-            assert result is True
-        except ImportError:
-            assert result is False
+        assert long_subject in result
 
 
 if __name__ == "__main__":

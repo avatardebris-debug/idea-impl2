@@ -19,81 +19,45 @@ def validate_skill_schema(skill_data: Dict[str, Any]) -> None:
     Validate that a skill dictionary has the required structure.
     
     Args:
-        skill_data: Dictionary containing skill data
-        
+        skill_data: Dictionary containing skill data.
+
     Raises:
-        SkillValidationError: If the schema is invalid
+        SkillValidationError: If validation fails.
     """
-    required_keys = {"system_prompt", "functions", "examples"}
-    missing_keys = required_keys - set(skill_data.keys())
-    
-    if missing_keys:
-        raise SkillValidationError(
-            f"Missing required keys: {', '.join(sorted(missing_keys))}"
-        )
-    
-    if not isinstance(skill_data["system_prompt"], str):
-        raise SkillValidationError("'system_prompt' must be a string")
-    
-    if not isinstance(skill_data["functions"], list):
+    required_fields = ["name", "description", "system_prompt"]
+    for field in required_fields:
+        if field not in skill_data:
+            raise SkillValidationError(f"Missing required field: {field}")
+
+    if "functions" in skill_data and not isinstance(skill_data["functions"], list):
         raise SkillValidationError("'functions' must be a list")
-    
-    if not isinstance(skill_data["examples"], list):
+
+    if "examples" in skill_data and not isinstance(skill_data["examples"], list):
         raise SkillValidationError("'examples' must be a list")
-    
-    # Validate each function has required fields
-    for i, func in enumerate(skill_data["functions"]):
-        if not isinstance(func, dict):
-            raise SkillValidationError(f"Function at index {i} must be a dictionary")
-        
-        required_func_keys = {"name", "description", "parameters"}
-        missing_func_keys = required_func_keys - set(func.keys())
-        
-        if missing_func_keys:
-            raise SkillValidationError(
-                f"Function '{func.get('name', i)}' missing required keys: {', '.join(sorted(missing_func_keys))}"
-            )
-        
-        if not isinstance(func["name"], str):
-            raise SkillValidationError(f"Function '{func['name']}' name must be a string")
-        
-        if not isinstance(func["description"], str):
-            raise SkillValidationError(f"Function '{func['name']}' description must be a string")
-        
-        if not isinstance(func["parameters"], dict):
-            raise SkillValidationError(f"Function '{func['name']}' parameters must be a dictionary")
+
+    if "functions" in skill_data:
+        for i, func in enumerate(skill_data["functions"]):
+            if not isinstance(func, dict):
+                raise SkillValidationError(f"functions[{i}] must be a dict")
+            if "name" not in func:
+                raise SkillValidationError(f"functions[{i}] missing 'name'")
 
 
-def load_skill(skill_path: Union[str, Path]) -> Dict[str, Any]:
+def load_skill(path: Union[str, Path]) -> Dict[str, Any]:
     """
-    Load and validate a JSON skill file.
+    Load a skill from a JSON file.
     
     Args:
-        skill_path: Path to the JSON skill file
-        
+        path: Path to the JSON skill file.
+
     Returns:
-        Dictionary containing the parsed and validated skill data
-        
+        Dictionary containing the skill data.
+
     Raises:
-        FileNotFoundError: If the file doesn't exist
-        json.JSONDecodeError: If the file contains invalid JSON
-        SkillValidationError: If the file fails validation
+        SkillValidationError: If the file fails validation.
     """
-    path = Path(skill_path)
-    
-    if not path.exists():
-        raise FileNotFoundError(f"Skill file not found: {skill_path}")
-    
-    with open(path, "r", encoding="utf-8") as f:
-        try:
-            skill_data = json.load(f)
-        except json.JSONDecodeError as e:
-            raise json.JSONDecodeError(
-                f"Invalid JSON in skill file: {e.msg}",
-                e.doc,
-                e.pos
-            )
-    
+    path = Path(path)
+    with open(path, "r") as f:
+        skill_data = json.load(f)
     validate_skill_schema(skill_data)
-    
     return skill_data

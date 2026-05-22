@@ -70,6 +70,13 @@ def should_skip(name: str) -> bool:
         return True
     if "MANIFEST.json" == pathlib.PurePosixPath(name).name:
         return True
+    # Do not re-import repo infrastructure leaked into project workspaces
+    try:
+        from pipeline.path_health import should_skip_zip_workspace_path
+        if should_skip_zip_workspace_path(name):
+            return True
+    except ImportError:
+        pass
     return False
 
 

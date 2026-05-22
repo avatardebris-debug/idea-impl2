@@ -1,77 +1,100 @@
-"""Generate Table of Contents from niche profiles."""
+"""Table of contents generator that builds a TOC from niche profiles."""
 
 from __future__ import annotations
 
+import logging
 from typing import List, Optional
 
-from book_researcher.models import NicheProfile, Chapter, Section
+from book_researcher.models import NicheProfile, TableOfContents, TOCChapter
+
+logger = logging.getLogger(__name__)
+
+
+def _generate_chapters(
+    niches: list[NicheProfile],
+    max_chapters: int = 12,
+    book_title: str = "The Underserved Book",
+    target_audience: str = "Practitioners seeking comprehensive coverage",
+) -> list[TOCChapter]:
+    """Generate TOC chapters from the top niche profiles.
+
+    Each niche becomes a chapter. Chapters are ordered by niche score.
+
+    Args:
+        niches: List of NicheProfile objects.
+        max_chapters: Maximum number of chapters to generate.
+        book_title: Title for the generated book.
+        target_audience: Target audience description.
+
+    Returns:
+        List of TOCChapter objects.
+    """
+    if not niches:
+        logger.warning("No niches provided to generate chapters")
+        return []
+
+    # Take top niches up to max_chapters
+    top_niches = niches[:max_chapters]
+
+    chapters: list[TOCChapter] = []
+    for i, niche in enumerate(top_niches, start=1):
+        # Generate a descriptive chapter title from the niche topic
+        chapter_title = f"Chapter {i}: {niche.topic.title()} - Addressing the Gap"
+
+        # Estimate pages based on gap count
+        estimated_pages = max(5, niche.gap_count * 10)
+
+        chapter = TOCChapter(
+            chapter_number=i,
+            title=chapter_title,
+            estimated_pages=estimated_pages,
+            related_gaps=niche.sample_gaps,
+        )
+        chapters.append(chapter)
+
+    logger.info("Generated %d chapters from %d niches", len(chapters), len(niches))
+    return chapters
 
 
 def generate_toc(
-    niches: List[NicheProfile],
-    target_audience: str = "intermediate practitioners",
-    book_length: str = "standard",
-    include_case_studies: bool = True,
-) -> List[Chapter]:
-    """Generate a structured Table of Contents from niche profiles.
+    niches: list[NicheProfile],
+    max_chapters: int = 12,
+    book_title: str = "The Underserved Book",
+    target_audience: str = "Practitioners seeking comprehensive coverage",
+) -> TableOfContents:
+    """Generate a complete TableOfContents from niche profiles.
 
     Args:
-        niches: List of NicheProfile objects representing content gaps.
-        target_audience: Description of the target reader.
-        book_length: One of 'short', 'standard', 'comprehensive'.
-        include_case_studies: Whether to include case study chapters.
+        niches: List of NicheProfile objects.
+        max_chapters: Maximum number of chapters.
+        book_title: Title for the generated book.
+        target_audience: Target audience description.
 
     Returns:
-        List of Chapter objects forming the TOC.
+        A TableOfContents object.
+
+    Raises:
+        ValueError: If niches is empty.
     """
-    chapters: List[Chapter] = []
+    if not niches:
+        raise ValueError("Cannot generate TOC from empty niches list")
 
-    # Determine chapter count based on book length
-    if book_length == "short":
-        num_chapters = min(3, len(niches))
-    elif book_length == "standard":
-        num_chapters = min(6, len(niches))
-    else:  # comprehensive
-        num_chapters = min(10, len(niches))
+    chapters = _generate_chapters(
+        niches=niches,
+        max_chapters=max_chapters,
+        book_title=book_title,
+        target_audience=target_audience,
+    )
 
-    # Generate chapters from top niches
-    for i, niche in enumerate(niches[:num_chapters]):
-        chapter = Chapter(
-            title=f"Chapter {i+1}: {niche.topic.title()} Fundamentals",
-            niche=niche,
-            sections=[],
-        )
+    total_pages = sum(ch.estimated_pages for ch in chapters)
 
-        # Generate sections based on niche gaps
-        gap_texts = [g.text for g in niche.gaps]
-        for j, gap_text in enumerate(gap_texts[:4]):  # Max 4 sections per chapter
-            section = Section(
-                title=f"Section {j+1}: {gap_text.title()}",
-                content_hint=gap_text,
-                estimated_pages=8 if book_length == "comprehensive" else 5,
-            )
-            chapter.sections.append(section)
+    toc = TableOfContents(
+        book_title=book_title,
+        target_audience=target_audience,
+        chapters=chapters,
+        total_chapters=len(chapters),
+        estimated_total_pages=total_pages,
+    )
 
-        chapters.append(chapter)
-
-    # Add case study chapter if requested and there are enough niches
-    if include_case_studies and len(niches) > 1:
-        case_study_chapter = Chapter(
-            title="Case Studies and Applications",
-            niche=niches[-1] if niches else None,
-            sections=[
-                Section(
-                    title="Real-World Implementation",
-                    content_hint="Practical examples from the identified gaps",
-                    estimated_pages=15,
-                ),
-                Section(
-                    title="Common Pitfalls and Solutions",
-                    content_hint="Addressing the most frequent challenges",
-                    estimated_pages=12,
-                ),
-            ],
-        )
-        chapters.append(case_study_chapter)
-
-    return chapters
+    logger.info("Generated TOC: %s (%d chapters, %d pages)", book_title, len(chapters), total_pages)
+    return toc

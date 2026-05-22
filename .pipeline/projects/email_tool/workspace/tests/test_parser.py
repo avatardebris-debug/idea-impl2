@@ -1,569 +1,366 @@
-"""Unit tests for the email parser."""
+"""Tests for the EmailParser module."""
 
 import pytest
+import os
+import tempfile
 from datetime import datetime
-from email_tool.parser import (
-    parse_email_file,
-    parse_email_content,
-    _decode_mime_word,
-    _parse_date,
-    _get_header_value,
-    _get_addresses,
-    _extract_attachments,
-    _extract_body_parts,
-)
+from email_tool.parser import EmailParser
 from email_tool.models import Email
 
 
-class TestDecodeMimeWord:
-    """Tests for MIME word decoding."""
-
-    def test_decode_plain_text(self):
-        """Test decoding of plain text without encoding."""
-        result = _decode_mime_word("Hello World")
-        assert result == "Hello World"
-
-    def test_decode_utf8_base64(self):
-        """Test decoding of UTF-8 base64 encoded text."""
-        result = _decode_mime_word("=?UTF-8?B?SGVsbG8gV29ybGQ=?=")
-        assert result == "Hello World"
-
-    def test_decode_iso8859_q_encoded(self):
-        """Test decoding of ISO-8859-1 Q-encoded text."""
-        result = _decode_mime_word("=?ISO-8859-1?Q?Hello_World?=")
-        assert result == "Hello World"
-
-    def test_decode_multiple_mime_words(self):
-        """Test decoding of multiple MIME words in sequence."""
-        result = _decode_mime_word("=?UTF-8?B?SGVsbG8=?= =?UTF-8?B?IFdvcmxk?=")
-        assert result == "Hello World"
-
-    def test_decode_empty_string(self):
-        """Test decoding of empty string."""
-        result = _decode_mime_word("")
-        assert result == ""
-
-
-class TestParseDate:
-    """Tests for date parsing."""
-
-    def test_parse_valid_date(self):
-        """Test parsing of valid RFC 2822 date."""
-        result = _parse_date("Mon, 01 Jan 2024 12:00:00 +0000")
-        assert result is not None
-        assert isinstance(result, datetime)
-
-    def test_parse_date_with_timezone(self):
-        """Test parsing of date with timezone offset."""
-        result = _parse_date("Mon, 01 Jan 2024 12:00:00 +0530")
-        assert result is not None
-
-    def test_parse_invalid_date(self):
-        """Test parsing of invalid date string."""
-        result = _parse_date("Not a valid date")
-        assert result is None
-
-    def test_parse_empty_date(self):
-        """Test parsing of empty date string."""
-        result = _parse_date("")
-        assert result is None
-
-    def test_parse_none_date(self):
-        """Test parsing of None date."""
-        result = _parse_date(None)
-        assert result is None
-
-
-class TestGetHeaderValue:
-    """Tests for header value extraction."""
-
-    def test_get_header_value(self, mock_email):
-        """Test getting a header value."""
-        result = _get_header_value(mock_email, "Subject")
-        assert result == "Test Subject"
-
-    def test_get_header_value_case_insensitive(self, mock_email):
-        """Test getting header value with different case."""
-        result = _get_header_value(mock_email, "subject")
-        assert result == "Test Subject"
-
-    def test_get_header_value_missing(self, mock_email):
-        """Test getting a missing header value."""
-        result = _get_header_value(mock_email, "Missing-Header")
-        assert result is None
-
-
-class TestGetAddresses:
-    """Tests for address extraction."""
-
-    def test_get_addresses_single(self, mock_email):
-        """Test getting addresses from single recipient."""
-        result = _get_addresses(mock_email, "To")
-        assert len(result) == 1
-        assert "recipient@example.com" in result
-
-    def test_get_addresses_multiple(self, mock_email_multi):
-        """Test getting addresses from multiple recipients."""
-        result = _get_addresses(mock_email_multi, "To")
-        assert len(result) == 2
-        assert "recipient1@example.com" in result
-        assert "recipient2@example.com" in result
-
-    def test_get_addresses_empty(self, mock_email_empty):
-        """Test getting addresses when header is empty."""
-        result = _get_addresses(mock_email_empty, "To")
-        assert result == []
-
-    def test_get_addresses_display_name(self, mock_email_display):
-        """Test getting addresses with display names."""
-        result = _get_addresses(mock_email_display, "From")
-        assert len(result) == 1
-        assert "sender@example.com" in result
-
-
-class TestExtractBodyParts:
-    """Tests for body part extraction."""
-
-    def test_extract_plain_text_body(self, mock_email_plain):
-        """Test extracting plain text body."""
-        plain, html = _extract_body_parts(mock_email_plain)
-        assert plain == "This is a plain text email body."
-        assert html is None
-
-    def test_extract_html_body(self, mock_email_html):
-        """Test extracting HTML body."""
-        plain, html = _extract_body_parts(mock_email_html)
-        assert plain is None
-        assert html == "<html><body><p>HTML content</p></body></html>"
-
-    def test_extract_both_body_types(self, mock_email_multipart):
-        """Test extracting both plain and HTML bodies."""
-        plain, html = _extract_body_parts(mock_email_multipart)
-        assert plain == "Plain text version"
-        assert html == "<html><body>HTML version</body></html>"
-
-    def test_extract_empty_body(self, mock_email_empty_body):
-        """Test extracting empty body."""
-        plain, html = _extract_body_parts(mock_email_empty_body)
-        assert plain is None
-        assert html is None
-
-
-class TestExtractAttachments:
-    """Tests for attachment extraction."""
-
-    def test_extract_attachments(self, mock_email_with_attachment):
-        """Test extracting attachment filenames."""
-        attachments = _extract_attachments(mock_email_with_attachment)
-        assert len(attachments) == 1
-        assert "document.pdf" in attachments
-
-    def test_extract_multiple_attachments(self, mock_email_multiple_attachments):
-        """Test extracting multiple attachments."""
-        attachments = _extract_attachments(mock_email_multiple_attachments)
-        assert len(attachments) == 2
-        assert "file1.txt" in attachments
-        assert "file2.pdf" in attachments
-
-    def test_extract_no_attachments(self, mock_email_no_attachment):
-        """Test extracting when no attachments exist."""
-        attachments = _extract_attachments(mock_email_no_attachment)
-        assert attachments == []
-
-    def test_extract_inline_attachments(self, mock_email_inline_attachment):
-        """Test extracting inline attachments."""
-        attachments = _extract_attachments(mock_email_inline_attachment)
-        assert len(attachments) == 1
-        assert "image.png" in attachments
-
-
-class TestParseEmailContent:
-    """Tests for parsing email content."""
-
-    def test_parse_plain_text_email(self):
-        """Test parsing a plain text email."""
-        content = """From: sender@example.com
+class TestEmailParser:
+    """Tests for EmailParser class."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.parser = EmailParser()
+        self.sample_email_content = """From: sender@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Test Email Subject
+Date: Mon, 15 Jan 2024 10:30:00 +0000
+Message-ID: <test123@example.com>
 
-This is a plain text email body."""
+This is the plain text body of the email.
+"""
+    
+    def test_parse_file_path(self):
+        """Test parsing from file path."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.eml', delete=False) as f:
+            f.write(self.sample_email_content)
+            temp_path = f.name
         
-        email = parse_email_content(content)
+        try:
+            email = self.parser.parse(temp_path)
+            
+            assert email is not None
+            assert isinstance(email, Email)
+            assert email.from_addr == "sender@example.com"
+            assert email.to_addrs == ["recipient@example.com"]
+            assert email.subject == "Test Email Subject"
+            assert email.body_plain == "This is the plain text body of the email."
+        finally:
+            os.unlink(temp_path)
+    
+    def test_parse_content(self):
+        """Test parsing from string content."""
+        email = self.parser.parse_content(self.sample_email_content)
+        
         assert email is not None
+        assert isinstance(email, Email)
         assert email.from_addr == "sender@example.com"
         assert email.to_addrs == ["recipient@example.com"]
-        assert email.subject == "Test Email"
-        assert email.body_plain == "This is a plain text email body."
-        assert email.body_html is None
-
-    def test_parse_html_email(self):
-        """Test parsing an HTML email."""
-        content = """From: sender@example.com
+        assert email.subject == "Test Email Subject"
+        assert email.body_plain == "This is the plain text body of the email."
+    
+    def test_parse_with_html_body(self):
+        """Test parsing email with HTML body."""
+        html_email = """From: sender@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
-Content-Type: text/html
+Subject: HTML Email
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-<html><body><p>HTML content</p></body></html>"""
+<html>
+<body>
+<p>This is the <strong>HTML</strong> body.</p>
+</body>
+</html>
+"""
+        email = self.parser.parse_content(html_email)
         
-        email = parse_email_content(content)
         assert email is not None
-        assert email.body_html == "<html><body><p>HTML content</p></body></html>"
-
-    def test_parse_multipart_email(self):
-        """Test parsing a multipart email."""
-        content = """From: sender@example.com
+        assert email.body_html == "<html>\n<body>\n<p>This is the <strong>HTML</strong> body.</p>\n</body>\n</html>"
+    
+    def test_parse_with_multipart_body(self):
+        """Test parsing email with multipart body."""
+        multipart_email = """From: sender@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
-Content-Type: multipart/alternative; boundary="boundary"
+Subject: Multipart Email
+Date: Mon, 15 Jan 2024 10:30:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/alternative; boundary="boundary123"
 
---boundary
-Content-Type: text/plain
+--boundary123
+Content-Type: text/plain; charset="utf-8"
 
-Plain text body
+This is the plain text body.
 
---boundary
-Content-Type: text/html
+--boundary123
+Content-Type: text/html; charset="utf-8"
 
-<html><body>HTML body</body></html>
---boundary--"""
+<p>This is the <strong>HTML</strong> body.</p>
+
+--boundary123--
+"""
+        email = self.parser.parse_content(multipart_email)
         
-        email = parse_email_content(content)
         assert email is not None
-        assert email.body_plain == "Plain text body"
-        assert email.body_html == "<html><body>HTML body</body></html>"
-
-    def test_parse_email_with_attachments(self):
-        """Test parsing an email with attachments."""
-        content = """From: sender@example.com
+        assert email.body_plain == "This is the plain text body."
+        assert email.body_html == "<p>This is the <strong>HTML</strong> body.</p>"
+    
+    def test_parse_with_attachments(self):
+        """Test parsing email with attachments."""
+        attachment_email = """From: sender@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
-Content-Type: multipart/mixed; boundary="boundary"
+Subject: Email with Attachment
+Date: Mon, 15 Jan 2024 10:30:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="boundary123"
 
---boundary
-Content-Type: text/plain
+--boundary123
+Content-Type: text/plain; charset="utf-8"
 
-Email body
+This email has an attachment.
 
---boundary
-Content-Disposition: attachment; filename="test.txt"
-Content-Type: text/plain
+--boundary123
+Content-Type: application/pdf
+Content-Disposition: attachment; filename="document.pdf"
 
-Attachment content
---boundary--"""
+[Binary content would be here]
+
+--boundary123--
+"""
+        email = self.parser.parse_content(attachment_email)
         
-        email = parse_email_content(content)
         assert email is not None
-        assert len(email.attachments) == 1
-        assert "test.txt" in email.attachments
+        assert "document.pdf" in email.attachments
+    
+    def test_parse_with_multiple_recipients(self):
+        """Test parsing email with multiple recipients."""
+        multi_recipient_email = """From: sender@example.com
+To: recipient1@example.com, recipient2@example.com
+Cc: cc@example.com
+Subject: Multi-recipient Email
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-    def test_parse_email_with_missing_headers(self):
-        """Test parsing an email with missing headers."""
-        content = """From: sender@example.com
-Subject: Test Email
-
-Email body without To or Date headers."""
+Email with multiple recipients.
+"""
+        email = self.parser.parse_content(multi_recipient_email)
         
-        email = parse_email_content(content)
+        assert email is not None
+        assert len(email.to_addrs) == 2
+        assert "recipient1@example.com" in email.to_addrs
+        assert "recipient2@example.com" in email.to_addrs
+    
+    def test_parse_with_custom_headers(self):
+        """Test parsing email with custom headers."""
+        custom_headers_email = """From: sender@example.com
+To: recipient@example.com
+Subject: Custom Headers Email
+X-Priority: 1
+X-Mailer: CustomMailer
+Date: Mon, 15 Jan 2024 10:30:00 +0000
+
+Email with custom headers.
+"""
+        email = self.parser.parse_content(custom_headers_email)
+        
+        assert email is not None
+        assert email.raw_headers.get("X-Priority") == "1"
+        assert email.raw_headers.get("X-Mailer") == "CustomMailer"
+    
+    def test_parse_empty_email(self):
+        """Test parsing empty email content."""
+        email = self.parser.parse_content("")
+        
+        assert email is not None
+        assert email.from_addr is None
+        assert email.subject is None
+        assert email.body_plain is None
+    
+    def test_parse_invalid_email(self):
+        """Test parsing invalid email content."""
+        invalid_email = "This is not a valid email format"
+        
+        email = self.parser.parse_content(invalid_email)
+        
+        # Should still return an Email object even if parsing fails
+        assert email is not None
+        assert isinstance(email, Email)
+    
+    def test_parse_with_date(self):
+        """Test parsing email with date header."""
+        email = self.parser.parse_content(self.sample_email_content)
+        
+        assert email.date is not None
+        assert isinstance(email.date, datetime)
+        assert email.date.year == 2024
+        assert email.date.month == 1
+        assert email.date.day == 15
+    
+    def test_parse_with_missing_fields(self):
+        """Test parsing email with missing optional fields."""
+        minimal_email = """From: sender@example.com
+Subject: Minimal Email
+Date: Mon, 15 Jan 2024 10:30:00 +0000
+
+No To field, no body.
+"""
+        email = self.parser.parse_content(minimal_email)
+        
         assert email is not None
         assert email.from_addr == "sender@example.com"
-        assert email.subject == "Test Email"
+        assert email.subject == "Minimal Email"
         assert email.to_addrs == []
-        assert email.date is None
-
-    def test_parse_invalid_email(self):
-        """Test parsing an invalid email."""
-        content = "This is not a valid email format"
-        email = parse_email_content(content)
-        assert email is not None  # Should still parse, just with minimal data
-
-
-class TestParseEmailFile:
-    """Tests for parsing email files."""
-
-    def test_parse_valid_eml_file(self, tmp_path, sample_eml_file):
-        """Test parsing a valid .eml file."""
-        email = parse_email_file(sample_eml_file)
-        assert email is not None
-        assert email.subject == "Test Email"
-
-    def test_parse_nonexistent_file(self):
-        """Test parsing a nonexistent file."""
-        email = parse_email_file("/nonexistent/path/to/file.eml")
-        assert email is None
-
-    def test_parse_invalid_eml_file(self, tmp_path):
-        """Test parsing an invalid .eml file."""
-        invalid_file = tmp_path / "invalid.eml"
-        invalid_file.write_text("This is not a valid email file")
-        
-        email = parse_email_file(invalid_file)
-        assert email is not None  # Should still parse, just with minimal data
-
-
-class TestEmailParsingEdgeCases:
-    """Tests for edge cases in email parsing."""
-
-    def test_email_with_unicode_subject(self):
-        """Test parsing email with unicode in subject."""
-        content = """From: sender@example.com
+        assert email.body_plain == "No To field, no body."
+    
+    def test_parse_file_not_found(self):
+        """Test parsing non-existent file."""
+        with pytest.raises(FileNotFoundError):
+            self.parser.parse("/nonexistent/path/to/email.eml")
+    
+    def test_parse_with_special_characters(self):
+        """Test parsing email with special characters."""
+        special_email = """From: sender@example.com
 To: recipient@example.com
-Subject: =?UTF-8?B?VGVzdCBzdWJqZWN0IHdpdGggdW5pY29kZQ==?=
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Test with special chars: @#$%^&*()
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-Body content."""
+Body with special chars: <>&"'
+"""
+        email = self.parser.parse_content(special_email)
         
-        email = parse_email_content(content)
         assert email is not None
-        assert email.subject == "Test subject with unicode"
-
-    def test_email_with_multiple_from_addresses(self):
-        """Test parsing email with multiple From addresses."""
-        content = """From: sender1@example.com, sender2@example.com
+        assert email.subject == "Test with special chars: @#$%^&*()"
+        assert "<>&\"'" in email.body_plain
+    
+    def test_parse_with_unicode(self):
+        """Test parsing email with unicode characters."""
+        unicode_email = """From: sender@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Unicode Test: 你好世界 🌍
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-Body content."""
+Body with unicode: Привет мир مرحبا
+"""
+        email = self.parser.parse_content(unicode_email)
         
-        email = parse_email_content(content)
         assert email is not None
-        assert len(email.from_addr) > 0
+        assert "你好世界" in email.subject
+        assert "Привет мир" in email.body_plain
 
-    def test_email_with_cc_and_bcc(self):
-        """Test parsing email with CC and BCC."""
-        content = """From: sender@example.com
+
+class TestEmailParserBatch:
+    """Tests for batch parsing functionality."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.parser = EmailParser()
+    
+    def test_parse_batch_from_directory(self):
+        """Test parsing multiple emails from directory."""
+        emails_data = [
+            """From: sender1@example.com
 To: recipient@example.com
-Cc: cc1@example.com, cc2@example.com
-Bcc: bcc1@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Email 1
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-Body content."""
+First email.
+""",
+            """From: sender2@example.com
+To: recipient@example.com
+Subject: Email 2
+Date: Mon, 15 Jan 2024 11:30:00 +0000
+
+Second email.
+""",
+            """From: sender3@example.com
+To: recipient@example.com
+Subject: Email 3
+Date: Mon, 15 Jan 2024 12:30:00 +0000
+
+Third email.
+"""
+        ]
         
-        email = parse_email_content(content)
-        assert email is not None
-        assert "cc1@example.com" in email.raw_headers.get("Cc", "")
-        assert "bcc1@example.com" in email.raw_headers.get("Bcc", "")
-
-    def test_email_with_special_characters_in_body(self):
-        """Test parsing email with special characters in body."""
-        content = """From: sender@example.com
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Write test emails
+            for i, content in enumerate(emails_data):
+                filepath = os.path.join(temp_dir, f"email_{i}.eml")
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(content)
+            
+            # Parse batch
+            emails = self.parser.parse_batch(temp_dir)
+            
+            assert len(emails) == 3
+            assert emails[0].subject == "Email 1"
+            assert emails[1].subject == "Email 2"
+            assert emails[2].subject == "Email 3"
+    
+    def test_parse_batch_with_subdirectories(self):
+        """Test parsing emails from subdirectories."""
+        emails_data = [
+            """From: sender1@example.com
 To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Email 1
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-Special chars: <>&"' and newlines
-and more text."""
+First email.
+""",
+            """From: sender2@example.com
+To: recipient@example.com
+Subject: Email 2
+Date: Mon, 15 Jan 2024 11:30:00 +0000
+
+Second email.
+"""
+        ]
         
-        email = parse_email_content(content)
-        assert email is not None
-        assert "<>&" in email.body_plain
-
-    def test_email_with_long_subject(self):
-        """Test parsing email with very long subject."""
-        long_subject = "A" * 1000
-        content = f"""From: sender@example.com
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create subdirectory
+            subdir = os.path.join(temp_dir, "subdir")
+            os.makedirs(subdir)
+            
+            # Write test emails
+            filepath1 = os.path.join(temp_dir, "email_1.eml")
+            filepath2 = os.path.join(subdir, "email_2.eml")
+            
+            with open(filepath1, 'w', encoding='utf-8') as f:
+                f.write(emails_data[0])
+            with open(filepath2, 'w', encoding='utf-8') as f:
+                f.write(emails_data[1])
+            
+            # Parse batch
+            emails = self.parser.parse_batch(temp_dir)
+            
+            assert len(emails) == 2
+    
+    def test_parse_batch_empty_directory(self):
+        """Test parsing from empty directory."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            emails = self.parser.parse_batch(temp_dir)
+            
+            assert emails == []
+    
+    def test_parse_batch_non_eml_files(self):
+        """Test parsing directory with non-.eml files."""
+        emails_data = [
+            """From: sender@example.com
 To: recipient@example.com
-Subject: {long_subject}
-Date: Mon, 01 Jan 2024 12:00:00 +0000
+Subject: Email 1
+Date: Mon, 15 Jan 2024 10:30:00 +0000
 
-Body content."""
+First email.
+"""
+        ]
         
-        email = parse_email_content(content)
-        assert email is not None
-        assert email.subject == long_subject
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Write test email
+            filepath = os.path.join(temp_dir, "email_1.eml")
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(emails_data[0])
+            
+            # Write non-.eml file
+            non_eml_path = os.path.join(temp_dir, "readme.txt")
+            with open(non_eml_path, 'w', encoding='utf-8') as f:
+                f.write("This is not an email")
+            
+            # Parse batch
+            emails = self.parser.parse_batch(temp_dir)
+            
+            assert len(emails) == 1
+            assert emails[0].subject == "Email 1"
 
 
-# Fixtures for test data
-@pytest.fixture
-def mock_email():
-    """Create a mock email with basic headers."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg['Date'] = 'Mon, 01 Jan 2024 12:00:00 +0000'
-    msg.set_payload('This is a plain text email body.')
-    return msg
-
-
-@pytest.fixture
-def mock_email_multi():
-    """Create a mock email with multiple recipients."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient1@example.com, recipient2@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg['Date'] = 'Mon, 01 Jan 2024 12:00:00 +0000'
-    msg.set_payload('Body')
-    return msg
-
-
-@pytest.fixture
-def mock_email_empty():
-    """Create a mock email with empty headers."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg.set_payload('Body')
-    return msg
-
-
-@pytest.fixture
-def mock_email_display():
-    """Create a mock email with display names."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = '"Sender Name" <sender@example.com>'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg.set_payload('Body')
-    return msg
-
-
-@pytest.fixture
-def mock_email_plain():
-    """Create a mock email with plain text body."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg.set_payload('This is a plain text email body.')
-    return msg
-
-
-@pytest.fixture
-def mock_email_html():
-    """Create a mock email with HTML body."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg.set_content('<html><body><p>HTML content</p></body></html>', subtype='html')
-    return msg
-
-
-@pytest.fixture
-def mock_email_multipart():
-    """Create a mock email with multipart body."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    
-    msg.set_content('Plain text version')
-    msg.add_alternative('<html><body>HTML version</body></html>', subtype='html')
-    return msg
-
-
-@pytest.fixture
-def mock_email_empty_body():
-    """Create a mock email with empty body."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    return msg
-
-
-@pytest.fixture
-def mock_email_with_attachment():
-    """Create a mock email with attachment."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    
-    msg.set_content('Email body')
-    msg.add_attachment('Attachment content', filename='document.pdf')
-    return msg
-
-
-@pytest.fixture
-def mock_email_multiple_attachments():
-    """Create a mock email with multiple attachments."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    
-    msg.set_content('Email body')
-    msg.add_attachment('File 1', filename='file1.txt')
-    msg.add_attachment('File 2', filename='file2.pdf')
-    return msg
-
-
-@pytest.fixture
-def mock_email_no_attachment():
-    """Create a mock email without attachments."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    msg.set_payload('Body content')
-    return msg
-
-
-@pytest.fixture
-def mock_email_inline_attachment():
-    """Create a mock email with inline attachment."""
-    from email.message import EmailMessage
-    from email.policy import default
-    
-    msg = EmailMessage(policy=default)
-    msg['From'] = 'sender@example.com'
-    msg['To'] = 'recipient@example.com'
-    msg['Subject'] = 'Test Subject'
-    
-    msg.set_content('Email body')
-    msg.add_attachment('Image data', filename='image.png', disposition='inline')
-    return msg
-
-
-@pytest.fixture
-def sample_eml_file(tmp_path):
-    """Create a sample .eml file for testing."""
-    eml_file = tmp_path / "test.eml"
-    eml_file.write_text("""From: sender@example.com
-To: recipient@example.com
-Subject: Test Email
-Date: Mon, 01 Jan 2024 12:00:00 +0000
-
-This is a test email body.""")
-    return eml_file
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

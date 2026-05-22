@@ -1,5 +1,21 @@
-"""OSINT Corp data models."""
+"""Data models for OSINT Corp."""
 
-from osint_corp.models.entities import Company, Filing, Manifest
+from osint_corp.models.entities import (
+    Company,
+    Filing,
+    Relationship,
+    Location,
+    Manifest,
+    Contract,
+    JobPosting,
+)
 
-__all__ = ["Company", "Filing", "Manifest"]
+__all__ = [
+    "Company",
+    "Filing",
+    "Relationship",
+    "Location",
+    "Manifest",
+    "Contract",
+    "JobPosting",
+]

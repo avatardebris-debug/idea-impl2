@@ -5,8 +5,7 @@ Handles dispatching function calls defined in skill JSON files to their
 corresponding implementations.
 """
 
-from typing import Any, Callable, Dict, List, Optional, Union
-import inspect
+from typing import Any, Callable, Dict, List, Optional
 
 
 class FunctionDispatcher:
@@ -15,110 +14,62 @@ class FunctionDispatcher:
     
     The dispatcher maintains a registry of function names to callable
     implementations. When a skill requests a function call, the dispatcher
-    looks up the handler and executes it with the provided arguments.
+    looks up the handler and executes it.
     """
     
-    def __init__(self):
-        """Initialize an empty dispatcher."""
-        self._handlers: Dict[str, Callable] = {}
+    def __init__(self) -> None:
+        self._registry: Dict[str, Callable] = {}
     
     def register(self, name: str, func: Callable) -> None:
-        """
-        Register a function handler.
-        
-        Args:
-            name: The name to register the function under
-            func: The callable to invoke when this function is dispatched
-        """
-        if not isinstance(name, str):
-            raise TypeError("Function name must be a string")
-        
-        if not callable(func):
-            raise TypeError("Handler must be callable")
-        
-        self._handlers[name] = func
+        """Register a function handler by name."""
+        self._registry[name] = func
     
-    def unregister(self, name: str) -> bool:
+    def unregister(self, name: str) -> None:
+        """Unregister a function handler by name."""
+        self._registry.pop(name, None)
+    
+    def dispatch(self, name: str, args: Optional[Dict[str, Any]] = None) -> Any:
         """
-        Unregister a function handler.
+        Dispatch a function call by name with the given arguments.
         
         Args:
-            name: The name of the handler to remove
+            name: The function name to dispatch.
+            args: Optional keyword arguments dict.
             
         Returns:
-            True if the handler was found and removed, False otherwise
-        """
-        if name in self._handlers:
-            del self._handlers[name]
-            return True
-        return False
-    
-    def list_functions(self) -> List[str]:
-        """
-        List all registered function names.
-        
-        Returns:
-            List of registered function names
-        """
-        return list(self._handlers.keys())
-    
-    def dispatch(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Any:
-        """
-        Dispatch a function call to its handler.
-        
-        Args:
-            name: The name of the function to call
-            arguments: Dictionary of arguments to pass to the function
-            
-        Returns:
-            The return value of the function
+            The result of the function call.
             
         Raises:
-            KeyError: If the function is not registered
-            TypeError: If arguments don't match the function signature
+            KeyError: If the function name is not registered.
         """
-        if name not in self._handlers:
+        if name not in self._registry:
             raise KeyError(f"Function '{name}' is not registered")
-        
-        handler = self._handlers[name]
-        args = arguments or {}
-        
-        # Get the function signature
-        sig = inspect.signature(handler)
-        
-        # Check if the handler accepts **kwargs
-        has_var_keyword = any(
-            p.kind == inspect.Parameter.VAR_KEYWORD
-            for p in sig.parameters.values()
-        )
-        
-        if not has_var_keyword:
-            # Validate that all provided arguments are in the signature
-            param_names = set(sig.parameters.keys())
-            extra_args = set(args.keys()) - param_names
-            if extra_args:
-                raise TypeError(
-                    f"Function '{name}' does not accept arguments: {extra_args}"
-                )
-        
-        # Call the handler with the arguments
-        try:
-            result = handler(**args)
-        except TypeError as e:
-            raise TypeError(
-                f"Error calling function '{name}': {e}"
-            )
-        
-        return result
+        handler = self._registry[name]
+        if args is None:
+            args = {}
+        return handler(**args)
     
-    def get_handler(self, name: str) -> Optional[Callable]:
+    def register_from_skill_functions(
+        self,
+        functions: List[Dict[str, Any]],
+        handler_map: Dict[str, Callable],
+    ) -> None:
         """
-        Get a registered handler by name.
+        Register all functions from a skill's function definitions.
         
         Args:
-            name: The name of the handler to get
-            
-        Returns:
-            The handler function, or None if not found
+            functions: List of function definition dicts from a skill.
+            handler_map: Mapping of function names to callables.
         """
-        return self._handlers.get(name)
+        for func_def in functions:
+            name = func_def.get("name")
+            if name and name in handler_map:
+                self.register(name, handler_map[name])
+    
+    def list_functions(self) -> List[str]:
+        """Return a list of registered function names."""
+        return list(self._registry.keys())
+    
+    def has_function(self, name: str) -> bool:
+        """Check if a function is registered."""
+        return name in self._registry

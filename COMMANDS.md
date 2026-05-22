@@ -102,6 +102,10 @@ python pipeline/runner.py --resume --provider ollama \
 # ai_movie_generation_suite after prep (use --resume above instead):
 # python pipeline/runner.py --polish --provider ollama --model qwen3.6:35b-a3b-q4_K_M
 
+# Path leak cleanup (repo scripts copied into project workspaces)
+python health_check.py              # report shadow files across all projects
+python health_check.py --fix        # delete import_zip/health_check/pipeline/ nests, etc.
+
 # Hermes tasks (--hermes at end of a master_ideas line): auto-clones on first use
 # hermes-agent-main/ is gitignored; runner clones https://github.com/NousResearch/hermes-agent
 # and pip install -e hermes-agent-main unless HERMES_AUTO_INSTALL=0

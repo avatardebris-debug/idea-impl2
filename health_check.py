@@ -7,7 +7,8 @@ runner loop), this tool scans ALL projects at rest and catches systemic bugs:
 
   1. Stale status  — status says phase_1_executing but phase > 1
   2. Phantom phases — total_phases doesn't match master_plan.md
-  3. Shadow dirs    — workspace/pipeline/ or workspace/import_zip.py
+  3. Shadow leaks   — repo infra copied into workspace/ (import_zip, pipeline/, etc.)
+  3b. Nested workspace — workspace/workspace/ double-nesting
   4. Orphan tests   — tests/__init__.py with broken relative imports
   5. Enum drift     — source files referencing missing enum members
   6. Validation gap — all phases PASS but status ≠ complete
@@ -34,6 +35,15 @@ from typing import Any
 
 PIPELINE = pathlib.Path(__file__).parent / ".pipeline"
 PROJECTS = PIPELINE / "projects"
+REPO_ROOT = pathlib.Path(__file__).parent
+
+# Shared with pipeline/health_checks.py and executor rescue logic
+sys.path.insert(0, str(REPO_ROOT))
+from pipeline.path_health import (  # noqa: E402
+    find_workspace_shadows,
+    prune_workspace_shadows,
+    rescue_dir_filtered,
+)
 
 
 # ── Result container ─────────────────────────────────────────────────
@@ -107,26 +117,48 @@ def check_phantom_phases(slug: str, state: dict, plan_path: pathlib.Path) -> lis
 
 
 def check_shadow_dirs(slug: str, workspace: pathlib.Path) -> list[Finding]:
-    """Shadow pipeline/ directories or stray import_zip.py inside workspace."""
+    """Repo infrastructure leaked into project workspace."""
     findings = []
-    shadow_pipeline = workspace / "pipeline"
-    if shadow_pipeline.is_dir():
-        count = sum(1 for _ in shadow_pipeline.rglob("*") if _.is_file())
+    for issue in find_workspace_shadows(workspace):
+        sev = "critical" if "pipeline/" in issue or "workspace/workspace" in issue else "warning"
         findings.append(Finding(
-            slug, "shadow_pipeline", "critical",
-            f"Shadow pipeline/ directory in workspace ({count} files)",
+            slug, "shadow_leak", sev,
+            issue,
             fixable=True,
-            fix_detail="Would delete workspace/pipeline/",
+            fix_detail="Would prune shadow files/dirs via path_health",
         ))
+    return findings
 
-    for bad_file in ("import_zip.py", "import_cloud_zip.py", "extract.py"):
-        if (workspace / bad_file).exists():
-            findings.append(Finding(
-                slug, "shadow_script", "warning",
-                f"Stray {bad_file} in workspace (runner infrastructure leak)",
-                fixable=True,
-                fix_detail=f"Would delete workspace/{bad_file}",
-            ))
+
+def check_slug_dir_at_workspace_root(slug: str, workspace: pathlib.Path) -> list[Finding]:
+    """workspace/<slug>/ when slug matches project — merge into workspace root."""
+    findings = []
+    nested_slug = workspace / slug
+    if nested_slug.is_dir():
+        py_count = sum(1 for _ in nested_slug.rglob("*.py") if _.is_file())
+        findings.append(Finding(
+            slug, "nested_slug_dir", "warning",
+            f"Redundant workspace/{slug}/ directory ({py_count} .py files)",
+            fixable=True,
+            fix_detail=f"Would merge workspace/{slug}/ into workspace/ and remove nest",
+        ))
+    return findings
+
+
+def check_stray_src_at_repo_root(slug: str) -> list[Finding]:
+    """src/ or tests/ at repo root that belong in a project workspace."""
+    findings = []
+    for name in ("src", "tests", "test"):
+        stray = REPO_ROOT / name
+        if stray.is_dir():
+            count = sum(1 for _ in stray.rglob("*.py") if _.is_file())
+            if count:
+                findings.append(Finding(
+                    slug, "root_stray_dir", "warning",
+                    f"Repo root {name}/ has {count} .py file(s) — may belong in workspace",
+                    fixable=True,
+                    fix_detail=f"Would merge root {name}/ into {slug}/workspace/{name}/",
+                ))
     return findings
 
 
@@ -254,17 +286,33 @@ def apply_fix(finding: Finding) -> bool:
             state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
             return True
 
-    elif finding.check == "shadow_pipeline":
-        shadow = PROJECTS / slug / "workspace" / "pipeline"
-        if shadow.is_dir():
-            shutil.rmtree(str(shadow))
+    elif finding.check in ("shadow_leak", "shadow_pipeline", "shadow_script"):
+        workspace = PROJECTS / slug / "workspace"
+        actions = prune_workspace_shadows(workspace)
+        return bool(actions)
+
+    elif finding.check == "nested_slug_dir":
+        workspace = PROJECTS / slug / "workspace"
+        nested = workspace / slug
+        if nested.is_dir():
+            rescue_dir_filtered(nested, workspace)
+            try:
+                shutil.rmtree(str(nested))
+            except OSError:
+                pass
             return True
 
-    elif finding.check == "shadow_script":
-        for name in ("import_zip.py", "import_cloud_zip.py", "extract.py"):
-            f = PROJECTS / slug / "workspace" / name
-            if f.exists():
-                f.unlink()
+    elif finding.check == "root_stray_dir":
+        workspace = PROJECTS / slug / "workspace"
+        for name in ("src", "tests", "test"):
+            stray = REPO_ROOT / name
+            if stray.is_dir():
+                dest = workspace / name
+                rescue_dir_filtered(stray, dest)
+                try:
+                    shutil.rmtree(str(stray))
+                except OSError:
+                    pass
         return True
 
     elif finding.check == "broken_init_import":
@@ -336,12 +384,21 @@ def run_health_check(fix: bool = False) -> list[Finding]:
         all_findings.extend(check_stale_status(slug, state, phases_dir))
         all_findings.extend(check_phantom_phases(slug, state, plan_path))
         all_findings.extend(check_shadow_dirs(slug, workspace))
+        all_findings.extend(check_slug_dir_at_workspace_root(slug, workspace))
         all_findings.extend(check_orphan_init(slug, workspace))
         all_findings.extend(check_validation_gap(slug, state, phases_dir))
         all_findings.extend(check_empty_workspace(slug, state, workspace))
 
     # Cross-project checks
     all_findings.extend(check_duplicate_titles(all_states))
+    # Repo-root stray dirs (attribute to first active slug for fix targeting)
+    active_slug = next(
+        (s for s, st in all_states.items()
+         if st.get("status") not in ("complete", "budget_exceeded")),
+        next(iter(all_states), ""),
+    )
+    if active_slug:
+        all_findings.extend(check_stray_src_at_repo_root(active_slug))
 
     # Apply fixes if requested
     if fix:
