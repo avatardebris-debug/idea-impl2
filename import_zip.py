@@ -228,6 +228,54 @@ def main() -> None:
             written += 1
 
         print(f"\n  Imported {written} files to {dest_root}")
+        ps = dest_root / ".pipeline" / "state" / "polish_status.json"
+        pq = dest_root / "polish_queue.md"
+        if pq.exists():
+            print(f"  Polish queue imported: {pq.name}")
+        if ps.exists():
+            try:
+                import json as _json
+                st = _json.loads(ps.read_text(encoding="utf-8"))
+                print(f"  Last polish run: {st.get('run_state', '?')} — {st.get('reason', '')}")
+            except Exception:
+                pass
+        print("  After import: python reset_budget_exceeded.py --generate-polish")
+        print("                python pipeline/runner.py --polish ...")
+        try:
+            sys.path.insert(0, str(dest_root))
+            from pipeline.pipeline_mode import legacy_mode
+
+            if not legacy_mode():
+                from pathlib import Path as _Path
+
+                export_candidates = [
+                    dest_root / ".pipeline/state/capability_registry_export.json",
+                    dest_root / "capability_registry_export.json",
+                ]
+                merged = False
+                for exp in export_candidates:
+                    if exp.exists():
+                        from pipeline.capability_sync import merge_snapshot
+
+                        mstats = merge_snapshot(exp)
+                        print(
+                            f"  Registry merged from {exp.name}: "
+                            f"+{mstats.get('inserted_capabilities', 0)} caps, "
+                            f"~{mstats.get('updated_capabilities', 0)} updated, "
+                            f"from {mstats.get('from_instance', '?')}"
+                        )
+                        merged = True
+                        break
+                if not merged:
+                    from pipeline.capability_registry import rebuild_registry
+
+                    stats = rebuild_registry()
+                    print(
+                        f"  Registry rebuilt: {stats.get('total', 0)} capabilities, "
+                        f"{stats.get('edges', 0)} edges, fts={stats.get('fts_indexed', 0)}"
+                    )
+        except Exception as _reg_err:
+            print(f"  [registry] rebuild skipped: {_reg_err}")
         print(f"  Done.")
 
 

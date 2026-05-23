@@ -38,7 +38,7 @@ GOALS_DIR = PIPELINE_DIR / "goals"
 class GoalBranch:
     id: str
     subgoal: str
-    type: Literal["software", "compound", "hermes_task", "robot_skill"]
+    type: Literal["software", "compound", "hermes_task", "robot_skill", "capability_gap"]
     description: str = ""
     requires: list[str] = field(default_factory=list)
     hermes_prompt: str = ""
@@ -82,12 +82,16 @@ GOAL: {goal_text}
    - compound: Still too big — needs further decomposition (max depth: 2)
    - hermes_task: Open-ended research/exploration/benchmarking (no fixed output format)
    - robot_skill: A physical robot movement primitive (only for actual motor control)
+   - capability_gap: A needed tool exists in the registry but is draft/blocked, OR no verified
+     capability covers the task — queue a normal pipeline project to build or verify it
 
 2. For software branches: be specific. Name files, classes, I/O formats.
 3. For hermes_task: write a clear `hermes_goal_check` question the critic can evaluate.
 4. Declare dependencies with `requires:` using existing project slugs.
 5. Do NOT include already-complete projects as branches.
 6. Produce 3-8 branches. More is worse — prefer fewer, more specific branches.
+7. Prefer reusing verified capabilities from the registry (listed below) via `requires:` slugs
+   instead of rebuilding equivalent software.
 
 ## Output format (JSON only, no other text):
 {{
@@ -211,21 +215,38 @@ def decompose_goal(
     completed = _completed_project_slugs()
     pending = _pending_idea_titles(mi_path)
 
+    registry_block = ""
+    try:
+        from pipeline.pipeline_mode import legacy_mode
+        if not legacy_mode():
+            from pipeline.capability_registry import capabilities_summary
+            registry_block = capabilities_summary(max_rows=20) or ""
+    except Exception:
+        pass
+
     prompt = _DECOMPOSE_PROMPT.format(
         goal_text=goal_text,
         completed_projects=", ".join(completed[:60]) or "(none yet)",
         pending_ideas=", ".join(pending[:40]) or "(none yet)",
     )
+    if registry_block:
+        prompt += f"\n\n## Verified capabilities (reuse via requires:)\n{registry_block}\n"
 
     raw = _call_llm(prompt)
     branch_dicts = _parse_llm_branches(raw)
 
+    valid_types = frozenset(
+        {"software", "compound", "hermes_task", "robot_skill", "capability_gap"}
+    )
     branches = []
     for b in branch_dicts:
+        btype = b.get("type", "software")
+        if btype not in valid_types:
+            btype = "software"
         branches.append(GoalBranch(
             id=b.get("id", f"b{len(branches):03d}"),
             subgoal=b.get("subgoal", "unknown"),
-            type=b.get("type", "software"),
+            type=btype,
             description=b.get("description", ""),
             requires=b.get("requires", []),
             hermes_prompt=b.get("hermes_prompt", ""),
@@ -296,16 +317,54 @@ def inject_branches_into_ideas(tree: GoalTree, mi_path: pathlib.Path) -> int:
             tag = "--hermes"
         elif branch.type == "robot_skill":
             tag = "--robot"
+        elif branch.type == "capability_gap":
+            tag = ""
         else:
             tag = ""
 
         requires_clause = ""
-        if branch.requires:
+        desc = branch.description
+        if branch.type == "capability_gap":
+            try:
+                from pipeline.pipeline_mode import legacy_mode
+                if not legacy_mode():
+                    from pipeline.capability_router import route_task
+
+                    hits = route_task(branch.description or branch.subgoal, limit=3)
+                    usable = [h for h in hits if h.get("requires_ok")]
+                    if usable:
+                        reuse = usable[0]["slug"]
+                        requires_clause = f". requires: {reuse}"
+                        desc = (
+                            f"Reuse verified capability `{reuse}` before building new code. "
+                            f"{branch.description}"
+                        )
+                    else:
+                        desc = (
+                            f"[capability_gap] Build or verify tooling for: {branch.subgoal}. "
+                            f"{branch.description}"
+                        )
+            except Exception:
+                pass
+        elif branch.requires:
             requires_clause = f". requires: {', '.join(branch.requires)}"
+
+        suggest_clause = ""
+        if branch.type != "capability_gap":
+            try:
+                from pipeline.pipeline_mode import legacy_mode
+                if not legacy_mode():
+                    from pipeline.capability_router import route_task
+                    hits = route_task(branch.description or branch.subgoal, limit=2)
+                    usable = [h["slug"] for h in hits if h.get("requires_ok")]
+                    if usable:
+                        suggest_clause = f". suggested_reuse: {', '.join(usable)}"
+            except Exception:
+                pass
 
         line = (
             f"- [ ] **[{branch.subgoal}]** — "
-            f"[[goal:{tree.goal_id}:{branch.id}] {branch.description}{requires_clause}]"
+            f"[[goal:{tree.goal_id}:{branch.id}] {desc}{requires_clause}{suggest_clause}]"
         )
         if tag:
             line += f" {tag}"

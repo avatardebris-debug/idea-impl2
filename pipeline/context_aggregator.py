@@ -24,6 +24,7 @@ Cache schema:
     "workspace_tree": ["foo/bar.py", ...],   # relative paths, max 200
     "shared_libs":    ["http_client", ...],  # dir names under shared_libs/
     "reusable_tools": "...",          # .pipeline/state/reusable_tools.md
+    "capabilities_summary": "...",    # generated from capability_registry.sqlite (non-legacy)
     "validation_report": "...",       # phases/phase_N/validation_report.md (last)
     "fix_report":     "...",          # phases/phase_N/fix_report.md (last)
     "pending_fixes":  "...",          # state/pending_fixes.md
@@ -115,6 +116,15 @@ def build_context_cache(project_dir: pathlib.Path) -> dict[str, Any]:
     # Reusable tools index (pipeline-global)
     reusable_tools_path = project_dir.parent.parent / "state" / "reusable_tools.md"
 
+    cap_summary = ""
+    try:
+        from pipeline.pipeline_mode import legacy_mode
+        if not legacy_mode():
+            from pipeline.capability_registry import capabilities_summary
+            cap_summary = capabilities_summary(project_dir.name)
+    except Exception:
+        pass
+
     cache: dict[str, Any] = {
         "slug":              project_dir.name,
         "refreshed_at":      datetime.now(timezone.utc).isoformat(),
@@ -123,7 +133,8 @@ def build_context_cache(project_dir: pathlib.Path) -> dict[str, Any]:
         "current_tasks":     _read(tasks_path),
         "workspace_tree":    _workspace_tree(workspace),
         "shared_libs":       shared_libs,
-        "reusable_tools":    _read(reusable_tools_path),
+        "reusable_tools":       _read(reusable_tools_path),
+        "capabilities_summary": cap_summary[:MAX_TEXT_BYTES] if cap_summary else "",
         "validation_report": _read(val_path),
         "fix_report":        _read(fix_path),
         "pending_fixes":     _read(state_dir / "pending_fixes.md"),

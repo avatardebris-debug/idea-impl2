@@ -190,6 +190,19 @@ def _install_hermes_deps() -> None:
     marker.write_text("ok\n", encoding="utf-8")
 
 
+def _clear_local_agent_shadow() -> None:
+    """Drop idea-impl's agent.py from sys.modules so Hermes's agent/ package can load."""
+    agent_mod = sys.modules.get("agent")
+    if agent_mod is None:
+        return
+    agent_file = getattr(agent_mod, "__file__", "") or ""
+    if agent_file and pathlib.Path(agent_file).resolve() == (PROJECT_ROOT / "agent.py").resolve():
+        del sys.modules["agent"]
+        for key in list(sys.modules):
+            if key == "agent" or key.startswith("agent."):
+                del sys.modules[key]
+
+
 def ensure_hermes_available() -> None:
     """
     Ensure hermes-agent-main/ exists and run_agent.AIAgent is importable.
@@ -206,8 +219,16 @@ def ensure_hermes_available() -> None:
             )
         _clone_hermes_repo()
 
-    if str(HERMES_DIR) not in sys.path:
-        sys.path.insert(0, str(HERMES_DIR))
+    _clear_local_agent_shadow()
+    hermes_path = str(HERMES_DIR)
+    if hermes_path not in sys.path:
+        sys.path.insert(0, hermes_path)
+    # PROJECT_ROOT/agent.py wins over hermes-agent-main/agent/ if both are on sys.path.
+    root_path = str(PROJECT_ROOT)
+    saved_path = sys.path[:]
+    sys.path[:] = [p for p in sys.path if p != root_path]
+    if hermes_path not in sys.path:
+        sys.path.insert(0, hermes_path)
 
     try:
         import run_agent  # noqa: F401
@@ -218,12 +239,17 @@ def ensure_hermes_available() -> None:
                 f"Run: pip install -e {HERMES_DIR.name}"
             ) from exc
         _install_hermes_deps()
+        _clear_local_agent_shadow()
         try:
             import run_agent  # noqa: F401
         except ImportError as exc2:
             raise RuntimeError(
                 f"Hermes import still failed after pip install: {exc2}"
             ) from exc2
+    finally:
+        sys.path[:] = saved_path
+        if hermes_path not in sys.path:
+            sys.path.insert(0, hermes_path)
 
 
 # ---------------------------------------------------------------------------
@@ -233,6 +259,12 @@ def ensure_hermes_available() -> None:
 def _build_worker(base_url: str, model: str, api_key: str, max_iterations: int = 25):
     """Instantiate a Hermes AIAgent configured for pipeline use."""
     ensure_hermes_available()
+    _clear_local_agent_shadow()
+    root_path = str(PROJECT_ROOT)
+    saved_path = sys.path[:]
+    sys.path[:] = [p for p in sys.path if p != root_path]
+    if str(HERMES_DIR) not in sys.path:
+        sys.path.insert(0, str(HERMES_DIR))
 
     try:
         from run_agent import AIAgent
@@ -240,6 +272,10 @@ def _build_worker(base_url: str, model: str, api_key: str, max_iterations: int =
         raise RuntimeError(
             f"Cannot import Hermes AIAgent from {HERMES_DIR}. Error: {exc}"
         ) from exc
+    finally:
+        sys.path[:] = saved_path
+        if str(HERMES_DIR) not in sys.path:
+            sys.path.insert(0, str(HERMES_DIR))
 
     worker = AIAgent(
         base_url=base_url,

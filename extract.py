@@ -174,6 +174,21 @@ def build_zip(
                     arcname = sf.relative_to(pipeline_dir.parent)
                     zf.write(sf, arcname)
                     included += 1
+                reg_db = state_dir / "capability_registry.sqlite"
+                if reg_db.exists():
+                    zf.write(reg_db, reg_db.relative_to(pipeline_dir.parent))
+                    included += 1
+                try:
+                    from pipeline.capability_sync import export_snapshot
+
+                    exp_path = export_snapshot(
+                        state_dir / "capability_registry_export.json",
+                        include_metrics=True,
+                    )
+                    zf.write(exp_path, exp_path.relative_to(pipeline_dir.parent))
+                    included += 1
+                except Exception:
+                    pass
                 # Also include reusable_tools.md (the shared library index)
                 rtmd = state_dir / "reusable_tools.md"
                 if rtmd.exists():
@@ -197,6 +212,24 @@ def build_zip(
         if mi.exists():
             zf.write(mi, mi.name)
 
+        # --- Polish queue + status (resume --polish after import) ---
+        pq = pipeline_dir.parent / "polish_queue.md"
+        if pq.exists():
+            zf.write(pq, pq.name)
+            included += 1
+
+        if not workspace_only:
+            state_dir = pipeline_dir / "state"
+            for polish_artifact in (
+                "plan_amendments.md",
+                "polish_status.json",
+                "pipeline_status.json",
+            ):
+                pf = state_dir / polish_artifact
+                if pf.exists():
+                    zf.write(pf, pf.relative_to(pipeline_dir.parent))
+                    included += 1
+
         # --- Manifest ---
         # Count shared_libs files for manifest
         shared_libs_count = 0
@@ -217,8 +250,11 @@ def build_zip(
             "resume_instructions": (
                 "1. git pull on new instance\n"
                 "2. unzip this file into /workspace/idea\\ impl/\n"
-                "3. python pipeline/runner.py --from-list --provider ollama --model qwen3.5:35b\n"
-                "   Runner will auto-detect in-progress projects and re-queue them.\n"
+                "3. python import_zip.py --yes  (or unzip manually)\n"
+                "4a. In-progress / new ideas: python pipeline/runner.py --from-list ...\n"
+                "4b. Missing phases (polish_queue.md): python reset_budget_exceeded.py --generate-polish\n"
+                "    then python pipeline/runner.py --polish ...\n"
+                "    Check .pipeline/state/polish_status.json for RUNNING vs TERMINATED.\n"
                 "   Shared libs are in .pipeline/shared_libs/ — executor uses them automatically."
             ),
             "projects": summaries,
@@ -271,6 +307,11 @@ def main() -> None:
         help="Regenerate truth.md from completions registry and complete projects",
     )
     parser.add_argument(
+        "--rebuild-registry",
+        action="store_true",
+        help="Rebuild capability_registry.sqlite + dependency graph + FTS index",
+    )
+    parser.add_argument(
         "--ideas-file",
         default=None,
         help="Ideas markdown to sync (default: master_ideas.md next to .pipeline/)",
@@ -292,6 +333,13 @@ def main() -> None:
         from pipeline.ideas_sync import rebuild_truth_from_registry
         n = rebuild_truth_from_registry(projects_dir=projects_dir)
         print(f"\n  Rebuilt truth.md with {n} completion(s)\n")
+        return
+
+    if args.rebuild_registry:
+        from pipeline.capability_registry import rebuild_registry
+
+        stats = rebuild_registry()
+        print(f"\n  Registry: {stats}\n")
         return
 
     if args.sync_ideas:

@@ -75,7 +75,9 @@ class PhasePlannerAgent(AgentProcess):
             f"   CRITICAL: Every task MUST start with `- [ ]`. "
             f"The executor marks tasks done with `- [x]` as it works.\n"
             f"   Do NOT use ## headings for tasks. Do NOT use ✅ or other symbols.\n"
-            f"4. Say DONE.\n"
+            f"4. Before inventing new modules, use `suggest_capabilities` / `invoke_capability` "
+            f"if the executor context lists verified capabilities.\n"
+            f"5. Say DONE.\n"
         )
 
         # Append bug memory guardrails if any were found — placed after instructions

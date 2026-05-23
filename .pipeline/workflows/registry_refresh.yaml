@@ -1,0 +1,23 @@
+slug: registry_refresh
+title: Refresh capability registry and backlog audit
+kind: workflow
+status: verified
+backend: native
+purpose: Rebuild capability registry then regenerate backlog audit (no new code).
+domains:
+  - devops
+requires: []
+
+steps:
+  - id: rebuild_registry
+    type: shell
+    command: python scripts/build_capability_registry.py
+    save_as: rebuild
+    timeout_s: 180
+
+  - id: backlog_audit
+    type: shell
+    command: python scripts/gen_backlog_audit.py
+    when: "{{ steps.rebuild.ok }}"
+    save_as: audit
+    timeout_s: 120

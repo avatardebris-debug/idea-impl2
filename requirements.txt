@@ -1,4 +1,6 @@
 pyyaml>=6.0
+# Optional: Cursor MCP server (scripts/mcp_idea_capabilities_server.py)
+mcp>=1.2.0
 numpy>=1.24
 ollama>=0.1
 

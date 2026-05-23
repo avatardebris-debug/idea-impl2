@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "idea-capabilities": {
+      "type": "stdio",
+      "command": "python",
+      "args": ["${workspaceFolder}/scripts/mcp_idea_capabilities_server.py"],
+      "env": {
+        "PIPELINE_LEGACY": "0"
+      },
+      "envFile": "${workspaceFolder}/.env"
+    }
+  }
+}

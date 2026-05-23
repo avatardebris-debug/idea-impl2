@@ -57,6 +57,18 @@ class ExecutorAgent(AgentProcess):
                 f"Read any of these files before reimplementing similar functionality."
             )
 
+        # 3. Capability summary (canonical: context_cache.json from context_aggregator)
+        cache_file = self._project_path("state/context_cache.json")
+        if cache_file.exists():
+            try:
+                import json as _json
+                cache = _json.loads(cache_file.read_text(encoding="utf-8"))
+                cap = (cache.get("capabilities_summary") or "").strip()
+                if cap:
+                    parts.append(cap)
+            except Exception:
+                pass
+
         return "\n\n".join(parts)
 
     def _save_interrupt_checkpoint(self) -> None:

@@ -349,6 +349,35 @@ def apply_fix(finding: Finding) -> bool:
     return False
 
 
+def check_stale_requires_markdown() -> list[Finding]:
+    """Phase 5/7: requires: slugs in master_ideas that are unknown to registry/projects."""
+    findings: list[Finding] = []
+    try:
+        from pipeline.capability_graph import stale_requires_in_markdown
+
+        mi = REPO_ROOT / "master_ideas.md"
+        for item in stale_requires_in_markdown(mi):
+            findings.append(
+                Finding(
+                    item["from_slug"],
+                    "stale_requires",
+                    "warning",
+                    f"requires unknown slug `{item['unknown_dep']}` in master_ideas.md",
+                    fixable=False,
+                )
+            )
+    except Exception as exc:
+        findings.append(
+            Finding(
+                "_registry",
+                "stale_requires",
+                "info",
+                f"Could not run requires graph check: {exc}",
+            )
+        )
+    return findings
+
+
 # ── Main ─────────────────────────────────────────────────────────────
 
 def run_health_check(fix: bool = False) -> list[Finding]:
@@ -391,6 +420,7 @@ def run_health_check(fix: bool = False) -> list[Finding]:
 
     # Cross-project checks
     all_findings.extend(check_duplicate_titles(all_states))
+    all_findings.extend(check_stale_requires_markdown())
     # Repo-root stray dirs (attribute to first active slug for fix targeting)
     active_slug = next(
         (s for s, st in all_states.items()

@@ -98,9 +98,55 @@ python pipeline/runner.py --resume --provider ollama \
 python pipeline/runner.py --resume --provider ollama \
     --model qwen3.6:35b-a3b-q4_K_M
 
-# Polish mode only works when status is complete/budget_exceeded — not for
-# ai_movie_generation_suite after prep (use --resume above instead):
-# python pipeline/runner.py --polish --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+# Polish (missing phases on complete/budget_exceeded projects):
+python reset_budget_exceeded.py --generate-polish   # refresh polish_queue.md from disk
+python pipeline/runner.py --polish --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+# Status: .pipeline/state/polish_status.json (run_state: running | terminated)
+# Mid-phase work: use --resume, not --polish. Do NOT use --ideas-file for polish (use --polish-queue).
+
+# Capability registry (default) vs legacy pre-fork behavior
+python pipeline/runner.py --from-list --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+python pipeline/runner.py --from-list --legacy --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+python scripts/build_capability_registry.py
+python scripts/build_capability_registry.py --list --domain robotics
+python scripts/build_capability_registry.py --graph      # scripts/capability_graph.dot
+python scripts/build_capability_registry.py --blocked    # master_ideas blocked by requires:
+python scripts/gen_backlog_audit.py                      # includes Blocked downstream section
+# Overrides: .pipeline/state/capability_overrides.yaml then rebuild
+
+# Tool lifecycle (Phase 6): review -> shared_lib draft; complete -> verified + promote libs;
+# Hermes achieved -> hermes_task row. Metrics: .pipeline/state/capability_metrics.jsonl
+python scripts/capability_metrics_report.py
+# MCP (Cursor): .cursor/mcp.json → scripts/mcp_idea_capabilities_server.py
+#   pip install mcp>=1.2.0
+#   Tools: list/describe/suggest/invoke capabilities, registry_blocked_ideas
+# Legacy line protocol: scripts/mcp_capability_server.py
+
+# Multi-instance registry sync (cloud ↔ local):
+python scripts/sync_capability_registry.py export --copy-root --metrics
+git add capability_registry_export.json   # optional commit
+# other machine:
+python scripts/sync_capability_registry.py merge
+# or: import_zip auto-merges .pipeline/state/capability_registry_export.json from zip
+# full replace: python scripts/sync_capability_registry.py replace --sqlite path/to/registry.sqlite
+# See .pipeline/docs/capability_registry.md
+
+# Workflows / connectors (compose capabilities; optional self-hosted n8n):
+python scripts/run_workflow.py registry_refresh
+python scripts/run_workflow.py registry_refresh --export-n8n .pipeline/workflows/exports/registry_refresh.n8n.json
+python scripts/run_workflow.py --n8n-health   # N8N_BASE_URL, N8N_API_KEY
+# invoke_capability('registry_refresh') when status: verified in YAML
+# See .pipeline/docs/workflows.md
+
+# User steering dropbox (runner polls every 10 min; manager replies in-file):
+# Edit dropbox.md at repo root — see template inside the file.
+# Example:
+#   ### USER msg-20260520-001
+#   target: my_project_slug
+#   Add export to MP4 before phase 3 review.
+
+# Agent tools (default runner only; disabled with --legacy):
+#   suggest_capabilities, list_capabilities, describe_capability, invoke_capability
 
 # Path leak cleanup (repo scripts copied into project workspaces)
 python health_check.py              # report shadow files across all projects

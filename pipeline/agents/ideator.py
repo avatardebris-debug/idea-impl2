@@ -67,14 +67,15 @@ class IdeatorAgent(AgentProcess):
             f"## Master Ideas List (all ideas ever)\n{master_ideas[:2000]}\n\n"
             f"## Your Job\n"
             f"1. Read the above context carefully.\n"
-            f"2. Generate 10-20 ideas across all categories:\n"
-            f"   - Immediate improvements to what was just built\n"
-            f"   - Feature expansions for the current idea\n"
-            f"   - Parallel ideas that reuse existing code\n"
-            f"   - Integration opportunities between ideas in the master list\n"
-            f"   - Reusable tools/utilities to extract\n"
+            f"2. Generate 10-20 ideas biased toward pipeline improvement and RSI:\n"
+            f"   - Harness: runner, agents, debugging, speed, learning loops\n"
+            f"   - Immediate fixes to what was just built\n"
+            f"   - Reusable tools/utilities to extract (shared_libs / capability registry)\n"
+            f"   - Bridges/connectors between existing projects (kind:connector requires: slugs)\n"
+            f"   - Safe experiments (dynamic routing, metrics, A/B)\n"
             f"3. Be SPECIFIC — name files, functions, exact changes.\n"
-            f"4. Write your output to `.pipeline/{output_path}`.\n"
+            f"4. Write your output to `.pipeline/{output_path}` using sections:\n"
+            f"   Immediate / Harness / Reusable / Bridge / Experiment\n"
             f"5. Say DONE.\n"
         )
 
@@ -130,35 +131,39 @@ class IdeatorAgent(AgentProcess):
         llm = get_llm(self.provider, model=self.model, temperature=0.85)
 
         system_prompt = (
-            "You are the Ideator — a creative idea generation engine for an autonomous "
-            "software development pipeline. Generate concise, actionable software project ideas. "
-            "Respond ONLY with the list of ideas in the requested format. No preamble, no summary."
+            "You are the Ideator for an autonomous self-improving software pipeline. "
+            "Prioritize ideas that make the pipeline faster, smarter, more debuggable, "
+            "more agentic, and better at recursive self-improvement (RSI). "
+            "Respond ONLY with the list of ideas in the requested format. No preamble."
         )
 
         user_prompt = (
-            f"The idea backlog is empty. Generate exactly 30 new ideas across 6 groups of 5.\n\n"
-            f"## Existing Projects (with workspace files and plans)\n"
+            f"The idea backlog is empty. Generate exactly 30 ideas across 6 groups of 5.\n\n"
+            f"## Existing Projects (slug= in each block — use exact slugs for bridges)\n"
             f"{projects_context}\n\n"
             f"## Reusable Shared Tools Already Built\n"
             f"{reusable_tools}\n\n"
-            f"## Existing Ideas (do NOT duplicate these)\n"
+            f"## Existing Ideas (do NOT duplicate)\n"
             f"{existing_ideas}\n\n"
             f"## Format for each idea\n"
             f"{format_spec}\n\n"
+            f"## Focus\n"
+            f"Bias toward: pipeline harness, agent tooling, debugging, speed, learning/RSI, "
+            f"workflows/connectors, and safe experiments — NOT random consumer apps.\n\n"
             f"## The 6 Categories (5 ideas each = 30 total)\n\n"
-            f"**GROUP 1 — SIMILAR**: 5 ideas similar in scope/type to existing projects "
-            f"but targeting different niches or audiences.\n\n"
-            f"**GROUP 2 — EXPANSION**: 5 ideas that expand an existing project with new "
-            f"major features. Use the workspace file listings above to understand what was "
-            f"built and what meaningful next steps would be.\n\n"
-            f"**GROUP 3 — INDEPENDENT**: 5 fresh ideas completely unrelated to existing work. "
-            f"Think about tools, services, or products people actually pay for.\n\n"
-            f"**GROUP 4 — COMBINATION**: 5 ideas that merge 2 or more existing projects "
-            f"into a unified product. Name which projects are combined.\n\n"
-            f"**GROUP 5 — BRIDGE**: 5 ideas for connectors, APIs, or integrations that "
-            f"link existing projects together so they can share data or workflows.\n\n"
-            f"**GROUP 6 — HARNESS**: 5 ideas for improving this pipeline/toolkit itself — "
-            f"better agents, new capabilities, developer tooling, observability, etc.\n\n"
+            f"**GROUP 1 — PIPELINE CORE**: 5 ideas improving runner, agents, orchestration, "
+            f"message bus, subprocess reliability, dropbox steering, or run_loop.\n\n"
+            f"**GROUP 2 — DEBUG & QUALITY**: 5 ideas for validator, reviewer, health checks, "
+            f"test harness, failure analysis, or bug memory.\n\n"
+            f"**GROUP 3 — SPEED & EFFICIENCY**: 5 ideas for context cache, parallel seeds, "
+            f"token savings, faster iteration, or cheaper model routing.\n\n"
+            f"**GROUP 4 — LEARNING & RSI**: 5 ideas for finetune corpus, metrics, capability "
+            f"registry learning, constitutional patcher, or self-improvement loops.\n\n"
+            f"**GROUP 5 — AGENTIC & BRIDGE**: 5 ideas linking 2+ existing capabilities via "
+            f"workflows/connectors/MCP. Each line MUST include "
+            f"`kind:connector requires: slug_a, slug_b` using exact slugs.\n\n"
+            f"**GROUP 6 — EXPERIMENTS**: 5 ideas for dynamic routing, A/B agents, feature flags, "
+            f"or novel pipeline experiments (mention kind:experiment in description).\n\n"
             f"Output ONLY the 30 idea lines with group headers. Each idea on its own line:\n"
             f"  - [ ] **[Title]** — [description]\n"
         )
@@ -181,6 +186,32 @@ class IdeatorAgent(AgentProcess):
 
         # Force all generated ideas to unchecked [ ]
         idea_lines = [re.sub(r"\[[ xX]\]", "[ ]", l) for l in idea_lines]
+
+        # --- Bridge / agentic → connector YAML (GROUP 5) ---
+        synth_summary: dict = {}
+        try:
+            from pipeline.connector_synthesis import process_ideator_generation, write_synthesis_log
+
+            idea_lines, synth_summary = process_ideator_generation(raw_text, idea_lines)
+            if synth_summary.get("written") or synth_summary.get("skipped"):
+                write_synthesis_log(synth_summary, ts)
+                logger.info(
+                    "[ideator] Connector YAML written=%s skipped=%s",
+                    synth_summary.get("written"),
+                    synth_summary.get("skipped"),
+                )
+        except Exception as e:
+            logger.warning("[ideator] Connector synthesis failed (non-fatal): %s", e)
+
+        # --- Tag harness/experiment; queue harness in capability_gaps ---
+        enrich_summary: dict = {}
+        try:
+            from pipeline.ideator_enrich import enrich_ideator_lines
+
+            # Match groups by title (lines may already have kind:connector from synthesis)
+            idea_lines, enrich_summary = enrich_ideator_lines(raw_text, idea_lines)
+        except Exception as e:
+            logger.warning("[ideator] Enrich failed (non-fatal): %s", e)
 
         # --- Append to master_ideas.md ---
         mi_path = pathlib.Path(master_ideas_path)
@@ -225,8 +256,11 @@ class IdeatorAgent(AgentProcess):
             },
         )
 
+        connector_note = ""
+        if synth_summary.get("written"):
+            connector_note = f"; connector YAML: {len(synth_summary['written'])} created"
         summary = (
-            f"Generated {len(idea_lines)} new ideas and appended to master_ideas.md"
+            f"Generated {len(idea_lines)} new ideas and appended to master_ideas.md{connector_note}"
             if idea_lines
             else "LLM returned no parseable idea lines — check idea_generation_log"
         )

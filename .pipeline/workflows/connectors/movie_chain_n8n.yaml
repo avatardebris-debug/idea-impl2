@@ -1,0 +1,42 @@
+slug: movie_chain_n8n
+title: Movie chain (n8n hybrid template)
+kind: connector
+status: draft
+backend: hybrid
+purpose: |
+  Template connector chaining movie generation to downstream steps.
+  Native steps run locally; optional n8n webhook notifies self-hosted n8n.
+  Set status verified and fill requires when ai_movie_generation_suite is ready.
+domains:
+  - video
+requires:
+  - ai_movie_generation_suite
+
+n8n:
+  base_url: "${N8N_BASE_URL:-http://localhost:5678}"
+  webhook_path: "/webhook/movie-chain"
+  workflow_id: ""
+  api_key_env: N8N_API_KEY
+  timeout_s: 600
+
+steps:
+  - id: generate
+    type: capability
+    capability: ai_movie_generation_suite
+    args: "--help"
+    save_as: generate
+
+  - id: notify_n8n
+    type: n8n_webhook
+    when: "{{ steps.generate.ok }}"
+    body:
+      event: movie_chain_step_complete
+      step: generate
+      workflow_slug: movie_chain_n8n
+    save_as: n8n_notify
+
+  # Uncomment when movie_player is verified:
+  # - id: play
+  #   type: capability
+  #   capability: movie_player
+  #   when: "{{ steps.generate.ok }}"

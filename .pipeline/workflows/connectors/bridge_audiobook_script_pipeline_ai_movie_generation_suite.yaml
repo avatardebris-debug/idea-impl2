@@ -1,0 +1,36 @@
+slug: bridge_audiobook_script_pipeline_ai_movie_generation_suite
+title: '[TTS to video]'
+kind: connector
+status: draft
+backend: native
+purpose: 'Pipe audiobook output into movie suite kind:connector requires: audiobook_script_pipeline,
+  ai_movie_generation_suite
+
+
+  Auto-generated from ideator (integration bridge). Source: - [ ] **[TTS to video]**
+  — Pipe audiobook output into movie suite kind:connector requires: audiobook_script_pipeline,
+  ai_movie_generation_suite'
+domains:
+- devops
+requires:
+- audiobook_script_pipeline
+- ai_movie_generation_suite
+- ai_movie_generation_suite_2
+steps:
+- id: audiobook_script_pipeline
+  type: capability
+  capability: audiobook_script_pipeline
+  args: --help
+  save_as: audiobook_script_pipeline
+- id: ai_movie_generation_suite
+  type: capability
+  capability: ai_movie_generation_suite
+  args: --help
+  save_as: ai_movie_generation_suite
+  when: '{{ steps.audiobook_script_pipeline.ok }}'
+- id: ai_movie_generation_suite_2
+  type: capability
+  capability: ai_movie_generation_suite_2
+  args: --help
+  save_as: ai_movie_generation_suite_2
+  when: '{{ steps.ai_movie_generation_suite.ok }}'

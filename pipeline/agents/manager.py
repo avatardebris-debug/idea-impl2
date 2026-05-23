@@ -37,6 +37,11 @@ class ManagerAgent(AgentProcess):
         source = msg.payload.get("source", msg.from_agent)
         outgoing = []
 
+        if msg.type == "dropbox_user":
+            answer = self._handle_dropbox_user(msg)
+            self._log_decision(msg, [], note=f"dropbox {msg.payload.get('msg_id', '?')}")
+            return AgentOutput(success=True, answer=answer, outgoing=[])
+
         if source == "ideator" or msg.from_agent == "ideator":
             outgoing = self._handle_ideator_result(msg)
         elif msg.payload.get("signal") == "FIX_ANALYSIS_NEEDED":
@@ -72,11 +77,12 @@ class ManagerAgent(AgentProcess):
             f"## Current Master Ideas List\n"
             f"{self._read_master_ideas()[:2000]}\n\n"
             f"## Your Job\n"
-            f"Categorize each idea into EXACTLY one of these 4 categories:\n"
+            f"Categorize each idea into EXACTLY one of these 5 categories:\n"
             f"1. **ADD_TO_PLAN** — extends or improves what is currently being built\n"
             f"2. **REUSABLE_TOOL** — generic utility/library that could work across projects\n"
             f"3. **ADD_TO_BACKLOG** — a distinct new project idea for the future\n"
-            f"4. **ARCHIVE** — interesting but not actionable right now\n\n"
+            f"4. **CAPABILITY_GAP** — no existing verified tool covers this; pipeline should build it\n"
+            f"5. **ARCHIVE** — interesting but not actionable right now\n\n"
             f"Then write EACH category to its own file (append, don't overwrite):\n\n"
             f"- **ADD_TO_PLAN** items → append to `.pipeline/state/plan_amendments.md`\n"
             f"  Format each as: `- [ ] <title>: <what to add and why>`\n\n"
@@ -84,9 +90,13 @@ class ManagerAgent(AgentProcess):
             f"  Format each as: `- <tool name>: <what it does, which agents/files it lives near>`\n\n"
             f"- **ADD_TO_BACKLOG** items → append to `master_ideas.md`\n"
             f"  Format each as: `- [ ] **<title>** — <one line description>`\n\n"
+            f"- **CAPABILITY_GAP** items → append to `.pipeline/state/capability_gaps.md`\n"
+            f"  Format each as: `- [ ] **<title>** — <what tool is missing and why>`\n\n"
             f"- **ARCHIVE** items → append to `.pipeline/state/archived_ideas.md`\n"
             f"  Format each as: `- <title>: <reason archived>`\n\n"
-            f"Write ALL four files even if a category is empty (just skip writing that one).\n"
+            f"Write ALL five files even if a category is empty (just skip writing that one).\n"
+            f"Before categorizing, call suggest_capabilities mentally: prefer REUSABLE_TOOL or "
+            f"ADD_TO_BACKLOG with requires: slugs when a verified capability already fits.\n"
             f"Say DONE when finished.\n"
         )
 
@@ -94,6 +104,65 @@ class ManagerAgent(AgentProcess):
 
         # No outgoing messages needed — the LLM call writes to files directly
         return []
+
+    def _handle_dropbox_user(self, msg: Message) -> str:
+        """Triage a user dropbox.md message; steer projects and reply in dropbox."""
+        from pipeline.dropbox import append_manager_reply, apply_project_steer
+
+        msg_id = msg.payload.get("msg_id", "")
+        body = msg.payload.get("body", "")
+        target = msg.payload.get("target_slug", "") or msg.payload.get("active_slug", "")
+        ideas_path = msg.payload.get("ideas_path", "master_ideas.md")
+
+        mi = self._read_master_ideas()[:2500]
+        steer_path = ""
+        if target:
+            sp = pathlib.Path(".pipeline/projects") / target / "state" / "user_steer.md"
+            if sp.exists():
+                steer_path = sp.read_text(encoding="utf-8")[-1500:]
+
+        task_prompt = (
+            f"You are the Manager handling a USER dropbox message while the pipeline runs.\n\n"
+            f"## User message (id={msg_id})\n{body}\n\n"
+            f"## Target project slug\n{target or '(none — general pipeline)'}\n\n"
+            f"## Prior steering for this project\n{steer_path or '(none)'}\n\n"
+            f"## Master ideas (excerpt)\n{mi}\n\n"
+            f"## Your job\n"
+            f"1. Decide action(s): STEER_PROJECT | PLAN_AMENDMENT | BACKLOG_IDEA | "
+            f"CAPABILITY_GAP | REPLY_ONLY | NEEDS_INFO\n"
+            f"2. If steering a project, write concise bullet instructions agents should follow.\n"
+            f"3. If NEEDS_INFO, ask specific clarifying questions.\n"
+            f"4. Append files using write_file:\n"
+            f"   - Project steer: `.pipeline/projects/{target}/state/user_steer.md` (append)\n"
+            f"   - Plan tweak: `.pipeline/state/plan_amendments.md` (append `- [ ] ...`)\n"
+            f"   - New idea: `{ideas_path}` (append `- [ ] **Title** — desc` only if user asked)\n"
+            f"   - Gap: `.pipeline/state/capability_gaps.md` (append if tooling missing)\n"
+            f"5. End your answer with a block:\n"
+            f"   DROPBOX_REPLY:\n"
+            f"   status: ok | needs_info\n"
+            f"   (user-facing reply, 2-6 sentences)\n"
+            f"Say DONE when files are updated.\n"
+        )
+
+        result = self.call_agent(task=task_prompt, verbose=False)
+        answer = result.answer or ""
+
+        reply_body = answer
+        status = "ok"
+        if "DROPBOX_REPLY:" in answer:
+            parts = answer.split("DROPBOX_REPLY:", 1)[1].strip()
+            if "status: needs_info" in parts.lower():
+                status = "needs_info"
+            reply_body = re.sub(r"status:\s*\w+\s*", "", parts, flags=re.I).strip()
+
+        if target and body and status == "ok":
+            try:
+                apply_project_steer(target, body, source_msg_id=msg_id)
+            except Exception as e:
+                logger.warning("[manager] dropbox steer file failed: %s", e)
+
+        append_manager_reply(msg_id, reply_body[:2000], status=status)
+        return f"dropbox {msg_id} -> {status}"
 
     # --- Signal handling ---
 

@@ -21,7 +21,39 @@ from datetime import datetime
 
 from llm_interface import get_llm, Message
 from tools import TOOLS, TOOL_SCHEMAS, read_file, list_tree
+
+
 from governance import GovernanceGate, AffirmationSystem, load_constitution
+
+
+def _pipeline_capability_tools_enabled() -> bool:
+    import os
+    return os.environ.get("PIPELINE_CAPABILITY_TOOLS", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _active_tool_map() -> dict:
+    """Base tools plus capability tools in pipeline subprocesses (env-gated)."""
+    merged = dict(TOOLS)
+    if _pipeline_capability_tools_enabled():
+        try:
+            from pipeline.capability_tools import CAPABILITY_TOOLS
+            merged.update(CAPABILITY_TOOLS)
+        except ImportError:
+            pass
+    return merged
+
+
+def _active_tool_schemas() -> list:
+    schemas = list(TOOL_SCHEMAS)
+    if _pipeline_capability_tools_enabled():
+        try:
+            from pipeline.capability_tools import CAPABILITY_TOOL_SCHEMAS
+            schemas = schemas + CAPABILITY_TOOL_SCHEMAS
+        except ImportError:
+            pass
+    return schemas
 # reflection module archived — derived values section gracefully disabled
 
 # ---------------------------------------------------------------------------
@@ -168,7 +200,7 @@ def _record_tool_time(elapsed_s: float) -> None:
 
 
 def execute_tool(name: str, args: dict) -> str:
-    fn = TOOLS.get(name)
+    fn = _active_tool_map().get(name)
     if fn is None:
         return f"ERROR: Unknown tool '{name}'"
     _t0 = time.time()
@@ -333,7 +365,7 @@ def run_agent(
         if verbose:
             print_step(f"⟳  STEP {step}/{max_steps}", "", "cyan")
 
-        response: Message = llm.chat(messages, tools=TOOL_SCHEMAS)
+        response: Message = llm.chat(messages, tools=_active_tool_schemas())
 
         # Accumulate token usage
         if response.usage:
