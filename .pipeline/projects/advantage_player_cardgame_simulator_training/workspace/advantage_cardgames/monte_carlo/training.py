@@ -420,7 +420,7 @@ class MonteCarloTrainer:
         )
 
         # Play episode
-        while self._game.state == GameStatus.PLAYER_TURN:
+        while self._game.status == GameStatus.PLAYER_TURN:
             available_actions = self.get_available_actions(state)
             best_action = self.estimator.get_best_action(state, available_actions)
             action = self.policy.get_action(available_actions, best_action, state)
@@ -446,7 +446,7 @@ class MonteCarloTrainer:
             episode.append(state, action, result.net_result)
 
             # Check if episode ended
-            if self._game.state in [
+            if self._game.status in [
                 GameStatus.WIN,
                 GameStatus.LOSS,
                 GameStatus.PUSH,

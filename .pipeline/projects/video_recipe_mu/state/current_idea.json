@@ -1,15 +1,18 @@
 {
   "title": "[video recipe mu]",
   "description": "Takes video_scribe structured scene descriptions and uses an LLM to extract an ordered sequence of atomic actions as a robot recipe. Output JSON: [{step, action, object, xyz_delta, duration_s, preconditions, success_state}]. Any video of a real task becomes a structured skill recipe. require",
-  "status": "phase_1_planning",
-  "phase": 1,
+  "status": "complete",
+  "phase": 3,
   "total_phases": 3,
-  "started_at": "2026-05-22T02:12:37.541552+00:00",
+  "started_at": "2026-05-23T06:16:29.460514+00:00",
   "depends_on": [
     "video_scribe"
   ],
   "priority_tier": 0,
   "_slug": "video_recipe_mu",
-  "session_started_at": "2026-05-22T02:13:30.178701+00:00",
-  "checkpoint_at": "2026-05-22T02:30:18.261221+00:00"
+  "session_started_at": "2026-05-23T06:16:29.460514+00:00",
+  "checkpoint_at": "2026-05-22T22:39:53.466047+00:00",
+  "tasks_done": 1,
+  "tasks_total": 3,
+  "completed_at": "2026-05-23T08:03:43.623856+00:00"
 }

@@ -10,6 +10,7 @@ from typing import List
 from video_recipe_mu.recipe_extractor import extract_recipe
 from video_recipe_mu.recipe_validator import validate_steps, normalize_steps
 from video_recipe_mu.schema import RobotRecipeStep
+from video_recipe_mu.video_pipeline import PipelineConfig, PipelineResult, run_pipeline, save_pipeline_result
 
 
 def main():
@@ -42,10 +43,71 @@ def main():
         action="store_true",
         help="Normalize recipe steps before output.",
     )
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        help="Directory for caching LLM responses.",
+    )
+    parser.add_argument(
+        "--multi-scene",
+        action="store_true",
+        help="Treat input as multi-scene description.",
+    )
+    parser.add_argument(
+        "--video",
+        default=None,
+        help="Path to raw video file for end-to-end pipeline.",
+    )
+    parser.add_argument(
+        "--spatial-grounding",
+        action="store_true",
+        help="Enable spatial grounding using key frames.",
+    )
 
     args = parser.parse_args()
 
-    # Extract recipe
+    # If --video is provided, use the full pipeline
+    if args.video:
+        config = PipelineConfig(
+            provider=args.provider,
+            cache_dir=args.cache_dir,
+            multi_scene=args.multi_scene,
+            use_spatial_grounding=args.spatial_grounding,
+            validate=args.validate,
+            normalize=args.normalize,
+        )
+        result = run_pipeline(args.video, config)
+
+        # Output
+        output_data = {
+            "steps": [dict(s) for s in result.steps],
+            "scene_count": result.scene_count,
+            "key_frame_count": result.key_frame_count,
+        }
+        if result.grounding_results:
+            output_data["grounding"] = [
+                {
+                    "step": gr.step,
+                    "xyz_delta": gr.xyz_delta,
+                    "confidence": gr.confidence,
+                    "method": gr.method,
+                    "notes": gr.notes,
+                }
+                for gr in result.grounding_results
+            ]
+        if result.validation_errors:
+            output_data["validation_errors"] = result.validation_errors
+
+        output_json = json.dumps(output_data, indent=2)
+
+        if args.output:
+            save_pipeline_result(result, args.output)
+            print(f"Recipe written to {args.output}", file=sys.stderr)
+        else:
+            print(output_json)
+        return
+
+    # Legacy mode: extract from scene description file
     try:
         steps: List[RobotRecipeStep] = extract_recipe(args.input, provider=args.provider)
     except Exception as e:

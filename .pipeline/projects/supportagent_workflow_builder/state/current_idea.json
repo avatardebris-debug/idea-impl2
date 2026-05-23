@@ -1,7 +1,7 @@
 {
   "title": "[SupportAgent Workflow Builder]",
   "description": "Design an agentic SOP execution system for automated customer support ticket routing, triage, and draft response generation.",
-  "status": "complete",
+  "status": "phase_3_planning",
   "phase": 2,
   "total_phases": 3,
   "started_at": "2026-05-12T01:11:20.119055+00:00",
@@ -11,7 +11,7 @@
   "_slug": "supportagent_workflow_builder",
   "_instance_skip": true,
   "pre_skip_status": "complete",
-  "session_started_at": "2026-05-12T01:11:20.119055+00:00",
+  "session_started_at": "2026-05-22T22:21:30.076331+00:00",
   "review_result": {
     "blocking_bugs": 0,
     "review_path": "phases/phase_1/review.md",
@@ -74,6 +74,6 @@
     "non_blocking_notes": "## Non-Blocking Notes\n- **Decorative separator comments**: Files like `models.py` and `ingest.py` use excessive `# ------` separator lines (e.g., `# ---------------------------------------------------------------------------`). These add noise without value.\n- **`SRouter` class naming**: The class is named `SRouter` (likely a typo for `Router`). Consider renaming to `Router` for clarity.\n- **`classifier.py:65` \u2014 Priority formula**: `best_priority = min(best_priority + best_score, 10)` mixes the base priority with raw keyword count. A clearer formula might be `best_priority = min(rule.priority_base + best_score, 10)` to separate base from boost.\n- **`ingest.py` \u2014 `from urllib.parse import unquote_plus`**: Should be at the top of the file with other imports.\n- **`classifier.py` \u2014 Keyword matching is substring-based**: `combined_text.count(kw)` does substring matching, so keyword \"bill\" would match \"billing\" and \"billed\". This may cause false positives. Consider using word-boundary regex (`\\b`) for more precise matching.\n- **`router.py` \u2014 No validation of YAML config**: If the YAML is malformed or missing expected keys, `self.config[\"teams\"]` or `self.config[\"routing\"]` will raise `KeyError`. Consider adding validation or default fallbacks.\n- **`classifier.py` \u2014 `best_score` starts at 0**: If no keywords match, `best_category` stays as \"general\" with score 0, which is correct. But the `best_score` variable is never used after the loop \u2014 it could be removed.\n- **`pyproject.toml` ",
     "review_content_preview": "# Phase 1 Review \u2014 SupportAgent Workflow Builder\n\n### What's Good\n- **Clean data model design**: `Ticket` and `PipelineResult` dataclasses are well-structured with clear serialization/deserialization helpers (`to_dict`, `to_json`, `from_dict`, `from_json`).\n- **Flexible ingestion**: `Ingestor` handles three input formats (JSON, MIME email, web form URL-encoded) with graceful fallback for missing keys and auto-generated UUIDs.\n- **Email MIME parsing**: Properly handles multipart emails, charset decoding, and header preservation \u2014 a non-trivial task done correctly.\n- **Keyword-based classifier**: Simple but effective scoring mechanism with configurable YAML rules; handles urgency boosting and priority capping.\n- **Config-driven routing**: `SRouter` uses YAML for team/category mapping, priority-based routing, and SLA breach detection \u2014 easy to modify without code changes.\n- **Comprehensive test coverage**: 35 tests covering construction, serialization, ingestion (all 3 formats), classification (all categories, edge cases), and pipeline result mapping.\n- **Good use of `dataclasses` and `Enum` types**: Type safety with `str, Enum` mixins for serialization compatibility.\n- **`from_ticket` factory on `PipelineResult`**: Clean bridge between internal `Ticket` state and external API output.\n- **`conftest.py` path injection**: Ensures local imports work in pytest without requiring installed package.\n\n## Blocking Bugs\n- **`supportagent/router.py:1` \u2014 Missing `from __future__ import anno"
   },
-  "pre_budget_status": "phase_1_reviewed",
-  "budget_note": "Force-completed after 580 min (budget: 225 min for 3-phase project)"
+  "polish_notes": "p2/3 complete. Continue phases 3-3. Original title: [SupportAgent Workflow Builder]",
+  "checkpoint_at": "2026-05-23T14:29:45.858501+00:00"
 }

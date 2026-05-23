@@ -1,6 +1,6 @@
 {
   "slug": "thronglets_as_a_game",
-  "refreshed_at": "2026-05-19T23:14:11.007384+00:00",
+  "refreshed_at": "2026-05-23T14:29:16.453746+00:00",
   "current_phase": 1,
   "master_plan": "# [thronglets as a game] — Master Plan\n\n## Overview\n[each thronglet is an agent, each agent has a 2d world and you can prompt it and it can visualize interactions with the others. Turn system management into a game where the interactions of the game map to realworld usefulness and gamifies system buildling]\n\n*Reconstructed from project state — original plan was not preserved.*\n\n## Phase 1: Implementation (in progress: 2/6 tasks)\n**Goal**: Implement the core functionality of [thronglets as a game].\n**Deliverable**: Working Python package with tests.\n**Tasks done**: 2/6\n\n## Workspace Summary\n- Source files: 7\n- Test files: 4",
   "current_tasks": "- [x] Task 1: Core data models and types\n- [x] Task 2: 2D World engine\n- [ ] Task 3: Thronglet agent core\n- [ ] Task 4: Interaction and communication system\n- [ ] Task 5: ASCII visualization layer\n- [ ] Task 6: Game loop and CLI entry point",
@@ -11,7 +11,6 @@
     "conftest.py",
     "pytest.ini",
     "src/thronglets/__init__.py",
-    "src/thronglets/agent.py",
     "src/thronglets/models.py",
     "src/thronglets/types.py",
     "src/thronglets/world.py",

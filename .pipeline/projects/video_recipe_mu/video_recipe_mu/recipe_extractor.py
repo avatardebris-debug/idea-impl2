@@ -13,7 +13,11 @@ from video_recipe_mu.schema import RobotRecipeStep
 def _load_prompt_template(prompt_name: str) -> str:
     """Load a prompt template from the prompts directory."""
     prompt_dir = os.path.join(os.path.dirname(__file__), "..", "prompts")
-    prompt_path = os.path.join(prompt_dir, f"{prompt_name}.md")
+    # Ensure the prompt_name doesn't already have .md extension
+    if prompt_name.endswith(".md"):
+        prompt_path = os.path.join(prompt_dir, prompt_name)
+    else:
+        prompt_path = os.path.join(prompt_dir, f"{prompt_name}.md")
     with open(prompt_path, "r") as f:
         return f.read()
 

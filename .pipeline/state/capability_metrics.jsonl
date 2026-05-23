@@ -1,0 +1,6 @@
+{"ts": "2026-05-22T23:08:22.135092+00:00", "event": "route", "slug": "ai_movie_generation_suite", "ok": true, "detail": "match (score=12.7 +fts)"}
+{"ts": "2026-05-22T23:08:22.140744+00:00", "event": "route", "slug": "movie_idea_generator", "ok": true, "detail": "match (score=10.3 +fts)"}
+{"ts": "2026-05-22T23:08:22.142071+00:00", "event": "route", "slug": "player_attribute_library", "ok": true, "detail": "match (score=10.2 +fts)"}
+{"ts": "2026-05-23T04:38:57.703069+00:00", "event": "workflow", "slug": "registry_refresh", "ok": true, "detail": "backend=native"}
+{"ts": "2026-05-23T04:40:06.343536+00:00", "event": "workflow", "slug": "registry_refresh", "ok": true, "detail": "backend=native"}
+{"ts": "2026-05-23T19:29:37.322366+00:00", "event": "workflow", "slug": "registry_refresh", "ok": true, "detail": "backend=native"}

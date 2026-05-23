@@ -31,5 +31,8 @@
     "review_content_preview": "# Code Review \u2014 Phase 2\n\n## Blocking Bugs\n- Review could not be completed (LLM did not write review file)\n\n## Non-Blocking Notes\nNone\n\n## Verdict\nFAIL \u2014 review file was not generated\n"
   },
   "_slug": "udemy_training_tool",
-  "completed_at": "2026-05-13T20:14:53.658225+00:00"
+  "completed_at": "2026-05-23T19:25:17.551170+00:00",
+  "polish_notes": "p2/3 complete. Continue phases 3-3. Original title: [udemy training tool]",
+  "checkpoint_at": "2026-05-23T11:37:39.940585+00:00",
+  "budget_note": "Force-completed: exceeded 80 total retries across all phases (actual: 999)"
 }

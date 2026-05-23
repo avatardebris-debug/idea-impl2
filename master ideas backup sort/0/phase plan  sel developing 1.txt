@@ -1,0 +1,262 @@
+Capability registry — phased plan
+Goal: move from “agents can run_shell anything if they guess” to “the system knows what exists, when to use it, how to invoke it safely,” and eventually registers new tools it builds.
+
+This extends what you already have (reusable_tools.md, shared_libs/, context_cache.json, truth.md, reviewer extraction) instead of replacing it.
+
+Phase 0 — Foundations (prep, ~1–2 days)
+Objective: Agree on schema, ownership, and refresh triggers before writing code.
+
+Deliverables
+
+Item	Description
+Schema v1
+SQLite tables (or JSONL if you prefer git-friendly diffs first)
+Capability kinds
+project_cli, shared_lib, pipeline_script, hermes_skill, external_binary
+Lifecycle states
+draft, verified, deprecated, broken
+Promotion rules
+What counts as “verified” (e.g. phase N complete + pytest PASS)
+Proposed core tables
+
+capabilities
+  id, slug, title, kind, status
+  purpose          -- one sentence for routing
+  domains          -- JSON array: robotics, video, finance, ...
+  entrypoint       -- CLI or python -m path
+  import_path      -- optional: shared_libs.foo.bar
+  cwd_template     -- e.g. .pipeline/projects/{slug}/workspace
+  requires         -- JSON slugs
+  env_vars         -- JSON
+  example_invoke   -- one copy-paste command
+  source_project   -- slug or null
+  success_count, fail_count, last_used_at
+  created_at, updated_at
+capability_tags     -- optional normalized tags
+capability_edges    -- requires / enhances / supersedes
+Decisions to lock
+
+SQLite lives at .pipeline/state/capability_registry.sqlite
+Generated human view: .pipeline/state/CAPABILITIES.md (regenerated, not hand-edited)
+Keep reusable_tools.md during migration; deprecate in Phase 4
+Hermes tools are a separate kind with source=hermes (unified registry, different invoke path)
+Exit criteria
+
+Schema doc in .pipeline/docs/capability_registry.md (or section in COMMANDS.md)
+Team agrees on “verified” = disk complete at max phase + validation PASS (configurable)
+Phase 1 — Catalog (discovery only, ~3–5 days)
+Objective: Automatically inventory everything on disk; no new agent tools yet.
+
+Work
+
+scripts/build_capability_registry.py
+Scan .pipeline/projects/*/workspace for:
+cli.py, __main__.py, pyproject.toml [project.scripts]
+README “Usage” sections (optional LLM-free heuristics)
+Scan .pipeline/shared_libs/*/ for importable packages
+Scan repo root: extract.py, health_check.py, import_zip.py, runner.py, goal_decomposer, etc.
+Read current_idea.json + validation_report.md for status
+Upsert into SQLite; set status from disk truth
+Generate CAPABILITIES.md grouped by domain/kind (top N per section, full detail in DB)
+CLI: python scripts/build_capability_registry.py --list --domain robotics
+Hooks (manual run first)
+
+python scripts/build_capability_registry.py
+python extract.py --rebuild-truth   # keep truth.md in sync
+Exit criteria
+
+Registry has ≥90% of complete projects represented
+Each row has at least: slug, purpose (from description or spec), entrypoint or import_path, status
+CAPABILITIES.md readable in <5 min for a human audit
+Not in scope
+
+Router, invoke_capability, automatic prompt injection
+Phase 2 — Context injection (awareness, ~2–4 days)
+Objective: Agents see the catalog without choosing yet.
+
+Work
+
+Extend pipeline/context_aggregator.py
+Add capabilities_summary: top 15–30 relevant rows (by domain match on project title/tags, or global top verified)
+Cap tokens (~2–4k chars), link to full CAPABILITIES.md path
+Executor / phase_planner / goal_decomposer prompts
+“Before implementing, check capabilities_summary and shared_libs; prefer reuse.”
+Ideator — feed truncated registry + reusable_tools until Phase 4 merge
+Refresh triggers
+On record_completion
+On import_zip / --rebuild-truth (optional flag --rebuild-capabilities)
+Background: same interval as context_cache refresh
+Exit criteria
+
+context_cache.json includes capabilities_summary for active project
+Executor logs show fewer duplicate implementations (qualitative; track in finetune/corpus later)
+Rebuild is deterministic and fast (<30s for 100 projects)
+Phase 3 — Routing policy (tuned selection, ~4–7 days)
+Objective: System recommends which capability to use for a task — still optional for the agent to follow.
+
+Work
+
+pipeline/capability_router.py
+Input: task text, project slug, domain hints
+Output: ranked list [{id, slug, score, reason, example_invoke}]
+Methods (layered):
+Rules: keyword → domain (URDF → robotics; “pytest” → dev tools)
+Requires graph: only suggest if dependencies satisfied on disk
+LLM critic (optional): small call: “pick top 3 from this table”
+Integrate into goal_decomposer
+For each branch: suggested_capabilities: [...]
+Prefer reuse branches when match score > threshold
+Integrate into phase_planner
+Add “Reuse” section in tasks.md when router finds hits
+--hermes routing
+If task is open-ended research → kind=hermes_skill rows rank higher
+New artifact: .pipeline/goals/<goal_id>/capability_plan.yaml (optional)
+
+Exit criteria
+
+Router returns sensible top-3 for 10 hand-written test queries (robotics, movie, CSV, SEO)
+Goal decomposition entries include reuse suggestions where projects exist
+Documented false-positive handling (low score → “build new”)
+Phase 4 — Safe invocation (controlled execution, ~5–8 days)
+Objective: One new tool: invoke known entrypoints with guardrails — not raw shell roulette.
+
+Work
+
+New tools in tools.py (or pipeline/capability_tools.py)
+list_capabilities(domain?, status=verified)
+describe_capability(slug)
+invoke_capability(slug, args_json, cwd?) → runs whitelisted entrypoint only
+Guardrails
+Entrypoint must exist in registry with status=verified
+cwd resolved from template; no .. escape
+Timeout, max output size, allowlist env vars
+Log every invoke → update success_count / fail_count
+Wire into executor only first (not validator/reviewer)
+Deprecate path: merge reusable_tools.md generation from SQLite export; single source of truth
+Exit criteria
+
+Agent can run e.g. json_diff_tool or a shared_lib CLI via invoke_capability without hand-rolled shell
+Failed invokes mark capability broken after N failures (health check report)
+Security review: no arbitrary shell string from model — only registry rows
+Phase 5 — Graph & dependencies (~3–5 days)
+Objective: Align registry with requires: in ideas and robot/movie lock chains.
+
+Work
+
+capability_edges table from:
+master_ideas.md requires: parsing
+goal_decomposer output
+Import graph within monorepo (optional static analysis)
+Router respects graph — don’t suggest blocked capabilities
+BACKLOG_AUDIT / polish integration — “complete but blocked downstream” view
+Visualizer (optional): scripts/capability_graph.dot for Graphviz
+Exit criteria
+
+movie_player only routable when ai_movie_generation_suite is verified
+Robot chain order matches registry edges
+Stale requires in markdown flagged by health check
+Phase 6 — Self-developing tools loop (~2–4 weeks, iterative)
+Objective: Pipeline builds a tool → validator passes → registry auto-registers → future tasks reuse it.
+
+Work
+
+Reviewer promotion hook (extend _extract_shared_libs)
+On REUSABLE_TOOL / phase complete → register_capability(draft)
+After validation PASS → status=verified
+Meta-ideas channel
+Manager/ideator can seed: “capability gap: X” → normal project → auto-register
+Tie to subgoal_generator: subgoals tagged reuse vs build
+capability_gap task type in goal_decomposer
+Node not in registry → queue pipeline project
+Node in registry → invoke_capability or import shared_lib
+Embeddings (optional)
+purpose + example_invoke embedded for semantic search in router
+Hermes unification
+Hermes-discovered artifacts → rows with kind=hermes_task
+Same router chooses Hermes vs pipeline vs shared_lib
+Exit criteria
+
+New complete project appears in registry within one rebuild cycle without manual edit
+Second project in same domain reuses first via router suggestion (measurable on 3 test pairs)
+Documented “tool lifecycle” in COMMANDS.md
+Phase 7 — Operations & tuning (ongoing)
+Objective: Production hygiene on a growing registry.
+
+Activity	Frequency
+Rebuild registry
+After zip import, completion, weekly cron
+Prune deprecated
+Projects deleted / renamed
+Health check extension
+Shadow scripts + missing entrypoints
+Metrics dashboard
+Top used, highest fail rate, unused verified
+Human override file
+.pipeline/state/capability_overrides.yaml for manual fixes
+Future (Phase 8+)
+
+MCP server exposing list_capabilities / invoke_capability to external agents
+Multi-tenant / cloud instance sync via git + sqlite merge
+RL or bandit routing from success_count (advanced)
+Recommended execution order
+Phase 0 ──► Phase 1 ──► Phase 2 ──► Phase 3
+                              │
+                              ▼
+                         Phase 5 (deps graph)
+                              │
+                              ▼
+                         Phase 4 (invoke)  ← needs catalog + graph
+                              │
+                              ▼
+                         Phase 6 (self-dev loop)
+                              │
+                              ▼
+                         Phase 7 (ops)
+Parallelizable: Phase 5 can start after Phase 1; Phase 4 should wait until Phase 3 rules exist (otherwise invoke has nothing smart to target).
+
+Effort & risk summary
+Phase	Effort	Risk	User-visible win
+0
+S
+Low
+Clear contract
+1
+M
+Low
+Full inventory
+2
+M
+Low
+Less duplicate work
+3
+M
+Medium
+Smarter goals/tasks
+4
+L
+Medium
+Safe execution
+5
+M
+Low
+Correct lock chains
+6
+XL
+High
+Autonomous tool growth
+7
+S ongoing
+Low
+Stability
+Biggest risks
+
+Registry drift (stale entrypoints) → mitigated by rebuild hooks + health check
+Model ignores router → mitigated by Phase 4 invoke_capability as easier path than shell
+Token bloat → mitigated by summary in cache, full data in SQLite only
+First implementation slice (if you start coding next)
+Phase 0 schema doc
+Phase 1 build_capability_registry.py + SQLite + CAPABILITIES.md
+Phase 2 hook in context_aggregator + completion rebuild
+That gives you the MD/SQLite catalog you imagined without yet building the router or new tool calls.
+
+I can turn Phase 0–1 into concret

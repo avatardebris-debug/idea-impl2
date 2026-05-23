@@ -1,12 +1,15 @@
 {
   "title": "[tim ferriss learning tool]",
   "description": "[Using meta-learning accelerated learning techniques to help deconstruct topic, DISSS. (decnstruction, selection, sequencing, stakes) Gather material of various media, summarize sources, outline, provide an LLM/RAG for asking/answering about the details, deep dive and 80/20 extraction of most important parts, lesson plans sequencing of the parts, etc. Cafe. Compression, Frequency, Encoding for memory tricks.]",
-  "status": "complete",
+  "status": "phase_4_planning",
   "total_phases": 6,
   "tasks_done": 0,
   "tasks_total": 3,
   "started_at": "2026-04-30T19:19:42.109374+00:00",
   "phase": 3,
   "_slug": "tim_ferriss_learning_tool",
-  "completed_at": "2026-05-13T20:14:53.669632+00:00"
+  "completed_at": "2026-05-13T20:14:53.669632+00:00",
+  "session_started_at": "2026-05-22T22:21:30.079019+00:00",
+  "polish_notes": "p3/6 complete. Continue phases 4-6. Original title: [tim ferriss learning tool]",
+  "checkpoint_at": "2026-05-23T14:29:45.856347+00:00"
 }

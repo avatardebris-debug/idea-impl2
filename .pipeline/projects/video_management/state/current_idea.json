@@ -1,12 +1,15 @@
 {
   "title": "[video management]",
   "description": "[airtable like platform or system for managing video content. AI can help generate content and schedule videos and scale. Integration with youtube suite]",
-  "status": "complete",
+  "status": "phase_2_planning",
   "total_phases": 5,
   "tasks_done": 0,
   "tasks_total": 5,
   "phase": 1,
   "started_at": "2026-05-05T10:27:14.577116+00:00",
   "_slug": "video_management",
-  "completed_at": "2026-05-13T20:16:56.611026+00:00"
+  "completed_at": "2026-05-13T20:16:56.611026+00:00",
+  "session_started_at": "2026-05-22T22:21:30.080703+00:00",
+  "polish_notes": "p1/5 complete. Continue phases 2-5. Original title: [video management]",
+  "checkpoint_at": "2026-05-23T14:29:45.856787+00:00"
 }

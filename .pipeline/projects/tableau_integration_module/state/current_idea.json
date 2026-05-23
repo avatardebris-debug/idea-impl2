@@ -9,8 +9,7 @@
   "tasks_done": 7,
   "tasks_total": 8,
   "_slug": "tableau_integration_module",
-  "pre_budget_status": "phase_2_reviewed",
-  "session_started_at": "2026-05-11T20:35:55.305747+00:00",
+  "session_started_at": "2026-05-22T22:21:30.077356+00:00",
   "review_result": {
     "blocking_bugs": 1,
     "review_path": "phases/phase_2/review.md",
@@ -22,6 +21,7 @@
     "non_blocking_notes": "## Non-Blocking Notes\n- `renderers.py` already has the correct imports for `WinRatePanel`, `BankrollCurvePanel`, and `NashEquilibriumPanel` (imported at top of file).\n- `panels.py` mutable default argument for `confidence_interval` is low-risk since tuples are immutable, but should be typed as `tuple[float, float]`.\n- Grid layout in `layout.py` is fragile on panel removal (panels stored in flat list, accessed via linear index).\n- `price` attribute in `tickers.py` is repurposed for win rate \u2014 consider renaming.\n- Magic numbers for Nash thresholds in `panels.py` should be constants.\n- Missing tests for `TableauDashboard.__post_init__` default panels and `TableauRESTRenderer` exception handling.",
     "review_content_preview": "# Code Review \u2014 Phase 2\n\n## Blocking Bugs\n- **RESOLVED: Test symbol case mismatch** \u2014 `tests/test_layout.py` already expects `\"WIN_RATE\"` and `\"BANKROLL\"` (uppercase), matching the source code in `panels.py`. All 11 tests in `test_layout.py` pass.\n\n## Non-Blocking Notes\n- `renderers.py` already has the correct imports for `WinRatePanel`, `BankrollCurvePanel`, and `NashEquilibriumPanel` (imported at top of file).\n- `panels.py` mutable default argument for `confidence_interval` is low-risk since tuples are immutable, but should be typed as `tuple[float, float]`.\n- Grid layout in `layout.py` is fragile on panel removal (panels stored in flat list, accessed via linear index).\n- `price` attribute in `tickers.py` is repurposed for win rate \u2014 consider renaming.\n- Magic numbers for Nash thresholds in `panels.py` should be constants.\n- Missing tests for `TableauDashboard.__post_init__` default panels and `TableauRESTRenderer` exception handling.\n\n## Verdict\nPASS \u2014 blocking bug has been resolved. All tests in `test_layout.py` pass.\n"
   },
-  "budget_note": "Force-completed after 275 min (budget: 225 min for 3-phase project)",
-  "completed_at": "2026-05-13T19:42:53.642610+00:00"
+  "completed_at": "2026-05-23T19:25:17.437565+00:00",
+  "polish_notes": "p2/3 complete. Continue phases 3-3. Original title: [Tableau Integration Module]",
+  "checkpoint_at": "2026-05-23T14:29:45.858770+00:00"
 }

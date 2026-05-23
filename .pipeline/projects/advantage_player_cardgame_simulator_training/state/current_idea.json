@@ -1,12 +1,22 @@
 {
   "title": "[advantage player cardgame simulator training]",
   "description": "[monte carlo simulations and training, solve nash distance leveage pokerkit and poker-mtt-icm-master on github if necessary for making it easier to develop poker aspect to the suite. blackjack, video poker, tournament poker vs cash game, 7 card stud, limit holdem, etc progressive jackpot slot calculator]",
-  "status": "complete",
+  "status": "phase_3_reviewed",
   "total_phases": 6,
-  "tasks_done": 6,
-  "tasks_total": 6,
+  "tasks_done": 0,
+  "tasks_total": 3,
   "started_at": "2026-04-27T18:43:36.022797+00:00",
   "_slug": "advantage_player_cardgame_simulator_training",
-  "phase": 1,
-  "completed_at": "2026-05-13T20:16:56.620222+00:00"
+  "phase": 3,
+  "completed_at": "2026-05-13T20:16:56.620222+00:00",
+  "polish_notes": "p1/6 complete. Continue phases 2-6. Original title: [advantage player cardgame simulator training]",
+  "checkpoint_at": "2026-05-23T14:29:45.857011+00:00",
+  "pre_budget_status": "phase_3_reviewed",
+  "review_result": {
+    "blocking_bugs": 0,
+    "non_blocking_notes": "Manager force-advanced: 1 failures after 3 attempts. This appears to be a directory listing for a complex AI agent framework, likely **Hermes Agent** (given the file names like `software-development-hermes-agent-skill-authoring.md` and `hermes_runner.py`), combined with a documentation site (Docusaurus structure) and a personal knowledge management system (Master Ideas).\n\nHere is a breakdown of the architecture and key components visible in this structure:\n\n### 1. Core Agent Framework (`pipeline/`)\nThis directory contains the logic for an autonomo",
+    "tasks_path": "phases/phase_3/tasks.md",
+    "workspace_path": "/workspace/idea impl/.pipeline/projects/advantage_player_cardgame_simulator_training/workspace",
+    "review_path": "phases/phase_3/review.md"
+  }
 }

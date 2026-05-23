@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "subgoal-generator"
+version = "0.3.0"
+description = "General-purpose LLM goal decomposition engine. Decomposes high-level goals into ordered, dependency-aware subgoals."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.0.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+subgoal-generator = "subgoal_generator.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["subgoal_generator*"]

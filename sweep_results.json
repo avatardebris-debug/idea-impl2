@@ -1,302 +1,1052 @@
 {
+  "academic_thesis_writer": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "advantage_player_cardgame_simulator_training": {
+    "status": "TIMEOUT",
+    "elapsed": 60.0,
+    "detail": "timed out after 60s"
+  },
+  "agency_sop_automator": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.50s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_agency_sop_automator.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.50s",
+    "stderr_tail": ""
+  },
+  "agentflow_drophip": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "10 errors in 0.89s",
+    "elapsed": 3.3,
+    "full_stdout_tail": "ERROR tests/test_task.py\nERROR tests/test_workflow.py\nERROR tests/test_workflow_engine.py\n!!!!!!!!!!!!!!!!!! Interrupted: 10 errors during collection !!!!!!!!!!!!!!!!!!!\n10 errors in 0.89s",
+    "stderr_tail": ""
+  },
+  "agentic_mirroring_game": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "4 errors in 0.24s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "ERROR tests/test_mirroring.py\nERROR tests/test_models.py\nERROR tests/test_player.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!\n4 errors in 0.24s",
+    "stderr_tail": ""
+  },
+  "ai_author_suite": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "ai_movie_generation_suite": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "128 passed in 2.03s",
+    "elapsed": 7.2,
+    "full_stdout_tail": "........................................................................ [ 56%]\n........................................................                 [100%]\n128 passed in 2.03s",
+    "stderr_tail": ""
+  },
+  "ai_movie_generation_suite_2": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "180 passed in 54.90s",
+    "elapsed": 57.1,
+    "full_stdout_tail": "........................................................................ [ 40%]\n........................................................................ [ 80%]\n....................................                                     [100%]\n180 passed in 54.90s",
+    "stderr_tail": ""
+  },
+  "audiobook_script_pipeline": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.4,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:5: in <module>\n    from audiobook_script_pipeline.parser.manuscript_parser import ManuscriptParser, ManuscriptParseError\nE   ModuleNotFoundError: No module named 'audiobook_script_pipeline'"
+  },
+  "automatedclientops_manager": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "babble": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.9,
+    "full_stdout_tail": "",
+    "stderr_tail": "    from babble.models import Phrase  # noqa: F401\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   ModuleNotFoundError: No module named 'babble'"
+  },
+  "beatsheet_generator": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.5,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:3: in <module>\n    from beatsheet_generator.service import BeatSheetService\nE   ModuleNotFoundError: No module named 'beatsheet_generator'"
+  },
+  "book_researcher": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.6,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:3: in <module>\n    from book_researcher.models import BookReview, Gap, NicheProfile, TableOfContents\nE   ModuleNotFoundError: No module named 'book_researcher'"
+  },
+  "brain_download": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.1,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:5: in <module>\n    from brain_download.config.domain_profiles import DOMAIN_PROFILES, get_domain_profile\nE   ModuleNotFoundError: No module named 'brain_download'"
+  },
+  "budgetflow_tracker_system": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "chronovision": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "9 errors in 0.60s",
+    "elapsed": 5.2,
+    "full_stdout_tail": "ERROR tests/test_predictor.py\nERROR tests/test_state_space.py\nERROR tests/test_xgboost_predictor.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 9 errors during collection !!!!!!!!!!!!!!!!!!!\n9 errors in 0.60s",
+    "stderr_tail": ""
+  },
+  "chronovision2": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "5 errors in 0.52s",
+    "elapsed": 2.7,
+    "full_stdout_tail": "ERROR tests/test_prediction_engine.py\nERROR tests/test_surprise_meter.py\nERROR tests/test_world_simulator.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 5 errors during collection !!!!!!!!!!!!!!!!!!!\n5 errors in 0.52s",
+    "stderr_tail": ""
+  },
+  "chronovision_autoresearch_adapter": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "47 passed in 0.33s",
+    "elapsed": 2.6,
+    "full_stdout_tail": "...............................................                          [100%]\n47 passed in 0.33s",
+    "stderr_tail": ""
+  },
+  "code_review_diff_summarizer": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "15 passed in 0.18s",
+    "elapsed": 2.3,
+    "full_stdout_tail": "...............                                                          [100%]\n15 passed in 0.18s",
+    "stderr_tail": ""
+  },
+  "code_reviewer": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.23s",
+    "elapsed": 2.9,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.23s",
+    "stderr_tail": ""
+  },
+  "config_schema_validator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.75s",
+    "elapsed": 3.8,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.75s",
+    "stderr_tail": ""
+  },
   "consistent_character_developer": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "32 passed in 16.51s",
-    "elapsed": 18.3,
-    "full_stdout_tail": "................................                                         [100%]\n32 passed in 16.51s",
+    "summary": "32 passed in 27.65s",
+    "elapsed": 29.9,
+    "full_stdout_tail": "................................                                         [100%]\n32 passed in 27.65s",
     "stderr_tail": ""
   },
   "consistent_scene_developer": {
     "status": "NO_TESTS_DIR",
     "detail": "no tests/ directory"
   },
+  "contract_extractor": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.19s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.19s",
+    "stderr_tail": ""
+  },
+  "cross_project_linter": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.28s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.28s",
+    "stderr_tail": ""
+  },
+  "csv_analyzer": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "4 errors in 6.43s",
+    "elapsed": 8.7,
+    "full_stdout_tail": "ERROR tests/test_cli.py\nERROR tests/test_csv_io.py\nERROR tests/test_integration.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!\n4 errors in 6.43s",
+    "stderr_tail": ""
+  },
+  "csv_data_pipeline_builder": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 0.31s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "ERROR tests/test_dag.py\nERROR tests/test_nodes.py\nERROR tests/test_pipeline.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.31s",
+    "stderr_tail": ""
+  },
+  "dependencyvuln_code_scanner": {
+    "status": "TIMEOUT",
+    "elapsed": 60.0,
+    "detail": "timed out after 60s"
+  },
+  "dfs_arb": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "4 errors in 0.41s",
+    "elapsed": 2.0,
+    "full_stdout_tail": "ERROR tests/test_engine.py\nERROR tests/test_odds.py\nERROR tests/test_promos.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!\n4 errors in 0.41s",
+    "stderr_tail": ""
+  },
   "docsai_documentation_generator": {
     "status": "COMPLETED",
     "exit_code": 2,
-    "summary": "3 errors in 0.33s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "ERROR tests/test_integration.py\nERROR tests/test_llm_interface.py\nERROR tests/test_parsers.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.33s",
+    "summary": "2 errors in 0.63s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_integration.py\nERROR tests/test_llm_interface.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n2 errors in 0.63s",
     "stderr_tail": ""
   },
   "drop_servicing_tool": {
     "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "14 errors in 1.35s",
+    "elapsed": 4.4,
+    "full_stdout_tail": "ERROR tests/test_sop_schema.py\nERROR tests/test_sop_store.py\nERROR tests/test_template_library.py\n!!!!!!!!!!!!!!!!!! Interrupted: 14 errors during collection !!!!!!!!!!!!!!!!!!!\n14 errors in 1.35s",
+    "stderr_tail": ""
+  },
+  "dropgentic": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "161 passed in 0.36s",
+    "elapsed": 2.1,
+    "full_stdout_tail": "........................................................................ [ 44%]\n........................................................................ [ 89%]\n.................                                                        [100%]\n161 passed in 0.36s",
+    "stderr_tail": ""
+  },
+  "dropify": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "droppain": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.8,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:5: in <module>\n    from droppain.config import Config, get_config\nE   ModuleNotFoundError: No module named 'droppain'"
+  },
+  "dropsearch": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "82 passed, 7 warnings in 27.02s",
+    "elapsed": 29.4,
+    "full_stdout_tail": "tests/test_scraper.py::TestSupplierDetector::test_detect_printful\n  C:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\dropsearch\\workspace\\tests\\..\\src\\scraper\\supplier_detector.py:117: FutureWarning: Possible nested set at position 28\n    urls = re.findall(url_pattern, html, re.IGNORECASE)\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n82 passed, 7 warnings in 27.02s",
+    "stderr_tail": ""
+  },
+  "dropshipserviceecommerce_autoseo_autometa": {
+    "status": "COMPLETED",
     "exit_code": 1,
-    "summary": "12 failed, 211 passed in 21.00s",
-    "elapsed": 24.3,
-    "full_stdout_tail": "FAILED tests/test_phase2_integration.py::TestResultsStore::test_get_result_task_not_found\nFAILED tests/test_phase4.py::TestTemplates::test_list_templates_with_templates\nFAILED tests/test_phase4.py::TestTemplates::test_get_existing_template - asse...\nFAILED tests/test_phase4.py::TestTemplates::test_delete_template - assert 404...\n12 failed, 211 passed in 21.00s",
+    "summary": "35 passed in 1.39s",
+    "elapsed": 5.1,
+    "full_stdout_tail": "dropship_seo\\models.py              117     32    73%   67, 75, 90, 107, 189, 205-214, 218-228, 231-234, 237-240\n---------------------------------------------------------------\nTOTAL                              1168   1082     7%\nFAIL Required test coverage of 85% not reached. Total coverage: 7.36%\n35 passed in 1.39s",
+    "stderr_tail": ""
+  },
+  "dropstore": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 1.24s",
+    "elapsed": 4.6,
+    "full_stdout_tail": "ERROR tests/test_catalog_service.py\nERROR tests/test_niche_service.py\nERROR tests/test_shopify_service.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 1.24s",
+    "stderr_tail": ""
+  },
+  "dynamic_pricing_integrator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "97 passed in 0.61s",
+    "elapsed": 2.7,
+    "full_stdout_tail": "........................................................................ [ 74%]\n.........................                                                [100%]\n97 passed in 0.61s",
+    "stderr_tail": ""
+  },
+  "ecommercecatalog_metadata_optimizer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "5 failed, 48 passed in 0.52s",
+    "elapsed": 2.7,
+    "full_stdout_tail": "FAILED tests/test_metadata_optimizer.py::TestCatalogAnalyzer::test_empty_csv_audit\nFAILED tests/test_metadata_optimizer.py::TestMetadataOptimizer::test_truncate_title_length\nFAILED tests/test_metadata_optimizer.py::TestMetadataOptimizer::test_truncate_description_length\nFAILED tests/test_metadata_optimizer.py::TestHelperFunctions::test_optional_columns_present\n5 failed, 48 passed in 0.52s",
+    "stderr_tail": ""
+  },
+  "email_tool": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.3,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:8: in <module>\n    from email_tool.models import (\nE   ModuleNotFoundError: No module named 'email_tool'"
+  },
+  "extraction": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.9,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:14: in <module>\n    from extraction.extractor import extract, _fallback_extract\nE   ModuleNotFoundError: No module named 'extraction'"
+  },
+  "ffo": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.0,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:8: in <module>\n    from ffo.models.player import Player, FreeAgent\nE   ModuleNotFoundError: No module named 'ffo'"
+  },
+  "file_deduplicator": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 0.50s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "ERROR tests/test_duplicates.py\nERROR tests/test_report.py\nERROR tests/test_scanner.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.50s",
+    "stderr_tail": ""
+  },
+  "finance_tracker": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "27 passed in 0.25s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "...........................                                              [100%]\n27 passed in 0.25s",
     "stderr_tail": ""
   },
   "financial_document_analyzer": {
     "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "16 failed, 40 passed in 1.40s",
-    "elapsed": 3.0,
-    "full_stdout_tail": "FAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_no_tables - Attribu...\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_empty_table - Attri...\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_with_mixed_numeric_and_text\nFAILED tests/test_parsers.py::TestParsePDF::test_pdf_filename_extraction - At...\n16 failed, 40 passed in 1.40s",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.0,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:6: in <module>\n    from financial_document_analyzer.parsers import parse_csv, parse_pdf\nE   ModuleNotFoundError: No module named 'financial_document_analyzer'"
+  },
+  "financial_portfolio_simulator": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.0,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:5: in <module>\n    from financial_portfolio_simulator.api import run_simulation\nE   ModuleNotFoundError: No module named 'financial_portfolio_simulator'"
+  },
+  "fiverr_job_automation_tool": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "201 passed in 1.42s",
+    "elapsed": 3.5,
+    "full_stdout_tail": "........................................................................ [ 35%]\n........................................................................ [ 71%]\n.........................................................                [100%]\n201 passed in 1.42s",
     "stderr_tail": ""
   },
   "football_nfl_draft_and_recruit_optimizer": {
     "status": "COMPLETED",
-    "exit_code": 2,
-    "summary": "1 error in 0.20s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_import_zip.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.20s",
+    "exit_code": 5,
+    "summary": "no tests ran in 0.01s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "no tests ran in 0.01s",
+    "stderr_tail": ""
+  },
+  "football_simulator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "131 passed in 0.86s",
+    "elapsed": 3.2,
+    "full_stdout_tail": "........................................................................ [ 54%]\n...........................................................              [100%]\n131 passed in 0.86s",
+    "stderr_tail": ""
+  },
+  "forensic": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "271 passed in 5.91s",
+    "elapsed": 8.5,
+    "full_stdout_tail": "........................................................................ [ 26%]\n........................................................................ [ 53%]\n........................................................................ [ 79%]\n.......................................................                  [100%]\n271 passed in 5.91s",
     "stderr_tail": ""
   },
   "forensic2": {
     "status": "NO_TESTS_DIR",
     "detail": "no tests/ directory"
   },
-  "market_strategy_backtester": {
-    "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "25 failed, 30 passed in 1.28s",
-    "elapsed": 2.5,
-    "full_stdout_tail": "FAILED tests/test_strategies.py::TestSMACrossoverStrategy::test_invalid_params_window_lt_1\nFAILED tests/test_strategies.py::TestSMACrossoverStrategy::test_generate_signals_no_lookahead\nFAILED tests/test_strategies.py::TestMACDStrategy::test_invalid_params - Fail...\nFAILED tests/test_strategies.py::TestBollingerBandsStrategy::test_bollinger_bands_computation\n25 failed, 30 passed in 1.28s",
-    "stderr_tail": ""
-  },
-  "player_attribute_library": {
-    "status": "NO_TESTS_DIR",
-    "detail": "no tests/ directory"
-  },
-  "sec_importer": {
-    "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "29 failed, 131 passed in 18.30s",
-    "elapsed": 19.7,
-    "full_stdout_tail": "FAILED tests/test_repository_rate_limiter.py::TestRateLimiter::test_wait_between\nFAILED tests/test_repository_rate_limiter.py::TestRateLimiter::test_reset - a...\nFAILED tests/test_schema_models_config.py::TestFilingItemModel::test_invalid_filing_id\nFAILED tests/test_schema_models_config.py::TestConfig::test_missing_file_uses_defaults\n29 failed, 131 passed in 18.30s",
-    "stderr_tail": ""
-  },
-  "supportagent_workflow_builder": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "59 passed in 0.26s",
-    "elapsed": 1.0,
-    "full_stdout_tail": "...........................................................              [100%]\n59 passed in 0.26s",
-    "stderr_tail": ""
-  },
-  "tim_ferriss_learning_tool": {
-    "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "=================== 1 failed, 18 passed, 2 errors in 0.10s ====================",
-    "elapsed": 2.8,
-    "full_stdout_tail": "=========================== short test summary info ===========================\nFAILED tests\\test_extraction_pipeline.py::TestIntegration::test_summary_generation\nERROR tests\\test_extraction_pipeline.py::TestSummaryGenerator::test_initialization\nERROR tests\\test_extraction_pipeline.py::TestSummaryGenerator::test_generate_markdown_summary\n=================== 1 failed, 18 passed, 2 errors in 0.10s ====================",
-    "stderr_tail": ""
-  },
-  "transcript_extractor": {
-    "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "86 failed, 106 passed, 4 errors in 5.40s",
-    "elapsed": 7.5,
-    "full_stdout_tail": "ERROR tests/test_formatter.py::TestFormatToSrt::test_format_to_srt - TypeErro...\nERROR tests/test_formatter.py::TestFormatToSrt::test_format_to_srt_empty_result\nERROR tests/test_formatter.py::TestFormatToVtt::test_format_to_vtt - TypeErro...\nERROR tests/test_formatter.py::TestFormatToVtt::test_format_to_vtt_empty_result\n86 failed, 106 passed, 4 errors in 5.40s",
-    "stderr_tail": ""
-  },
-  "video_ingestor_summary": {
-    "status": "COMPLETED",
-    "exit_code": 2,
-    "summary": "10 errors in 1.19s",
-    "elapsed": 2.4,
-    "full_stdout_tail": "ERROR tests/test_storage.py\nERROR tests/test_summarizer.py\nERROR tests/test_vector_store.py\n!!!!!!!!!!!!!!!!!! Interrupted: 10 errors during collection !!!!!!!!!!!!!!!!!!!\n10 errors in 1.19s",
-    "stderr_tail": ""
-  },
-  "ai_movie_generation_suite_2": {
-    "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "29 failed, 108 passed, 43 errors in 11.26s",
-    "elapsed": 12.9,
-    "full_stdout_tail": "ERROR tests/test_stage_generators.py::TestStage5MusicComposer::test_stage_name\nERROR tests/test_stage_generators.py::TestStage5MusicComposer::test_execute_sets_status\nERROR tests/test_stage_generators.py::TestStage6PostProductionPlanner::test_stage_name\nERROR tests/test_stage_generators.py::TestStage6PostProductionPlanner::test_execute_sets_status\n29 failed, 108 passed, 43 errors in 11.26s",
-    "stderr_tail": ""
-  },
-  "chronovision": {
-    "status": "NO_TESTS_DIR",
-    "detail": "no tests/ directory"
-  },
-  "chronovision2": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "124 passed in 4.17s",
-    "elapsed": 6.3,
-    "full_stdout_tail": "........................................................................ [ 58%]\n....................................................                     [100%]\n124 passed in 4.17s",
-    "stderr_tail": ""
-  },
-  "football_simulator": {
+  "forensic_accounting_suite": {
     "status": "COMPLETED",
     "exit_code": 4,
     "summary": "no output",
-    "elapsed": 0.9,
+    "elapsed": 1.8,
     "full_stdout_tail": "",
-    "stderr_tail": "__init__.py:11: in <module>\n    from .field import Field\nE   ModuleNotFoundError: No module named 'workspace.field'"
+    "stderr_tail": "__init__.py:8: in <module>\n    from forensic_accounting_suite.core.models import (\nE   ModuleNotFoundError: No module named 'forensic_accounting_suite'"
   },
-  "financial_portfolio_simulator": {
+  "freelancetask_manager_system": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "99 passed in 0.82s",
-    "elapsed": 1.6,
-    "full_stdout_tail": "........................................................................ [ 72%]\n...........................                                              [100%]\n99 passed in 0.82s",
+    "summary": "47 passed, 72 warnings in 4.50s",
+    "elapsed": 6.6,
+    "full_stdout_tail": "tests/test_opportunity.py: 38 warnings\n  C:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\freelancetask_manager_system\\workspace\\core\\client_profile.py:36: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    self.created_at = datetime.utcnow().isoformat()\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n47 passed, 72 warnings in 4.50s",
     "stderr_tail": ""
   },
-  "forensic": {
+  "gameagent": {
     "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "271 passed in 3.25s",
-    "elapsed": 5.4,
-    "full_stdout_tail": "........................................................................ [ 26%]\n........................................................................ [ 53%]\n........................................................................ [ 79%]\n.......................................................                  [100%]\n271 passed in 3.25s",
-    "stderr_tail": ""
-  },
-  "osint_corp": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "43 passed in 0.29s",
-    "elapsed": 1.3,
-    "full_stdout_tail": "...........................................                              [100%]\n43 passed in 0.29s",
-    "stderr_tail": ""
-  },
-  "sec_importer2": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "75 passed in 2.39s",
-    "elapsed": 5.2,
-    "full_stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 2.39s",
-    "stderr_tail": ""
-  },
-  "sopdata_ingestion_bridge": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "64 passed in 0.29s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "................................................................         [100%]\n64 passed in 0.29s",
-    "stderr_tail": ""
-  },
-  "url_health_checker": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "42 passed in 0.49s",
-    "elapsed": 1.4,
-    "full_stdout_tail": "..........................................                               [100%]\n42 passed in 0.49s",
-    "stderr_tail": ""
-  },
-  "scott_adams_botllm_fine_tuning": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "73 passed in 27.22s",
-    "elapsed": 30.2,
-    "full_stdout_tail": "........................................................................ [ 98%]\n.                                                                        [100%]\n73 passed in 27.22s",
-    "stderr_tail": ""
-  },
-  "video_langfake": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "83 passed in 29.52s",
-    "elapsed": 31.8,
-    "full_stdout_tail": "........................................................................ [ 86%]\n...........                                                              [100%]\n83 passed in 29.52s",
-    "stderr_tail": ""
-  },
-  "video_management": {
-    "status": "NO_TESTS_DIR",
-    "detail": "no tests/ directory"
-  },
-  "fiverr_job_automation_tool": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "201 passed in 0.78s",
-    "elapsed": 1.7,
-    "full_stdout_tail": "........................................................................ [ 35%]\n........................................................................ [ 71%]\n.........................................................                [100%]\n201 passed in 0.78s",
+    "exit_code": 2,
+    "summary": "8 errors in 0.77s",
+    "elapsed": 3.2,
+    "full_stdout_tail": "ERROR tests/test_runner.py\nERROR tests/test_sim.py\nERROR tests/test_trainer.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 8 errors during collection !!!!!!!!!!!!!!!!!!!\n8 errors in 0.77s",
     "stderr_tail": ""
   },
   "human_in_the_loop_reviewer": {
     "status": "COMPLETED",
-    "exit_code": 1,
-    "summary": "5 failed, 53 passed in 10.73s",
-    "elapsed": 12.0,
-    "full_stdout_tail": "FAILED tests/test_cli.py::TestApproveCommand::test_approve_success - Assertio...\nFAILED tests/test_cli.py::TestRejectCommand::test_reject_success - AssertionE...\nFAILED tests/test_cli.py::TestRejectCommand::test_reject_with_reason - Assert...\nFAILED tests/test_cli.py::TestWaitCommand::test_wait_approved - AssertionErro...\n5 failed, 53 passed in 10.73s",
-    "stderr_tail": ""
-  },
-  "tableau_integration_module": {
-    "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "254 passed in 1.60s",
+    "exit_code": 2,
+    "summary": "5 errors in 0.31s",
     "elapsed": 2.6,
-    "full_stdout_tail": "........................................................................ [ 28%]\n........................................................................ [ 56%]\n........................................................................ [ 85%]\n......................................                                   [100%]\n254 passed in 1.60s",
+    "full_stdout_tail": "ERROR tests/test_reviewer.py\nERROR tests/test_store.py\nERROR tests/test_validation.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 5 errors during collection !!!!!!!!!!!!!!!!!!!\n5 errors in 0.31s",
     "stderr_tail": ""
   },
-  "video_babbel": {
+  "idea": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.28s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_audiobook2pdf.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.28s",
+    "stderr_tail": ""
+  },
+  "invoice_processor": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.2,
+    "full_stdout_tail": "",
+    "stderr_tail": "ledger.py:8: in <module>\n    from invoice_processor.models import Invoice, Ledger, LineItem\nE   ModuleNotFoundError: No module named 'invoice_processor'"
+  },
+  "job_automation_tool": {
     "status": "COMPLETED",
     "exit_code": 1,
-    "summary": "20 failed, 102 passed in 0.43s",
-    "elapsed": 1.5,
-    "full_stdout_tail": "FAILED tests/test_translator.py::TestTranslateGoogle::test_translate_google_import_error\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_success\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_missing_api_key\nFAILED tests/test_translator.py::TestTranslateDeepL::test_translate_deepl_import_error\n20 failed, 102 passed in 0.43s",
+    "summary": "26 failed, 16 passed in 1.92s",
+    "elapsed": 4.6,
+    "full_stdout_tail": "FAILED tests\\test_profile.py::TestProfileValidate::test_validate_missing_title\nFAILED tests\\test_profile.py::TestProfileValidate::test_validate_missing_company\nFAILED tests\\test_profile.py::TestProfileValidate::test_validate_missing_description\nFAILED tests\\test_profile.py::TestProfileValidate::test_validate_whitespace_only\n26 failed, 16 passed in 1.92s",
     "stderr_tail": ""
   },
-  "ai_movie_generation_suite": {
+  "json_diff_tool": {
     "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "99 passed, 10 warnings in 0.85s",
-    "elapsed": 1.8,
-    "full_stdout_tail": "tests/test_pipeline.py::TestPipelineIntegration::test_full_pipeline\n  c:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\ai_movie_generation_suite\\workspace\\ai_movie_gen_suite\\models.py:215: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).\n    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n99 passed, 10 warnings in 0.85s",
+    "exit_code": 2,
+    "summary": "1 error in 0.32s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_diff.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.32s",
     "stderr_tail": ""
   },
-  "dynamic_pricing_integrator": {
+  "json_schema_profiler": {
     "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "97 passed in 0.18s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "........................................................................ [ 74%]\n.........................                                                [100%]\n97 passed in 0.18s",
+    "exit_code": 2,
+    "summary": "3 errors in 0.50s",
+    "elapsed": 2.6,
+    "full_stdout_tail": "ERROR tests/test_anomaly.py\nERROR tests/test_cli.py\nERROR tests/test_inference.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.50s",
     "stderr_tail": ""
   },
-  "ffo": {
+  "json_skill": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 0.37s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "ERROR tests/test_dispatcher.py\nERROR tests/test_loader.py\nERROR tests/test_runtime.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.37s",
+    "stderr_tail": ""
+  },
+  "logistics_csv_optimizer": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.9,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:9: in <module>\n    from logistics_csv_optimizer.importer import Importer\nE   ModuleNotFoundError: No module named 'logistics_csv_optimizer'"
+  },
+  "manuscriptdata_analyzer_system": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "59 passed in 0.05s",
-    "elapsed": 0.9,
-    "full_stdout_tail": "...........................................................              [100%]\n59 passed in 0.05s",
+    "summary": "65 passed in 2.27s",
+    "elapsed": 4.6,
+    "full_stdout_tail": ".................................................................        [100%]\n65 passed in 2.27s",
     "stderr_tail": ""
+  },
+  "markdown_to_html_converter": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "2 errors in 0.36s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_parser.py\nERROR tests/test_template.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n2 errors in 0.36s",
+    "stderr_tail": ""
+  },
+  "market_predictor": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "4 passed in 0.14s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "....                                                                     [100%]\n4 passed in 0.14s",
+    "stderr_tail": ""
+  },
+  "market_strategy_backtester": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "4 errors in 2.17s",
+    "elapsed": 4.7,
+    "full_stdout_tail": "ERROR tests/test_backtester.py\nERROR tests/test_integration.py\nERROR tests/test_strategies.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!\n4 errors in 2.17s",
+    "stderr_tail": ""
+  },
+  "meeting_summarizer": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.13s",
+    "elapsed": 2.3,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.13s",
+    "stderr_tail": ""
+  },
+  "memory_system": {
+    "status": "COMPLETED",
+    "exit_code": 5,
+    "summary": "no tests ran in 0.04s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "no tests ran in 0.04s",
+    "stderr_tail": ""
+  },
+  "mobile_access_to_pc": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "movie_idea_generator": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
   },
   "movieseries_auto_tracker": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "79 passed in 0.40s",
-    "elapsed": 1.3,
-    "full_stdout_tail": "........................................................................ [ 91%]\n.......                                                                  [100%]\n79 passed in 0.40s",
+    "summary": "79 passed in 1.09s",
+    "elapsed": 5.5,
+    "full_stdout_tail": "........................................................................ [ 91%]\n.......                                                                  [100%]\n79 passed in 1.09s",
     "stderr_tail": ""
   },
   "multi_format_export_engine": {
     "status": "COMPLETED",
-    "exit_code": 0,
-    "summary": "118 passed in 3.40s",
-    "elapsed": 4.9,
-    "full_stdout_tail": "........................................................................ [ 61%]\n..............................................                           [100%]\n118 passed in 3.40s",
+    "exit_code": 2,
+    "summary": "6 errors in 0.72s",
+    "elapsed": 4.0,
+    "full_stdout_tail": "ERROR tests/test_models.py\nERROR tests/test_pdf_exporter.py\nERROR tests/test_validation.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 6 errors during collection !!!!!!!!!!!!!!!!!!!\n6 errors in 0.72s",
     "stderr_tail": ""
   },
   "nda_contract_generator": {
     "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "2 errors in 0.63s",
+    "elapsed": 4.0,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_clause_library.py\nERROR tests/test_jurisdiction_database.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n2 errors in 0.63s",
+    "stderr_tail": ""
+  },
+  "newsletter_online_profit_environment_for_llm_rl_training_and_sims": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "32 failed, 100 passed in 3.01s",
+    "elapsed": 6.9,
+    "full_stdout_tail": "FAILED tests\\test_simulator.py::TestNewsletterSimulatorEdgeCases::test_run_simulation_zero_weeks\nFAILED tests\\test_simulator.py::TestNewsletterSimulatorEdgeCases::test_run_simulation_with_zero_subscribers\nFAILED tests\\test_simulator.py::TestNewsletterSimulatorEdgeCases::test_run_simulation_with_high_churn\nFAILED tests\\test_simulator.py::TestNewsletterSimulatorEdgeCases::test_run_simulation_with_high_growth\n32 failed, 100 passed in 3.01s",
+    "stderr_tail": ""
+  },
+  "observability_dashboard": {
+    "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "92 passed in 0.54s",
-    "elapsed": 1.5,
-    "full_stdout_tail": "........................................................................ [ 78%]\n....................                                                     [100%]\n92 passed in 0.54s",
+    "summary": "4 passed in 0.17s",
+    "elapsed": 3.6,
+    "full_stdout_tail": "....                                                                     [100%]\n4 passed in 0.17s",
+    "stderr_tail": ""
+  },
+  "osint_corp": {
+    "status": "TIMEOUT",
+    "elapsed": 159.6,
+    "detail": "timed out after 60s"
+  },
+  "osint_corp2": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "pairenv": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "2 errors in 0.66s",
+    "elapsed": 3.9,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_integration.py\nERROR tests/test_pairenv.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n2 errors in 0.66s",
+    "stderr_tail": ""
+  },
+  "pantrychef_meal_planner": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "3 errors in 0.68s",
+    "elapsed": 4.1,
+    "full_stdout_tail": "ERROR tests/test_advanced_meal_planner.py\nERROR tests/test_exporter.py\nERROR tests/test_preference_filter.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!\n3 errors in 0.68s",
+    "stderr_tail": ""
+  },
+  "pdf_schema": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "49 passed, 1 warning in 0.51s",
+    "elapsed": 3.2,
+    "full_stdout_tail": "tests/test_extractor.py::TestTryPypdf::test_returns_none_on_empty_text\n  C:\\Users\\avata\\AppData\\Roaming\\Python\\Python313\\site-packages\\PyPDF2\\__init__.py:21: DeprecationWarning: PyPDF2 is deprecated. Please move to the pypdf library instead.\n    warnings.warn(\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n49 passed, 1 warning in 0.51s",
+    "stderr_tail": ""
+  },
+  "pipeline_observability_dashboard": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "11 passed in 4.89s",
+    "elapsed": 7.9,
+    "full_stdout_tail": "...........                                                              [100%]\n11 passed in 4.89s",
+    "stderr_tail": ""
+  },
+  "player_attribute_library": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "5 errors in 1.60s",
+    "elapsed": 6.2,
+    "full_stdout_tail": "ERROR tests/test_error_handling.py\nERROR tests/test_integration.py\nERROR tests/test_models.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 5 errors during collection !!!!!!!!!!!!!!!!!!!\n5 errors in 1.60s",
     "stderr_tail": ""
   },
   "pocketknife_of_the_internet": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "80 passed in 0.14s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "........................................................................ [ 90%]\n........                                                                 [100%]\n80 passed in 0.14s",
+    "summary": "80 passed in 0.37s",
+    "elapsed": 2.9,
+    "full_stdout_tail": "........................................................................ [ 90%]\n........                                                                 [100%]\n80 passed in 0.37s",
+    "stderr_tail": ""
+  },
+  "podcast": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "16 failed in 0.36s",
+    "elapsed": 5.2,
+    "full_stdout_tail": "FAILED tests/test_podcast.py::TestFormatter::test_markdown_includes_quotes_by_default\nFAILED tests/test_podcast.py::TestFormatter::test_markdown_excludes_quotes_when_flag_set\nFAILED tests/test_podcast.py::TestFormatter::test_plain_numbered_list - Modul...\nFAILED tests/test_podcast.py::TestFormatter::test_plain_contains_episode - Mo...\n16 failed in 0.36s",
+    "stderr_tail": ""
+  },
+  "podcastseo_metadata_optimizer": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 42.33s",
+    "elapsed": 52.0,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_show_notes.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 42.33s",
+    "stderr_tail": "  File \"<frozen importlib._bootstrap>\", line 1331 in _find_and_load_unlocked\n  File \"<frozen importlib._bootstrap>\", line 1360 in _find_and_load\n  File \"C:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\podcastseo_metadata_optimizer\\workspace\\tests\\test_cli.py\", line 7 in <module>"
+  },
+  "quant_developing_program_for_prediction_markets_sports_events_weather_markets": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "7 failed, 97 passed in 1.78s",
+    "elapsed": 4.4,
+    "full_stdout_tail": "FAILED tests/test_strategies.py::TestBettingStrategy::test_generate_signal_no_bet\nFAILED tests/test_utils.py::TestFormatOdds::test_fractional_odds - AssertionE...\nFAILED tests/test_utils.py::TestImpliedProbability::test_low_odds - assert 0....\nFAILED tests/test_utils.py::TestDecimalOddsFromProbability::test_high_probability\n7 failed, 97 passed in 1.78s",
+    "stderr_tail": ""
+  },
+  "ranker_architecture": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "143 passed in 0.59s",
+    "elapsed": 2.7,
+    "full_stdout_tail": "........................................................................ [ 50%]\n.......................................................................  [100%]\n143 passed in 0.59s",
+    "stderr_tail": ""
+  },
+  "real_estate_listing_analyzer": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.28s",
+    "elapsed": 3.1,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_fetcher.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.28s",
+    "stderr_tail": ""
+  },
+  "research1": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.26s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_researcher_report.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.26s",
+    "stderr_tail": ""
+  },
+  "resume_and_cover_letter_builder": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "resume_builder": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "42 passed in 0.62s",
+    "elapsed": 2.9,
+    "full_stdout_tail": "..........................................                               [100%]\n42 passed in 0.62s",
+    "stderr_tail": ""
+  },
+  "reviewpulse_aggregator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "24 passed in 13.89s",
+    "elapsed": 16.2,
+    "full_stdout_tail": "........................                                                 [100%]\n24 passed in 13.89s",
+    "stderr_tail": ""
+  },
+  "rl_for_dropshipping": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "robot_primitive_vocabulary": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "45 passed in 0.32s",
+    "elapsed": 2.7,
+    "full_stdout_tail": ".............................................                            [100%]\n45 passed in 0.32s",
+    "stderr_tail": ""
+  },
+  "robot_primitive_vocabulary_schema": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.30s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_primitives.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.30s",
     "stderr_tail": ""
   },
   "rule_based_triage_engine": {
     "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "53 passed in 0.13s",
-    "elapsed": 1.3,
-    "full_stdout_tail": ".....................................................                    [100%]\n53 passed in 0.13s",
+    "summary": "53 passed in 0.71s",
+    "elapsed": 2.8,
+    "full_stdout_tail": ".....................................................                    [100%]\n53 passed in 0.71s",
     "stderr_tail": ""
+  },
+  "saas_pricing": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.12s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.12s",
+    "stderr_tail": ""
+  },
+  "scott_adams_botllm_fine_tuning": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "73 passed in 20.44s",
+    "elapsed": 25.3,
+    "full_stdout_tail": "........................................................................ [ 98%]\n.                                                                        [100%]\n73 passed in 20.44s",
+    "stderr_tail": ""
+  },
+  "sec_importer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "1 failed, 159 passed in 20.04s",
+    "elapsed": 22.1,
+    "full_stdout_tail": "........................................................................ [ 90%]\n................                                                         [100%]\n=========================== short test summary info ===========================\nFAILED tests/test_rate_limiter.py::TestRateLimiterWait::test_wait_without_jitter\n1 failed, 159 passed in 20.04s",
+    "stderr_tail": ""
+  },
+  "sec_importer2": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "75 passed in 6.74s",
+    "elapsed": 10.8,
+    "full_stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 6.74s",
+    "stderr_tail": ""
+  },
+  "see_bs": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.4,
+    "full_stdout_tail": "",
+    "stderr_tail": "    from see_bs.engine import ScoreEngine, AnalysisResult  # noqa: F401\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   ModuleNotFoundError: No module named 'see_bs'"
+  },
+  "seo_tool": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "9 errors in 1.07s",
+    "elapsed": 3.3,
+    "full_stdout_tail": "ERROR tests/test_models.py\nERROR tests/test_pdf_report.py\nERROR tests/test_scorer.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 9 errors during collection !!!!!!!!!!!!!!!!!!!\n9 errors in 1.07s",
+    "stderr_tail": ""
+  },
+  "shuffler_tracker_teacher": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "10 failed, 70 passed in 28.92s",
+    "elapsed": 35.2,
+    "full_stdout_tail": "FAILED tests/test_visualizer.py::TestVisualizerCutDistribution::test_visualize_cut_distribution_with_variation\nFAILED tests/test_visualizer.py::TestVisualizerBeforeAfter::test_visualize_before_after\nFAILED tests/test_visualizer.py::TestVisualizerCombined::test_visualize_combined\nFAILED tests/test_visualizer.py::TestVisualizerCombined::test_visualize_combined_with_sample\n10 failed, 70 passed in 28.92s",
+    "stderr_tail": ""
+  },
+  "sim_real_comparator": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "4 errors in 0.57s",
+    "elapsed": 2.3,
+    "full_stdout_tail": "ERROR tests/test_frame_extractor.py\nERROR tests/test_heatmaps.py\nERROR tests/test_metrics.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 4 errors during collection !!!!!!!!!!!!!!!!!!!\n4 errors in 0.57s",
+    "stderr_tail": ""
+  },
+  "skill_ninja": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "24 failed in 0.20s",
+    "elapsed": 2.6,
+    "full_stdout_tail": "FAILED tests/test_chain.py::TestDispatcher::test_list_skills_finds_file - Mod...\nFAILED tests/test_chain.py::TestDispatcher::test_list_skills_empty_dir - Modu...\nFAILED tests/test_chain.py::TestDispatcher::test_format_summary - ModuleNotFo...\nFAILED tests/test_chain.py::TestDispatcher::test_list_skills_path_added - Mod...\n24 failed in 0.20s",
+    "stderr_tail": ""
+  },
+  "skillify": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.9,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:38: in <module>\n    from skillify.converter import convert, save_skill, load_skill\nE   ModuleNotFoundError: No module named 'skillify'"
+  },
+  "social_media_managementetc": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "sopdata_ingestion_bridge": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.0,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:3: in <module>\n    from sopdata_ingestion_bridge.bridge import SOPBridge, ingest\nE   ModuleNotFoundError: No module named 'sopdata_ingestion_bridge'"
+  },
+  "sports_betting_strategy_simulator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "7 passed in 0.34s",
+    "elapsed": 3.0,
+    "full_stdout_tail": ".......                                                                  [100%]\n7 passed in 0.34s",
+    "stderr_tail": ""
+  },
+  "sportsevent_bet_front_runner": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "20 failed, 48 passed, 1 warning in 0.42s",
+    "elapsed": 2.8,
+    "full_stdout_tail": "FAILED tests/test_signal_processor.py::TestSignalProcessor::test_process_signal_skip_action\nFAILED tests/test_signal_processor.py::TestSignalProcessor::test_process_signals_batch\nFAILED tests/test_signal_processor.py::TestSignalProcessor::test_reset - Attr...\nFAILED tests/test_signal_processor.py::TestSignalProcessor::test_risk_calculation\n20 failed, 48 passed, 1 warning in 0.42s",
+    "stderr_tail": ""
+  },
+  "startup_compliance": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.15s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.15s",
+    "stderr_tail": ""
+  },
+  "subgoal_generator": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.8,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:7: in <module>\n    from subgoal_generator.models import Subgoal, DependencyGraph\nE   ModuleNotFoundError: No module named 'subgoal_generator'"
+  },
+  "summarizer_tool": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.5,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:8: in <module>\n    from summarizer_tool.sources.pdf_summarizer import PDFSummarizer\nE   ModuleNotFoundError: No module named 'summarizer_tool'"
+  },
+  "supportagent_workflow_builder": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "59 passed in 1.00s",
+    "elapsed": 3.1,
+    "full_stdout_tail": "...........................................................              [100%]\n59 passed in 1.00s",
+    "stderr_tail": ""
+  },
+  "tableau_integration_module": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "254 passed in 3.32s",
+    "elapsed": 5.8,
+    "full_stdout_tail": "........................................................................ [ 28%]\n........................................................................ [ 56%]\n........................................................................ [ 85%]\n......................................                                   [100%]\n254 passed in 3.32s",
+    "stderr_tail": ""
+  },
+  "test_coverage_mutator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.26s",
+    "elapsed": 2.0,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.26s",
+    "stderr_tail": ""
+  },
+  "test_fixture_generator": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "34 passed in 1.02s",
+    "elapsed": 3.0,
+    "full_stdout_tail": "..................................                                       [100%]\n34 passed in 1.02s",
+    "stderr_tail": ""
+  },
+  "thronglets_as_a_game": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "============================== 1 error in 0.79s ===============================",
+    "elapsed": 2.7,
+    "full_stdout_tail": "collected 125 items / 1 error\n=========================== short test summary info ===========================\nERROR tests/test_agent.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n============================== 1 error in 0.79s ===============================",
+    "stderr_tail": ""
+  },
+  "tim_ferriss_learning_tool": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "============================= 21 passed in 0.40s ==============================",
+    "elapsed": 5.9,
+    "full_stdout_tail": "============================= test session starts =============================\ncollected 21 items\ntests\\test_extraction_pipeline.py .....................                  [100%]\n============================= 21 passed in 0.40s ==============================",
+    "stderr_tail": ""
+  },
+  "transcript_extractor": {
+    "status": "TIMEOUT",
+    "elapsed": 60.1,
+    "detail": "timed out after 60s"
   },
   "udemy_training_tool": {
     "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.7,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:3: in <module>\n    from udemy_training_tool.models import Course, LearningPath, Module, Lesson\nE   ModuleNotFoundError: No module named 'udemy_training_tool'"
+  },
+  "universal_llm_router": {
+    "status": "COMPLETED",
     "exit_code": 0,
-    "summary": "183 passed in 0.27s",
-    "elapsed": 1.1,
-    "full_stdout_tail": "........................................................................ [ 39%]\n........................................................................ [ 78%]\n.......................................                                  [100%]\n183 passed in 0.27s",
+    "summary": "10 passed in 0.25s",
+    "elapsed": 2.7,
+    "full_stdout_tail": "..........                                                               [100%]\n10 passed in 0.25s",
+    "stderr_tail": ""
+  },
+  "unweb": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "17 failed in 0.27s",
+    "elapsed": 2.2,
+    "full_stdout_tail": "FAILED tests/test_unweb.py::TestReporter::test_report_contains_orgs - ModuleN...\nFAILED tests/test_unweb.py::TestReporter::test_report_contains_red_flags - Mo...\nFAILED tests/test_unweb.py::TestReporter::test_report_contains_connections - ...\nFAILED tests/test_unweb.py::TestReporter::test_save_report - ModuleNotFoundEr...\n17 failed in 0.27s",
+    "stderr_tail": ""
+  },
+  "url_health_checker": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "no output",
+    "elapsed": 1.5,
+    "full_stdout_tail": "",
+    "stderr_tail": "  File \"C:\\Users\\avata\\aicompete\\idea impl\\.pipeline\\projects\\url_health_checker\\workspace\\concurrent.py\", line 3, in <module>\n    from concurrent.futures import ThreadPoolExecutor, as_completed\nModuleNotFoundError: No module named 'concurrent.futures'; 'concurrent' is not a package"
+  },
+  "vastai_instance_initializer": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "3 failed, 191 passed in 3.05s",
+    "elapsed": 5.4,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nFAILED tests/test_preset_loader.py::TestValidatePresetTypes::test_name_not_string\nFAILED tests/test_preset_loader.py::TestValidatePresetTypes::test_gpu_type_not_string\nFAILED tests/test_preset_loader.py::TestValidatePresetTypes::test_image_not_string\n3 failed, 191 passed in 3.05s",
+    "stderr_tail": ""
+  },
+  "video_babbel": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 2.5,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:49: in <module>\n    from video_babbel.core import (\nE   ModuleNotFoundError: No module named 'video_babbel'"
+  },
+  "video_babbel_enhanced": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "9 errors in 0.52s",
+    "elapsed": 2.5,
+    "full_stdout_tail": "ERROR tests/test_subtitle_overlay.py\nERROR tests/test_transcriber.py\nERROR tests/test_translator.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 9 errors during collection !!!!!!!!!!!!!!!!!!!\n9 errors in 0.52s",
+    "stderr_tail": ""
+  },
+  "video_gan": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 7.5,
+    "full_stdout_tail": "",
+    "stderr_tail": "video_gan.py:12: in <module>\n    from video_gan.generator import Generator\nE   ModuleNotFoundError: No module named 'video_gan.generator'; 'video_gan' is not a package"
+  },
+  "video_ingestor_summary": {
+    "status": "TIMEOUT",
+    "elapsed": 60.2,
+    "detail": "timed out after 60s"
+  },
+  "video_langfake": {
+    "status": "COMPLETED",
+    "exit_code": 4,
+    "summary": "no output",
+    "elapsed": 1.8,
+    "full_stdout_tail": "",
+    "stderr_tail": "__init__.py:3: in <module>\n    from video_langfake.exceptions import (\nE   ModuleNotFoundError: No module named 'video_langfake'"
+  },
+  "video_management": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "video_pow": {
+    "status": "TIMEOUT",
+    "elapsed": 60.0,
+    "detail": "timed out after 60s"
+  },
+  "video_recipe": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "2 errors in 1.28s",
+    "elapsed": 3.3,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_app.py\nERROR tests/test_e2e.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n2 errors in 1.28s",
+    "stderr_tail": ""
+  },
+  "video_recipe_mu": {
+    "status": "COMPLETED",
+    "exit_code": 1,
+    "summary": "6 failed, 34 passed in 2.89s",
+    "elapsed": 5.7,
+    "full_stdout_tail": "FAILED tests/test_multi_scene.py::TestMultiSceneRecipeToJson::test_serialize_recipe\nFAILED tests/test_video_pipeline.py::TestRunPipeline::test_pipeline_returns_result\nFAILED tests/test_video_pipeline.py::TestRunPipeline::test_pipeline_with_spatial_grounding\nFAILED tests/test_video_pipeline.py::TestRunPipeline::test_pipeline_with_validation\n6 failed, 34 passed in 2.89s",
+    "stderr_tail": ""
+  },
+  "video_scribe": {
+    "status": "COMPLETED",
+    "exit_code": 2,
+    "summary": "1 error in 0.90s",
+    "elapsed": 3.2,
+    "full_stdout_tail": "=========================== short test summary info ===========================\nERROR tests/test_pipeline.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!\n1 error in 0.90s",
+    "stderr_tail": ""
+  },
+  "vr_practice_mode": {
+    "status": "NO_TESTS_DIR",
+    "detail": "no tests/ directory"
+  },
+  "vr_room_for_stock_ticker_scanning": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "145 passed in 0.61s",
+    "elapsed": 2.9,
+    "full_stdout_tail": "........................................................................ [ 49%]\n........................................................................ [ 99%]\n.                                                                        [100%]\n145 passed in 0.61s",
+    "stderr_tail": ""
+  },
+  "weather_dashboard": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "3 passed in 0.23s",
+    "elapsed": 2.8,
+    "full_stdout_tail": "...                                                                      [100%]\n3 passed in 0.23s",
+    "stderr_tail": ""
+  },
+  "youtube_studio": {
+    "status": "COMPLETED",
+    "exit_code": 0,
+    "summary": "37 passed in 0.57s",
+    "elapsed": 2.6,
+    "full_stdout_tail": ".....................................                                    [100%]\n37 passed in 0.57s",
+    "stderr_tail": ""
+  },
+  "youtube_workflow_tool": {
+    "status": "COMPLETED",
+    "exit_code": 5,
+    "summary": "no tests ran in 0.02s",
+    "elapsed": 2.4,
+    "full_stdout_tail": "no tests ran in 0.02s",
+    "stderr_tail": ""
+  },
+  "zillow": {
+    "status": "COMPLETED",
+    "exit_code": 5,
+    "summary": "no tests ran in 0.03s",
+    "elapsed": 2.0,
+    "full_stdout_tail": "no tests ran in 0.03s",
     "stderr_tail": ""
   }
 }

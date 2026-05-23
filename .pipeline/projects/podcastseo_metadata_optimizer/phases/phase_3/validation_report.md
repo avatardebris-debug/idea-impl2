@@ -1,47 +1,46 @@
 # Validation Report — Phase 3
+
 ## Summary
-- Tests: 174 passed, 6 failed
+- Tests: 0 passed, 0 failed, 1 errors
+- Python files in workspace: 27
+(Deterministic pytest — no LLM validator steps used.)
+
+## Phase 3 Tasks (acceptance scope)
+# Phase 3 Tasks
+
+- [ ] Task 1: Implement core Phase 3 functionality
+  - What: Build the primary components described in the phase spec
+  - Done when: Core functionality works and is importable
+
+- [ ] Task 2: Add tests for Phase 3
+  - What: Write unit tests covering the main code paths
+  - Done when: Tests pass with pytest
+
+- [ ] Task 3: Integration and documentation
+  - What: Integrate with existing phases and update README
+  - Done when: Full pipeline works end-to-end
+
+## Test Output
+```
+================================================================================ test session starts =================================================================================
+collecting ... collected 120 items / 1 error
+
+======================================================================================= ERRORS =======================================================================================
+_____________________________________________________________________ ERROR collecting tests/test_show_notes.py ______________________________________________________________________
+ImportError while importing test module '/workspace/idea impl/.pipeline/projects/podcastseo_metadata_optimizer/workspace/tests/test_show_notes.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.12/importlib/__init__.py:90: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_show_notes.py:10: in <module>
+    from podcastseo.show_notes_generator import ShowNotesConfig, ShowNotesGenerator
+E   ImportError: cannot import name 'ShowNotesConfig' from 'podcastseo.show_notes_generator' (/workspace/idea impl/.pipeline/projects/podcastseo_metadata_optimizer/workspace/podcastseo/show_notes_generator.py)
+============================================================================== short test summary info ===============================================================================
+ERROR tests/test_show_notes.py
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+================================================================================== 1 error in 3.14s ==================================================================================
+
+```
+
 ## Verdict: FAIL
-
-## Details
-
-### Test Results
-- **174 tests passed**, **6 tests failed**
-- All failures are in `tests/test_show_notes.py`
-
-### Failed Tests
-1. `TestShowNotesGenerate::test_generate_with_both_empty` — TypeError: `isinstance()` arg 2 must be a type (test bug: `isinstance(result, result)`)
-2. `TestShowNotesGenerateTakeaways::test_takeaways_respects_max_count` — TypeError: 'FixtureFunctionDefinition' object is not iterable (fixture misuse in test)
-3. `TestShowNotesGenerateTakeaways::test_takeaways_with_empty_transcript` — AssertionError: expected 'No key takeaways available' not found in output
-4. `TestShowNotesGenerateTimestamps::test_timestamps_respects_max_count` — TypeError: expected string or bytes-like object, got 'FixtureFunctionDefinition'
-5. `TestShowNotesGenerateRelatedTopics::test_related_topics_with_empty_transcript` — AssertionError: expected 'No related topics available' not found in output
-6. `TestShowNotesIntegration::test_full_pipeline_html` — AssertionError: expected `<h1>` in rendered HTML output
-
-### Core Files Present
-- `podcastseo/show_notes_generator.py`
-- `podcastseo/cli.py`
-- `podcastseo/keyword_extractor.py`
-- `podcastseo/transcript_parser.py`
-- `src/dashboard/models.py`
-- `src/dashboard/panels.py`
-- `src/dashboard/tickers.py`
-- `src/dashboard/visualization.py`
-- `src/ticker.py`
-- `llm_interface.py`
-- `health_check.py`
-- `quality_scorer.py`
-- `tools.py`
-- `sweep_all.py`
-- `conftest.py`
-- `tests/test_show_notes.py`
-- `tests/test_cli.py`
-- `tests/test_dashboard_models.py`
-- `tests/test_dashboard_panels.py`
-- `tests/test_dashboard_tickers.py`
-- `tests/test_dashboard_visualization.py`
-- `tests/test_extractor.py`
-- `tests/test_parser.py`
-- `tests/test_ticker.py`
-
-### Root Cause
-The 6 failures stem from bugs in `tests/test_show_notes.py` (test code issues like incorrect `isinstance` usage and fixture misuse) and corresponding issues in `podcastseo/show_notes_generator.py` (production code not handling edge cases properly).
