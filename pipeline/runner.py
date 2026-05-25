@@ -42,17 +42,10 @@ if _ENV_FILE.exists():
             if _key not in os.environ:  # don't override explicit env vars
                 os.environ[_key] = _val
 
-_ANSI_ESCAPE = re.compile(r'(?:\x1B[@-Z\\-_]|[\x80-\x9A\x9C-\x9F]|(?:\x1B\[|\x9B)[0-?]*[ -/]*[@-~]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\))')
-
 # Suppress Jupyter/cloud terminal escape sequences (^[]11;rgb:... etc.)
 # These are OSC color query responses that pollute output in web terminals.
 if not sys.stdout.isatty():
     os.environ.setdefault("TERM", "dumb")
-
-def _clean(text: str) -> str:
-    """Strip ANSI/OSC escape sequences from a string."""
-    return _ANSI_ESCAPE.sub('', text)
-
 
 # Repo root on sys.path (required when invoked as `python pipeline/runner.py`)
 _PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -90,7 +83,6 @@ from pipeline.seeding import (
     _SEED_GOAL_QUEUED,
     _SEED_SEEDED,
     _purge_dep_blocked_messages,
-    _request_ideation,
     _seeded_this_session,
     check_resume,
     seed_from_master_list,
@@ -103,7 +95,6 @@ from pipeline.project_ops import (
 )
 from pipeline.startup import resolve_initial_work
 
-# Re-export for run_loop (import pipeline.runner as r)
 __all__ = [
     "AGENT_ROLES",
     "MAX_PROJECT_LIFETIME_RETRIES",
@@ -114,10 +105,8 @@ __all__ = [
     "_SEED_EMPTY",
     "_SEED_GOAL_QUEUED",
     "_SEED_SEEDED",
-    "_apply_seed_empty",
     "_check_ollama_heartbeat",
     "_check_priority_eviction",
-    "_clean",
     "_get_active_idea_state",
     "_get_all_active_idea_states",
     "_seeded_this_session",
@@ -130,46 +119,6 @@ __all__ = [
 
 
 _run_ctx: "RunContext | None" = None
-
-def _apply_seed_empty(
-    seeded: str,
-    bus: "MessageBus",
-    *,
-    ideation_in_progress: bool,
-    ideation_requested_at: float,
-    ideation_timeout_s: float,
-) -> tuple[bool, float, bool]:
-    """
-    Handle _SEED_EMPTY via seed_policy. Returns (ideation_in_progress, ideation_requested_at, stop_requested).
-    """
-    if seeded != _SEED_EMPTY:
-        return ideation_in_progress, ideation_requested_at, False
-    if not _run_ctx:
-        return ideation_in_progress, ideation_requested_at, False
-
-    from pipeline.seed_policy import SeedEmptyAction, on_seed_empty
-
-    timed_out = (
-        ideation_in_progress
-        and ideation_requested_at > 0
-        and time.time() - ideation_requested_at > ideation_timeout_s
-    )
-    action = on_seed_empty(
-        _run_ctx,
-        bus,
-        seeded_session=_seeded_this_session,
-        ideation_in_progress=ideation_in_progress,
-        ideation_timed_out=timed_out,
-    )
-    if action == SeedEmptyAction.STOP:
-        return ideation_in_progress, ideation_requested_at, True
-    if action == SeedEmptyAction.RETRY_IDEATION:
-        print("  ⏰ Ideation timed out — retrying...")
-        return False, 0.0, False
-    if action == SeedEmptyAction.IDEATE:
-        _request_ideation(bus)
-        return True, time.time(), False
-    return ideation_in_progress, ideation_requested_at, False
 
 def run_pipeline(
     idea: str | None = None,

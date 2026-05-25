@@ -10,8 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-METRICS_LOG = PROJECT_ROOT / ".pipeline" / "state" / "capability_metrics.jsonl"
+from pipeline.pipeline_config import PIPELINE_DIR
+
+METRICS_LOG = PIPELINE_DIR / "state" / "capability_metrics.jsonl"
 
 
 def log_capability_event(

@@ -20,11 +20,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pipeline.capability_registry import REGISTRY_DB
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
-
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
-REGISTRY_DB = PIPELINE_DIR / "state" / "capability_registry.sqlite"
 EXPORT_JSON = PIPELINE_DIR / "state" / "capability_registry_export.json"
 EXPORT_JSON_ALT = PROJECT_ROOT / "capability_registry_export.json"  # repo root handoff
 

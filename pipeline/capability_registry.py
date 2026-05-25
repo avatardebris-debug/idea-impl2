@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.pipeline_mode import legacy_mode
+from pipeline.slug_util import slugify_title as _slugify
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
@@ -64,11 +65,6 @@ def _connect() -> sqlite3.Connection:
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA_SQL)
     return conn
-
-
-def _slugify(title: str) -> str:
-    t = title.strip("[] ").lower()
-    return re.sub(r"[^a-z0-9]+", "_", t).strip("_")[:60]
 
 
 def _guess_domains(title: str, description: str) -> list[str]:

@@ -21,6 +21,7 @@ from pipeline.pipeline_config import (
     PIPELINE_DIR,
     PROJECT_ROOT,
 )
+from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
 from pipeline.slug_util import slugify_title as _slugify
 
 if TYPE_CHECKING:
@@ -144,24 +145,25 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
                     description_raw = re.sub(r'\s*[,;.-]?\s*\b(?:priority|priority_tier):\s*\d+\s*', '', description_raw, flags=re.IGNORECASE).strip()
 
                 locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
-                dep_match = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', description_raw, re.IGNORECASE)
-                deps = []
-                if dep_match:
-                    raw_deps = dep_match.group(1)
-                    deps = [d.strip() for d in re.split(r'[,;]+', raw_deps) if d.strip()]
+                deps = parse_requires_from_description(description_raw)
 
                 blocking = []
                 for dep_slug in deps:
                     dep_state_file = projects_dir / dep_slug / "state" / "current_idea.json"
                     if not dep_state_file.exists():
-                        blocking.append(dep_slug)
+                        reason = dep_blocking_reason(dep_slug, None, context="seeding")
+                        if reason:
+                            blocking.append(reason)
                         continue
                     try:
                         dep_state = json.loads(dep_state_file.read_text(encoding="utf-8"))
-                        if dep_state.get("status") not in ("complete", "budget_exceeded"):
-                            blocking.append(dep_slug)
+                        reason = dep_blocking_reason(
+                            dep_slug, dep_state.get("status"), context="seeding",
+                        )
+                        if reason:
+                            blocking.append(reason)
                     except Exception:
-                        blocking.append(dep_slug)
+                        blocking.append(f"{dep_slug} (unreadable)")
 
                 if not blocking:
                     ready_unseeded.append({
@@ -179,14 +181,19 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
         for dep_slug in deps:
             dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
             if not dep_file.exists():
-                blocking.append(dep_slug)
+                reason = dep_blocking_reason(dep_slug, None, context="seeding")
+                if reason:
+                    blocking.append(reason)
                 continue
             try:
                 dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
-                if dep_st.get("status") not in ("complete", "budget_exceeded"):
-                    blocking.append(dep_slug)
+                reason = dep_blocking_reason(
+                    dep_slug, dep_st.get("status"), context="seeding",
+                )
+                if reason:
+                    blocking.append(reason)
             except Exception:
-                blocking.append(dep_slug)
+                blocking.append(f"{dep_slug} (unreadable)")
         if not blocking:
             waiting_projects.append(ep)
 

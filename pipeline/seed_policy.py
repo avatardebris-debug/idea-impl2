@@ -5,11 +5,13 @@ Unified handling when seed_from_master_list returns _SEED_EMPTY.
 
 from __future__ import annotations
 
+import time
 from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipeline.run_context import RunContext
+from pipeline.seeding import _SEED_EMPTY, _request_ideation, _seeded_this_session
 
 if TYPE_CHECKING:
     from pipeline.message_bus import MessageBus
@@ -48,3 +50,45 @@ def on_seed_empty(
     if not ideation_in_progress:
         return SeedEmptyAction.IDEATE
     return SeedEmptyAction.CONTINUE
+
+
+def apply_seed_empty(
+    seeded: str,
+    bus: "MessageBus",
+    run_ctx: RunContext | None,
+    *,
+    ideation_in_progress: bool,
+    ideation_requested_at: float,
+    ideation_timeout_s: float,
+) -> tuple[bool, float, bool]:
+    """
+    Handle _SEED_EMPTY via on_seed_empty.
+
+    Returns (ideation_in_progress, ideation_requested_at, stop_requested).
+    """
+    if seeded != _SEED_EMPTY:
+        return ideation_in_progress, ideation_requested_at, False
+    if not run_ctx:
+        return ideation_in_progress, ideation_requested_at, False
+
+    timed_out = (
+        ideation_in_progress
+        and ideation_requested_at > 0
+        and time.time() - ideation_requested_at > ideation_timeout_s
+    )
+    action = on_seed_empty(
+        run_ctx,
+        bus,
+        seeded_session=_seeded_this_session,
+        ideation_in_progress=ideation_in_progress,
+        ideation_timed_out=timed_out,
+    )
+    if action == SeedEmptyAction.STOP:
+        return ideation_in_progress, ideation_requested_at, True
+    if action == SeedEmptyAction.RETRY_IDEATION:
+        print("  ⏰ Ideation timed out — retrying...")
+        return False, 0.0, False
+    if action == SeedEmptyAction.IDEATE:
+        _request_ideation(bus)
+        return True, time.time(), False
+    return ideation_in_progress, ideation_requested_at, False

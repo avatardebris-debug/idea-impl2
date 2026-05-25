@@ -130,6 +130,7 @@ def resolve_initial_work(
                 bus,
                 ideas_path=ideas_path,
                 resume_inprogress=fresh_list_only,
+                run_ctx=run_ctx,
             )
             has_work = seed_result in (SEED_SEEDED, SEED_BLOCKED)
 
@@ -147,6 +148,7 @@ def resolve_initial_work(
                     bus,
                     ideas_path=ideas_path,
                     resume_inprogress=fresh_list_only,
+                    run_ctx=run_ctx,
                 )
                 if sr != SEED_SEEDED:
                     break

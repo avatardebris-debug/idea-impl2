@@ -14,11 +14,17 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from pipeline.message_bus import Message, MessageBus
+from pipeline.dep_policy import (
+    dep_blocking_reason,
+    parse_requires_from_description,
+    split_requires_from_description,
+)
 from pipeline.pipeline_config import AGENT_ROLES, PIPELINE_DIR, PROJECT_ROOT
+from pipeline.project_ops import _rebuild_single_project
 from pipeline.slug_util import slugify_title as _slugify
 
 if TYPE_CHECKING:
-    pass
+    from pipeline.run_context import RunContext
 
 # Return values for seed_from_master_list
 SEED_SEEDED = "seeded"
@@ -44,7 +50,6 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
 
     Returns the number of messages purged.
     """
-    DONE_STATUSES = ("complete", "budget_exceeded")
     projects_dir = PIPELINE_DIR / "projects"
     purged = 0
 
@@ -74,12 +79,15 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
             for dep_slug in deps:
                 dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
                 if not dep_file.exists():
-                    blocking.append(f"{dep_slug} (not started)")
+                    blocking.append(dep_blocking_reason(dep_slug, None, context="purge"))
                     continue
                 try:
                     dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
-                    if dep_st.get("status") not in DONE_STATUSES:
-                        blocking.append(f"{dep_slug} ({dep_st.get('status', '?')})")
+                    reason = dep_blocking_reason(
+                        dep_slug, dep_st.get("status"), context="purge",
+                    )
+                    if reason:
+                        blocking.append(reason)
                 except Exception:
                     blocking.append(f"{dep_slug} (unreadable)")
 
@@ -106,9 +114,6 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
                     pass
 
     return purged
-
-
-_seeded_this_session: set[str] = set()  # titles seeded in this runner invocation
 
 
 def seed_idea(bus: MessageBus, title: str, description: str,
@@ -257,6 +262,7 @@ def seed_from_master_list(
     silent: bool = False,
     ideas_path: pathlib.Path | None = None,
     resume_inprogress: bool = False,
+    run_ctx: "RunContext | None" = None,
 ) -> str:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
@@ -269,10 +275,7 @@ def seed_from_master_list(
     Blocked ideas (deps not yet complete) are skipped with a status message.
     They unblock automatically once their dependencies reach 'complete'.
     """
-    from pipeline import runner as _runner
-
-    _run_ctx = _runner._run_ctx
-    if _run_ctx and _run_ctx.mode == "polish":
+    if run_ctx and run_ctx.mode == "polish":
         # Polish runs only use polish_queue.md via run_polish_mode / queue_pending.
         return SEED_EMPTY
 
@@ -291,7 +294,7 @@ def seed_from_master_list(
         print(f"  ✗ {mi_path.name} not found")
         return SEED_EMPTY
     # Trim completed ideas from master list only (not polish queue)
-    _is_polish_list = _run_ctx.is_polish_queue(mi_path) if _run_ctx else False
+    _is_polish_list = run_ctx.is_polish_queue(mi_path) if run_ctx else False
     if not _is_polish_list:
         try:
             from pipeline.ideas_sync import prepare_master_ideas_for_seed
@@ -359,22 +362,22 @@ def seed_from_master_list(
                     # Also try parsing from master_ideas line (for legacy projects
                     # seeded before stub-writing existed)
                     raw_desc = match.group(2).strip()
-                    _dm = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', raw_desc, re.IGNORECASE)
-                    if _dm:
-                        in_progress_deps = [d.strip() for d in re.split(r'[,;]+', _dm.group(1)) if d.strip()]
+                    in_progress_deps = parse_requires_from_description(raw_desc)
 
                 if in_progress_deps:
                     _blocking = []
-                    DONE = ("complete", "budget_exceeded")
                     for _dep in in_progress_deps:
                         _df = PIPELINE_DIR / "projects" / _dep / "state" / "current_idea.json"
                         if not _df.exists():
-                            _blocking.append(f"{_dep} (not started)")
+                            _blocking.append(dep_blocking_reason(_dep, None, context="seeding"))
                             continue
                         try:
                             _ds = json.loads(_df.read_text(encoding="utf-8"))
-                            if _ds.get("status") not in DONE:
-                                _blocking.append(f"{_dep} ({_ds.get('status','?')})")
+                            reason = dep_blocking_reason(
+                                _dep, _ds.get("status"), context="seeding",
+                            )
+                            if reason:
+                                _blocking.append(reason)
                         except Exception:
                             _blocking.append(f"{_dep} (unreadable)")
                     if _blocking:
@@ -522,15 +525,9 @@ def seed_from_master_list(
         locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
 
         # --- Parse 'requires: slug1, slug2' dependency declarations ---
-        # Handles trailing ] from markdown format e.g. [desc. requires: slug]
-        dep_match = re.search(r'\brequires:\s*([\w,\s_-]+?)[\]\s.]*$', description_raw, re.IGNORECASE)
-        deps: list = []
         description = re.sub(r'\s*\[lock\]', '', description_raw, flags=re.IGNORECASE).strip()
-        if dep_match:
-            raw_deps = dep_match.group(1)
-            deps = [d.strip() for d in re.split(r'[,;]+', raw_deps) if d.strip()]
-            description = description[:dep_match.start()].strip().rstrip('.')
-            description = re.sub(r'\s*\[lock\]', '', description, flags=re.IGNORECASE).strip()
+        description, deps = split_requires_from_description(description)
+        description = re.sub(r'\s*\[lock\]', '', description, flags=re.IGNORECASE).strip()
 
         # --- Check all dependencies are complete before seeding ---
         if deps:
@@ -538,12 +535,15 @@ def seed_from_master_list(
             for dep_slug in deps:
                 dep_state_file = PIPELINE_DIR / "projects" / dep_slug / "state" / "current_idea.json"
                 if not dep_state_file.exists():
-                    blocking.append(f"{dep_slug} (not started)")
+                    blocking.append(dep_blocking_reason(dep_slug, None, context="seeding"))
                     continue
                 try:
                     dep_state = json.loads(dep_state_file.read_text(encoding="utf-8"))
-                    if dep_state.get("status") not in ("complete", "budget_exceeded"):
-                        blocking.append(f"{dep_slug} ({dep_state.get('status', '?')})")
+                    reason = dep_blocking_reason(
+                        dep_slug, dep_state.get("status"), context="seeding",
+                    )
+                    if reason:
+                        blocking.append(reason)
                 except Exception:
                     blocking.append(f"{dep_slug} (unreadable)")
             if blocking:

@@ -14,11 +14,9 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from pipeline.capability_registry import REGISTRY_DB
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
-
-PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
-REGISTRY_DB = PIPELINE_DIR / "state" / "capability_registry.sqlite"
 GOALS_DIR = PIPELINE_DIR / "goals"
 MASTER_IDEAS = PROJECT_ROOT / "master_ideas.md"
 OVERRIDES_PATH = PIPELINE_DIR / "state" / "capability_overrides.yaml"
