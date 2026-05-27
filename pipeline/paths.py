@@ -28,6 +28,7 @@ __all__ = [
     "registry_db",
     "capabilities_md",
     "completions_jsonl",
+    "reusable_tools_md",
     "queues_dir",
     "message_bus_db",
     "throughput_json",
@@ -89,6 +90,10 @@ def capabilities_md() -> pathlib.Path:
 
 def completions_jsonl() -> pathlib.Path:
     return state_dir() / "completions.jsonl"
+
+
+def reusable_tools_md() -> pathlib.Path:
+    return state_dir() / "reusable_tools.md"
 
 
 def queues_dir() -> pathlib.Path:

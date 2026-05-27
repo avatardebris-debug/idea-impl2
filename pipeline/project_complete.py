@@ -5,12 +5,14 @@ from __future__ import annotations
 import json
 import pathlib
 
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import get_pipeline_dir, project_state_file
 
 
 def is_project_complete(slug: str, *, pipeline_dir: pathlib.Path | None = None) -> bool:
-    root = pipeline_dir or get_pipeline_dir()
-    state_file = root / "projects" / slug / "state" / "current_idea.json"
+    if pipeline_dir is not None:
+        state_file = pipeline_dir / "projects" / slug / "state" / "current_idea.json"
+    else:
+        state_file = project_state_file(slug)
     if not state_file.exists():
         return False
     try:

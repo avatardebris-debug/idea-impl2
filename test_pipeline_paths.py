@@ -121,3 +121,18 @@ def test_state_path_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.P
     assert completions_jsonl() == pipeline.resolve() / "state" / "completions.jsonl"
     assert activity_jsonl() == pipeline.resolve() / "state" / "activity.jsonl"
     assert project_state_file("foo") == pipeline.resolve() / "projects" / "foo" / "state" / "current_idea.json"
+
+
+def test_agent_modules_importable() -> None:
+    """Regression: executor/reviewer must not import removed agent_process helpers."""
+    from pipeline.agents.executor import ExecutorAgent
+    from pipeline.agents.reviewer import ReviewerAgent
+    from pipeline.agents.validator import ValidatorAgent
+    from pipeline.agents.manager import ManagerAgent
+    from pipeline.agents.ideator import IdeatorAgent
+    from pipeline.agents.phase_planner import PhasePlannerAgent
+    from pipeline.agents.idea_planner import IdeaPlannerAgent
+
+    assert ExecutorAgent.role == "executor"
+    assert ReviewerAgent.role == "reviewer"
+    assert ValidatorAgent.role == "validator"
