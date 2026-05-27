@@ -10,11 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import polish_status_json
 
 
 def polish_status_path() -> Path:
-    return get_pipeline_dir() / "state" / "polish_status.json"
+    return polish_status_json()
 
 
 def _now() -> str:

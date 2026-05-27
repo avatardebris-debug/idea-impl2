@@ -33,15 +33,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Any
 
-from pipeline.pipeline_config import get_pipeline_dir
-
-
-def _queues_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "queues"
-
-
-def _db_path() -> pathlib.Path:
-    return get_pipeline_dir() / "state" / "message_bus.db"
+from pipeline.paths import message_bus_db, queues_dir
 
 # ---------------------------------------------------------------------------
 # Message data model  (unchanged from original)
@@ -153,9 +145,9 @@ class MessageBus:
 
     def __init__(self, base_dir: pathlib.Path | None = None):
         # base_dir kept for API compat — we don't use it (single shared DB)
-        self.base_dir = base_dir or _queues_dir()
+        self.base_dir = base_dir or queues_dir()
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self._db = _db_path()
+        self._db = str(message_bus_db())
         _init_db(self._db)
 
     # ------------------------------------------------------------------
@@ -408,7 +400,7 @@ class MessageBus:
         via INSERT OR IGNORE (msg_id uniqueness).
         Returns count of messages imported.
         """
-        if not _queues_dir().exists():
+        if not queues_dir().exists():
             return 0
         conn = _get_conn(self._db)
         # Ensure msg_id uniqueness for idempotent re-import
@@ -417,7 +409,7 @@ class MessageBus:
         )
         conn.commit()
         imported = 0
-        for qf in _queues_dir().glob("*.jsonl"):
+        for qf in queues_dir().glob("*.jsonl"):
             try:
                 with open(qf, "r", encoding="utf-8") as f:
                     for line in f:

@@ -13,7 +13,7 @@ from typing import Any
 
 from pipeline.message_bus import Message, MessageBus
 from pipeline.pipeline_config import PROJECT_ROOT
-from pipeline.paths import get_pipeline_dir, state_dir
+from pipeline.paths import get_pipeline_dir, project_dir, state_dir
 
 DROPBOX_PATH = PROJECT_ROOT / "dropbox.md"
 
@@ -192,7 +192,7 @@ def check_dropbox(bus: MessageBus, ideas_path: Path | None = None) -> int:
 
 def apply_project_steer(slug: str, notes: str, *, source_msg_id: str = "") -> Path:
     """Append user steering notes to a project's state directory."""
-    proj = get_pipeline_dir() / "projects" / slug
+    proj = project_dir(slug)
     proj.mkdir(parents=True, exist_ok=True)
     path = proj / "state" / "user_steer.md"
     header = f"\n\n## {_now()} (dropbox {source_msg_id})\n"

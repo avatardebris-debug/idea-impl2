@@ -47,9 +47,9 @@ PROMPTS_DIR  = ROOT / "pipeline" / "prompts"
 
 
 def _memory_dir() -> pathlib.Path:
-    from pipeline.pipeline_config import get_pipeline_dir
+    from pipeline.paths import memory_dir
 
-    return get_pipeline_dir() / "memory"
+    return memory_dir()
 
 
 def _bug_memory() -> pathlib.Path:

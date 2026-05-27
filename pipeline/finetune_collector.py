@@ -46,11 +46,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import finetune_dataset_dir
 
 
 def _dataset_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "finetune"
+    return finetune_dataset_dir()
 
 
 def _dataset_file() -> pathlib.Path:

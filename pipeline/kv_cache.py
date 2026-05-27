@@ -135,7 +135,9 @@ class OllamaKVCache:
 
     def _workspace_mtime(self, slug: str) -> float:
         """Return latest mtime across the project workspace (or 0 if not found)."""
-        ws = get_pipeline_dir() / "projects" / slug / "workspace"
+        from pipeline.paths import project_dir
+
+        ws = project_dir(slug) / "workspace"
         if not ws.exists():
             return 0.0
         try:

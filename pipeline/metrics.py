@@ -24,15 +24,15 @@ from dataclasses import dataclass, field
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 PROMPTS_DIR = PROJECT_ROOT / "pipeline" / "prompts"
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import metrics_dir, prompt_versions_dir
 
 
 def _versions_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "prompt_versions"
+    return prompt_versions_dir()
 
 
 def _metrics_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "metrics"
+    return metrics_dir()
 
 
 # ---------------------------------------------------------------------------

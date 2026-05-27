@@ -14,12 +14,12 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from pipeline.message_bus import Message, MessageBus
+from pipeline.paths import plan_amendments_md, projects_dir
 from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PHASE_RETRIES,
     MAX_PROJECT_LIFETIME_RETRIES,
     PROJECT_ROOT,
-    get_pipeline_dir,
 )
 from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
 from pipeline.slug_util import slugify_title as _slugify
@@ -66,7 +66,7 @@ def _reset_retries(project_dir: pathlib.Path, phase_num: int) -> None:
 
 def _append_polish(project_dir: pathlib.Path, phase_num: int, notes: str) -> None:
     """Save non-blocking review notes as deferred polish tasks."""
-    path = get_pipeline_dir() / "state" / "plan_amendments.md"
+    path = plan_amendments_md()
     path.parent.mkdir(parents=True, exist_ok=True)
     bullets = re.findall(r'^[-*]\s+(.+)$', notes, re.MULTILINE)
     if not bullets:
@@ -79,15 +79,15 @@ def _append_polish(project_dir: pathlib.Path, phase_num: int, notes: str) -> Non
 
 def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: pathlib.Path | None = None) -> None:
     """Eviction Controller: pre-empts lowest priority running project if a higher priority one is ready."""
-    projects_dir = get_pipeline_dir() / "projects"
-    if not projects_dir.exists():
+    projects_root = projects_dir()
+    if not projects_root.exists():
         return
 
     # 1. Scan active and evicted projects
     active_projects = []
     evicted_projects = []
     
-    for p in projects_dir.iterdir():
+    for p in projects_root.iterdir():
         if not p.is_dir():
             continue
         sf = p / "state" / "current_idea.json"
@@ -131,7 +131,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
                 title = match.group(1).strip()
                 slug = _slugify(title)
                 
-                if (projects_dir / slug / "state" / "current_idea.json").exists():
+                if (projects_root / slug / "state" / "current_idea.json").exists():
                     continue
 
                 description_raw = match.group(2).strip()
@@ -149,7 +149,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
 
                 blocking = []
                 for dep_slug in deps:
-                    dep_state_file = projects_dir / dep_slug / "state" / "current_idea.json"
+                    dep_state_file = projects_root / dep_slug / "state" / "current_idea.json"
                     if not dep_state_file.exists():
                         reason = dep_blocking_reason(dep_slug, None, context="seeding")
                         if reason:
@@ -179,7 +179,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
         deps = ep["state"].get("depends_on", [])
         blocking = []
         for dep_slug in deps:
-            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            dep_file = projects_root / dep_slug / "state" / "current_idea.json"
             if not dep_file.exists():
                 reason = dep_blocking_reason(dep_slug, None, context="seeding")
                 if reason:

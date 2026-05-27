@@ -14,18 +14,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import activity_jsonl
 
 
 def activity_log_path() -> Path:
-    return get_pipeline_dir() / "state" / "activity.jsonl"
+    return activity_jsonl()
 
 
 def log_activity(event: str, **fields: Any) -> None:
     """Append one JSON line to state/activity.jsonl (never raises)."""
     try:
-        root = get_pipeline_dir()
-        path = root / "state" / "activity.jsonl"
+        path = activity_jsonl()
         path.parent.mkdir(parents=True, exist_ok=True)
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),

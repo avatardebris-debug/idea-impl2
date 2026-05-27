@@ -28,6 +28,18 @@ __all__ = [
     "registry_db",
     "capabilities_md",
     "completions_jsonl",
+    "queues_dir",
+    "message_bus_db",
+    "throughput_json",
+    "pipeline_status_json",
+    "polish_status_json",
+    "activity_jsonl",
+    "plan_amendments_md",
+    "finetune_dataset_dir",
+    "prompt_versions_dir",
+    "metrics_dir",
+    "project_dir",
+    "project_state_file",
 ]
 
 
@@ -77,3 +89,51 @@ def capabilities_md() -> pathlib.Path:
 
 def completions_jsonl() -> pathlib.Path:
     return state_dir() / "completions.jsonl"
+
+
+def queues_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "queues"
+
+
+def message_bus_db() -> pathlib.Path:
+    return state_dir() / "message_bus.db"
+
+
+def throughput_json() -> pathlib.Path:
+    return state_dir() / "throughput.json"
+
+
+def pipeline_status_json() -> pathlib.Path:
+    return state_dir() / "pipeline_status.json"
+
+
+def polish_status_json() -> pathlib.Path:
+    return state_dir() / "polish_status.json"
+
+
+def activity_jsonl() -> pathlib.Path:
+    return state_dir() / "activity.jsonl"
+
+
+def plan_amendments_md() -> pathlib.Path:
+    return state_dir() / "plan_amendments.md"
+
+
+def finetune_dataset_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "finetune"
+
+
+def prompt_versions_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "prompt_versions"
+
+
+def metrics_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "metrics"
+
+
+def project_dir(slug: str) -> pathlib.Path:
+    return projects_dir() / slug
+
+
+def project_state_file(slug: str) -> pathlib.Path:
+    return project_dir(slug) / "state" / "current_idea.json"

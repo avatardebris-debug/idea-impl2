@@ -10,7 +10,11 @@ import pathlib
 import re
 from typing import TYPE_CHECKING
 
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import (
+    get_pipeline_dir,
+    pipeline_status_json,
+    throughput_json,
+)
 
 if TYPE_CHECKING:
     pass
@@ -64,7 +68,7 @@ def init_pipeline_dirs() -> None:
         (get_pipeline_dir() / subdir).mkdir(parents=True, exist_ok=True)
 
     # Session-Agnostic Throughput Cleanup: clear throughput.json on startup
-    tp_path = get_pipeline_dir() / "state" / "throughput.json"
+    tp_path = throughput_json()
     if tp_path.exists():
         try:
             tp_path.unlink()
@@ -146,14 +150,14 @@ def _get_all_active_idea_states(pipeline_dir: pathlib.Path) -> list[dict]:
 
 
 def save_pipeline_status(status: dict) -> None:
-    path = get_pipeline_dir() / "state" / "pipeline_status.json"
+    path = pipeline_status_json()
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(status, f, indent=2)
 
 
 def load_pipeline_status() -> dict:
-    path = get_pipeline_dir() / "state" / "pipeline_status.json"
+    path = pipeline_status_json()
     if path.exists():
         with open(path, encoding="utf-8") as f:
             return json.load(f)

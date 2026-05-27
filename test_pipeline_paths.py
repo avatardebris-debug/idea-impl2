@@ -96,3 +96,28 @@ def test_capability_graph_connects_to_live_registry(
         assert pathlib.Path(conn.execute("PRAGMA database_list").fetchone()[2]) == db
     finally:
         conn.close()
+
+
+def test_state_path_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    pipeline = tmp_path / "out"
+    (pipeline / "state").mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+    from pipeline.paths import (
+        activity_jsonl,
+        completions_jsonl,
+        message_bus_db,
+        pipeline_status_json,
+        project_state_file,
+        throughput_json,
+    )
+
+    reload_pipeline_dir()
+    assert message_bus_db() == pipeline.resolve() / "state" / "message_bus.db"
+    assert throughput_json() == pipeline.resolve() / "state" / "throughput.json"
+    assert pipeline_status_json() == pipeline.resolve() / "state" / "pipeline_status.json"
+    assert completions_jsonl() == pipeline.resolve() / "state" / "completions.jsonl"
+    assert activity_jsonl() == pipeline.resolve() / "state" / "activity.jsonl"
+    assert project_state_file("foo") == pipeline.resolve() / "projects" / "foo" / "state" / "current_idea.json"

@@ -259,19 +259,19 @@ class ContextAggregator:
         Returns:
             The context cache dict, or {} if the project dir doesn't exist.
         """
-        from pipeline.pipeline_config import get_pipeline_dir
+        from pipeline.paths import project_dir as pipeline_project_dir
 
-        project_dir = get_pipeline_dir() / "projects" / slug
-        if not project_dir.exists():
+        proj = pipeline_project_dir(slug)
+        if not proj.exists():
             return {}
-        cache_path = project_dir / "state" / "context_cache.json"
+        cache_path = proj / "state" / "context_cache.json"
         if not force and cache_path.exists():
             # Already warm — return quickly without I/O
             try:
                 return json.loads(cache_path.read_text(encoding="utf-8"))
             except Exception:
                 pass  # Fall through to rebuild
-        return build_context_cache(project_dir)
+        return build_context_cache(proj)
 
 
 _aggregator: ContextAggregator | None = None

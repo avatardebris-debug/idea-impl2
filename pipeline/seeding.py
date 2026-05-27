@@ -19,6 +19,7 @@ from pipeline.dep_policy import (
     parse_requires_from_description,
     split_requires_from_description,
 )
+from pipeline.paths import project_dir, project_state_file, projects_dir as pipeline_projects_dir
 from pipeline.pipeline_config import AGENT_ROLES, PROJECT_ROOT, get_pipeline_dir
 from pipeline.project_ops import _rebuild_single_project
 from pipeline.slug_util import slugify_title as _slugify
@@ -50,7 +51,7 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
 
     Returns the number of messages purged.
     """
-    projects_dir = get_pipeline_dir() / "projects"
+    projects_dir = pipeline_projects_dir()
     purged = 0
 
     for role in AGENT_ROLES:
@@ -130,13 +131,13 @@ def seed_idea(bus: MessageBus, title: str, description: str,
     dep_workspaces: dict = {}
     if deps:
         for dep_slug in deps:
-            ws = get_pipeline_dir() / "projects" / dep_slug / "workspace"
+            ws = project_dir(dep_slug) / "workspace"
             if ws.exists():
                 dep_workspaces[dep_slug] = str(ws)
 
     # Write a stub current_idea.json NOW so deps survive runner restarts.
     # idea_planner will overwrite this with full state once it processes the idea.
-    stub_state_file = get_pipeline_dir() / "projects" / idea_slug / "state" / "current_idea.json"
+    stub_state_file = project_state_file(idea_slug)
     if not stub_state_file.exists():
         stub_state_file.parent.mkdir(parents=True, exist_ok=True)
         stub_state_file.write_text(json.dumps({
@@ -334,7 +335,7 @@ def seed_from_master_list(
             continue
 
         slug = _slugify(title)
-        project_state = get_pipeline_dir() / "projects" / slug / "state" / "current_idea.json"
+        project_state = project_state_file(slug)
 
         if project_state.exists():
             try:
@@ -367,7 +368,7 @@ def seed_from_master_list(
                 if in_progress_deps:
                     _blocking = []
                     for _dep in in_progress_deps:
-                        _df = get_pipeline_dir() / "projects" / _dep / "state" / "current_idea.json"
+                        _df = project_state_file(_dep)
                         if not _df.exists():
                             _blocking.append(dep_blocking_reason(_dep, None, context="seeding"))
                             continue
@@ -533,7 +534,7 @@ def seed_from_master_list(
         if deps:
             blocking: list = []
             for dep_slug in deps:
-                dep_state_file = get_pipeline_dir() / "projects" / dep_slug / "state" / "current_idea.json"
+                dep_state_file = project_state_file(dep_slug)
                 if not dep_state_file.exists():
                     blocking.append(dep_blocking_reason(dep_slug, None, context="seeding"))
                     continue

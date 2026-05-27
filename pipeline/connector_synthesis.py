@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 
 from pipeline.pipeline_config import PROJECT_ROOT  # noqa: F401
-from pipeline.paths import connectors_dir, get_pipeline_dir
+from pipeline.paths import connectors_dir, projects_dir
 from pipeline.slug_util import slugify_title
 IDEA_LINE_RE = re.compile(
     r"^\s*-\s*\[[ xX]\]\s*\*\*(.+?)\*\*\s*(?:kind:\s*connector\s*)?"
@@ -31,7 +31,7 @@ GROUP_HEADER_RE = re.compile(
 def _known_project_slugs() -> dict[str, str]:
     """slug -> display title from .pipeline/projects."""
     out: dict[str, str] = {}
-    projects = get_pipeline_dir() / "projects"
+    projects = projects_dir()
     if not projects.exists():
         return out
     for d in projects.iterdir():

@@ -154,7 +154,9 @@ class RollingContext:
 
     @staticmethod
     def _state_file(slug: str) -> pathlib.Path:
-        return get_pipeline_dir() / "projects" / slug / "state" / "rolling_context.json"
+        from pipeline.paths import project_dir
+
+        return project_dir(slug) / "state" / "rolling_context.json"
 
     def _save(self, slug: str) -> None:
         """Persist current in-memory window for slug to disk (call under lock)."""
