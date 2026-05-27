@@ -299,6 +299,7 @@ def run_pipeline(
 
     loop_control = LoopControl()
     original_sigint = signal.getsignal(signal.SIGINT)
+    _output_dir = PIPELINE_DIR
 
     def _handle_interrupt(signum, frame):
         if loop_control.stop_requested:
@@ -309,12 +310,12 @@ def run_pipeline(
         print("\n\n  [Pipeline] Graceful stop — checkpointing all active projects...")
         # Stamp checkpoint_at on all in-flight projects so resume display is clear
         try:
-            for _ckpt_state in _get_all_active_idea_states(PIPELINE_DIR):
+            for _ckpt_state in _get_all_active_idea_states(_output_dir):
                 _ckpt_slug = _ckpt_state.get("_slug", "")
                 if not _ckpt_slug:
                     continue
                 _ckpt_file = (
-                    PIPELINE_DIR / "projects" / _ckpt_slug / "state" / "current_idea.json"
+                    _output_dir / "projects" / _ckpt_slug / "state" / "current_idea.json"
                 )
                 try:
                     _ckpt_data = json.loads(_ckpt_file.read_text(encoding="utf-8"))
@@ -333,10 +334,10 @@ def run_pipeline(
         supervisor.save_registry()
 
         # --- Warm context caches for all existing projects ---
-        _ctx_refreshed = refresh_all_projects(PIPELINE_DIR)
+        _ctx_refreshed = refresh_all_projects(_output_dir)
         if _ctx_refreshed:
             print(f"  📦 Context cache: warmed {_ctx_refreshed} project(s)")
-        start_background_refresh(PIPELINE_DIR, interval_seconds=120)
+        start_background_refresh(_output_dir, interval_seconds=120)
 
         if polish:
             print(f"\n  🚀 Polish pipeline RUNNING. Press Ctrl+C to stop.")
@@ -352,7 +353,7 @@ def run_pipeline(
 
         # --- Dynamic Parallelizer (auto-tune) ---
         _tuner = None
-        _tuner_log_path = PIPELINE_DIR / "state" / "tuner_log.jsonl"
+        _tuner_log_path = _output_dir / "state" / "tuner_log.jsonl"
         if auto_tune:
             try:
                 from pipeline.dynamic_parallelizer import DynamicParallelizer
@@ -368,7 +369,7 @@ def run_pipeline(
         # When active_count < parallel_seeds, we can seed another project.
         def _count_active_projects() -> int:
             """Count projects that are in-flight (not complete/budget_exceeded)."""
-            pd = PIPELINE_DIR / "projects"
+            pd = _output_dir / "projects"
             if not pd.exists():
                 return 0
             active = 0

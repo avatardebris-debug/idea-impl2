@@ -32,6 +32,18 @@ from datetime import datetime
 
 def find_pipeline_dir() -> pathlib.Path:
     """Locate pipeline output root (projects/, state/, …)."""
+    try:
+        root = pathlib.Path(__file__).resolve().parent
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from pipeline.pipeline_config import get_pipeline_dir
+
+        p = get_pipeline_dir()
+        if p.is_dir() and (p / "projects").is_dir():
+            return p
+    except Exception:
+        pass
+
     env = os.environ.get("PIPELINE_DIR", "").strip()
     if env:
         p = pathlib.Path(env).expanduser().resolve()

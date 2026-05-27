@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipeline.message_bus import Message
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
 
 if TYPE_CHECKING:
     from pipeline.message_bus import MessageBus
@@ -67,7 +67,7 @@ def requeue_polish_in_progress(
     """Re-queue polish_queue projects already in phase_N_* (prior --polish run)."""
     from pipeline.project_ops import _rebuild_single_project
 
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
     requeued = 0
 
     for raw_title, _notes, slug in _iter_polish_queue_lines(polish_path):
@@ -113,7 +113,7 @@ def run_polish_mode(
         return 0
 
     queued = 0
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
 
     for raw_title, notes, slug in _iter_polish_queue_lines(polish_path):
         if raw_title in seeded_session:
@@ -226,7 +226,7 @@ def handle_polish_idle(bus: "MessageBus", polish_path: Path, seeded_session: set
 
 
 def write_polish_queue_template(path: Path) -> None:
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
     lines = [
         "# Polish Queue",
         "",

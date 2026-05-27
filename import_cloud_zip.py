@@ -31,7 +31,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
 
 
 def find_latest_zip() -> pathlib.Path:
@@ -256,7 +256,7 @@ def import_zip(zip_path: pathlib.Path) -> None:
                 continue
 
             slug = remote_proj.name
-            local_proj = PIPELINE_DIR / "projects" / slug
+            local_proj = get_pipeline_dir() / "projects" / slug
             print(f"\n  ðŸ“ Project: {slug}")
 
             # Fix double-nesting before merging
@@ -315,12 +315,12 @@ def import_zip(zip_path: pathlib.Path) -> None:
     print_manifest()
 
     # Auto-generate import report
-    write_import_report(PIPELINE_DIR)
+    write_import_report(get_pipeline_dir())
 
 
 def print_manifest() -> None:
     """Print a clean manifest of all projects and their key file counts."""
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
     if not projects_dir.exists():
         return
 

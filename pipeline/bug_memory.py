@@ -36,9 +36,15 @@ from typing import NamedTuple
 # Paths
 # ---------------------------------------------------------------------------
 
-from pipeline.pipeline_config import PIPELINE_DIR
-MEMORY_DIR     = PIPELINE_DIR / "memory"
-RESOLUTIONS_PATH = MEMORY_DIR / "bug_resolutions.jsonl"
+from pipeline.pipeline_config import get_pipeline_dir
+
+
+def _memory_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "memory"
+
+
+def _resolutions_path() -> pathlib.Path:
+    return _memory_dir() / "bug_resolutions.jsonl"
 
 MAX_RECORDS = 500   # prune oldest when exceeded
 MAX_CONTEXT = 2000  # characters of resolution context injected into planner
@@ -203,11 +209,11 @@ def extract_fix_summary(validation_report: str, fix_report: str = "") -> str:
 
 def _is_duplicate(failure_reason: str, source: str) -> bool:
     """Skip near-duplicate entries in the last 30 records."""
-    if not RESOLUTIONS_PATH.exists() or not failure_reason:
+    if not _resolutions_path().exists() or not failure_reason:
         return False
     try:
         lines = [
-            ln for ln in RESOLUTIONS_PATH.read_text(encoding="utf-8").splitlines()
+            ln for ln in _resolutions_path().read_text(encoding="utf-8").splitlines()
             if ln.strip()
         ][-30:]
     except OSError:
@@ -226,13 +232,13 @@ def _is_duplicate(failure_reason: str, source: str) -> bool:
 
 
 def _append_record(record: dict) -> None:
-    MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+    _memory_dir().mkdir(parents=True, exist_ok=True)
     record.setdefault("ts", datetime.now(timezone.utc).isoformat())
     record.setdefault("keywords", _extract_keywords(
         f"{record.get('failure_reason', '')} {record.get('fix_summary', '')}"
     ))
-    with _SimpleLock(RESOLUTIONS_PATH):
-        with RESOLUTIONS_PATH.open("a", encoding="utf-8") as f:
+    with _SimpleLock(_resolutions_path()):
+        with _resolutions_path().open("a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
         _prune_if_needed()
 
@@ -427,12 +433,12 @@ def format_for_fix_loop(
 
 def _prune_if_needed() -> None:
     """Keep only the most recent MAX_RECORDS entries. Called inside lock."""
-    if not RESOLUTIONS_PATH.exists():
+    if not _resolutions_path().exists():
         return
-    lines = RESOLUTIONS_PATH.read_text(encoding="utf-8").splitlines()
+    lines = _resolutions_path().read_text(encoding="utf-8").splitlines()
     if len(lines) > MAX_RECORDS:
         kept = lines[-MAX_RECORDS:]
-        RESOLUTIONS_PATH.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        _resolutions_path().write_text("\n".join(kept) + "\n", encoding="utf-8")
 
 
 def query_relevant(
@@ -453,7 +459,7 @@ def query_relevant(
     Returns:
         List of resolution dicts, sorted by relevance score descending.
     """
-    if not RESOLUTIONS_PATH.exists():
+    if not _resolutions_path().exists():
         return []
 
     query_keywords = set(_extract_keywords(task_text))
@@ -463,7 +469,7 @@ def query_relevant(
     scored: list[tuple[int, dict]] = []
 
     try:
-        lines = RESOLUTIONS_PATH.read_text(encoding="utf-8").splitlines()
+        lines = _resolutions_path().read_text(encoding="utf-8").splitlines()
     except OSError:
         return []
 
@@ -528,11 +534,11 @@ def format_for_prompt(task_text: str, top_n: int = 3) -> str:
 
 def print_stats() -> None:
     """Print a summary of the bug resolution memory store."""
-    if not RESOLUTIONS_PATH.exists():
+    if not _resolutions_path().exists():
         print("  No bug resolutions recorded yet.")
         return
 
-    lines = RESOLUTIONS_PATH.read_text(encoding="utf-8").splitlines()
+    lines = _resolutions_path().read_text(encoding="utf-8").splitlines()
     records = []
     for line in lines:
         try:
@@ -560,7 +566,7 @@ def print_stats() -> None:
         by_type[r.get("type", "resolution")] = by_type.get(r.get("type", "resolution"), 0) + 1
         by_source[r.get("source", "?")] = by_source.get(r.get("source", "?"), 0) + 1
 
-    print(f"\n  Bug Resolution Memory: {RESOLUTIONS_PATH}")
+    print(f"\n  Bug Resolution Memory: {_resolutions_path()}")
     print(f"  Total records:     {len(records)}")
     print(f"  Unique projects:   {unique_slugs}")
     print(f"  Avg retries/fix:   {avg_retries:.1f}")

@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.pipeline_config import PIPELINE_DIR
+from pipeline.pipeline_config import get_pipeline_dir
 
-POLISH_STATUS_PATH = PIPELINE_DIR / "state" / "polish_status.json"
+
+def polish_status_path() -> Path:
+    return get_pipeline_dir() / "state" / "polish_status.json"
 
 
 def _now() -> str:
@@ -20,18 +22,18 @@ def _now() -> str:
 
 
 def save_polish_status(**fields: Any) -> None:
-    POLISH_STATUS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    polish_status_path().parent.mkdir(parents=True, exist_ok=True)
     data = load_polish_status()
     data.update(fields)
     data["updated_at"] = _now()
-    POLISH_STATUS_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    polish_status_path().write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def load_polish_status() -> dict[str, Any]:
-    if not POLISH_STATUS_PATH.exists():
+    if not polish_status_path().exists():
         return {}
     try:
-        return json.loads(POLISH_STATUS_PATH.read_text(encoding="utf-8"))
+        return json.loads(polish_status_path().read_text(encoding="utf-8"))
     except Exception:
         return {}
 

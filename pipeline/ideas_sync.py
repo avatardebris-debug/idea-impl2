@@ -18,10 +18,17 @@ import pathlib
 import re
 from datetime import datetime, timezone
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT as _PROJECT_ROOT
-PROJECTS_DIR = PIPELINE_DIR / "projects"
-COMPLETIONS_PATH = PIPELINE_DIR / "state" / "completions.jsonl"
+from pipeline.pipeline_config import PROJECT_ROOT as _PROJECT_ROOT, get_pipeline_dir
+
 TRUTH_PATH = _PROJECT_ROOT / "truth.md"
+
+
+def _projects_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "projects"
+
+
+def _completions_path() -> pathlib.Path:
+    return get_pipeline_dir() / "state" / "completions.jsonl"
 
 _MAX_DESC = 2000
 
@@ -85,7 +92,7 @@ def collect_completion_records(projects_dir: pathlib.Path | None = None) -> dict
     Merges live complete projects, completions.jsonl, and truth.md bullets.
     """
     records: dict[str, dict] = {}
-    root = projects_dir or PROJECTS_DIR
+    root = projects_dir or _projects_dir()
 
     if root.exists():
         for proj in root.iterdir():
@@ -109,9 +116,9 @@ def collect_completion_records(projects_dir: pathlib.Path | None = None) -> dict
                 "workspace": str(proj / "workspace"),
             }
 
-    if COMPLETIONS_PATH.exists():
+    if _completions_path().exists():
         try:
-            for line in COMPLETIONS_PATH.read_text(encoding="utf-8").splitlines():
+            for line in _completions_path().read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
                 try:
@@ -288,15 +295,15 @@ def register_completion(
     workspace: str = "",
 ) -> None:
     """Append to completions.jsonl (idempotent per slug). Includes description for revisit."""
-    COMPLETIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _completions_path().parent.mkdir(parents=True, exist_ok=True)
     slug = slug.strip()
     title = title.strip()
     description = (description or "").strip()[:_MAX_DESC]
     if not slug:
         return
     try:
-        if COMPLETIONS_PATH.exists():
-            for line in COMPLETIONS_PATH.read_text(encoding="utf-8").splitlines()[-500:]:
+        if _completions_path().exists():
+            for line in _completions_path().read_text(encoding="utf-8").splitlines()[-500:]:
                 if not line.strip():
                     continue
                 try:
@@ -314,7 +321,7 @@ def register_completion(
         "completed_at": completed_at,
         "workspace": workspace,
     }
-    with COMPLETIONS_PATH.open("a", encoding="utf-8") as f:
+    with _completions_path().open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     _append_truth_entry(slug, title, completed_at, description)
 
@@ -381,8 +388,8 @@ def rebuild_truth_from_registry(projects_dir: pathlib.Path | None = None) -> int
     TRUTH_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     # Refresh completions.jsonl from project state (full descriptions)
-    COMPLETIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with COMPLETIONS_PATH.open("w", encoding="utf-8") as f:
+    _completions_path().parent.mkdir(parents=True, exist_ok=True)
+    with _completions_path().open("w", encoding="utf-8") as f:
         for slug in sorted(records.keys()):
             rec = records[slug]
             row = {

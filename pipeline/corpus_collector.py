@@ -46,13 +46,31 @@ logger = logging.getLogger(__name__)
 # Paths
 # ---------------------------------------------------------------------------
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
-PROJECTS_DIR  = PIPELINE_DIR / "projects"
-CORPUS_DIR    = PIPELINE_DIR / "finetune_corpus"
-RAW_DIR       = CORPUS_DIR / "raw"        # live output of pipeline
-TASK_DIR      = RAW_DIR / "task"          # task-level pairs
-PHASE_DIR     = RAW_DIR / "phase"         # phase-level pairs
-PROJECT_DIR_C = RAW_DIR / "project"       # project-level pairs
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
+
+
+def _projects_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "projects"
+
+
+def _corpus_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "finetune_corpus"
+
+
+def _raw_dir() -> pathlib.Path:
+    return _corpus_dir() / "raw"
+
+
+def _task_dir() -> pathlib.Path:
+    return _raw_dir() / "task"
+
+
+def _phase_dir() -> pathlib.Path:
+    return _raw_dir() / "phase"
+
+
+def _project_corpus_dir() -> pathlib.Path:
+    return _raw_dir() / "project"
 
 # Legacy hard limits (used only when use_continuation=False)
 _MAX_FILE_CHARS = 8_000
@@ -526,9 +544,9 @@ def collect_project(
     master_plan = _read_state(project_dir, "state/master_plan.md", 4_000)
 
     # Output JSONL file paths keyed by slug
-    task_file    = TASK_DIR    / f"{slug}.jsonl"
-    phase_file   = PHASE_DIR   / f"{slug}.jsonl"
-    project_file = PROJECT_DIR_C / f"{slug}.jsonl"
+    task_file    = _task_dir()    / f"{slug}.jsonl"
+    phase_file   = _phase_dir()   / f"{slug}.jsonl"
+    project_file = _project_corpus_dir() / f"{slug}.jsonl"
 
     written      = 0
     phase_pairs: list[dict] = []
@@ -601,14 +619,14 @@ def collect_project_on_complete(project_dir: pathlib.Path, state: dict) -> None:
     try:
         n = collect_project(project_dir, state)
         if n:
-            print(f"  [corpus] +{n} fine-tune pairs -> {RAW_DIR}")
+            print(f"  [corpus] +{n} fine-tune pairs -> {_raw_dir()}")
             from pipeline.pipeline_activity import log_activity, maybe_sync_output_repo
 
             log_activity(
                 "corpus_collected",
                 slug=project_dir.name,
                 pairs_added=n,
-                corpus_dir=str(RAW_DIR),
+                corpus_dir=str(_raw_dir()),
             )
             maybe_sync_output_repo(f"corpus: {project_dir.name} (+{n} pairs)")
     except Exception as exc:
@@ -633,11 +651,11 @@ def collect_all_existing(
         {slug: pairs_written}
     """
     results: dict[str, int] = {}
-    if not PROJECTS_DIR.exists():
-        print(f"No projects directory found at {PROJECTS_DIR}")
+    if not _projects_dir().exists():
+        print(f"No projects directory found at {_projects_dir()}")
         return results
 
-    dirs = sorted(p for p in PROJECTS_DIR.iterdir() if p.is_dir())
+    dirs = sorted(p for p in _projects_dir().iterdir() if p.is_dir())
     print(f"Scanning {len(dirs)} project directories...")
 
     total_written = 0
@@ -669,7 +687,7 @@ def collect_all_existing(
             print(f"  {marker} {project_dir.name}: +{n} pairs")
 
     print(f"\nDone. Total new pairs written: {total_written}")
-    print(f"Corpus: {RAW_DIR}")
+    print(f"Corpus: {_raw_dir()}")
     return results
 
 
@@ -679,7 +697,7 @@ def collect_all_existing(
 
 def corpus_stats() -> None:
     """Print a summary of the current corpus."""
-    if not RAW_DIR.exists():
+    if not _raw_dir().exists():
         print("No corpus yet. Run --collect-all to build it.")
         return
 
@@ -687,7 +705,7 @@ def corpus_stats() -> None:
     quality_counts: dict[str, int] = {}
     model_counts: dict[str, int]   = {}
 
-    for jsonl_file in RAW_DIR.rglob("*.jsonl"):
+    for jsonl_file in _raw_dir().rglob("*.jsonl"):
         for line in jsonl_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if not line:
@@ -702,17 +720,17 @@ def corpus_stats() -> None:
             except Exception:
                 pass
 
-    task_count    = sum(1 for _ in TASK_DIR.glob("*.jsonl"))    if TASK_DIR.exists()    else 0
-    phase_count   = sum(1 for _ in PHASE_DIR.glob("*.jsonl"))   if PHASE_DIR.exists()   else 0
-    project_count = sum(1 for _ in PROJECT_DIR_C.glob("*.jsonl")) if PROJECT_DIR_C.exists() else 0
+    task_count    = sum(1 for _ in _task_dir().glob("*.jsonl"))    if _task_dir().exists()    else 0
+    phase_count   = sum(1 for _ in _phase_dir().glob("*.jsonl"))   if _phase_dir().exists()   else 0
+    project_count = sum(1 for _ in _project_corpus_dir().glob("*.jsonl")) if _project_corpus_dir().exists() else 0
 
     print(f"\n{'='*50}")
     print(f"  Fine-Tune Corpus Stats")
     print(f"{'='*50}")
     print(f"  Total records:   {total_records}")
-    print(f"  Task files:      {task_count}   -> {TASK_DIR}")
-    print(f"  Phase files:     {phase_count}   -> {PHASE_DIR}")
-    print(f"  Project files:   {project_count}   -> {PROJECT_DIR_C}")
+    print(f"  Task files:      {task_count}   -> {_task_dir()}")
+    print(f"  Phase files:     {phase_count}   -> {_phase_dir()}")
+    print(f"  Project files:   {project_count}   -> {_project_corpus_dir()}")
     print("")
     print("  Quality breakdown:")
     for label, count in sorted(quality_counts.items()):
@@ -742,7 +760,7 @@ def merge_corpus(
         granularity:    "task", "phase", or "project"
         filter_quality: Only include records with these quality labels.
                         Default: ["clean", "patched"] (excludes "struggled")
-        output_path:    Where to write. Default: CORPUS_DIR/sft_{granularity}.jsonl
+        output_path:    Where to write. Default: _corpus_dir()/sft_{granularity}.jsonl
 
     Returns:
         Path to the merged file.
@@ -750,13 +768,13 @@ def merge_corpus(
     if filter_quality is None:
         filter_quality = ["clean", "patched"]
 
-    src_dir = {"task": TASK_DIR, "phase": PHASE_DIR, "project": PROJECT_DIR_C}.get(granularity)
+    src_dir = {"task": _task_dir(), "phase": _phase_dir(), "project": _project_corpus_dir()}.get(granularity)
     if src_dir is None:
         raise ValueError(f"Unknown granularity: {granularity}")
 
     if output_path is None:
-        CORPUS_DIR.mkdir(parents=True, exist_ok=True)
-        output_path = CORPUS_DIR / f"sft_{granularity}.jsonl"
+        _corpus_dir().mkdir(parents=True, exist_ok=True)
+        output_path = _corpus_dir() / f"sft_{granularity}.jsonl"
 
     written = 0
     seen_ids: set[str] = set()
@@ -839,7 +857,7 @@ def _cli() -> None:
         collect_all_existing(verbose=True, use_continuation=use_cont, run_enrichers=args.enrich)
 
     if args.project:
-        project_dir = PROJECTS_DIR / args.project
+        project_dir = _projects_dir() / args.project
         if not project_dir.exists():
             print(f"Project not found: {project_dir}")
             sys.exit(1)
