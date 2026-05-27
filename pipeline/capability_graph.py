@@ -15,15 +15,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.capability_registry import REGISTRY_DB
-from pipeline.paths import get_pipeline_dir, projects_dir, state_dir
+from pipeline.paths import goals_dir, projects_dir, state_dir
 from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
 
 MASTER_IDEAS = PROJECT_ROOT / "master_ideas.md"
-
-
-def _goals_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "goals"
 
 
 def _overrides_path() -> pathlib.Path:
@@ -182,9 +178,9 @@ def _edges_from_master_ideas(path: pathlib.Path = MASTER_IDEAS) -> list[tuple[st
 
 def _edges_from_goals() -> list[tuple[str, str, str]]:
     edges: list[tuple[str, str, str]] = []
-    if not _goals_dir().exists():
+    if not goals_dir().exists():
         return edges
-    for gf in _goals_dir().glob("*.json"):
+    for gf in goals_dir().glob("*.json"):
         try:
             data = json.loads(gf.read_text(encoding="utf-8"))
         except Exception:

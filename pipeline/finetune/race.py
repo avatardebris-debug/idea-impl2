@@ -67,11 +67,19 @@ def _pipeline_dir() -> pathlib.Path:
 
 
 def _projects_dir() -> pathlib.Path:
-    return _pipeline_dir() / "projects"
+    if _pipeline_override is not None:
+        return _pipeline_override / "projects"
+    from pipeline.paths import projects_dir
+
+    return projects_dir()
 
 
 def _memory_dir() -> pathlib.Path:
-    return _pipeline_dir() / "memory"
+    if _pipeline_override is not None:
+        return _pipeline_override / "memory"
+    from pipeline.paths import memory_dir
+
+    return memory_dir()
 
 log = logging.getLogger(__name__)
 

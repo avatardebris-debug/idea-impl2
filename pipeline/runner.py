@@ -95,6 +95,15 @@ from pipeline.project_ops import (
 )
 from pipeline.startup import resolve_initial_work
 
+
+def _display_path(path: pathlib.Path) -> str:
+    """Human-readable path for logs (relative to factory repo when possible)."""
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
 __all__ = [
     "AGENT_ROLES",
     "MAX_PROJECT_LIFETIME_RETRIES",
@@ -341,7 +350,7 @@ def run_pipeline(
 
         if polish:
             print(f"\n  🚀 Polish pipeline RUNNING. Press Ctrl+C to stop.")
-            print(f"     Status file: .pipeline/state/polish_status.json\n")
+            print(f"     Status file: {_display_path(_output_dir / 'state' / 'polish_status.json')}\n")
         else:
             print(f"\n  🚀 Pipeline running. Press Ctrl+C to stop.\n")
 
@@ -485,9 +494,9 @@ def run_pipeline(
 
         print("\n" + "=" * 60)
         print("  Pipeline stopped.")
-        print(f"  Logs: .pipeline/logs/")
-        print(f"  Output: .pipeline/workspace/")
-        print(f"  Decisions: .pipeline/state/manager_decisions.md")
+        print(f"  Output:   {_display_path(_output_dir)}")
+        print(f"  Logs:     {_display_path(_output_dir / 'logs')}/")
+        print(f"  Decisions: {_display_path(_output_dir / 'state' / 'manager_decisions.md')}")
         try:
             from pipeline.dropbox import ensure_dropbox
             ensure_dropbox()
@@ -581,7 +590,7 @@ def main():
         metavar="GOAL_ID",
         default=None,
         help="Try to achieve a decomposed goal using capabilities or Hermes "
-             "(see .pipeline/goals/<id>.json).",
+             "(see pipeline output goals/<id>.json).",
     )
     parser.add_argument(
         "--attempt-branch",

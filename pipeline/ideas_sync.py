@@ -18,13 +18,10 @@ import pathlib
 import re
 from datetime import datetime, timezone
 
+from pipeline.paths import projects_dir as default_projects_dir
 from pipeline.pipeline_config import PROJECT_ROOT as _PROJECT_ROOT, get_pipeline_dir
 
 TRUTH_PATH = _PROJECT_ROOT / "truth.md"
-
-
-def _projects_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "projects"
 
 
 def _completions_path() -> pathlib.Path:
@@ -92,7 +89,7 @@ def collect_completion_records(projects_dir: pathlib.Path | None = None) -> dict
     Merges live complete projects, completions.jsonl, and truth.md bullets.
     """
     records: dict[str, dict] = {}
-    root = projects_dir or _projects_dir()
+    root = projects_dir if projects_dir is not None else default_projects_dir()
 
     if root.exists():
         for proj in root.iterdir():

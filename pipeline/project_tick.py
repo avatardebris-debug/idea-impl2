@@ -18,7 +18,6 @@ from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PHASE_RETRIES,
     MAX_PROJECT_LIFETIME_RETRIES,
-    PIPELINE_DIR,
     PROJECT_ROOT,
 )
 from pipeline.slug_util import slugify_title as _slugify

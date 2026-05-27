@@ -23,6 +23,8 @@ __all__ = [
     "logs_dir",
     "finetune_corpus_dir",
     "connectors_dir",
+    "goals_dir",
+    "shared_libs_dir",
 ]
 
 
@@ -52,3 +54,11 @@ def logs_dir() -> pathlib.Path:
 
 def finetune_corpus_dir() -> pathlib.Path:
     return get_pipeline_dir() / "finetune_corpus"
+
+
+def goals_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "goals"
+
+
+def shared_libs_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "shared_libs"

@@ -33,6 +33,7 @@ PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from pipeline.message_bus import MessageBus, Message
+from pipeline.paths import logs_dir, projects_dir
 
 logger = logging.getLogger(__name__)
 
@@ -60,20 +61,6 @@ DEFAULT_PROVIDER = os.environ.get("PIPELINE_PROVIDER", "ollama")
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 PROMPTS_DIR = pathlib.Path(__file__).parent / "prompts"
-
-
-def _pipeline_dir() -> pathlib.Path:
-    from pipeline.pipeline_config import get_pipeline_dir
-
-    return get_pipeline_dir()
-
-
-def _projects_dir() -> pathlib.Path:
-    return _pipeline_dir() / "projects"
-
-
-def _logs_dir() -> pathlib.Path:
-    return _pipeline_dir() / "logs"
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +336,7 @@ class AgentProcess:
         Uses the cwd captured at agent startup so all paths are anchored
         to the correct location regardless of LLM tool resolution.
         """
-        d = _projects_dir() / self._current_slug
+        d = projects_dir() / self._current_slug
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -825,7 +812,7 @@ class AgentProcess:
 
     def _setup_logging(self) -> None:
         """Configure per-agent log file."""
-        logs = _logs_dir()
+        logs = logs_dir()
         logs.mkdir(parents=True, exist_ok=True)
         log_file = logs / f"{self.role}.log"
 

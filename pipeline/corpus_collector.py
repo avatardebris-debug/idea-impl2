@@ -46,15 +46,12 @@ logger = logging.getLogger(__name__)
 # Paths
 # ---------------------------------------------------------------------------
 
-from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
-
-
-def _projects_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "projects"
+from pipeline.paths import finetune_corpus_dir, projects_dir
+from pipeline.pipeline_config import PROJECT_ROOT
 
 
 def _corpus_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "finetune_corpus"
+    return finetune_corpus_dir()
 
 
 def _raw_dir() -> pathlib.Path:
@@ -651,11 +648,11 @@ def collect_all_existing(
         {slug: pairs_written}
     """
     results: dict[str, int] = {}
-    if not _projects_dir().exists():
-        print(f"No projects directory found at {_projects_dir()}")
+    if not projects_dir().exists():
+        print(f"No projects directory found at {projects_dir()}")
         return results
 
-    dirs = sorted(p for p in _projects_dir().iterdir() if p.is_dir())
+    dirs = sorted(p for p in projects_dir().iterdir() if p.is_dir())
     print(f"Scanning {len(dirs)} project directories...")
 
     total_written = 0
@@ -857,7 +854,7 @@ def _cli() -> None:
         collect_all_existing(verbose=True, use_continuation=use_cont, run_enrichers=args.enrich)
 
     if args.project:
-        project_dir = _projects_dir() / args.project
+        project_dir = projects_dir() / args.project
         if not project_dir.exists():
             print(f"Project not found: {project_dir}")
             sys.exit(1)

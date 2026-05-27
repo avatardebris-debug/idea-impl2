@@ -15,8 +15,12 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import sys
 
-PROJECTS_DIR = pathlib.Path(".pipeline/projects")
+PROJECT_ROOT = pathlib.Path(__file__).parent.resolve()
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from pipeline.paths import projects_dir  # noqa: E402
 
 
 def count_workspace_py(proj: pathlib.Path) -> tuple[int, int]:
@@ -140,8 +144,12 @@ def fix_state_total_phases(proj: pathlib.Path, state: dict) -> dict:
 def main():
     fixed = 0
     skipped = 0
+    root = projects_dir()
+    if not root.exists():
+        print(f"No projects directory found at {root}")
+        return
 
-    for proj in sorted(PROJECTS_DIR.iterdir()):
+    for proj in sorted(root.iterdir()):
         if not proj.is_dir():
             continue
 

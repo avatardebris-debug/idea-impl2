@@ -7,15 +7,11 @@ import pathlib
 from dataclasses import dataclass, field
 from typing import Literal
 
-from pipeline.pipeline_config import get_pipeline_dir
+from pipeline.paths import goals_dir
 
 GoalBranchType = Literal[
     "software", "compound", "hermes_task", "robot_skill", "capability_gap"
 ]
-
-
-def goals_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "goals"
 
 
 def tree_path(goal_id: str) -> pathlib.Path:

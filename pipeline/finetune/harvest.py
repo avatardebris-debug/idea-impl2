@@ -42,14 +42,7 @@ from typing import Iterator
 ROOT = pathlib.Path(__file__).parent.parent.parent.resolve()
 
 
-def _pipeline_dir() -> pathlib.Path:
-    from pipeline.pipeline_config import get_pipeline_dir
-
-    return get_pipeline_dir()
-
-
-def _projects_dir() -> pathlib.Path:
-    return _pipeline_dir() / "projects"
+from pipeline.paths import projects_dir as default_projects_dir
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -540,7 +533,7 @@ def main() -> None:
     projects_dir = (
         pathlib.Path(args.pipeline_dir) / "projects"
         if args.pipeline_dir
-        else _projects_dir()
+        else default_projects_dir()
     )
     if not projects_dir.exists():
         print(f"ERROR: projects dir not found: {projects_dir}")

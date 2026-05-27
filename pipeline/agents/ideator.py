@@ -86,7 +86,7 @@ class IdeatorAgent(AgentProcess):
             f"   - Bridges/connectors between existing projects (kind:connector requires: slugs)\n"
             f"   - Safe experiments (dynamic routing, metrics, A/B)\n"
             f"3. Be SPECIFIC — name files, functions, exact changes.\n"
-            f"4. Write your output to `.pipeline/{output_path}` using sections:\n"
+            f"4. Write your output to `{output_path}` in the current project directory using sections:\n"
             f"   Immediate / Harness / Reusable / Bridge / Experiment\n"
             f"5. Say DONE.\n"
         )
@@ -283,7 +283,9 @@ class IdeatorAgent(AgentProcess):
             logger.error("[ideator] Failed to write to master_ideas.md: %s", e)
 
         # --- Write generation log ---
-        log_dir = pathlib.Path(".pipeline/state")
+        from pipeline.paths import state_dir
+
+        log_dir = state_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = str(log_dir / f"idea_generation_log_{ts}.md")
         try:

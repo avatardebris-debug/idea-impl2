@@ -15,7 +15,13 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
+from pipeline.paths import (
+    get_pipeline_dir,
+    goals_dir,
+    projects_dir,
+    shared_libs_dir,
+)
+from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
 from pipeline.slug_util import slugify_title as _slugify
 
@@ -30,18 +36,6 @@ def capabilities_md() -> pathlib.Path:
     return get_pipeline_dir() / "state" / "CAPABILITIES.md"
 
 
-def projects_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "projects"
-
-
-def shared_libs_dir() -> pathlib.Path:
-    return get_pipeline_dir() / "shared_libs"
-
-
-def goals_dir_registry() -> pathlib.Path:
-    return get_pipeline_dir() / "goals"
-
-
 def __getattr__(name: str) -> pathlib.Path:
     """Lazy paths for importers that still use REGISTRY_DB / PROJECTS_DIR constants."""
     _map = {
@@ -49,7 +43,7 @@ def __getattr__(name: str) -> pathlib.Path:
         "CAPABILITIES_MD": capabilities_md,
         "PROJECTS_DIR": projects_dir,
         "SHARED_LIBS_DIR": shared_libs_dir,
-        "GOALS_DIR": goals_dir_registry,
+        "GOALS_DIR": goals_dir,
     }
     if name in _map:
         return _map[name]()
