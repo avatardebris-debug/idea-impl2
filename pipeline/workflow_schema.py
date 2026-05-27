@@ -12,9 +12,11 @@ from typing import Any
 
 import yaml
 
-from pipeline.pipeline_config import PIPELINE_DIR
+from pipeline.paths import workflows_dir
 
-WORKFLOWS_DIR = PIPELINE_DIR / "workflows"
+
+def _workflows_dir() -> pathlib.Path:
+    return workflows_dir()
 
 _TEMPLATE_RE = re.compile(r"\{\{\s*([^}]+?)\s*\}\}")
 
@@ -120,14 +122,14 @@ class WorkflowDefinition:
 
 
 def list_workflow_files() -> list[pathlib.Path]:
-    if not WORKFLOWS_DIR.exists():
+    if not _workflows_dir().exists():
         return []
     out: list[pathlib.Path] = []
-    for p in sorted(WORKFLOWS_DIR.rglob("*.yaml")):
+    for p in sorted(_workflows_dir().rglob("*.yaml")):
         if p.name.startswith("."):
             continue
         out.append(p)
-    for p in sorted(WORKFLOWS_DIR.rglob("*.yml")):
+    for p in sorted(_workflows_dir().rglob("*.yml")):
         if p.name.startswith("."):
             continue
         out.append(p)
@@ -143,7 +145,7 @@ def load_workflow(slug: str) -> WorkflowDefinition:
             continue
         if wf.slug == slug:
             return wf
-    raise FileNotFoundError(f"workflow '{slug}' not found under {WORKFLOWS_DIR}")
+    raise FileNotFoundError(f"workflow '{slug}' not found under {_workflows_dir()}")
 
 
 def render_template(text: str, context: dict[str, Any]) -> str:

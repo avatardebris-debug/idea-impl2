@@ -36,7 +36,7 @@ import time
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR as _PIPELINE_DIR
+from pipeline.paths import get_pipeline_dir
 
 _DEFAULT_N = 3          # exchanges to retain per (role, slug)
 _MAX_CHARS  = 8000      # max chars per exchange (prompt + response) to prevent bloat
@@ -154,7 +154,7 @@ class RollingContext:
 
     @staticmethod
     def _state_file(slug: str) -> pathlib.Path:
-        return _PIPELINE_DIR / "projects" / slug / "state" / "rolling_context.json"
+        return get_pipeline_dir() / "projects" / slug / "state" / "rolling_context.json"
 
     def _save(self, slug: str) -> None:
         """Persist current in-memory window for slug to disk (call under lock)."""

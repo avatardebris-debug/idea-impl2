@@ -14,8 +14,11 @@ import threading
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR
-_METRICS_PATH = PIPELINE_DIR / "state" / "agent_timing.jsonl"
+from pipeline.paths import state_dir
+
+
+def _metrics_path() -> pathlib.Path:
+    return state_dir() / "agent_timing.jsonl"
 _METRICS_LOCK = threading.Lock()
 
 
@@ -38,9 +41,9 @@ def record(
             "tokens": tokens,
             "files_written": files_written,
         }
-        _METRICS_PATH.parent.mkdir(parents=True, exist_ok=True)
+        _metrics_path().parent.mkdir(parents=True, exist_ok=True)
         with _METRICS_LOCK:
-            with open(_METRICS_PATH, "a", encoding="utf-8") as f:
+            with open(_metrics_path(), "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry) + "\n")
     except Exception:
         pass  # Never crash the pipeline over metrics
@@ -53,13 +56,13 @@ def summarize(window_minutes: float = 15.0) -> dict[str, dict[str, Any]]:
     Returns dict: {role: {calls, avg_wait_s, avg_handle_s, total_tokens, files_written}}
     """
     cutoff = time.time() - (window_minutes * 60)
-    if not _METRICS_PATH.exists():
+    if not _metrics_path().exists():
         return {}
 
     by_role: dict[str, list[dict]] = {}
     try:
         with _METRICS_LOCK:
-            lines = _METRICS_PATH.read_text(encoding="utf-8").splitlines()
+            lines = _metrics_path().read_text(encoding="utf-8").splitlines()
         for line in lines:
             if not line.strip():
                 continue
@@ -90,11 +93,11 @@ def summarize(window_minutes: float = 15.0) -> dict[str, dict[str, Any]]:
 def trim_old_records(keep_hours: float = 6.0) -> None:
     """Trim records older than keep_hours from the metrics file. Call periodically."""
     cutoff = time.time() - (keep_hours * 3600)
-    if not _METRICS_PATH.exists():
+    if not _metrics_path().exists():
         return
     try:
         with _METRICS_LOCK:
-            lines = _METRICS_PATH.read_text(encoding="utf-8").splitlines()
+            lines = _metrics_path().read_text(encoding="utf-8").splitlines()
             kept = []
             for line in lines:
                 if not line.strip():
@@ -105,6 +108,6 @@ def trim_old_records(keep_hours: float = 6.0) -> None:
                         kept.append(line)
                 except Exception:
                     pass
-            _METRICS_PATH.write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
+            _metrics_path().write_text("\n".join(kept) + ("\n" if kept else ""), encoding="utf-8")
     except Exception:
         pass

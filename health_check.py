@@ -33,12 +33,11 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
 
-PIPELINE = pathlib.Path(__file__).parent / ".pipeline"
-PROJECTS = PIPELINE / "projects"
 REPO_ROOT = pathlib.Path(__file__).parent
 
 # Shared with pipeline/health_checks.py and executor rescue logic
 sys.path.insert(0, str(REPO_ROOT))
+from pipeline.paths import get_pipeline_dir, projects_dir  # noqa: E402
 from pipeline.path_health import (  # noqa: E402
     find_workspace_shadows,
     prune_workspace_shadows,
@@ -265,7 +264,7 @@ def check_empty_workspace(slug: str, state: dict, workspace: pathlib.Path) -> li
 def apply_fix(finding: Finding) -> bool:
     """Apply an auto-fix for a finding. Returns True if fixed."""
     slug = finding.slug
-    state_file = PROJECTS / slug / "state" / "current_idea.json"
+    state_file = projects_dir() / slug / "state" / "current_idea.json"
 
     if finding.check == "stale_status":
         state = json.loads(state_file.read_text(encoding="utf-8"))
@@ -279,7 +278,7 @@ def apply_fix(finding: Finding) -> bool:
 
     elif finding.check == "phantom_phases":
         state = json.loads(state_file.read_text(encoding="utf-8"))
-        plan = (PROJECTS / slug / "state" / "master_plan.md").read_text(encoding="utf-8", errors="ignore")
+        plan = (projects_dir() / slug / "state" / "master_plan.md").read_text(encoding="utf-8", errors="ignore")
         plan_phases = len(re.findall(r"^##\s+Phase\s+\d+", plan, re.MULTILINE))
         if plan_phases >= 2:
             state["total_phases"] = plan_phases
@@ -287,12 +286,12 @@ def apply_fix(finding: Finding) -> bool:
             return True
 
     elif finding.check in ("shadow_leak", "shadow_pipeline", "shadow_script"):
-        workspace = PROJECTS / slug / "workspace"
+        workspace = projects_dir() / slug / "workspace"
         actions = prune_workspace_shadows(workspace)
         return bool(actions)
 
     elif finding.check == "nested_slug_dir":
-        workspace = PROJECTS / slug / "workspace"
+        workspace = projects_dir() / slug / "workspace"
         nested = workspace / slug
         if nested.is_dir():
             rescue_dir_filtered(nested, workspace)
@@ -303,7 +302,7 @@ def apply_fix(finding: Finding) -> bool:
             return True
 
     elif finding.check == "root_stray_dir":
-        workspace = PROJECTS / slug / "workspace"
+        workspace = projects_dir() / slug / "workspace"
         for name in ("src", "tests", "test"):
             stray = REPO_ROOT / name
             if stray.is_dir():
@@ -317,7 +316,7 @@ def apply_fix(finding: Finding) -> bool:
 
     elif finding.check == "broken_init_import":
         # Clear the __init__.py to just a comment
-        for init in (PROJECTS / slug / "workspace").rglob("__init__.py"):
+        for init in (projects_dir() / slug / "workspace").rglob("__init__.py"):
             if init.parent.name in ("tests", "test"):
                 text = init.read_text(encoding="utf-8", errors="ignore")
                 if "from ." in text:
@@ -335,7 +334,7 @@ def apply_fix(finding: Finding) -> bool:
             from pipeline.ideas_sync import record_completion
             title = state.get("title", slug)
             mi = pathlib.Path(__file__).parent / "master_ideas.md"
-            ws = str((PROJECTS / slug / "workspace"))
+            ws = str((projects_dir() / slug / "workspace"))
             record_completion(
                 slug, title,
                 ideas_path=mi if mi.exists() else None,
@@ -384,11 +383,11 @@ def run_health_check(fix: bool = False) -> list[Finding]:
     all_findings: list[Finding] = []
     all_states: dict[str, dict] = {}
 
-    if not PROJECTS.exists():
+    if not projects_dir().exists():
         print("No .pipeline/projects/ found.")
         return all_findings
 
-    for proj in sorted(PROJECTS.iterdir()):
+    for proj in sorted(projects_dir().iterdir()):
         if not proj.is_dir():
             continue
         slug = proj.name

@@ -12,7 +12,8 @@ import sys
 import time
 
 from pipeline.message_bus import MessageBus
-from pipeline.pipeline_config import AGENT_ROLES, AGENTS_DIR, PIPELINE_DIR, PROJECT_ROOT
+from pipeline.paths import logs_dir, state_dir
+from pipeline.pipeline_config import AGENT_ROLES, AGENTS_DIR, PROJECT_ROOT
 
 class AgentSupervisor:
     """Manages agent subprocesses."""
@@ -58,7 +59,7 @@ class AgentSupervisor:
             env["PIPELINE_CAPABILITY_TOOLS"] = "1"
 
         _key = key_override or role
-        log_path = PIPELINE_DIR / "logs" / f"{_key}.out"
+        log_path = logs_dir() / f"{_key}.out"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         log_file = open(log_path, "a", encoding="utf-8")
 
@@ -151,7 +152,7 @@ class AgentSupervisor:
                 "pid": proc.pid,
                 "status": "running" if proc.poll() is None else f"exited({proc.returncode})",
             }
-        path = PIPELINE_DIR / "state" / "agent_registry.json"
+        path = state_dir() / "agent_registry.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(registry, f, indent=2)

@@ -43,7 +43,7 @@ Usage (wired into runner.py's main loop)
 
     # Inside the monitoring loop (every health check):
     action = tuner.observe(
-        throughput_path=PIPELINE_DIR / "state" / "throughput.json",
+        throughput_path=cfg.pipeline_dir / "state" / "throughput.json",
         current_seeds=parallel_seeds,
         gpu_idle=gpu_is_idle,   # True if Ollama reports no model loaded
         gpu_util_pct=gpu_pct,   # 0-100 GPU compute utilisation

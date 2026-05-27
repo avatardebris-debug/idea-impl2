@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.pipeline_config import PIPELINE_DIR
+from pipeline.paths import state_dir
 
-METRICS_LOG = PIPELINE_DIR / "state" / "capability_metrics.jsonl"
+
+def _metrics_log() -> Path:
+    return state_dir() / "capability_metrics.jsonl"
 
 
 def log_capability_event(
@@ -26,7 +28,7 @@ def log_capability_event(
     """Events: route, suggest, invoke, register, promote."""
     if not event:
         return
-    METRICS_LOG.parent.mkdir(parents=True, exist_ok=True)
+    _metrics_log().parent.mkdir(parents=True, exist_ok=True)
     row = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "event": event,
@@ -37,16 +39,16 @@ def log_capability_event(
     if extra:
         row.update(extra)
     try:
-        with METRICS_LOG.open("a", encoding="utf-8") as f:
+        with _metrics_log().open("a", encoding="utf-8") as f:
             f.write(json.dumps(row, ensure_ascii=False) + "\n")
     except OSError:
         pass
 
 
 def read_metrics(limit: int = 5000) -> list[dict[str, Any]]:
-    if not METRICS_LOG.exists():
+    if not _metrics_log().exists():
         return []
-    lines = METRICS_LOG.read_text(encoding="utf-8", errors="ignore").splitlines()
+    lines = _metrics_log().read_text(encoding="utf-8", errors="ignore").splitlines()
     out: list[dict[str, Any]] = []
     for line in lines[-limit:]:
         if not line.strip():

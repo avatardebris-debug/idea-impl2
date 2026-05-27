@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING
 
 from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
 from pipeline.message_bus import Message, MessageBus
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.paths import projects_dir
+from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.project_state import _write_state
 from pipeline.project_tick import _tick_project
 
@@ -211,11 +212,11 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
     if bus.has_active_work():
         return 0
 
-    projects_dir = PIPELINE_DIR / "projects"
-    if not projects_dir.exists():
+    projects_root = projects_dir()
+    if not projects_root.exists():
         return 0
 
-    for project_dir in projects_dir.iterdir():
+    for project_dir in projects_root.iterdir():
         if not project_dir.is_dir():
             continue
         state_file = project_dir / "state" / "current_idea.json"
@@ -250,7 +251,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
 
         still_blocked = []
         for dep_slug in deps:
-            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            dep_file = projects_root / dep_slug / "state" / "current_idea.json"
             if not dep_file.exists():
                 still_blocked.append(dep_blocking_reason(dep_slug, None, context="rebuild"))
                 continue
@@ -278,7 +279,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         except Exception:
             return 0.0
 
-    for project_dir in sorted(projects_dir.iterdir(), key=_project_recency):
+    for project_dir in sorted(projects_root.iterdir(), key=_project_recency):
         if not project_dir.is_dir():
             continue
 
@@ -332,7 +333,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         if depends_on:
             dep_blocked = []
             for dep_slug in depends_on:
-                dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+                dep_file = projects_root / dep_slug / "state" / "current_idea.json"
                 if not dep_file.exists():
                     dep_blocked.append(dep_blocking_reason(dep_slug, None, context="rebuild"))
                     continue
@@ -375,7 +376,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         continue
 
     blocked_by_budget: dict[str, list[str]] = {}
-    for project_dir in projects_dir.iterdir():
+    for project_dir in projects_root.iterdir():
         if not project_dir.is_dir():
             continue
         state_file = project_dir / "state" / "current_idea.json"
@@ -390,7 +391,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
         title = state.get("title", project_dir.name)
         deps = state.get("depends_on", [])
         for dep_slug in deps:
-            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            dep_file = projects_root / dep_slug / "state" / "current_idea.json"
             if not dep_file.exists():
                 continue
             try:
@@ -403,7 +404,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
     if blocked_by_budget:
         now = datetime.now(timezone.utc).isoformat()
         for dep_slug, waiters in blocked_by_budget.items():
-            dep_file = projects_dir / dep_slug / "state" / "current_idea.json"
+            dep_file = projects_root / dep_slug / "state" / "current_idea.json"
             try:
                 dep_state = json.loads(dep_file.read_text(encoding="utf-8"))
                 pre_status = dep_state.get("pre_budget_status", "phase_1_executing")

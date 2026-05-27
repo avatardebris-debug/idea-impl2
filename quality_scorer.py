@@ -34,8 +34,9 @@ import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
-PIPELINE = pathlib.Path(__file__).parent / ".pipeline"
-PROJECTS = PIPELINE / "projects"
+REPO_ROOT = pathlib.Path(__file__).parent
+sys.path.insert(0, str(REPO_ROOT))
+from pipeline.paths import projects_dir  # noqa: E402
 
 
 @dataclass
@@ -348,7 +349,7 @@ def score_project_structure(slug: str, workspace: pathlib.Path) -> tuple[float, 
 
 def score_project(slug: str, run_tests: bool = True) -> Optional[ProjectScore]:
     """Score a single project across all dimensions."""
-    proj_dir = PROJECTS / slug
+    proj_dir = projects_dir() / slug
     state_file = proj_dir / "state" / "current_idea.json"
     workspace = proj_dir / "workspace"
     phases_dir = proj_dir / "phases"
@@ -407,7 +408,7 @@ def score_all_projects(run_tests: bool = True,
                         only_complete: bool = False) -> list[ProjectScore]:
     """Score all projects."""
     scores = []
-    for proj in sorted(PROJECTS.iterdir()):
+    for proj in sorted(projects_dir().iterdir()):
         if not proj.is_dir():
             continue
         state_file = proj / "state" / "current_idea.json"

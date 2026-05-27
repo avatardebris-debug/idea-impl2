@@ -11,11 +11,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.capability_registry import PIPELINE_DIR, PROJECT_ROOT
 from pipeline.message_bus import Message, MessageBus
+from pipeline.pipeline_config import PROJECT_ROOT
+from pipeline.paths import get_pipeline_dir, state_dir
 
 DROPBOX_PATH = PROJECT_ROOT / "dropbox.md"
-DROPBOX_STATE = PIPELINE_DIR / "state" / "dropbox_state.json"
+
+
+def _dropbox_state_path():
+    return state_dir() / "dropbox_state.json"
 USER_MSG_RE = re.compile(
     r"^###\s+USER\s+(?P<id>msg-[\w-]+)\s*$",
     re.MULTILINE | re.IGNORECASE,
@@ -57,23 +61,23 @@ If the manager needs clarification, it will ask in a MANAGER block — reply wit
 """,
             encoding="utf-8",
         )
-    DROPBOX_STATE.parent.mkdir(parents=True, exist_ok=True)
+    _dropbox_state_path().parent.mkdir(parents=True, exist_ok=True)
     return DROPBOX_PATH
 
 
 def _load_state() -> dict[str, Any]:
     ensure_dropbox()
-    if not DROPBOX_STATE.exists():
+    if not _dropbox_state_path().exists():
         return {"processed_user_ids": [], "queued_user_ids": [], "last_check": ""}
     try:
-        return json.loads(DROPBOX_STATE.read_text(encoding="utf-8"))
+        return json.loads(_dropbox_state_path().read_text(encoding="utf-8"))
     except Exception:
         return {"processed_user_ids": [], "queued_user_ids": [], "last_check": ""}
 
 
 def _save_state(state: dict[str, Any]) -> None:
-    DROPBOX_STATE.parent.mkdir(parents=True, exist_ok=True)
-    DROPBOX_STATE.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    _dropbox_state_path().parent.mkdir(parents=True, exist_ok=True)
+    _dropbox_state_path().write_text(json.dumps(state, indent=2), encoding="utf-8")
 
 
 def parse_user_messages(text: str) -> list[dict[str, str]]:
@@ -160,7 +164,7 @@ def check_dropbox(bus: MessageBus, ideas_path: Path | None = None) -> int:
 
     from pipeline.pipeline_status import _get_active_idea_state as get_active_idea_state
 
-    active = get_active_idea_state(PIPELINE_DIR)
+    active = get_active_idea_state(get_pipeline_dir())
     active_slug = active.get("_slug", "")
 
     queued = 0
@@ -188,7 +192,7 @@ def check_dropbox(bus: MessageBus, ideas_path: Path | None = None) -> int:
 
 def apply_project_steer(slug: str, notes: str, *, source_msg_id: str = "") -> Path:
     """Append user steering notes to a project's state directory."""
-    proj = PIPELINE_DIR / "projects" / slug
+    proj = get_pipeline_dir() / "projects" / slug
     proj.mkdir(parents=True, exist_ok=True)
     path = proj / "state" / "user_steer.md"
     header = f"\n\n## {_now()} (dropbox {source_msg_id})\n"

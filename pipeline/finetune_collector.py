@@ -46,10 +46,19 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR as _PIPELINE_DIR_CFG
-_DATASET_DIR  = _PIPELINE_DIR_CFG / "finetune"
-_DATASET_FILE = _DATASET_DIR / "dataset.jsonl"
-_STATS_FILE   = _DATASET_DIR / "stats.json"
+from pipeline.pipeline_config import get_pipeline_dir
+
+
+def _dataset_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "finetune"
+
+
+def _dataset_file() -> pathlib.Path:
+    return _dataset_dir() / "dataset.jsonl"
+
+
+def _stats_file() -> pathlib.Path:
+    return _dataset_dir() / "stats.json"
 
 # Max chars per code block to keep dataset manageable
 _MAX_CODE_CHARS   = 16_000
@@ -133,8 +142,8 @@ def collect_phase_pair(
             },
         }
 
-        _DATASET_DIR.mkdir(parents=True, exist_ok=True)
-        with open(_DATASET_FILE, "a", encoding="utf-8") as f:
+        _dataset_dir().mkdir(parents=True, exist_ok=True)
+        with open(_dataset_file(), "a", encoding="utf-8") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
         _update_stats(fix_cycles)
@@ -147,8 +156,8 @@ def collect_phase_pair(
 def get_dataset_stats() -> dict:
     """Return current dataset statistics."""
     try:
-        if _STATS_FILE.exists():
-            return json.loads(_STATS_FILE.read_text(encoding="utf-8"))
+        if _stats_file().exists():
+            return json.loads(_stats_file().read_text(encoding="utf-8"))
     except Exception:
         pass
     return {"total": 0, "high_quality": 0, "medium_quality": 0, "low_quality": 0}
@@ -286,6 +295,6 @@ def _update_stats(fix_cycles: int) -> None:
         quality = "high" if fix_cycles == 0 else ("medium" if fix_cycles <= 2 else "low")
         stats[f"{quality}_quality"] = stats.get(f"{quality}_quality", 0) + 1
         stats["last_updated"] = datetime.now(timezone.utc).isoformat()
-        _STATS_FILE.write_text(json.dumps(stats, indent=2), encoding="utf-8")
+        _stats_file().write_text(json.dumps(stats, indent=2), encoding="utf-8")
     except Exception:
         pass

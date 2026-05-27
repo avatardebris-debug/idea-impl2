@@ -19,8 +19,12 @@ import pathlib
 import re
 import sys
 
-PIPELINE_DIR = pathlib.Path(".pipeline")
-PROJECTS_DIR = PIPELINE_DIR / "projects"
+import sys
+
+PROJECT_ROOT = pathlib.Path(__file__).parent.resolve()
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from pipeline.paths import projects_dir  # noqa: E402
 
 
 def extract_phase_tasks(content: str, phase_num: int) -> tuple[str, int, int]:
@@ -114,11 +118,12 @@ def check_project(project_dir: pathlib.Path, do_fix: bool = False) -> dict:
 def main():
     do_fix = "--fix" in sys.argv
 
-    if not PROJECTS_DIR.exists():
-        print("No .pipeline/projects directory found.")
+    root = projects_dir()
+    if not root.exists():
+        print("No pipeline projects directory found.")
         return
 
-    projects = sorted(PROJECTS_DIR.iterdir())
+    projects = sorted(root.iterdir())
     print(f"\n{'=' * 70}")
     print(f"  Project Task Audit — {len(projects)} projects")
     print(f"  Mode: {'FIX' if do_fix else 'DRY RUN (use --fix to apply)'}")

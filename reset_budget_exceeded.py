@@ -19,8 +19,7 @@ import sys
 from datetime import datetime, timezone
 
 PROJECT_ROOT  = pathlib.Path(__file__).parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR
-PROJECTS_DIR  = PIPELINE_DIR / "projects"
+from pipeline.paths import projects_dir as _projects_dir
 POLISH_QUEUE  = PROJECT_ROOT / "polish_queue.md"
 
 
@@ -43,9 +42,9 @@ def _status_rank(status: str) -> int:
 def scan_projects() -> list[dict]:
     """Return info dicts for all projects."""
     results = []
-    if not PROJECTS_DIR.exists():
+    if not _projects_dir().exists():
         return results
-    for proj_dir in sorted(PROJECTS_DIR.iterdir()):
+    for proj_dir in sorted(_projects_dir().iterdir()):
         if not proj_dir.is_dir():
             continue
         sf = proj_dir / "state" / "current_idea.json"

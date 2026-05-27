@@ -181,7 +181,9 @@ def build_system_prompt(affirmation: AffirmationSystem | None = None,
 # ---------------------------------------------------------------------------
 
 # Path to shared throughput telemetry file (same one OllamaAdapter writes to)
-_TP_PATH = pathlib.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
+def _tp_path() -> pathlib.Path:
+    from pipeline.paths import state_dir
+    return state_dir() / "throughput.json"
 
 
 def _record_tool_time(elapsed_s: float) -> None:
@@ -189,12 +191,12 @@ def _record_tool_time(elapsed_s: float) -> None:
     try:
         import json as _js
         try:
-            data = _js.loads(_TP_PATH.read_text(encoding="utf-8"))
+            data = _js.loads(_tp_path().read_text(encoding="utf-8"))
         except Exception:
             data = {}
         data["cumulative_tool_s"] = round(data.get("cumulative_tool_s", 0.0) + elapsed_s, 3)
         data["tool_call_count"] = data.get("tool_call_count", 0) + 1
-        _TP_PATH.write_text(_js.dumps(data, indent=2), encoding="utf-8")
+        _tp_path().write_text(_js.dumps(data, indent=2), encoding="utf-8")
     except Exception:
         pass  # telemetry — never break a tool call
 
@@ -258,7 +260,8 @@ def check_preemption(slug: str) -> None:
         return
     import json
     import pathlib
-    idea_path = pathlib.Path(".pipeline") / "projects" / slug / "state" / "current_idea.json"
+    from pipeline.paths import projects_dir
+    idea_path = projects_dir() / slug / "state" / "current_idea.json"
     if idea_path.exists():
         try:
             # Robust CP1252/UTF-8 fallback reading to avoid silencing/crashes

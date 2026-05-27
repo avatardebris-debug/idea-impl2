@@ -21,9 +21,13 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.capability_registry import REGISTRY_DB
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.paths import state_dir
+from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
-EXPORT_JSON = PIPELINE_DIR / "state" / "capability_registry_export.json"
+
+
+def _export_json() -> Path:
+    return state_dir() / "capability_registry_export.json"
 EXPORT_JSON_ALT = PROJECT_ROOT / "capability_registry_export.json"  # repo root handoff
 
 
@@ -48,7 +52,7 @@ def export_snapshot(
     if legacy_mode():
         raise RuntimeError("Cannot export registry in legacy mode")
 
-    out = path or EXPORT_JSON
+    out = path or _export_json()
     out.parent.mkdir(parents=True, exist_ok=True)
 
     if not REGISTRY_DB.exists():
@@ -93,7 +97,7 @@ def export_snapshot(
     }
 
     if include_metrics:
-        metrics_path = PIPELINE_DIR / "state" / "capability_metrics.jsonl"
+        metrics_path = state_dir() / "capability_metrics.jsonl"
         if metrics_path.exists():
             lines = metrics_path.read_text(encoding="utf-8", errors="ignore").splitlines()[-2000:]
             payload["metrics_tail"] = [json.loads(l) for l in lines if l.strip()]
@@ -222,7 +226,7 @@ def merge_snapshot(
     metrics_merged = 0
     for ev in data.get("metrics_tail") or []:
         try:
-            mpath = PIPELINE_DIR / "state" / "capability_metrics.jsonl"
+            mpath = state_dir() / "capability_metrics.jsonl"
             mpath.parent.mkdir(parents=True, exist_ok=True)
             with mpath.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(ev, ensure_ascii=False) + "\n")
@@ -273,7 +277,7 @@ def find_export_file(start: Path | None = None) -> Path | None:
     """Locate export JSON in standard locations."""
     for p in (
         start,
-        EXPORT_JSON,
+        _export_json(),
         EXPORT_JSON_ALT,
         PROJECT_ROOT / "capability_registry_export.json",
     ):

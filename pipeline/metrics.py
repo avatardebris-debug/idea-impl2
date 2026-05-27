@@ -24,10 +24,15 @@ from dataclasses import dataclass, field
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 PROMPTS_DIR = PROJECT_ROOT / "pipeline" / "prompts"
-from pipeline.pipeline_config import PIPELINE_DIR
+from pipeline.pipeline_config import get_pipeline_dir
 
-VERSIONS_DIR = PIPELINE_DIR / "prompt_versions"
-METRICS_DIR = PIPELINE_DIR / "metrics"
+
+def _versions_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "prompt_versions"
+
+
+def _metrics_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "metrics"
 
 
 # ---------------------------------------------------------------------------
@@ -36,8 +41,8 @@ METRICS_DIR = PIPELINE_DIR / "metrics"
 
 def _next_version() -> str:
     """Return next version string like 'v001', 'v002', etc."""
-    VERSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    existing = sorted(p.name for p in VERSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("v"))
+    _versions_dir().mkdir(parents=True, exist_ok=True)
+    existing = sorted(p.name for p in _versions_dir().iterdir() if p.is_dir() and p.name.startswith("v"))
     if not existing:
         return "v001"
     last_num = int(existing[-1][1:])
@@ -50,7 +55,7 @@ def snapshot_prompts(changelog: str = "") -> str:
     Returns the version string (e.g. 'v002').
     """
     version = _next_version()
-    dest = VERSIONS_DIR / version
+    dest = _versions_dir() / version
     dest.mkdir(parents=True, exist_ok=True)
 
     # Copy all prompt files
@@ -64,7 +69,7 @@ def snapshot_prompts(changelog: str = "") -> str:
 
     # Generate diff from v001 baseline (if not the first version)
     if version != "v001":
-        baseline_dir = VERSIONS_DIR / "v001"
+        baseline_dir = _versions_dir() / "v001"
         if baseline_dir.exists():
             _generate_diff(baseline_dir, dest, dest / "diff_from_baseline.patch")
 
@@ -113,8 +118,8 @@ def _generate_diff(baseline_dir: pathlib.Path, current_dir: pathlib.Path,
 
 def get_current_version() -> str | None:
     """Return the latest version string, or None if no snapshots exist."""
-    VERSIONS_DIR.mkdir(parents=True, exist_ok=True)
-    existing = sorted(p.name for p in VERSIONS_DIR.iterdir() if p.is_dir() and p.name.startswith("v"))
+    _versions_dir().mkdir(parents=True, exist_ok=True)
+    existing = sorted(p.name for p in _versions_dir().iterdir() if p.is_dir() and p.name.startswith("v"))
     return existing[-1] if existing else None
 
 
@@ -209,7 +214,7 @@ class RunMetrics:
         """Finalize metrics and write summary to disk. Returns path to summary."""
         self.finished_at = datetime.now(timezone.utc).isoformat()
 
-        run_dir = METRICS_DIR / self.run_id
+        run_dir = _metrics_dir() / self.run_id
         run_dir.mkdir(parents=True, exist_ok=True)
 
         # Aggregate stats
@@ -312,7 +317,7 @@ class RunMetrics:
         report_path.write_text("\n".join(report_lines), encoding="utf-8")
 
         # Copy the diff from baseline if we have one
-        version_dir = VERSIONS_DIR / self.prompt_version
+        version_dir = _versions_dir() / self.prompt_version
         diff_path = version_dir / "diff_from_baseline.patch"
         if diff_path.exists():
             shutil.copy2(diff_path, run_dir / "diff_from_baseline.patch")

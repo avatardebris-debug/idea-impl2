@@ -26,8 +26,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR  # noqa: E402
-PROJECTS_DIR = PIPELINE_DIR / "projects"
+from pipeline.paths import get_pipeline_dir, projects_dir  # noqa: E402
 
 VERDICT_PASS = re.compile(r"Verdict:\s*PASS", re.IGNORECASE)
 
@@ -40,7 +39,7 @@ def _read(path: pathlib.Path, limit: int = 0) -> str:
 
 
 def resolve_project(slug: str) -> pathlib.Path:
-    proj = PROJECTS_DIR / slug
+    proj = projects_dir() / slug
     if not proj.is_dir():
         raise SystemExit(f"Project not found: {proj}")
     return proj

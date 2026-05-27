@@ -14,9 +14,8 @@ from typing import Any
 
 import yaml
 
-from pipeline.capability_registry import PIPELINE_DIR, PROJECT_ROOT  # noqa: F401
-
-CONNECTORS_DIR = PIPELINE_DIR / "workflows" / "connectors"
+from pipeline.pipeline_config import PROJECT_ROOT  # noqa: F401
+from pipeline.paths import connectors_dir, get_pipeline_dir
 from pipeline.slug_util import slugify_title
 IDEA_LINE_RE = re.compile(
     r"^\s*-\s*\[[ xX]\]\s*\*\*(.+?)\*\*\s*(?:kind:\s*connector\s*)?"
@@ -32,7 +31,7 @@ GROUP_HEADER_RE = re.compile(
 def _known_project_slugs() -> dict[str, str]:
     """slug -> display title from .pipeline/projects."""
     out: dict[str, str] = {}
-    projects = PIPELINE_DIR / "projects"
+    projects = get_pipeline_dir() / "projects"
     if not projects.exists():
         return out
     for d in projects.iterdir():
@@ -236,7 +235,7 @@ def synthesize_connectors_from_ideas(
 ) -> dict[str, Any]:
     """Write connector YAML for bridge/combination ideas; return summary."""
     known = _known_project_slugs()
-    CONNECTORS_DIR.mkdir(parents=True, exist_ok=True)
+    connectors_dir().mkdir(parents=True, exist_ok=True)
 
     written: list[str] = []
     skipped: list[str] = []
@@ -260,7 +259,7 @@ def synthesize_connectors_from_ideas(
         requires = list(dict.fromkeys(requires))
 
         slug = _connector_slug(title, requires)
-        path = CONNECTORS_DIR / f"{slug}.yaml"
+        path = connectors_dir() / f"{slug}.yaml"
         if path.exists():
             skipped.append(slug)
             enriched_lines[line] = enrich_master_idea_line(line, requires, slug)
@@ -316,7 +315,7 @@ def process_ideator_generation(raw_text: str, idea_lines: list[str]) -> tuple[li
 
 
 def write_synthesis_log(summary: dict[str, Any], ts: str) -> pathlib.Path:
-    log_dir = PIPELINE_DIR / "state"
+    log_dir = get_pipeline_dir() / "state"
     log_dir.mkdir(parents=True, exist_ok=True)
     path = log_dir / f"connector_synthesis_{ts}.md"
     lines = [

@@ -506,7 +506,8 @@ class OllamaAdapter(LLMBase):
             # overall pipeline tok/s (tokens / total wall-clock time).
             try:
                 import pathlib as _pl, json as _js, time as _t
-                _tp_path = _pl.Path(__file__).parent / ".pipeline" / "state" / "throughput.json"
+                from pipeline.paths import state_dir
+                _tp_path = state_dir() / "throughput.json"
                 _tp_path.parent.mkdir(parents=True, exist_ok=True)
                 _now = _t.time()
                 # Read-modify-write (best-effort; telemetry only)

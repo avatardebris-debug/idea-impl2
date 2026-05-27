@@ -42,7 +42,7 @@ from collections import OrderedDict
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR as _PIPELINE_DIR
+from pipeline.paths import get_pipeline_dir
 
 _OLLAMA_BASE = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
 _DEFAULT_TIMEOUT = 600   # seconds — long enough for a 16k context generation
@@ -135,7 +135,7 @@ class OllamaKVCache:
 
     def _workspace_mtime(self, slug: str) -> float:
         """Return latest mtime across the project workspace (or 0 if not found)."""
-        ws = _PIPELINE_DIR / "projects" / slug / "workspace"
+        ws = get_pipeline_dir() / "projects" / slug / "workspace"
         if not ws.exists():
             return 0.0
         try:

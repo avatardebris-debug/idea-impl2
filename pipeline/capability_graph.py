@@ -15,11 +15,19 @@ from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.capability_registry import REGISTRY_DB
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.paths import get_pipeline_dir, projects_dir, state_dir
+from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
-GOALS_DIR = PIPELINE_DIR / "goals"
+
 MASTER_IDEAS = PROJECT_ROOT / "master_ideas.md"
-OVERRIDES_PATH = PIPELINE_DIR / "state" / "capability_overrides.yaml"
+
+
+def _goals_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "goals"
+
+
+def _overrides_path() -> pathlib.Path:
+    return state_dir() / "capability_overrides.yaml"
 
 REQUIRES_RE = re.compile(
     r"\brequires:\s*([\w,\s_-]+?)(?:[\]\s.]|$)",
@@ -75,7 +83,7 @@ def _connect() -> sqlite3.Connection:
 
 
 def _project_verified(slug: str) -> bool:
-    state_file = PIPELINE_DIR / "projects" / slug / "state" / "current_idea.json"
+    state_file = projects_dir() / slug / "state" / "current_idea.json"
     if not state_file.exists():
         return False
     try:
@@ -102,14 +110,14 @@ def _registry_verified(slug: str) -> bool:
 
 
 def load_overrides() -> dict[str, Any]:
-    if not OVERRIDES_PATH.exists():
+    if not _overrides_path().exists():
         return {}
     try:
         import yaml  # type: ignore
     except ImportError:
         return {}
     try:
-        data = yaml.safe_load(OVERRIDES_PATH.read_text(encoding="utf-8")) or {}
+        data = yaml.safe_load(_overrides_path().read_text(encoding="utf-8")) or {}
         return data if isinstance(data, dict) else {}
     except Exception:
         return {}
@@ -174,9 +182,9 @@ def _edges_from_master_ideas(path: pathlib.Path = MASTER_IDEAS) -> list[tuple[st
 
 def _edges_from_goals() -> list[tuple[str, str, str]]:
     edges: list[tuple[str, str, str]] = []
-    if not GOALS_DIR.exists():
+    if not _goals_dir().exists():
         return edges
-    for gf in GOALS_DIR.glob("*.json"):
+    for gf in _goals_dir().glob("*.json"):
         try:
             data = json.loads(gf.read_text(encoding="utf-8"))
         except Exception:
@@ -200,7 +208,7 @@ def _edges_from_goals() -> list[tuple[str, str, str]]:
 
 def _edges_from_project_state() -> list[tuple[str, str, str]]:
     edges: list[tuple[str, str, str]] = []
-    projects = PIPELINE_DIR / "projects"
+    projects = projects_dir()
     if not projects.exists():
         return edges
     for proj in projects.iterdir():
@@ -317,7 +325,7 @@ def stale_requires_in_markdown(
         rows = conn.execute("SELECT slug FROM capabilities").fetchall()
         conn.close()
         known = {r["slug"] for r in rows}
-    projects = PIPELINE_DIR / "projects"
+    projects = projects_dir()
     if projects.exists():
         known |= {d.name for d in projects.iterdir() if d.is_dir()}
 

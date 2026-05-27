@@ -13,18 +13,17 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT  # noqa: E402
-
-PROJECTS_DIR = PIPELINE_DIR / "projects"
+from pipeline.paths import projects_dir  # noqa: E402
+from pipeline.pipeline_config import PROJECT_ROOT  # noqa: E402
 DEFAULT_RESULTS = REPO_ROOT / "sweep_results.json"
 
 
 def discover_project_slugs() -> list[str]:
     """All slugs under .pipeline/projects/ that have a workspace/ dir."""
-    if not PROJECTS_DIR.is_dir():
+    if not projects_dir().is_dir():
         return []
     out: list[str] = []
-    for d in sorted(PROJECTS_DIR.iterdir()):
+    for d in sorted(projects_dir().iterdir()):
         if d.is_dir() and (d / "workspace").is_dir():
             out.append(d.name)
     return out
@@ -44,12 +43,12 @@ def sweep_all(
     results_path: write JSON summary here
     project_slugs: optional subset; default = all with workspace/
     """
-    _ = pipeline_dir  # reserved; PROJECTS_DIR is canonical
+    _ = pipeline_dir  # reserved; projects_dir() is canonical
     slugs = project_slugs or discover_project_slugs()
     results: dict[str, dict] = {}
 
     for proj in slugs:
-        ws = PROJECTS_DIR / proj / "workspace"
+        ws = projects_dir() / proj / "workspace"
         if not ws.is_dir():
             results[proj] = {"status": "NOT_FOUND", "detail": "workspace dir missing"}
             continue
@@ -112,7 +111,7 @@ def print_summary_table(results: dict[str, dict]) -> None:
             print(f"{proj:<45} {'SKIP':<12} no tests/ directory")
         else:
             print(f"{proj:<45} {status:<12} {data.get('detail', '')}")
-    print(f"\nProjects dir: {PROJECTS_DIR}")
+    print(f"\nProjects dir: {projects_dir()}")
     print(f"Repo root:    {PROJECT_ROOT}")
 
 

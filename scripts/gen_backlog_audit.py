@@ -8,7 +8,10 @@ import re
 from datetime import datetime, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-PROJECTS = ROOT / ".pipeline" / "projects"
+import sys
+
+sys.path.insert(0, str(ROOT))
+from pipeline.paths import projects_dir  # noqa: E402
 
 
 def slugify(title: str) -> str:
@@ -30,7 +33,7 @@ def parse_unchecked(path: pathlib.Path) -> list[tuple[str, str]]:
 def main() -> None:
     complete: set[str] = set()
     partial: dict[str, str] = {}
-    for d in PROJECTS.iterdir():
+    for d in projects_dir().iterdir():
         if not d.is_dir():
             continue
         sf = d / "state" / "current_idea.json"
