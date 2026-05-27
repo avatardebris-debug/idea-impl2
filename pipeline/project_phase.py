@@ -248,6 +248,14 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     _write_state_dict(project_dir, state)
     print(f"  ✅ '{title}' completed all phases!")
 
+    if state.get("phase_template") == "phase_tetra":
+        try:
+            from pipeline.phase_tetra import maybe_run_phase_tetra_hook
+
+            maybe_run_phase_tetra_hook(project_dir, state)
+        except Exception as exc:
+            print(f"  [phase_tetra] validation skipped: {exc}")
+
     from pipeline.pipeline_status import get_runner_ideas_path
 
     mi_path = ideas_path or get_runner_ideas_path() or (PROJECT_ROOT / "master_ideas.md")
@@ -267,6 +275,19 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
         _log.getLogger(__name__).debug("truth/completion record skipped: %s", _is_err)
 
     # --- Fine-tune corpus: emit training pairs for this completed project ---
+    try:
+        from pipeline.pipeline_activity import log_activity
+
+        log_activity(
+            "project_complete",
+            slug=slug,
+            title=title,
+            status=state.get("status", "complete"),
+            phases=state.get("total_phases", 0),
+        )
+    except Exception:
+        pass
+
     try:
         from pipeline.corpus_collector import collect_project_on_complete
         collect_project_on_complete(project_dir, state)

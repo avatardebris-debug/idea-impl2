@@ -1,7 +1,0 @@
-include README.md
-include LICENSE
-include pyproject.toml
-include requirements.txt
-recursive-include audiobook_script_pipeline *.py
-recursive-include audiobook_script_pipeline *.txt
-recursive-include tests *.py

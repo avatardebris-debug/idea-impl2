@@ -30,24 +30,14 @@ HyperAgents-main/
 self_improving_coding_agent/
 SICA/
 
-# --- Runtime state (not committed — use resume to transfer) ---
-# .pipeline/projects/ is intentionally tracked so cloud instances can git pull
-.pipeline/queues/
-.pipeline/logs/
-.pipeline/state/pipeline_status.json
-.pipeline/state/agent_registry.json
-.pipeline/state/throughput.json
-.pipeline/pipeline_extract*/
+# --- Pipeline output (separate repo: ../thepipeline → avatardebris-debug/pipeline) ---
+# Factory resolves output via PIPELINE_DIR env or ../thepipeline when present.
+.pipeline/
+
+# --- Runtime / local-only (factory repo) ---
 .agent/
 experiments.tsv
 state_*.tar.gz
-
-# --- Generated pipeline runtime data (high-churn, not source) ---
-.pipeline/projects/freelancetask_manager_system/workspace/opportunity_pipelines/
-.pipeline/projects/*/workspace/**/*.log
-.pipeline/projects/*/workspace/**/*.db
-.pipeline/projects/*/workspace/submission_log.csv
-.pipeline/projects/*/workspace/data/**/*.json
 
 # --- Test artifacts ---
 .pytest_cache/

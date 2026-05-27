@@ -1,5 +1,0 @@
-invoice_id,vendor,date,total,currency,source_file,invoice_number,line_item_description,line_item_quantity,line_item_unit_price,line_item_amount
-inv001,Acme Corp,2024-01-15,1500.00,USD,sample_invoices/acme_invoice.csv,INV-2024-001,Web hosting service,12,50.00,600.00
-inv001,Acme Corp,2024-01-15,1500.00,USD,sample_invoices/acme_invoice.csv,INV-2024-001,Domain registration,1,100.00,100.00
-inv001,Acme Corp,2024-01-15,1500.00,USD,sample_invoices/acme_invoice.csv,INV-2024-001,SSL certificate,1,50.00,50.00
-inv001,Acme Corp,2024-01-15,1500.00,USD,sample_invoices/acme_invoice.csv,INV-2024-001,Support plan,12,75.00,900.00

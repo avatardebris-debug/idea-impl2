@@ -1,5 +1,0 @@
-pyyaml
-typer
-pydantic
-fastapi
-uvicorn[standard]

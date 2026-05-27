@@ -1,7 +1,0 @@
-{
-  "queue_id": "22446351bb85",
-  "sop_name": "test_sop",
-  "max_retries": 3,
-  "created_at": "2026-04-20T05:25:18.186738+00:00",
-  "total_tasks": 1
-}

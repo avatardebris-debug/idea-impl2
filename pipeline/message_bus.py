@@ -33,12 +33,10 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Any
 
-# Always resolve .pipeline/ relative to the project root (this file's grandparent dir),
-# NOT relative to wherever the runner is invoked from.
-_PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR  = _PROJECT_ROOT / ".pipeline"
-QUEUES_DIR    = PIPELINE_DIR / "queues"        # kept for backward compat (legacy JSONL)
-_DB_PATH      = PIPELINE_DIR / "state" / "message_bus.db"
+from pipeline.pipeline_config import PIPELINE_DIR
+
+QUEUES_DIR = PIPELINE_DIR / "queues"  # kept for backward compat (legacy JSONL)
+_DB_PATH = PIPELINE_DIR / "state" / "message_bus.db"
 
 # ---------------------------------------------------------------------------
 # Message data model  (unchanged from original)

@@ -1,0 +1,33 @@
+# Product mission and values for ideator / goal decomposition / seed policy.
+# Hard values block or reject; soft values are preferences in prompts and scoring.
+
+mission: >
+  Build reusable software that compounds capability across projects: prefer invoking
+  verified capabilities before greenfield builds, keep modules maintainable, and
+  capture training data from every completed run.
+
+values:
+  hard:
+    - id: complete_only_deps
+      rule: Only mark dependencies satisfied when prerequisite projects are complete.
+    - id: invoke_before_rebuild
+      rule: When a verified capability matches a goal, attempt invoke_capability before seeding a new project.
+    - id: no_unsandboxed_shell
+      rule: Capability invoke must use whitelisted command prefixes only.
+  soft:
+    - id: file_size_1k
+      rule: Prefer source files under 1000 lines; split when larger.
+    - id: tests_per_project
+      rule: Every software project should include automated tests.
+    - id: reuse_shared_libs
+      rule: Promote reusable code to shared_libs/ instead of duplicating.
+    - id: thermo_nuclear_quality
+      rule: After build, allow external deep quality review before treating output as production-grade.
+
+ideator:
+  construct_pass: >
+    Generate goals aligned with mission; prefer pipeline harness, learning/RSI, connectors,
+    and capability gaps. Do not duplicate existing projects or master_ideas lines.
+  deconstruct_pass: >
+    Refine construct-pass ideas: add requires/suggested_reuse, kind:connector or kind:experiment,
+    flag compound items as --goal candidates, and drop ideas that violate hard values.

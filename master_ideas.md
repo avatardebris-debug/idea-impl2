@@ -12,6 +12,8 @@ Ideas are processed top-to-bottom. The pipeline picks the first unchecked `[ ]` 
 
 ## Robotics & Physical Agency
 
+- [ ] **[tetra meta learn harness]** — [tetra] Validate Throng6 tetra_meta_learn toolcall from pipeline; phase 3 checks grounding_score and promotes capability in registry. requires: throng6
+
 - [ ] **[Bootstrap Robot Training]** — Design the full robot primitive vocabulary and skill acquisition pipeline, from atomic motion primitives through sim-to-real gap measurement. --goal
 
 

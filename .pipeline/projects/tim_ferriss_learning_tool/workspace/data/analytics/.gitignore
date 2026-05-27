@@ -1,3 +1,0 @@
-# Runtime analytics reports — generated every few minutes while tool runs
-# These are logs, not source code
-report_*.json

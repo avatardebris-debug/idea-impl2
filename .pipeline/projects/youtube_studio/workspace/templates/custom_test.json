@@ -1,5 +1,0 @@
-{
-  "title": "{{title|upper}}",
-  "description": "Learn {{topic}} from {{author}}",
-  "tags": "{{tags|join(\", \")}}"
-}

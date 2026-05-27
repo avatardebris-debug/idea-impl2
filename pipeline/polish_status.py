@@ -10,8 +10,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR
+
 POLISH_STATUS_PATH = PIPELINE_DIR / "state" / "polish_status.json"
 
 

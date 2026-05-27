@@ -15,16 +15,18 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
 from pipeline.slug_util import slugify_title as _slugify
-
-PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
 REGISTRY_DB = PIPELINE_DIR / "state" / "capability_registry.sqlite"
 CAPABILITIES_MD = PIPELINE_DIR / "state" / "CAPABILITIES.md"
 PROJECTS_DIR = PIPELINE_DIR / "projects"
 SHARED_LIBS_DIR = PIPELINE_DIR / "shared_libs"
 GOALS_DIR = PIPELINE_DIR / "goals"
+AICOMPETE_ROOT = PROJECT_ROOT.parent
+
+# Phase 6: minimum grounding_score to promote tetra-linked capabilities to verified
+TETRA_GROUNDING_THRESHOLD = float(os.environ.get("TETRA_GROUNDING_THRESHOLD", "0.35"))
 
 # Phase 5 edges table (see capability_graph.EDGES_SCHEMA)
 from pipeline.capability_graph import EDGES_SCHEMA  # noqa: E402
@@ -247,6 +249,90 @@ def promote_draft_shared_libs_for_project(source_project: str) -> int:
         except Exception:
             pass
     return n
+
+
+def register_tetra_meta_learn_capability(
+    *,
+    grounding_score: float | None = None,
+    achieved: bool = False,
+) -> bool:
+    """Phase 6: register Throng6 tetra_meta_learn toolcall in capability catalog."""
+    if legacy_mode():
+        return False
+    slug = "tetra_meta_learn"
+    threshold = TETRA_GROUNDING_THRESHOLD
+    verified = achieved or (
+        grounding_score is not None and grounding_score >= threshold
+    )
+    status = "verified" if verified else "draft"
+    entry = "python -m throng6 toolcall"
+    example = (
+        '{"tool":"tetra_meta_learn","env":{"type":"mario_ascii"},'
+        '"budget_steps":400,"outer_cycles":2} | python -m throng6 toolcall'
+    )
+    purpose = (
+        "Throng6 outer+inner meta-learning session via JSON toolcall. "
+        f"Promotes to verified when grounding_score >= {threshold}."
+    )
+    if grounding_score is not None:
+        purpose += f" Last score: {grounding_score:.3f}."
+
+    conn = _connect()
+    conn.execute(
+        """
+        INSERT INTO capabilities (
+            slug, title, kind, status, purpose, domains, entrypoint, import_path,
+            cwd_template, requires, example_invoke, source_project, phase, total_phases, updated_at
+        ) VALUES (?, ?, 'pipeline_tool', ?, ?, '["learning","tetra"]', ?, ?, ?, '[]', ?, 'throng6', 0, 0, ?)
+        ON CONFLICT(slug) DO UPDATE SET
+            status=excluded.status, purpose=excluded.purpose,
+            entrypoint=excluded.entrypoint, example_invoke=excluded.example_invoke,
+            updated_at=excluded.updated_at
+        """,
+        (
+            slug,
+            "tetra_meta_learn",
+            status,
+            purpose,
+            entry,
+            "pipeline.tools.tetra_meta_learn",
+            str(AICOMPETE_ROOT / "throng6"),
+            example,
+            _now(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    try:
+        from pipeline.capability_metrics import log_capability_event
+
+        log_capability_event(
+            "register",
+            slug,
+            ok=verified,
+            detail=f"grounding={grounding_score}",
+        )
+    except Exception:
+        pass
+    return True
+
+
+def promote_if_grounded(slug: str, grounding_score: float) -> bool:
+    """Promote capability to verified when grounding_score meets threshold."""
+    if legacy_mode() or grounding_score < TETRA_GROUNDING_THRESHOLD:
+        return False
+    conn = _connect()
+    cur = conn.execute(
+        """
+        UPDATE capabilities SET status = 'verified', updated_at = ?, purpose = purpose || ?
+        WHERE slug = ? AND status = 'draft'
+        """,
+        (_now(), f" [grounded:{grounding_score:.3f}]", slug),
+    )
+    n = cur.rowcount
+    conn.commit()
+    conn.close()
+    return n > 0
 
 
 def register_shared_lib_capability(
@@ -487,6 +573,8 @@ def rebuild_registry() -> dict[str, int]:
     total = conn.execute("SELECT COUNT(*) FROM capabilities").fetchone()[0]
     conn.close()
 
+    tetra_tool = register_tetra_meta_learn_capability()
+
     from pipeline.capability_graph import rebuild_edges
 
     edges = rebuild_edges()
@@ -507,6 +595,7 @@ def rebuild_registry() -> dict[str, int]:
         "shared_libs": libs,
         "pipeline_scripts": scripts,
         "workflows": workflows,
+        "tetra_tool": int(bool(tetra_tool)),
         "edges": edges,
         "pruned": pruned,
         "fts_indexed": fts_rows,

@@ -61,7 +61,7 @@ DEFAULT_PROVIDER = os.environ.get("PIPELINE_PROVIDER", "ollama")
 # Always anchor .pipeline/ to the project root (this file's grandparent),
 # not the cwd — prevents /workspace/.pipeline vs /.pipeline splits.
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = _PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR
 PROJECTS_DIR = PIPELINE_DIR / "projects"   # per-idea isolation root
 PROMPTS_DIR = pathlib.Path(__file__).parent / "prompts"
 LOGS_DIR = PIPELINE_DIR / "logs"

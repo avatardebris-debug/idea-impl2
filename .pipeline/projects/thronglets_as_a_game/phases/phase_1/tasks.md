@@ -1,6 +1,0 @@
-- [x] Task 1: Core data models and types
-- [x] Task 2: 2D World engine
-- [ ] Task 3: Thronglet agent core
-- [ ] Task 4: Interaction and communication system
-- [ ] Task 5: ASCII visualization layer
-- [ ] Task 6: Game loop and CLI entry point

@@ -1,2 +1,0 @@
-# Audiobook Script Pipeline — dependencies
-# No third-party dependencies required.

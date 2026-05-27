@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = _PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR  # noqa: E402
 PROJECTS_DIR = PIPELINE_DIR / "projects"
 
 VERDICT_PASS = re.compile(r"Verdict:\s*PASS", re.IGNORECASE)

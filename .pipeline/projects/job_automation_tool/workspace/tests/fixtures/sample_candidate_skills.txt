@@ -1,8 +1,0 @@
-Python
-JavaScript
-React
-AWS
-Docker
-Kubernetes
-Git
-SQL

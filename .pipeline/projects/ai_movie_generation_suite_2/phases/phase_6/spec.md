@@ -1,1 +1,0 @@
-Phase 6 of project ai_movie_generation_suite_2

@@ -31,22 +31,30 @@ from datetime import datetime
 # ---------------------------------------------------------------------------
 
 def find_pipeline_dir() -> pathlib.Path:
-    """Search upward from cwd and common locations for .pipeline/"""
+    """Locate pipeline output root (projects/, state/, …)."""
+    env = os.environ.get("PIPELINE_DIR", "").strip()
+    if env:
+        p = pathlib.Path(env).expanduser().resolve()
+        if p.is_dir() and (p / "projects").is_dir():
+            return p
+
     candidates = [
         pathlib.Path.cwd() / ".pipeline",
+        pathlib.Path.cwd(),  # output repo root (e.g. thepipeline/)
         pathlib.Path("/workspace") / ".pipeline",
         pathlib.Path("/workspace/idea impl") / ".pipeline",
+        pathlib.Path("/workspace/idea impl").parent / "thepipeline",
     ]
-    # Also search cwd parents
     for parent in pathlib.Path.cwd().parents:
         candidates.append(parent / ".pipeline")
+        candidates.append(parent)  # when cwd is inside output repo
 
     for c in candidates:
         if c.is_dir() and (c / "projects").is_dir():
-            return c
+            return c.resolve()
 
-    print("ERROR: Could not find .pipeline/projects/ directory.")
-    print("Run this script from your workspace, or check that the pipeline has run at least once.")
+    print("ERROR: Could not find pipeline output (directory with projects/).")
+    print("Set PIPELINE_DIR or run from idea impl / thepipeline.")
     sys.exit(1)
 
 

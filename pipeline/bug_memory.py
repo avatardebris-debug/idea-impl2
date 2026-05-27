@@ -36,8 +36,7 @@ from typing import NamedTuple
 # Paths
 # ---------------------------------------------------------------------------
 
-_PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR   = _PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR
 MEMORY_DIR     = PIPELINE_DIR / "memory"
 RESOLUTIONS_PATH = MEMORY_DIR / "bug_resolutions.jsonl"
 

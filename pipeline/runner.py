@@ -151,7 +151,15 @@ def run_pipeline(
     from pipeline.run_context import RunContext
 
     set_legacy_mode(legacy)
-    global PROJECT_ROOT, _run_ctx
+    global PROJECT_ROOT, _run_ctx, PIPELINE_DIR
+
+    from pipeline.output_bootstrap import bootstrap_hermes, bootstrap_output_repo
+    from pipeline import pipeline_config as _pc
+
+    bootstrap_output_repo()
+    PIPELINE_DIR = _pc.reload_pipeline_dir()
+    bootstrap_hermes()
+
     _ideas_path = pathlib.Path(ideas_file).resolve() if ideas_file else PROJECT_ROOT.resolve() / "master_ideas.md"
     _polish_path: pathlib.Path | None = None
     if polish:
@@ -187,6 +195,7 @@ def run_pipeline(
     print("=" * 60)
     print(f"  Provider: {provider}")
     print(f"  Model:    {model}")
+    print(f"  Output:   {PIPELINE_DIR}")
     if time_limit_minutes > 0:
         print(f"  Time:     {time_limit_minutes:.0f} minutes")
     else:
@@ -243,6 +252,20 @@ def run_pipeline(
         print("    python pipeline/runner.py \"Your idea here\"")
         print("    python pipeline/runner.py --from-list")
         return
+
+    try:
+        from pipeline.pipeline_activity import log_activity
+        from pipeline.pipeline_config import PIPELINE_DIR
+
+        log_activity(
+            "runner_start",
+            run_mode=_run_ctx.mode if _run_ctx else "single",
+            provider=provider,
+            model=model,
+            pipeline_dir=str(PIPELINE_DIR),
+        )
+    except Exception:
+        pass
 
     # Save initial status
     save_pipeline_status({
@@ -493,6 +516,8 @@ def main():
               python pipeline/runner.py --from-list --provider ollama --model qwen3.5:35b --time-limit 480
               python pipeline/runner.py --resume
               python pipeline/runner.py --from-list --legacy
+              python pipeline/runner.py --list-goals
+              python pipeline/runner.py --attempt-goal my_goal_id
         """),
     )
     parser.add_argument("idea", nargs="?", default=None,
@@ -552,8 +577,59 @@ def main():
              "capabilities_summary in context_cache or executor prompts. "
              "Same as before the capability-registry fork.",
     )
+    parser.add_argument(
+        "--attempt-goal",
+        metavar="GOAL_ID",
+        default=None,
+        help="Try to achieve a decomposed goal using capabilities or Hermes "
+             "(see .pipeline/goals/<id>.json).",
+    )
+    parser.add_argument(
+        "--attempt-branch",
+        metavar="BRANCH_ID",
+        default=None,
+        help="With --attempt-goal, only run this branch id.",
+    )
+    parser.add_argument(
+        "--list-goals",
+        action="store_true",
+        help="List decomposed goals and runnable branch counts, then exit.",
+    )
 
     args = parser.parse_args()
+
+    if args.list_goals:
+        from pipeline.output_bootstrap import bootstrap_output_repo
+        from pipeline import pipeline_config as _pc
+
+        bootstrap_output_repo()
+        _pc.reload_pipeline_dir()
+        from pipeline.goal_attempt import list_attemptable_goals
+
+        for row in list_attemptable_goals():
+            print(
+                f"  {row['goal_id']}: status={row['status']} "
+                f"branches={row['branches']} runnable={row['runnable']}"
+            )
+        return
+
+    if args.attempt_goal:
+        from pipeline.output_bootstrap import bootstrap_hermes, bootstrap_output_repo
+        from pipeline import pipeline_config as _pc
+
+        bootstrap_output_repo()
+        _pc.reload_pipeline_dir()
+        bootstrap_hermes()
+        from pipeline.goal_attempt import attempt_goal
+
+        result = attempt_goal(
+            args.attempt_goal,
+            branch_id=args.attempt_branch,
+            provider=args.provider,
+            model=args.model,
+        )
+        print(json.dumps(result, indent=2))
+        sys.exit(0 if result.get("ok") else 1)
 
     if not args.idea and not args.from_list and not args.resume and not args.polish:
         parser.print_help()

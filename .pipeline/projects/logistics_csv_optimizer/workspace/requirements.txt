@@ -1,2 +1,0 @@
-# Logistics CSV Optimizer — dependencies
-# No third-party dependencies required for Phase 1 (uses only stdlib).

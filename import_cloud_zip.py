@@ -31,8 +31,7 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-PROJECT_ROOT = pathlib.Path(__file__).parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 
 
 def find_latest_zip() -> pathlib.Path:

@@ -1,3 +1,0 @@
-{"task_id": "951e919ffe53_t0000", "status": "pending", "input_data": {"topic": "a"}, "retry_count": 0, "created_at": "2026-04-20T06:02:04.970243+00:00"}
-{"task_id": "951e919ffe53_t0001", "status": "pending", "input_data": {"topic": "b"}, "retry_count": 0, "created_at": "2026-04-20T06:02:04.970243+00:00"}
-{"task_id": "951e919ffe53_t0002", "status": "pending", "input_data": {"topic": "c"}, "retry_count": 0, "created_at": "2026-04-20T06:02:04.970243+00:00"}

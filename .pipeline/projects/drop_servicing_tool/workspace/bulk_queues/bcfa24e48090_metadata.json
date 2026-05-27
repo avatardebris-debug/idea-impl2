@@ -1,7 +1,0 @@
-{
-  "queue_id": "bcfa24e48090",
-  "sop_name": "test_sop",
-  "max_retries": 3,
-  "created_at": "2026-04-20T06:01:46.574876+00:00",
-  "total_tasks": 2
-}

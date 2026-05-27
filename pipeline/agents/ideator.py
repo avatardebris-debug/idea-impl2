@@ -58,8 +58,23 @@ class IdeatorAgent(AgentProcess):
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         output_path = f"ideator_output/{ts}_phase{phase_num}.md"
 
+        mission_block = ""
+        try:
+            from pipeline.mission import format_values_for_prompt, ideator_construct_prompt
+
+            mission_block = format_values_for_prompt()
+            construct = ideator_construct_prompt()
+            if construct:
+                mission_block = f"{mission_block}\n\nConstruct pass:\n{construct}".strip()
+        except Exception:
+            pass
+
         task_prompt = (
             f"You are the Ideator — the creative brainstorming engine.\n\n"
+        )
+        if mission_block:
+            task_prompt += f"## Mission & Values\n{mission_block}\n\n"
+        task_prompt += (
             f"## Current Project Master Plan\n{master_plan[:2000]}\n\n"
             f"## Phase {phase_num} Spec\n{phase_spec[:1000]}\n\n"
             f"## Phase {phase_num} Tasks Completed\n{tasks_content[:1000]}\n\n"
@@ -130,15 +145,37 @@ class IdeatorAgent(AgentProcess):
         # We write to master_ideas.md ourselves in Python after the call.
         llm = get_llm(self.provider, model=self.model, temperature=0.85)
 
+        mission_block = ""
+        construct_block = ""
+        deconstruct_block = ""
+        try:
+            from pipeline.mission import (
+                format_values_for_prompt,
+                ideator_construct_prompt,
+                ideator_deconstruct_prompt,
+            )
+
+            mission_block = format_values_for_prompt()
+            construct_block = ideator_construct_prompt()
+            deconstruct_block = ideator_deconstruct_prompt()
+        except Exception:
+            pass
+
         system_prompt = (
             "You are the Ideator for an autonomous self-improving software pipeline. "
             "Prioritize ideas that make the pipeline faster, smarter, more debuggable, "
             "more agentic, and better at recursive self-improvement (RSI). "
             "Respond ONLY with the list of ideas in the requested format. No preamble."
         )
+        if mission_block:
+            system_prompt += f"\n\n{mission_block}"
 
         user_prompt = (
             f"The idea backlog is empty. Generate exactly 30 ideas across 6 groups of 5.\n\n"
+        )
+        if construct_block:
+            user_prompt += f"## Construct pass\n{construct_block}\n\n"
+        user_prompt += (
             f"## Existing Projects (slug= in each block — use exact slugs for bridges)\n"
             f"{projects_context}\n\n"
             f"## Reusable Shared Tools Already Built\n"
@@ -176,6 +213,25 @@ class IdeatorAgent(AgentProcess):
         logger.info("[ideator] Calling LLM directly for idea generation (no ReAct loop)")
         response = llm.chat(messages)
         raw_text = response.content or ""
+
+        if deconstruct_block and raw_text.strip():
+            refine_messages = [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        f"## Deconstruct pass\n{deconstruct_block}\n\n"
+                        f"Refine these ideas. Output ONLY idea lines (- [ ] **[Title]** — ...):\n\n"
+                        f"{raw_text[:12000]}"
+                    ),
+                },
+            ]
+            try:
+                refined = llm.chat(refine_messages)
+                if refined.content and re.search(r"^\s*-\s*\[[ xX]\]", refined.content, re.M):
+                    raw_text = refined.content
+            except Exception as exc:
+                logger.warning("[ideator] Deconstruct pass failed (non-fatal): %s", exc)
 
         # --- Parse idea lines from response ---
         idea_lines = [

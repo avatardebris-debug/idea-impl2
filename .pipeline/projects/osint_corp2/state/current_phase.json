@@ -1,6 +1,0 @@
-{
-  "phase_num": 1,
-  "status": "active",
-  "updated_at": 0,
-  "notes": "Phase 1: Core Infrastructure - Building message bus, runner, and tool harness"
-}

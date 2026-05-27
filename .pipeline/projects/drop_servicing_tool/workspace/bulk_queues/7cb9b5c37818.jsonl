@@ -1,2 +1,0 @@
-{"task_id": "7cb9b5c37818_t0000", "status": "pending", "input_data": {"topic": "item1"}, "retry_count": 0, "created_at": "2026-04-20T06:29:37.392727+00:00"}
-{"task_id": "7cb9b5c37818_t0001", "status": "pending", "input_data": {"topic": "item2"}, "retry_count": 0, "created_at": "2026-04-20T06:29:37.392727+00:00"}

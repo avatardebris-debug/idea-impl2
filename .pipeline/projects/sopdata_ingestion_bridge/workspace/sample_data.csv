@@ -1,4 +1,0 @@
-task_name,description,steps,assignee,deadline,priority
-Set up CI pipeline,"Configure GitHub Actions for automated testing",1. Create workflow file\n2. Add test step\n3. Push to main,DevOps Team,2025-01-15,high
-Write API docs,"Document all REST endpoints",1. List endpoints\n2. Add request/response examples\n3. Publish to wiki,Technical Writer,2025-01-20,medium
-Code review process,"Establish peer review guidelines",1. Draft review checklist\n2. Share with team\n3. Get feedback,Engineering Lead,2025-01-25,low

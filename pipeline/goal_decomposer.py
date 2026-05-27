@@ -25,8 +25,8 @@ from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-PROJECT_ROOT = pathlib.Path(__file__).parent.parent
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT  # noqa: E402
+
 GOALS_DIR = PIPELINE_DIR / "goals"
 
 
@@ -302,7 +302,7 @@ def _save_goal_tree(tree: GoalTree) -> None:
 def inject_branches_into_ideas(tree: GoalTree, mi_path: pathlib.Path) -> int:
     """
     Write each leaf branch from the goal tree into master_ideas.md as new
-    unchecked idea entries, then mark the original --goal line as [x] done.
+    unchecked idea entries. Parent --goal line stays unchecked; see goals/backlog.md.
 
     Returns the number of branches injected.
     """
@@ -377,14 +377,24 @@ def inject_branches_into_ideas(tree: GoalTree, mi_path: pathlib.Path) -> int:
 
     content = mi_path.read_text(encoding="utf-8")
 
-    # Mark the original --goal line as complete
-    goal_title_pattern = re.escape(tree.goal_text[:30])
-    content = re.sub(
-        rf"(- \[ \](\s+\*\*.*?{re.escape(tree.goal_id[:15])}.*?\*\*.*?--goal[^\n]*))",
-        lambda m: m.group(0).replace("- [ ]", "- [x]"),
-        content,
-        flags=re.IGNORECASE,
-    )
+    # Parent --goal stays unchecked; track in goals/backlog.md
+    tree.status = "decomposed"
+    for branch in tree.branches:
+        if branch.status == "pending":
+            branch.status = "decomposed"
+    try:
+        from pipeline.goal_backlog import append_decomposed_goal
+
+        tree_path = GOALS_DIR / f"{tree.goal_id}.json"
+        append_decomposed_goal(
+            tree.goal_id,
+            tree.goal_text,
+            branch_count=len(tree.branches),
+            tree_path=tree_path,
+        )
+        _save_goal_tree(tree)
+    except Exception as exc:
+        logger.debug("goal backlog update skipped: %s", exc)
 
     # Append the new entries under a ## Goal Decompositions section
     section_header = "## Goal Decompositions"
@@ -434,4 +444,5 @@ def process_goal_line(
         return False
 
     injected = inject_branches_into_ideas(tree, mi_path)
+    _save_goal_tree(tree)
     return injected > 0

@@ -14,10 +14,10 @@ from typing import Any
 
 import yaml
 
-from pipeline.capability_registry import PIPELINE_DIR, PROJECT_ROOT
-from pipeline.slug_util import slugify_title
+from pipeline.capability_registry import PIPELINE_DIR, PROJECT_ROOT  # noqa: F401
 
-CONNECTORS_DIR = PROJECT_ROOT / ".pipeline" / "workflows" / "connectors"
+CONNECTORS_DIR = PIPELINE_DIR / "workflows" / "connectors"
+from pipeline.slug_util import slugify_title
 IDEA_LINE_RE = re.compile(
     r"^\s*-\s*\[[ xX]\]\s*\*\*(.+?)\*\*\s*(?:kind:\s*connector\s*)?"
     r"(?:requires:\s*([\w,\s_-]+?)\s*)?[—–-]\s*(.+)$",

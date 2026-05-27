@@ -1,4 +1,0 @@
-output_format: "yaml"
-languages:
-  - "rust"
-output_path: "C:/Users/avata/aicompete/idea impl/.pipeline/projects/docsai_documentation_generator/workspace/tests/sample_project/output.yaml"

@@ -1,1 +1,0 @@
-"""ReviewPulse Aggregator application package."""

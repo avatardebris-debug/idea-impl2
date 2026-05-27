@@ -24,8 +24,10 @@ from dataclasses import dataclass, field
 
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent
 PROMPTS_DIR = PROJECT_ROOT / "pipeline" / "prompts"
-VERSIONS_DIR = PROJECT_ROOT / ".pipeline" / "prompt_versions"
-METRICS_DIR = PROJECT_ROOT / ".pipeline" / "metrics"
+from pipeline.pipeline_config import PIPELINE_DIR
+
+VERSIONS_DIR = PIPELINE_DIR / "prompt_versions"
+METRICS_DIR = PIPELINE_DIR / "metrics"
 
 
 # ---------------------------------------------------------------------------

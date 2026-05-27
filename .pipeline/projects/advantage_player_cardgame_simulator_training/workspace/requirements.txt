@@ -1,5 +1,0 @@
-# Advantage Card Games — Requirements
-# Core: no third-party dependencies needed for Phase 1
-# Dev:
-pytest>=7.0
-pytest-cov>=4.0

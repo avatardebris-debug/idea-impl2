@@ -1,5 +1,0 @@
-# Sample URLs for testing
-https://example.com
-https://httpbin.org/status/200
-https://httpbin.org/status/404
-https://nonexistent.invalid.domain.test

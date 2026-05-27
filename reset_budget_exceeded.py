@@ -19,7 +19,7 @@ import sys
 from datetime import datetime, timezone
 
 PROJECT_ROOT  = pathlib.Path(__file__).parent.resolve()
-PIPELINE_DIR  = PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR
 PROJECTS_DIR  = PIPELINE_DIR / "projects"
 POLISH_QUEUE  = PROJECT_ROOT / "polish_queue.md"
 

@@ -46,7 +46,21 @@ def _read_json_file(path: pathlib.Path) -> dict:
 
 def init_pipeline_dirs() -> None:
     """Create all pipeline runtime directories."""
-    for subdir in ["queues", "state", "projects", "logs"]:
+    for subdir in [
+        "queues",
+        "state",
+        "projects",
+        "logs",
+        "finetune_corpus/raw/task",
+        "finetune_corpus/raw/phase",
+        "finetune_corpus/raw/project",
+        "shared_libs",
+        "workflows",
+        "workflows/connectors",
+        "memory",
+        "metrics",
+        "goals",
+    ]:
         (PIPELINE_DIR / subdir).mkdir(parents=True, exist_ok=True)
 
     # Session-Agnostic Throughput Cleanup: clear throughput.json on startup

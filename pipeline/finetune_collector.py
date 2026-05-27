@@ -46,7 +46,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-_DATASET_DIR  = _PROJECT_ROOT / ".pipeline" / "finetune"
+from pipeline.pipeline_config import PIPELINE_DIR as _PIPELINE_DIR_CFG
+_DATASET_DIR  = _PIPELINE_DIR_CFG / "finetune"
 _DATASET_FILE = _DATASET_DIR / "dataset.jsonl"
 _STATS_FILE   = _DATASET_DIR / "stats.json"
 

@@ -36,7 +36,7 @@ import time
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-_PIPELINE_DIR = _PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR as _PIPELINE_DIR
 
 _DEFAULT_N = 3          # exchanges to retain per (role, slug)
 _MAX_CHARS  = 8000      # max chars per exchange (prompt + response) to prevent bloat

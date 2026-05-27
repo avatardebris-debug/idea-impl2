@@ -18,8 +18,7 @@ import pathlib
 import re
 from datetime import datetime, timezone
 
-_PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = _PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT as _PROJECT_ROOT
 PROJECTS_DIR = PIPELINE_DIR / "projects"
 COMPLETIONS_PATH = PIPELINE_DIR / "state" / "completions.jsonl"
 TRUTH_PATH = _PROJECT_ROOT / "truth.md"

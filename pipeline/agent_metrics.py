@@ -14,7 +14,8 @@ import threading
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-_METRICS_PATH = _PROJECT_ROOT / ".pipeline" / "state" / "agent_timing.jsonl"
+from pipeline.pipeline_config import PIPELINE_DIR
+_METRICS_PATH = PIPELINE_DIR / "state" / "agent_timing.jsonl"
 _METRICS_LOCK = threading.Lock()
 
 

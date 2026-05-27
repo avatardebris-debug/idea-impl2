@@ -46,8 +46,7 @@ logger = logging.getLogger(__name__)
 # Paths
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT  = pathlib.Path(__file__).parent.parent
-PIPELINE_DIR  = PROJECT_ROOT / ".pipeline"
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 PROJECTS_DIR  = PIPELINE_DIR / "projects"
 CORPUS_DIR    = PIPELINE_DIR / "finetune_corpus"
 RAW_DIR       = CORPUS_DIR / "raw"        # live output of pipeline
@@ -55,9 +54,13 @@ TASK_DIR      = RAW_DIR / "task"          # task-level pairs
 PHASE_DIR     = RAW_DIR / "phase"         # phase-level pairs
 PROJECT_DIR_C = RAW_DIR / "project"       # project-level pairs
 
-# Max chars of code to include per file in a single pair (prevents 500k-token monsters)
+# Legacy hard limits (used only when use_continuation=False)
 _MAX_FILE_CHARS = 8_000
 _MAX_CODE_CHARS = 40_000   # total code block per pair
+
+# Continuation chunking defaults (see corpus_continuation.py)
+_DEFAULT_MAX_OUTPUT = 12_000
+_DEFAULT_MAX_INPUT_CONTINUE = 2_000
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +101,11 @@ def _read_state(project_dir: pathlib.Path, rel: str, max_chars: int = 0) -> str:
     return _read(project_dir / rel, max_chars)
 
 
-def _collect_workspace_code(workspace: pathlib.Path) -> dict[str, str]:
+def _collect_workspace_code(
+    workspace: pathlib.Path,
+    *,
+    max_file_chars: int = 0,
+) -> dict[str, str]:
     """Return {relative_path: code_content} for all .py files in workspace."""
     files: dict[str, str] = {}
     if not workspace.exists():
@@ -108,7 +115,7 @@ def _collect_workspace_code(workspace: pathlib.Path) -> dict[str, str]:
         if "__pycache__" in py.parts:
             continue
         rel = py.relative_to(workspace).as_posix()
-        files[rel] = _read(py, _MAX_FILE_CHARS)
+        files[rel] = _read(py, max_file_chars)
     return files
 
 
@@ -156,10 +163,10 @@ def _extract_phase_pair(
     if not tasks_md:
         return None
 
-    # Workspace code
+    # Workspace code (full files; chunking happens at Alpaca export)
     workspace    = project_dir / "workspace"
-    code_files   = _collect_workspace_code(workspace)
-    code_block   = _format_code_block(code_files)
+    code_files   = _collect_workspace_code(workspace, max_file_chars=0)
+    code_block   = _format_code_block(code_files)  # legacy single-block preview
 
     # Parse verdicts
     test_verdict   = "PASS" if "Verdict: PASS" in val_report else ("FAIL" if val_report else "UNKNOWN")
@@ -218,9 +225,8 @@ def _extract_phase_pair(
 # Alpaca-format builders
 # ---------------------------------------------------------------------------
 
-def _to_task_alpaca(pair: dict) -> dict:
-    """Convert a task-level pair to Alpaca instruction format."""
-    instruction = textwrap.dedent(f"""\
+def _task_instruction(pair: dict) -> str:
+    return textwrap.dedent(f"""\
         You are a senior software engineer. Write production-quality Python code for the following task.
 
         ## Project: {pair["project_title"]}
@@ -233,25 +239,13 @@ def _to_task_alpaca(pair: dict) -> dict:
         {pair["tasks"]}
     """).strip()
 
-    return {
-        "id":            pair["id"],
-        "instruction":   instruction,
-        "input":         "",
-        "output":        pair["code"],
-        "quality_label": pair["quality_label"],
-        "retry_count":   pair["retry_count"],
-        "model":         pair["model"],
-        "collected_at":  pair["collected_at"],
-    }
 
-
-def _to_phase_alpaca(pair: dict) -> dict:
-    """Phase-level pair includes master_plan in the instruction context."""
+def _phase_instruction(pair: dict) -> str:
     ctx = ""
     if pair["master_plan"]:
         ctx = f"\n## Full Project Master Plan\n{pair['master_plan']}\n"
 
-    instruction = textwrap.dedent(f"""\
+    return textwrap.dedent(f"""\
         You are a senior software engineer implementing one phase of a larger project.
 
         ## Project: {pair["project_title"]}
@@ -270,38 +264,135 @@ def _to_phase_alpaca(pair: dict) -> dict:
         ```
     """).strip()
 
+
+def _shared_alpaca_fields(pair: dict) -> dict[str, Any]:
     return {
-        "id":            f"{pair['id']}_phase",
-        "instruction":   instruction,
-        "input":         "",
-        "output":        pair["code"],
         "quality_label": pair["quality_label"],
         "retry_count":   pair["retry_count"],
         "model":         pair["model"],
         "collected_at":  pair["collected_at"],
+        "phase_num":     pair["phase_num"],
+        "project_slug":  pair["project_slug"],
     }
+
+
+def _to_task_alpaca(pair: dict, *, use_continuation: bool = True) -> list[dict]:
+    """Convert a task-level pair to one or more Alpaca records."""
+    instruction = _task_instruction(pair)
+    shared = _shared_alpaca_fields(pair)
+
+    if not use_continuation:
+        rec = {
+            "id": pair["id"],
+            "instruction": instruction,
+            "input": "",
+            "output": pair["code"],
+            **shared,
+        }
+        return [rec]
+
+    from pipeline.corpus_continuation import chunk_workspace_to_records
+
+    workspace = pair.get("_workspace_path")
+    code_files = pair.get("code_files_map") or {}
+    if workspace is not None:
+        return chunk_workspace_to_records(
+            workspace,
+            instruction,
+            input="",
+            max_chars_per_output=_DEFAULT_MAX_OUTPUT,
+            max_chars_per_input_continue=_DEFAULT_MAX_INPUT_CONTINUE,
+            sequence_id=pair["id"],
+            source_slug=pair["project_slug"],
+            granularity="task",
+            base_id=pair["id"],
+            extra_fields=shared,
+        )
+    from pipeline.corpus_continuation import records_from_code_block
+
+    return records_from_code_block(
+        pair["code"],
+        instruction,
+        input="",
+        max_chars_per_output=_DEFAULT_MAX_OUTPUT,
+        max_chars_per_input_continue=_DEFAULT_MAX_INPUT_CONTINUE,
+        sequence_id=pair["id"],
+        source_slug=pair["project_slug"],
+        granularity="task",
+        base_id=pair["id"],
+        extra_fields=shared,
+    )
+
+
+def _to_phase_alpaca(pair: dict, *, use_continuation: bool = True) -> list[dict]:
+    """Phase-level pair includes master_plan in the instruction context."""
+    instruction = _phase_instruction(pair)
+    shared = _shared_alpaca_fields(pair)
+    base_id = f"{pair['id']}_phase"
+
+    if not use_continuation:
+        return [{
+            "id": base_id,
+            "instruction": instruction,
+            "input": "",
+            "output": pair["code"],
+            **shared,
+        }]
+
+    from pipeline.corpus_continuation import chunk_workspace_to_records
+
+    workspace = pair.get("_workspace_path")
+    if workspace is not None:
+        return chunk_workspace_to_records(
+            workspace,
+            instruction,
+            input="",
+            max_chars_per_output=_DEFAULT_MAX_OUTPUT,
+            max_chars_per_input_continue=_DEFAULT_MAX_INPUT_CONTINUE,
+            sequence_id=base_id,
+            source_slug=pair["project_slug"],
+            granularity="phase",
+            base_id=base_id,
+            extra_fields=shared,
+        )
+    from pipeline.corpus_continuation import records_from_code_block
+
+    return records_from_code_block(
+        pair["code"],
+        instruction,
+        input="",
+        max_chars_per_output=_DEFAULT_MAX_OUTPUT,
+        max_chars_per_input_continue=_DEFAULT_MAX_INPUT_CONTINUE,
+        sequence_id=base_id,
+        source_slug=pair["project_slug"],
+        granularity="phase",
+        base_id=base_id,
+        extra_fields=shared,
+    )
 
 
 def _to_project_alpaca(
     slug: str,
     state: dict,
     all_phase_pairs: list[dict],
-) -> dict | None:
+    *,
+    use_continuation: bool = True,
+) -> list[dict]:
     """Project-level pair: description → all code across all phases."""
     if not all_phase_pairs:
-        return None
+        return []
 
     title       = state.get("title", slug)
     description = state.get("description", "")
     model       = os.environ.get("PIPELINE_MODEL", "unknown")
 
-    # Concatenate all phase code blocks
+    # Concatenate all phase code blocks (full content when use_continuation)
     combined_code_parts: list[str] = []
     total_chars = 0
     for pair in sorted(all_phase_pairs, key=lambda p: p["phase_num"]):
         header = f"## Phase {pair['phase_num']}: {pair['tasks'][:120].splitlines()[0]}\n"
         block  = header + pair["code"]
-        if total_chars + len(block) > _MAX_CODE_CHARS * 2:
+        if not use_continuation and total_chars + len(block) > _MAX_CODE_CHARS * 2:
             combined_code_parts.append("## [remaining phases truncated]\n")
             break
         combined_code_parts.append(block)
@@ -333,18 +424,40 @@ def _to_project_alpaca(
         ```
     """).strip()
 
-    return {
-        "id":            f"{slug}__project",
-        "instruction":   instruction,
-        "input":         "",
-        "output":        combined_code,
+    base_id = f"{slug}__project"
+    shared = {
         "quality_label": quality,
         "avg_retries":   round(avg_retries, 2),
         "total_phases":  state.get("total_phases", len(all_phase_pairs)),
         "final_status":  state.get("status", "unknown"),
         "model":         model,
         "collected_at":  _utcnow(),
+        "project_slug":  slug,
     }
+
+    if not use_continuation:
+        return [{
+            "id": base_id,
+            "instruction": instruction,
+            "input": "",
+            "output": combined_code,
+            **shared,
+        }]
+
+    from pipeline.corpus_continuation import records_from_code_block
+
+    return records_from_code_block(
+        combined_code,
+        instruction,
+        input="",
+        max_chars_per_output=_DEFAULT_MAX_OUTPUT,
+        max_chars_per_input_continue=_DEFAULT_MAX_INPUT_CONTINUE,
+        sequence_id=base_id,
+        source_slug=slug,
+        granularity="project",
+        base_id=base_id,
+        extra_fields=shared,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +487,14 @@ def _already_collected(path: pathlib.Path, record_id: str) -> bool:
 # Main public API
 # ---------------------------------------------------------------------------
 
-def collect_project(project_dir: pathlib.Path, state: dict | None = None) -> int:
+def collect_project(
+    project_dir: pathlib.Path,
+    state: dict | None = None,
+    *,
+    use_continuation: bool = True,
+    run_enrichers: bool = False,
+    enricher_names: list[str] | None = None,
+) -> int:
     """
     Collect fine-tune pairs from a single project directory.
 
@@ -413,30 +533,54 @@ def collect_project(project_dir: pathlib.Path, state: dict | None = None) -> int
     written      = 0
     phase_pairs: list[dict] = []
 
+    workspace_path = project_dir / "workspace"
+
     for phase_num in range(1, total_phases + 1):
         pair = _extract_phase_pair(project_dir, state, phase_num, master_plan)
         if not pair:
             continue
+        pair["_workspace_path"] = workspace_path
+        pair["code_files_map"] = _collect_workspace_code(workspace_path, max_file_chars=0)
+        if use_continuation:
+            from pipeline.corpus_continuation import format_workspace_block
+            pair["code"] = format_workspace_block(pair["code_files_map"])
         phase_pairs.append(pair)
 
-        # --- Task-level pair ---
-        task_rec = _to_task_alpaca(pair)
-        if not _already_collected(task_file, task_rec["id"]):
-            _append_jsonl(task_file, task_rec)
-            written += 1
+        def _write_records(path: pathlib.Path, records: list[dict]) -> int:
+            n = 0
+            for rec in records:
+                batch = [rec]
+                if run_enrichers:
+                    from pipeline.corpus_enrichers import run_corpus_enrichers
+                    batch = run_corpus_enrichers(rec, project_dir, only=enricher_names)
+                for out_rec in batch:
+                    if not _already_collected(path, out_rec["id"]):
+                        _append_jsonl(path, out_rec)
+                        n += 1
+            return n
 
-        # --- Phase-level pair ---
-        phase_rec = _to_phase_alpaca(pair)
-        if not _already_collected(phase_file, phase_rec["id"]):
-            _append_jsonl(phase_file, phase_rec)
-            written += 1
+        written += _write_records(
+            task_file,
+            _to_task_alpaca(pair, use_continuation=use_continuation),
+        )
+        written += _write_records(
+            phase_file,
+            _to_phase_alpaca(pair, use_continuation=use_continuation),
+        )
 
     # --- Project-level pair ---
     if phase_pairs:
-        proj_rec = _to_project_alpaca(slug, state, phase_pairs)
-        if proj_rec and not _already_collected(project_file, proj_rec["id"]):
-            _append_jsonl(project_file, proj_rec)
-            written += 1
+        for proj_rec in _to_project_alpaca(
+            slug, state, phase_pairs, use_continuation=use_continuation
+        ):
+            batch = [proj_rec]
+            if run_enrichers:
+                from pipeline.corpus_enrichers import run_corpus_enrichers
+                batch = run_corpus_enrichers(proj_rec, project_dir, only=enricher_names)
+            for out_rec in batch:
+                if not _already_collected(project_file, out_rec["id"]):
+                    _append_jsonl(project_file, out_rec)
+                    written += 1
 
     if written:
         logger.info(
@@ -457,7 +601,16 @@ def collect_project_on_complete(project_dir: pathlib.Path, state: dict) -> None:
     try:
         n = collect_project(project_dir, state)
         if n:
-            print(f"  [corpus] +{n} fine-tune pairs -> {RAW_DIR.relative_to(PROJECT_ROOT)}")
+            print(f"  [corpus] +{n} fine-tune pairs -> {RAW_DIR}")
+            from pipeline.pipeline_activity import log_activity, maybe_sync_output_repo
+
+            log_activity(
+                "corpus_collected",
+                slug=project_dir.name,
+                pairs_added=n,
+                corpus_dir=str(RAW_DIR),
+            )
+            maybe_sync_output_repo(f"corpus: {project_dir.name} (+{n} pairs)")
     except Exception as exc:
         logger.debug("corpus_collector.collect_project_on_complete failed (non-critical): %s", exc)
 
@@ -466,7 +619,12 @@ def collect_project_on_complete(project_dir: pathlib.Path, state: dict) -> None:
 # Retroactive batch collection
 # ---------------------------------------------------------------------------
 
-def collect_all_existing(verbose: bool = True) -> dict[str, int]:
+def collect_all_existing(
+    verbose: bool = True,
+    *,
+    use_continuation: bool = True,
+    run_enrichers: bool = False,
+) -> dict[str, int]:
     """
     Scan all project directories and collect pairs from every terminal project.
     Safe to re-run — existing records are skipped (dedup by id).
@@ -498,7 +656,12 @@ def collect_all_existing(verbose: bool = True) -> dict[str, int]:
                 print(f"  skip {project_dir.name} (status={status})")
             continue
 
-        n = collect_project(project_dir, state)
+        n = collect_project(
+            project_dir,
+            state,
+            use_continuation=use_continuation,
+            run_enrichers=run_enrichers,
+        )
         results[project_dir.name] = n
         total_written += n
         if verbose:
@@ -658,18 +821,34 @@ def _cli() -> None:
         metavar="SLUG",
         help="Collect from a single project slug",
     )
+    parser.add_argument(
+        "--no-continuation",
+        action="store_true",
+        help="Use legacy hard truncation (8k/file, 40k/phase) instead of continuation chains",
+    )
+    parser.add_argument(
+        "--enrich",
+        action="store_true",
+        help="Run registered corpus enrichers (architecture_notes, external_review_pair, ...)",
+    )
     args = parser.parse_args()
 
+    use_cont = not args.no_continuation
+
     if args.collect_all:
-        collect_all_existing(verbose=True)
+        collect_all_existing(verbose=True, use_continuation=use_cont, run_enrichers=args.enrich)
 
     if args.project:
         project_dir = PROJECTS_DIR / args.project
         if not project_dir.exists():
             print(f"Project not found: {project_dir}")
             sys.exit(1)
-        n = collect_project(project_dir)
-        print(f"Collected {n} pairs from {args.project}")
+        n = collect_project(
+            project_dir,
+            use_continuation=use_cont,
+            run_enrichers=args.enrich,
+        )
+        print(f"Collected {n} records from {args.project}")
 
     if args.merge:
         merge_corpus(granularity=args.merge, filter_quality=args.quality)

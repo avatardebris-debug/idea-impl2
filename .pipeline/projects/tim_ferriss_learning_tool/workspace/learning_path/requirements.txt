@@ -1,6 +1,0 @@
-# Learning Path Generator Dependencies
-openai>=1.0.0
-pyyaml>=6.0
-dataclasses-json>=0.5.0
-pytest>=7.0.0
-pytest-mock>=3.10.0

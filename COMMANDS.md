@@ -168,6 +168,33 @@ Ctrl+C
 pkill -f pipeline/runner.py
 ```
 
+### Goals (`--goal` decomposition)
+
+```bash
+# List decomposed goals and runnable branch counts
+python pipeline/runner.py --list-goals
+
+# Attempt branches (capabilities or Hermes) for a goal tree
+python pipeline/runner.py --attempt-goal GOAL_ID \
+    --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+
+# Single branch only
+python pipeline/runner.py --attempt-goal GOAL_ID --attempt-branch branch_1
+
+# Goal trees live in .pipeline/goals/<id>.json (or $PIPELINE_DIR/goals/)
+# Parent --goal lines stay unchecked until all branches are achieved.
+```
+
+### Output directory (`PIPELINE_DIR`)
+
+```bash
+# Local: sibling thepipeline/ if it has projects/
+# Cloud: export PIPELINE_CLOUD=1 → factory/.pipeline (cloned from GitHub)
+export PIPELINE_DIR=/path/to/your/.pipeline   # explicit override
+
+# Runner prints resolved output on startup after bootstrap.
+```
+
 ---
 
 ## State / Queue Management
@@ -278,6 +305,10 @@ git clone https://github.com/avatardebris-debug/idea.git "idea impl"
 cd "idea impl"
 pip install pyyaml ruff pytest
 
+# Clone output repo (cloud) or use ../thepipeline locally
+export PIPELINE_CLOUD=1
+git clone --depth 1 https://github.com/avatardebris-debug/pipeline.git .pipeline
+
 # Confirm no stale models then pull the right one
 ollama list
 ollama rm qwen3.5:35b 2>/dev/null || true     # remove if pre-installed
@@ -296,10 +327,13 @@ python pipeline/runner.py --from-list --provider ollama \
 chmod +x cloud_setup.sh
 bash cloud_setup.sh
 
-# After it completes, PIPELINE_MODEL is exported automatically.
-# The runner picks it up without needing --model:
+# After it completes, PIPELINE_MODEL and PIPELINE_CLOUD are exported.
+# The runner bootstraps .pipeline/ and Hermes on first run:
 source .venv/bin/activate
-python pipeline/runner.py --from-list --provider ollama --time-limit 600
+export PIPELINE_CLOUD=1
+python pipeline/runner.py --from-list --provider ollama \
+    --model qwen3.6:35b-a3b-q4_K_M --parallel-seeds 3 --executors 2 \
+    --auto-tune --max-seeds 4 --time-limit 600
 
 # Override model:
 MODEL=qwen3.6:35b bash cloud_setup.sh    # full MoE (needs 48GB+)
@@ -441,4 +475,25 @@ Rules:
 - `- [ ]` = unchecked (will be picked up by runner)
 - `- [x]` = done (runner marks these after completion)
 - `requires:` = comma-separated slugs that must be `complete` first
+- `[tetra]` = idea uses Throng6 tetra_meta_learn toolcall; phase_template `phase_tetra` runs grounding validation on complete
 - One idea per line, no sub-bullets
+
+---
+
+## Throng6 / Tetra integration (Phase 6)
+
+```bash
+# From throng6 repo
+echo '{"tool":"tetra_meta_learn","env":{"type":"mario_ascii"},"budget_steps":400,"outer_cycles":2}' | python -m throng6 toolcall
+
+# From idea impl repo
+python pipeline/tools/tetra_meta_learn.py
+
+# Register capability (includes tetra_meta_learn)
+python scripts/build_capability_registry.py --list | findstr tetra
+
+# Harness project validation
+python .pipeline/projects/tetra_meta_learn_harness/workspace/validate_tetra.py
+```
+
+Set `TETRA_GROUNDING_THRESHOLD=0.35` (default) for capability promotion via grounding court.

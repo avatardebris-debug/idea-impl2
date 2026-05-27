@@ -12,12 +12,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipeline.message_bus import Message
+from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
 
 if TYPE_CHECKING:
     from pipeline.message_bus import MessageBus
-
-PROJECT_ROOT = Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = PROJECT_ROOT / ".pipeline"
 
 # Must match runner.AGENT_ROLES for queue depth totals
 _AGENT_ROLES = (

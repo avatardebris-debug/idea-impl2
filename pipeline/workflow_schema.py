@@ -12,8 +12,9 @@ from typing import Any
 
 import yaml
 
-PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-WORKFLOWS_DIR = PROJECT_ROOT / ".pipeline" / "workflows"
+from pipeline.pipeline_config import PIPELINE_DIR
+
+WORKFLOWS_DIR = PIPELINE_DIR / "workflows"
 
 _TEMPLATE_RE = re.compile(r"\{\{\s*([^}]+?)\s*\}\}")
 

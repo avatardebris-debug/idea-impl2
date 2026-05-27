@@ -1,3 +1,0 @@
-{"task_id": "ee42586ce3cf_t0000", "status": "pending", "input_data": {"topic": "a"}, "retry_count": 0, "created_at": "2026-04-20T06:11:20.067105+00:00"}
-{"task_id": "ee42586ce3cf_t0001", "status": "pending", "input_data": {"topic": "b"}, "retry_count": 0, "created_at": "2026-04-20T06:11:20.067105+00:00"}
-{"task_id": "ee42586ce3cf_t0002", "status": "pending", "input_data": {"topic": "c"}, "retry_count": 0, "created_at": "2026-04-20T06:11:20.067105+00:00"}

@@ -131,7 +131,7 @@ ollama pull "${MODEL}"
 echo "  ✓ Model pulled"
 
 # --- 5. Set up the Python environment ---
-echo "[5/6] Setting up Python environment..."
+echo "[5/7] Setting up Python environment..."
 AGENT_DIR="${AGENT_DIR:-$(pwd)}"
 
 if [ ! -d "${AGENT_DIR}/.venv" ]; then
@@ -158,8 +158,28 @@ fi
 
 echo "  ✓ Python environment ready"
 
-# --- 6. Write the model config ---
-echo "[6/6] Writing runtime config..."
+# --- 6. Pipeline output repo + Hermes ---
+echo "[6/7] Bootstrapping pipeline output + Hermes..."
+export PIPELINE_CLOUD=1
+export PIPELINE_DIR="${AGENT_DIR}/.pipeline"
+
+if [ ! -d "${PIPELINE_DIR}/.git" ]; then
+    echo "  Cloning pipeline output → ${PIPELINE_DIR}"
+    git clone --depth 1 -b main https://github.com/avatardebris-debug/pipeline.git "${PIPELINE_DIR}" \
+        || mkdir -p "${PIPELINE_DIR}/projects" "${PIPELINE_DIR}/state"
+else
+    echo "  Pipeline output already cloned — git pull"
+    git -C "${PIPELINE_DIR}" pull --ff-only origin main || true
+fi
+
+echo "  Ensuring Hermes agent (for --hermes / goal attempts)..."
+python - <<'PY' || true
+from pipeline.output_bootstrap import bootstrap_hermes
+bootstrap_hermes()
+PY
+
+# --- 7. Write the model config ---
+echo "[7/7] Writing runtime config..."
 cat > "${AGENT_DIR}/.agent/cloud_config.json" << EOF
 {
     "provider": "ollama",
@@ -181,21 +201,29 @@ echo "  Model:              ${MODEL}"
 echo "  OLLAMA_NUM_PARALLEL: ${_OLLAMA_PARALLEL}"
 echo "  Provider:           ollama"
 echo "  Base URL:           http://localhost:11434"
+echo "  Output dir:         ${PIPELINE_DIR} (PIPELINE_CLOUD=1)"
 echo ""
 echo "  Quick smoke test (single idea):"
 echo ""
 echo "    source .venv/bin/activate"
+echo "    export PIPELINE_CLOUD=1"
 echo "    python pipeline/runner.py \"Build a Python word counter CLI\""
 echo ""
 echo "  Recommended run (VRAM-tuned for ${_VRAM_GB_INT}GB):"
 echo ""
+echo "    export PIPELINE_CLOUD=1"
 echo "    python pipeline/runner.py \\"
 echo "        --from-list \\"
 echo "        --provider ollama \\"
 echo "        --model ${MODEL} \\"
 echo "        --parallel-seeds ${_PARALLEL_SEEDS} \\"
+echo "        --executors 2 \\"
 echo "        --auto-tune \\"
 echo "        --max-seeds ${_MAX_SEEDS}"
+echo ""
+echo "  Goals (decomposed --goal entries):"
+echo "    python pipeline/runner.py --list-goals"
+echo "    python pipeline/runner.py --attempt-goal GOAL_ID --provider ollama --model ${MODEL}"
 echo ""
 echo "  Second instance (unstarted backlog only, no overlap):"
 echo ""
