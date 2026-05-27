@@ -16,9 +16,11 @@ from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.paths import (
+    capabilities_md,
     get_pipeline_dir,
     goals_dir,
     projects_dir,
+    registry_db,
     shared_libs_dir,
 )
 from pipeline.pipeline_config import PROJECT_ROOT
@@ -26,14 +28,6 @@ from pipeline.pipeline_mode import legacy_mode
 from pipeline.slug_util import slugify_title as _slugify
 
 AICOMPETE_ROOT = PROJECT_ROOT.parent
-
-
-def registry_db() -> pathlib.Path:
-    return get_pipeline_dir() / "state" / "capability_registry.sqlite"
-
-
-def capabilities_md() -> pathlib.Path:
-    return get_pipeline_dir() / "state" / "CAPABILITIES.md"
 
 
 def __getattr__(name: str) -> pathlib.Path:

@@ -217,9 +217,11 @@ def run_pipeline(
     else:
         print(f"  Mode:     CAPABILITIES - registry via context_cache (not rebuilt each run)")
         try:
-            from pipeline.capability_registry import REGISTRY_DB
-            if REGISTRY_DB.exists():
-                print(f"  Registry: {REGISTRY_DB.relative_to(PROJECT_ROOT)}")
+            from pipeline.paths import registry_db
+
+            db = registry_db()
+            if db.exists():
+                print(f"  Registry: {db.relative_to(PROJECT_ROOT)}")
             else:
                 print("  Registry: missing — run python scripts/build_capability_registry.py")
         except Exception as _reg_err:

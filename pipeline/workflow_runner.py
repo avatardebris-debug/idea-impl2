@@ -59,9 +59,10 @@ def _run_capability_step(step: WorkflowStep, context: dict[str, Any], *, force: 
 
     if force:
         # Direct invoke bypassing verified check — load row and run entrypoint
-        from pipeline.capability_registry import REGISTRY_DB, _connect
+        from pipeline.capability_registry import _connect
+        from pipeline.paths import registry_db
 
-        if not REGISTRY_DB.exists():
+        if not registry_db().exists():
             return {"ok": False, "error": f"registry missing for capability {slug}"}
         conn = _connect()
         row = conn.execute(

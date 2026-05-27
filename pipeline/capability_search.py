@@ -9,7 +9,8 @@ import re
 import sqlite3
 from typing import Any
 
-from pipeline.capability_registry import REGISTRY_DB, _connect
+from pipeline.capability_registry import _connect
+from pipeline.paths import registry_db
 from pipeline.pipeline_mode import legacy_mode
 
 FTS_SCHEMA = """
@@ -65,7 +66,7 @@ def search_capabilities(
     limit: int = 10,
 ) -> list[dict[str, Any]]:
     """Return [{slug, fts_rank}, ...] or [] if FTS unavailable."""
-    if legacy_mode() or not REGISTRY_DB.exists():
+    if legacy_mode() or not registry_db().exists():
         return []
     q = _fts_query(task_text)
     if not q:

@@ -3,9 +3,9 @@ pipeline/ideas_sync.py
 Completion truth for the idea pipeline.
 
 Source of truth (in order):
-  1. .pipeline/state/completions.jsonl  — machine registry
-  2. truth.md                           — human-readable list (project root)
-  3. .pipeline/projects/*/state         — status == complete
+  1. pipeline output state/completions.jsonl  — machine registry
+  2. truth.md                                 — human-readable list (factory root)
+  3. pipeline output projects/*/state         — status == complete
 
 master_ideas.md is your working queue (copy/paste from backup).
 Before seeding, completed names are REMOVED from master_ideas.md — not checked [x].
@@ -18,14 +18,10 @@ import pathlib
 import re
 from datetime import datetime, timezone
 
-from pipeline.paths import projects_dir as default_projects_dir
-from pipeline.pipeline_config import PROJECT_ROOT as _PROJECT_ROOT, get_pipeline_dir
+from pipeline.paths import completions_jsonl, projects_dir as default_projects_dir
+from pipeline.pipeline_config import PROJECT_ROOT as _PROJECT_ROOT
 
 TRUTH_PATH = _PROJECT_ROOT / "truth.md"
-
-
-def _completions_path() -> pathlib.Path:
-    return get_pipeline_dir() / "state" / "completions.jsonl"
 
 _MAX_DESC = 2000
 
@@ -35,7 +31,7 @@ _TRUTH_HEADER = """# Pipeline completions (source of truth)
 Before the runner seeds a new project, any idea listed here is **removed** from
 `master_ideas.md` automatically.
 
-Full records (including description) live in `.pipeline/state/completions.jsonl`.
+Full records (including description) live in the pipeline output `state/completions.jsonl`.
 Each entry below: `- slug — title — completed_at` then an indented description line.
 
 **Not listed here:** `budget_exceeded` projects — they stay in `master_ideas.md`.
@@ -113,9 +109,9 @@ def collect_completion_records(projects_dir: pathlib.Path | None = None) -> dict
                 "workspace": str(proj / "workspace"),
             }
 
-    if _completions_path().exists():
+    if completions_jsonl().exists():
         try:
-            for line in _completions_path().read_text(encoding="utf-8").splitlines():
+            for line in completions_jsonl().read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue
                 try:
@@ -292,15 +288,15 @@ def register_completion(
     workspace: str = "",
 ) -> None:
     """Append to completions.jsonl (idempotent per slug). Includes description for revisit."""
-    _completions_path().parent.mkdir(parents=True, exist_ok=True)
+    completions_jsonl().parent.mkdir(parents=True, exist_ok=True)
     slug = slug.strip()
     title = title.strip()
     description = (description or "").strip()[:_MAX_DESC]
     if not slug:
         return
     try:
-        if _completions_path().exists():
-            for line in _completions_path().read_text(encoding="utf-8").splitlines()[-500:]:
+        if completions_jsonl().exists():
+            for line in completions_jsonl().read_text(encoding="utf-8").splitlines()[-500:]:
                 if not line.strip():
                     continue
                 try:
@@ -318,7 +314,7 @@ def register_completion(
         "completed_at": completed_at,
         "workspace": workspace,
     }
-    with _completions_path().open("a", encoding="utf-8") as f:
+    with completions_jsonl().open("a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
     _append_truth_entry(slug, title, completed_at, description)
 
@@ -385,8 +381,8 @@ def rebuild_truth_from_registry(projects_dir: pathlib.Path | None = None) -> int
     TRUTH_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     # Refresh completions.jsonl from project state (full descriptions)
-    _completions_path().parent.mkdir(parents=True, exist_ok=True)
-    with _completions_path().open("w", encoding="utf-8") as f:
+    completions_jsonl().parent.mkdir(parents=True, exist_ok=True)
+    with completions_jsonl().open("w", encoding="utf-8") as f:
         for slug in sorted(records.keys()):
             rec = records[slug]
             row = {

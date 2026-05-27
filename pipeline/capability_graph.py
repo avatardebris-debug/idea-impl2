@@ -14,8 +14,7 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from pipeline.capability_registry import REGISTRY_DB
-from pipeline.paths import goals_dir, projects_dir, state_dir
+from pipeline.paths import goals_dir, projects_dir, registry_db, state_dir
 from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
 
@@ -71,8 +70,8 @@ def parse_requires_from_text(text: str) -> list[str]:
 
 
 def _connect() -> sqlite3.Connection:
-    REGISTRY_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(REGISTRY_DB)
+    registry_db().parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(registry_db())
     conn.row_factory = sqlite3.Row
     conn.executescript(EDGES_SCHEMA)
     return conn
@@ -93,7 +92,7 @@ def _project_verified(slug: str) -> bool:
 
 
 def _registry_verified(slug: str) -> bool:
-    if not REGISTRY_DB.exists():
+    if not registry_db().exists():
         return _project_verified(slug)
     conn = _connect()
     row = conn.execute(
@@ -135,7 +134,7 @@ def is_routable(slug: str, *, extra_requires: list[str] | None = None) -> bool:
 
 
 def get_requires(slug: str) -> list[str]:
-    if not REGISTRY_DB.exists():
+    if not registry_db().exists():
         return []
     conn = _connect()
     rows = conn.execute(
@@ -316,7 +315,7 @@ def stale_requires_in_markdown(
     """requires: slugs that don't exist as projects or capabilities."""
     stale: list[dict[str, Any]] = []
     known: set[str] = set()
-    if REGISTRY_DB.exists():
+    if registry_db().exists():
         conn = _connect()
         rows = conn.execute("SELECT slug FROM capabilities").fetchall()
         conn.close()
@@ -343,7 +342,7 @@ def write_graphviz_dot(path: pathlib.Path | None = None) -> pathlib.Path:
 
     nodes: set[str] = set()
     edges: list[tuple[str, str]] = []
-    if REGISTRY_DB.exists():
+    if registry_db().exists():
         conn = _connect()
         for row in conn.execute(
             "SELECT from_slug, to_slug FROM capability_edges"
@@ -354,7 +353,7 @@ def write_graphviz_dot(path: pathlib.Path | None = None) -> pathlib.Path:
         conn.close()
 
     verified = set()
-    if REGISTRY_DB.exists():
+    if registry_db().exists():
         conn = _connect()
         for row in conn.execute(
             "SELECT slug FROM capabilities WHERE status = 'verified'"

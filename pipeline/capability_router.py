@@ -12,7 +12,8 @@ import re
 from typing import Any
 
 from pipeline.capability_graph import is_routable, missing_requires
-from pipeline.capability_registry import REGISTRY_DB, _connect
+from pipeline.capability_registry import _connect
+from pipeline.paths import registry_db
 from pipeline.pipeline_mode import legacy_mode
 
 # Keyword → domain boost
@@ -90,7 +91,7 @@ def route_task(
 
     Each item: slug, title, score, reason, entrypoint, requires_ok, missing_requires
     """
-    if legacy_mode() or not REGISTRY_DB.exists():
+    if legacy_mode() or not registry_db().exists():
         return []
 
     conn = _connect()

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.capability_registry import REGISTRY_DB
+from pipeline.paths import registry_db
 from pipeline.paths import state_dir
 from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.pipeline_mode import legacy_mode
@@ -55,7 +55,7 @@ def export_snapshot(
     out = path or _export_json()
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    if not REGISTRY_DB.exists():
+    if not registry_db().exists():
         payload = {
             "meta": {
                 "exported_at": _now(),
@@ -70,7 +70,7 @@ def export_snapshot(
         out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         return out
 
-    conn = sqlite3.connect(REGISTRY_DB)
+    conn = sqlite3.connect(registry_db())
     conn.row_factory = sqlite3.Row
     caps = [dict(r) for r in conn.execute("SELECT * FROM capabilities").fetchall()]
     try:
@@ -265,12 +265,12 @@ def replace_from_sqlite(remote_db: Path) -> Path:
     """Full replace local registry DB from another machine's sqlite (fast path)."""
     if not remote_db.exists():
         raise FileNotFoundError(remote_db)
-    REGISTRY_DB.parent.mkdir(parents=True, exist_ok=True)
-    backup = REGISTRY_DB.with_suffix(".sqlite.bak")
-    if REGISTRY_DB.exists():
-        shutil.copy2(REGISTRY_DB, backup)
-    shutil.copy2(remote_db, REGISTRY_DB)
-    return REGISTRY_DB
+    registry_db().parent.mkdir(parents=True, exist_ok=True)
+    backup = registry_db().with_suffix(".sqlite.bak")
+    if registry_db().exists():
+        shutil.copy2(registry_db(), backup)
+    shutil.copy2(remote_db, registry_db())
+    return registry_db()
 
 
 def find_export_file(start: Path | None = None) -> Path | None:

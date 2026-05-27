@@ -12,7 +12,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from pipeline.capability_registry import PROJECT_ROOT, REGISTRY_DB, _connect
+from pipeline.capability_registry import PROJECT_ROOT, _connect
+from pipeline.paths import registry_db
 from pipeline.capability_router import route_task
 from pipeline.pipeline_mode import legacy_mode
 
@@ -24,7 +25,7 @@ _ALLOWED_PREFIXES = (
 
 
 def _get_capability(slug: str) -> dict[str, Any] | None:
-    if not REGISTRY_DB.exists():
+    if not registry_db().exists():
         return None
     conn = _connect()
     row = conn.execute(

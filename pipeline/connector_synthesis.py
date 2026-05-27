@@ -315,7 +315,9 @@ def process_ideator_generation(raw_text: str, idea_lines: list[str]) -> tuple[li
 
 
 def write_synthesis_log(summary: dict[str, Any], ts: str) -> pathlib.Path:
-    log_dir = get_pipeline_dir() / "state"
+    from pipeline.paths import state_dir
+
+    log_dir = state_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
     path = log_dir / f"connector_synthesis_{ts}.md"
     lines = [

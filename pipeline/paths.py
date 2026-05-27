@@ -25,6 +25,9 @@ __all__ = [
     "connectors_dir",
     "goals_dir",
     "shared_libs_dir",
+    "registry_db",
+    "capabilities_md",
+    "completions_jsonl",
 ]
 
 
@@ -62,3 +65,15 @@ def goals_dir() -> pathlib.Path:
 
 def shared_libs_dir() -> pathlib.Path:
     return get_pipeline_dir() / "shared_libs"
+
+
+def registry_db() -> pathlib.Path:
+    return state_dir() / "capability_registry.sqlite"
+
+
+def capabilities_md() -> pathlib.Path:
+    return state_dir() / "CAPABILITIES.md"
+
+
+def completions_jsonl() -> pathlib.Path:
+    return state_dir() / "completions.jsonl"

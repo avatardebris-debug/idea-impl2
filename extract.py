@@ -32,15 +32,16 @@ from datetime import datetime
 
 def find_pipeline_dir() -> pathlib.Path:
     """Locate pipeline output root (projects/, state/, …)."""
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
     try:
-        root = pathlib.Path(__file__).resolve().parent
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
-        from pipeline.pipeline_config import get_pipeline_dir
+        from pipeline.pipeline_config import get_pipeline_dir, resolve_pipeline_dir
 
-        p = get_pipeline_dir()
-        if p.is_dir() and (p / "projects").is_dir():
-            return p
+        for resolver in (get_pipeline_dir, resolve_pipeline_dir):
+            p = resolver()
+            if p.is_dir() and (p / "projects").is_dir():
+                return p.resolve()
     except Exception:
         pass
 
@@ -49,21 +50,6 @@ def find_pipeline_dir() -> pathlib.Path:
         p = pathlib.Path(env).expanduser().resolve()
         if p.is_dir() and (p / "projects").is_dir():
             return p
-
-    candidates = [
-        pathlib.Path.cwd() / ".pipeline",
-        pathlib.Path.cwd(),  # output repo root (e.g. thepipeline/)
-        pathlib.Path("/workspace") / ".pipeline",
-        pathlib.Path("/workspace/idea impl") / ".pipeline",
-        pathlib.Path("/workspace/idea impl").parent / "thepipeline",
-    ]
-    for parent in pathlib.Path.cwd().parents:
-        candidates.append(parent / ".pipeline")
-        candidates.append(parent)  # when cwd is inside output repo
-
-    for c in candidates:
-        if c.is_dir() and (c / "projects").is_dir():
-            return c.resolve()
 
     print("ERROR: Could not find pipeline output (directory with projects/).")
     print("Set PIPELINE_DIR or run from idea impl / thepipeline.")

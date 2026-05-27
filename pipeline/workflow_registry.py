@@ -9,7 +9,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from pipeline.capability_registry import PROJECT_ROOT, REGISTRY_DB, _connect
+from pipeline.capability_registry import PROJECT_ROOT, _connect
 from pipeline.workflow_schema import WorkflowDefinition, list_workflow_files
 
 

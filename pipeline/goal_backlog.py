@@ -1,4 +1,4 @@
-"""Track decomposed-but-unachieved goals in PIPELINE_DIR/goals/backlog.md."""
+"""Track decomposed-but-unachieved goals in pipeline output goals/backlog.md."""
 
 from __future__ import annotations
 

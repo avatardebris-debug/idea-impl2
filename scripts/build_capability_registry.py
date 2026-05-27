@@ -9,11 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from pipeline.capability_registry import (  # noqa: E402
-    REGISTRY_DB,
-    list_capabilities,
-    rebuild_registry,
-)
+from pipeline.capability_registry import list_capabilities, rebuild_registry  # noqa: E402
+from pipeline.paths import registry_db  # noqa: E402
 from pipeline.pipeline_mode import legacy_mode, set_legacy_mode  # noqa: E402
 
 
@@ -54,7 +51,7 @@ def main() -> None:
         print("Skipped:", stats.get("reason"))
         return
 
-    print(f"Registry: {REGISTRY_DB}")
+    print(f"Registry: {registry_db()}")
     print(
         f"  projects={stats.get('projects', 0)} "
         f"shared_libs={stats.get('shared_libs', 0)} "
