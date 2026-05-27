@@ -15,15 +15,45 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import Any
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
 from pipeline.pipeline_mode import legacy_mode
 from pipeline.slug_util import slugify_title as _slugify
-REGISTRY_DB = PIPELINE_DIR / "state" / "capability_registry.sqlite"
-CAPABILITIES_MD = PIPELINE_DIR / "state" / "CAPABILITIES.md"
-PROJECTS_DIR = PIPELINE_DIR / "projects"
-SHARED_LIBS_DIR = PIPELINE_DIR / "shared_libs"
-GOALS_DIR = PIPELINE_DIR / "goals"
+
 AICOMPETE_ROOT = PROJECT_ROOT.parent
+
+
+def registry_db() -> pathlib.Path:
+    return get_pipeline_dir() / "state" / "capability_registry.sqlite"
+
+
+def capabilities_md() -> pathlib.Path:
+    return get_pipeline_dir() / "state" / "CAPABILITIES.md"
+
+
+def projects_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "projects"
+
+
+def shared_libs_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "shared_libs"
+
+
+def goals_dir_registry() -> pathlib.Path:
+    return get_pipeline_dir() / "goals"
+
+
+def __getattr__(name: str) -> pathlib.Path:
+    """Lazy paths for importers that still use REGISTRY_DB / PROJECTS_DIR constants."""
+    _map = {
+        "REGISTRY_DB": registry_db,
+        "CAPABILITIES_MD": capabilities_md,
+        "PROJECTS_DIR": projects_dir,
+        "SHARED_LIBS_DIR": shared_libs_dir,
+        "GOALS_DIR": goals_dir_registry,
+    }
+    if name in _map:
+        return _map[name]()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 # Phase 6: minimum grounding_score to promote tetra-linked capabilities to verified
 TETRA_GROUNDING_THRESHOLD = float(os.environ.get("TETRA_GROUNDING_THRESHOLD", "0.35"))
@@ -62,8 +92,8 @@ def _now() -> str:
 
 
 def _connect() -> sqlite3.Connection:
-    REGISTRY_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(REGISTRY_DB)
+    registry_db().parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(registry_db())
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA_SQL)
     return conn
@@ -604,7 +634,7 @@ def rebuild_registry() -> dict[str, int]:
 
 
 def write_capabilities_md() -> None:
-    if legacy_mode() or not REGISTRY_DB.exists():
+    if legacy_mode() or not registry_db().exists():
         return
     conn = _connect()
     rows = conn.execute(
@@ -658,7 +688,7 @@ def capabilities_summary(
     max_chars: int = 4000,
 ) -> str:
     """Short markdown block for agent context. Empty in legacy mode."""
-    if legacy_mode() or not REGISTRY_DB.exists():
+    if legacy_mode() or not registry_db().exists():
         return ""
 
     conn = _connect()
@@ -724,7 +754,7 @@ def capabilities_summary(
 
 
 def list_capabilities(domain: str | None = None, status: str = "verified") -> list[dict[str, Any]]:
-    if not REGISTRY_DB.exists():
+    if not registry_db().exists():
         return []
     conn = _connect()
     q = "SELECT slug, title, kind, status, purpose, entrypoint FROM capabilities WHERE 1=1"

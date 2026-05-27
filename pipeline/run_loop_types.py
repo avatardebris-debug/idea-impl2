@@ -35,6 +35,7 @@ class MainLoopState:
 
 @dataclass
 class MainLoopConfig:
+    pipeline_dir: Path
     bus: Any
     supervisor: Any
     run_ctx: RunContext | None

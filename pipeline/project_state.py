@@ -18,8 +18,8 @@ from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PHASE_RETRIES,
     MAX_PROJECT_LIFETIME_RETRIES,
-    PIPELINE_DIR,
     PROJECT_ROOT,
+    get_pipeline_dir,
 )
 from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
 from pipeline.slug_util import slugify_title as _slugify
@@ -66,7 +66,7 @@ def _reset_retries(project_dir: pathlib.Path, phase_num: int) -> None:
 
 def _append_polish(project_dir: pathlib.Path, phase_num: int, notes: str) -> None:
     """Save non-blocking review notes as deferred polish tasks."""
-    path = PIPELINE_DIR / "state" / "plan_amendments.md"
+    path = get_pipeline_dir() / "state" / "plan_amendments.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     bullets = re.findall(r'^[-*]\s+(.+)$', notes, re.MULTILINE)
     if not bullets:
@@ -79,7 +79,7 @@ def _append_polish(project_dir: pathlib.Path, phase_num: int, notes: str) -> Non
 
 def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: pathlib.Path | None = None) -> None:
     """Eviction Controller: pre-empts lowest priority running project if a higher priority one is ready."""
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
     if not projects_dir.exists():
         return
 

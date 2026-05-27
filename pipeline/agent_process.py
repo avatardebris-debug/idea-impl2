@@ -58,13 +58,22 @@ _NEXT_ROLE_MAP: dict[str, str] = {
 DEFAULT_MODEL = os.environ.get("PIPELINE_MODEL", "qwen3.5:35b")
 DEFAULT_PROVIDER = os.environ.get("PIPELINE_PROVIDER", "ollama")
 
-# Always anchor .pipeline/ to the project root (this file's grandparent),
-# not the cwd — prevents /workspace/.pipeline vs /.pipeline splits.
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.pipeline_config import PIPELINE_DIR
-PROJECTS_DIR = PIPELINE_DIR / "projects"   # per-idea isolation root
 PROMPTS_DIR = pathlib.Path(__file__).parent / "prompts"
-LOGS_DIR = PIPELINE_DIR / "logs"
+
+
+def _pipeline_dir() -> pathlib.Path:
+    from pipeline.pipeline_config import get_pipeline_dir
+
+    return get_pipeline_dir()
+
+
+def _projects_dir() -> pathlib.Path:
+    return _pipeline_dir() / "projects"
+
+
+def _logs_dir() -> pathlib.Path:
+    return _pipeline_dir() / "logs"
 
 
 # ---------------------------------------------------------------------------
@@ -340,7 +349,7 @@ class AgentProcess:
         Uses the cwd captured at agent startup so all paths are anchored
         to the correct location regardless of LLM tool resolution.
         """
-        d = self._run_dir / ".pipeline" / "projects" / self._current_slug
+        d = _projects_dir() / self._current_slug
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -816,8 +825,9 @@ class AgentProcess:
 
     def _setup_logging(self) -> None:
         """Configure per-agent log file."""
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        log_file = LOGS_DIR / f"{self.role}.log"
+        logs = _logs_dir()
+        logs.mkdir(parents=True, exist_ok=True)
+        log_file = logs / f"{self.role}.log"
 
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setFormatter(logging.Formatter(

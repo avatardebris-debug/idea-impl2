@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-from pipeline.pipeline_config import PROJECT_ROOT  # noqa: E402
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir  # noqa: E402
 from pipeline.goal_tree import GoalBranch, GoalTree, goals_dir, save_goal_tree
 
 
@@ -119,7 +119,7 @@ def _call_llm(prompt: str) -> str:
 
 def _completed_project_slugs() -> list[str]:
     """Return slugs of all pipeline projects with status=complete."""
-    projects_dir = PIPELINE_DIR / "projects"
+    projects_dir = get_pipeline_dir() / "projects"
     if not projects_dir.exists():
         return []
     slugs = []

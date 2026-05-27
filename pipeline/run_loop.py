@@ -8,7 +8,6 @@ from __future__ import annotations
 import time
 
 from pipeline.pipeline_status import _get_active_idea_state
-from pipeline.pipeline_config import PIPELINE_DIR
 from pipeline.project_state import _check_priority_eviction
 from pipeline.run_loop_budget import tick_budget_enforcement
 from pipeline.run_loop_health import (
@@ -69,7 +68,7 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
     """One health-check cycle. Return True to break the main loop."""
     health = tick_health_preamble(cfg)
     all_empty = cfg.bus.all_queues_empty()
-    idea_state = _get_active_idea_state(PIPELINE_DIR)
+    idea_state = _get_active_idea_state(cfg.pipeline_dir)
 
     idea_state = tick_budget_enforcement(cfg, idea_state)
     idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)

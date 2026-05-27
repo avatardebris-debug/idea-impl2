@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
 
-from pipeline.agent_process import AgentProcess, AgentOutput
+from pipeline.agent_process import AgentProcess, AgentOutput, _pipeline_dir
 from pipeline.message_bus import Message
 
 
@@ -29,7 +29,7 @@ class ExecutorAgent(AgentProcess):
     @property
     def _shared_libs_dir(self) -> pathlib.Path:
         """Global shared library pool, accessible to all projects."""
-        d = self._run_dir / ".pipeline" / "shared_libs"
+        d = _pipeline_dir() / "shared_libs"
         d.mkdir(parents=True, exist_ok=True)
         return d
 
@@ -38,7 +38,7 @@ class ExecutorAgent(AgentProcess):
         parts: list[str] = []
 
         # 1. Reusable tools index (written by manager from ideator output + reviewer)
-        tools_file = self._run_dir / ".pipeline" / "state" / "reusable_tools.md"
+        tools_file = _pipeline_dir() / "state" / "reusable_tools.md"
         if tools_file.exists():
             content = tools_file.read_text(encoding="utf-8").strip()
             if content:

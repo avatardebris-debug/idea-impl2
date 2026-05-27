@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
 
-from pipeline.agent_process import AgentProcess, AgentOutput
+from pipeline.agent_process import AgentProcess, AgentOutput, _pipeline_dir
 from pipeline.message_bus import Message
 
 
@@ -45,8 +45,8 @@ class ReviewerAgent(AgentProcess):
         tasks_content = self.read_state_file(tasks_path) or ""
         validation_content = self.read_state_file(validation_path) or ""
 
-        shared_libs_path = str(self._run_dir / ".pipeline" / "shared_libs")
-        reusable_tools_path = str(self._run_dir / ".pipeline" / "state" / "reusable_tools.md")
+        shared_libs_path = str(_pipeline_dir() / "shared_libs")
+        reusable_tools_path = str(_pipeline_dir() / "state" / "reusable_tools.md")
 
         # Read broader project context for quality review
         master_plan = self.read_state_file("state/master_plan.md") or ""

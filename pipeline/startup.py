@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pipeline.pipeline_config import AGENT_ROLES, PIPELINE_DIR, PROJECT_ROOT
+from pipeline.pipeline_config import AGENT_ROLES, PROJECT_ROOT, get_pipeline_dir
 from pipeline.seeding import (
     SEED_BLOCKED,
     SEED_SEEDED,
@@ -137,7 +137,7 @@ def resolve_initial_work(
     if not polish and has_work and from_list and parallel_seeds > 1:
         from pipeline.pipeline_status import _get_all_active_idea_states
 
-        already_active = len(_get_all_active_idea_states(PIPELINE_DIR))
+        already_active = len(_get_all_active_idea_states(get_pipeline_dir()))
         queued_now = len(_seeded_this_session)
         effective_active = max(already_active, queued_now)
         slots_to_fill = max(0, parallel_seeds - effective_active)

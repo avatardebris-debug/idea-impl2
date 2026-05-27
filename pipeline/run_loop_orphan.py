@@ -9,7 +9,7 @@ import json
 import time
 from typing import Any
 
-from pipeline.pipeline_config import AGENT_ROLES, PIPELINE_DIR
+from pipeline.pipeline_config import AGENT_ROLES
 from pipeline.project_ops import _rebuild_queues_from_state
 
 from pipeline.run_loop_types import MainLoopConfig
@@ -75,7 +75,7 @@ def tick_zero_task_stall_kill(
             f"(kill in {(cfg.zero_task_phase_kill_s - _stall_secs) // 60:.0f}m)"
         )
     if _stall_secs > cfg.zero_task_phase_kill_s:
-        _proj_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
+        _proj_file = cfg.pipeline_dir / "projects" / _active_slug / "state" / "current_idea.json"
         try:
             _st = json.loads(_proj_file.read_text(encoding="utf-8"))
             if _st.get("status", "") not in ("complete", "budget_exceeded"):

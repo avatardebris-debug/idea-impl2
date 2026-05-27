@@ -9,7 +9,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-from pipeline.pipeline_config import AGENT_ROLES, PIPELINE_DIR
+from pipeline.pipeline_config import AGENT_ROLES
 
 from pipeline.run_loop_types import MainLoopConfig
 
@@ -26,7 +26,7 @@ def tick_budget_enforcement(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> 
     ):
         _active_started = datetime.now(timezone.utc).isoformat()
         idea_state["session_started_at"] = _active_started
-        _stamp_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
+        _stamp_file = cfg.pipeline_dir / "projects" / _active_slug / "state" / "current_idea.json"
         try:
             _stamp_file.write_text(json.dumps(idea_state, indent=2), encoding="utf-8")
         except Exception:
@@ -54,7 +54,7 @@ def tick_budget_enforcement(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> 
                 _phase_budget = int(_phase_budget * 1.5)
 
             if _elapsed > _phase_budget and not _is_locked:
-                _proj_file = PIPELINE_DIR / "projects" / _active_slug / "state" / "current_idea.json"
+                _proj_file = cfg.pipeline_dir / "projects" / _active_slug / "state" / "current_idea.json"
                 idea_state["pre_budget_status"] = idea_state.get("status", "phase_1_executing")
                 idea_state["status"] = "budget_exceeded"
                 idea_state["budget_note"] = (

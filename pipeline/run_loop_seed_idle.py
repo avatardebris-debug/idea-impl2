@@ -11,7 +11,6 @@ import threading
 import time
 from typing import Any
 
-from pipeline.pipeline_config import PIPELINE_DIR
 from pipeline.project_ops import _rebuild_queues_from_state
 from pipeline.seeding import SEED_EMPTY, SEED_SEEDED, _seeded_this_session, seed_from_master_list
 from pipeline.seed_policy import apply_seed_empty as _apply_seed_empty
@@ -86,7 +85,7 @@ def _any_project_recently_working() -> bool:
     """True if any project has a working-state status modified in the last 15 min."""
     _working_states = ("_executing", "_validating", "_reviewing", "_planning")
     _recency_cutoff = time.time() - 900
-    _projects_dir = PIPELINE_DIR / "projects"
+    _projects_dir = cfg.pipeline_dir / "projects"
     if not _projects_dir.exists():
         return False
     for _pd in _projects_dir.iterdir():

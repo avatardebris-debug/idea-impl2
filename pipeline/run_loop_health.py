@@ -14,7 +14,6 @@ from pipeline.ollama_health import _check_ollama_heartbeat
 from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PROJECT_LIFETIME_RETRIES,
-    PIPELINE_DIR,
     PROJECT_ROOT,
 )
 from pipeline.pipeline_status import _get_active_idea_state, _get_all_active_idea_states
@@ -40,7 +39,7 @@ def tick_reviewed_advance(
     if not _rv_match:
         return idea_state
     _rv_phase = int(_rv_match.group(1))
-    _rv_proj = PIPELINE_DIR / "projects" / _active_slug
+    _rv_proj = cfg.pipeline_dir / "projects" / _active_slug
     _rv_state_file = _rv_proj / "state" / "current_idea.json"
     if not _rv_state_file.exists():
         return idea_state
@@ -48,7 +47,7 @@ def tick_reviewed_advance(
         _rv_state = json.loads(_rv_state_file.read_text(encoding="utf-8"))
         routed = _tick_project(cfg.bus, _rv_proj, _rv_state, _rv_phase, _active_slug)
         if routed:
-            idea_state = _get_active_idea_state(PIPELINE_DIR)
+            idea_state = _get_active_idea_state(cfg.pipeline_dir)
     except Exception as _rv_err:
         print(f"  [reviewed] Failed to advance {_active_slug}: {_rv_err}")
     return idea_state
@@ -61,7 +60,7 @@ def read_task_progress(idea_state: dict[str, Any]) -> tuple[int, int]:
         slug = idea_state.get("_slug", "")
         phase_num = idea_state.get("phase", 1)
         if slug:
-            tasks_file = PIPELINE_DIR / "projects" / slug / f"phases/phase_{phase_num}/tasks.md"
+            tasks_file = cfg.pipeline_dir / "projects" / slug / f"phases/phase_{phase_num}/tasks.md"
             if tasks_file.exists():
                 from pipeline.agent_process import AgentProcess
 
@@ -84,7 +83,7 @@ def read_workspace_activity(active_slug: str) -> tuple[int, float]:
     _ws_last_mtime = 0.0
     try:
         if active_slug:
-            _ws_dir = PIPELINE_DIR / "projects" / active_slug / "workspace"
+            _ws_dir = cfg.pipeline_dir / "projects" / active_slug / "workspace"
             if _ws_dir.exists():
                 for _wf in _ws_dir.rglob("*"):
                     if _wf.is_file() and not _wf.name.startswith("."):
@@ -136,15 +135,15 @@ def tick_health_preamble(cfg: MainLoopConfig) -> dict[str, Any]:
         try:
             from pipeline.health_checks import run_all_checks, write_health_report
 
-            _active_for_health = _get_active_idea_state(PIPELINE_DIR)
+            _active_for_health = _get_active_idea_state(cfg.pipeline_dir)
             _health_slug = _active_for_health.get("_slug", "")
-            hc_results = run_all_checks(PROJECT_ROOT, PIPELINE_DIR, _health_slug)
+            hc_results = run_all_checks(PROJECT_ROOT, cfg.pipeline_dir, _health_slug)
             if hc_results:
                 fixes = sum(1 for r in hc_results if r.auto_fixed)
                 issues = len(hc_results) - fixes
                 if fixes:
                     print(f"  🩺 Health check: {fixes} auto-fixed, {issues} reported")
-                write_health_report(hc_results, PIPELINE_DIR)
+                write_health_report(hc_results, cfg.pipeline_dir)
         except Exception as _hc_err:
             print(f"  [health] Check failed: {_hc_err}")
 
@@ -181,7 +180,7 @@ def tick_status_display(
     phase = idea_state.get("status", "?")
     title = idea_state.get("title", "")
     if cfg.state.parallel_seeds > 1:
-        _all_active = _get_all_active_idea_states(PIPELINE_DIR)
+        _all_active = _get_all_active_idea_states(cfg.pipeline_dir)
         if len(_all_active) > 1:
             title_str = " | " + " / ".join(
                 f"[{s.get('title', '?')[:15]}]" for s in _all_active[:4]
@@ -212,7 +211,7 @@ def tick_status_display(
     _tps_str = ""
     _live_gpu_pct = 0.0
     try:
-        _tp_live_path = PIPELINE_DIR / "state" / "throughput.json"
+        _tp_live_path = cfg.pipeline_dir / "state" / "throughput.json"
         if _tp_live_path.exists():
             _tp_live = json.loads(_tp_live_path.read_text(encoding="utf-8"))
             _live_cum_tok = _tp_live.get("cumulative_tokens", 0)
@@ -231,7 +230,7 @@ def tick_status_display(
     _tuner_str = ""
     if cfg.tuner is not None:
         try:
-            _tp_path = PIPELINE_DIR / "state" / "throughput.json"
+            _tp_path = cfg.pipeline_dir / "state" / "throughput.json"
             _decision = cfg.tuner.observe(
                 throughput_path=_tp_path,
                 current_seeds=cfg.state.parallel_seeds,
@@ -280,7 +279,7 @@ def _print_throughput_breakdown(cfg: MainLoopConfig, running_agents: int) -> Non
     _now = time.time()
     if cfg.provider != "ollama" or (_now - cfg.state.last_tps_print) < _TPS_PRINT_INTERVAL:
         return
-    _tp_path = PIPELINE_DIR / "state" / "throughput.json"
+    _tp_path = cfg.pipeline_dir / "state" / "throughput.json"
     if not _tp_path.exists():
         cfg.state.last_tps_print = _now
         return
@@ -364,7 +363,7 @@ def tick_project_metrics(
     """Collect per-project metrics and wire throughput deltas."""
     _active_slug = idea_state.get("_slug", "")
     try:
-        projects_dir = PIPELINE_DIR / "projects"
+        projects_dir = cfg.pipeline_dir / "projects"
         if projects_dir.exists():
             for proj_dir in projects_dir.iterdir():
                 if not proj_dir.is_dir():
@@ -413,7 +412,7 @@ def tick_project_metrics(
         pass
 
     try:
-        _tp_metrics_path = PIPELINE_DIR / "state" / "throughput.json"
+        _tp_metrics_path = cfg.pipeline_dir / "state" / "throughput.json"
         if _tp_metrics_path.exists():
             _tp_data = json.loads(_tp_metrics_path.read_text(encoding="utf-8"))
             _total_tok = _tp_data.get("cumulative_tokens", 0)

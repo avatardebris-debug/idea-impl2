@@ -18,7 +18,6 @@ from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PHASE_RETRIES,
     MAX_PROJECT_LIFETIME_RETRIES,
-    PIPELINE_DIR,
     PROJECT_ROOT,
 )
 from pipeline.slug_util import slugify_title as _slugify
@@ -42,9 +41,9 @@ def _extract_shared_libs(
     import re as _re
     import shutil as _shutil
 
-    run_dir   = project_dir.parent.parent.parent  # .pipeline/projects/slug -> idea impl/
-    shared    = run_dir / ".pipeline" / "shared_libs"
-    tools_log = run_dir / ".pipeline" / "state" / "reusable_tools.md"
+    pipeline_root = project_dir.parent.parent  # projects/<slug> -> output root
+    shared = pipeline_root / "shared_libs"
+    tools_log = pipeline_root / "state" / "reusable_tools.md"
     review_full = project_dir / review_path
 
     if not review_full.exists():

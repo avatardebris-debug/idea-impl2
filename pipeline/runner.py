@@ -425,6 +425,7 @@ def run_pipeline(
             ).start()
 
         run_main_loop(MainLoopConfig(
+            pipeline_dir=PIPELINE_DIR,
             bus=bus,
             supervisor=supervisor,
             run_ctx=_run_ctx,
