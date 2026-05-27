@@ -62,3 +62,13 @@ def format_values_for_prompt(*, include_hard: bool = True, include_soft: bool = 
         for v in soft_values():
             lines.append(f"  - {v.get('id', '?')}: {v.get('rule', '')}")
     return "\n".join(lines)
+
+
+def mission_prompt_block(*, include_construct: bool = False) -> str:
+    """Mission + values block for ideator prompts."""
+    block = format_values_for_prompt()
+    if include_construct:
+        construct = ideator_construct_prompt()
+        if construct:
+            block = f"{block}\n\nConstruct pass:\n{construct}".strip()
+    return block

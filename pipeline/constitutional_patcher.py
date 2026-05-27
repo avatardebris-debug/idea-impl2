@@ -43,12 +43,21 @@ from typing import NamedTuple
 # ---------------------------------------------------------------------------
 
 ROOT         = pathlib.Path(__file__).parent.parent.resolve()
-PIPELINE_DIR = ROOT / ".pipeline"
-MEMORY_DIR   = PIPELINE_DIR / "memory"
 PROMPTS_DIR  = ROOT / "pipeline" / "prompts"
-PATCH_LOG    = MEMORY_DIR / "constitutional_patches.jsonl"
 
-BUG_MEMORY   = MEMORY_DIR / "bug_resolutions.jsonl"
+
+def _memory_dir() -> pathlib.Path:
+    from pipeline.pipeline_config import get_pipeline_dir
+
+    return get_pipeline_dir() / "memory"
+
+
+def _bug_memory() -> pathlib.Path:
+    return _memory_dir() / "bug_resolutions.jsonl"
+
+
+def _patch_log() -> pathlib.Path:
+    return _memory_dir() / "constitutional_patches.jsonl"
 
 # ---------------------------------------------------------------------------
 # Role → which keywords suggest this role's prompt needs patching
@@ -105,10 +114,11 @@ class PatchRecord(NamedTuple):
 
 def _load_resolutions() -> list[dict]:
     """Load all records from bug_resolutions.jsonl."""
-    if not BUG_MEMORY.exists():
+    bug_path = _bug_memory()
+    if not bug_path.exists():
         return []
     records = []
-    for line in BUG_MEMORY.read_text(encoding="utf-8").splitlines():
+    for line in bug_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -318,8 +328,9 @@ def run_patcher(
 
         # Persist to patch log
         if not dry_run:
-            PATCH_LOG.parent.mkdir(parents=True, exist_ok=True)
-            with PATCH_LOG.open("a", encoding="utf-8") as f:
+            plog = _patch_log()
+            plog.parent.mkdir(parents=True, exist_ok=True)
+            with plog.open("a", encoding="utf-8") as f:
                 f.write(json.dumps({
                     "role":      patch.role,
                     "pattern":   patch.pattern,
@@ -347,11 +358,12 @@ def run_patcher(
 
 def print_patch_log() -> None:
     """Print all previously applied patches."""
-    if not PATCH_LOG.exists():
+    plog = _patch_log()
+    if not plog.exists():
         print("  No constitutional patches applied yet.")
         return
     records = []
-    for line in PATCH_LOG.read_text(encoding="utf-8").splitlines():
+    for line in plog.read_text(encoding="utf-8").splitlines():
         if line.strip():
             try:
                 records.append(json.loads(line))

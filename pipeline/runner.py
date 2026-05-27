@@ -145,20 +145,17 @@ def run_pipeline(
         start_background_refresh,
         stop_background_refresh,
     )
-    from pipeline.message_bus import MessageBus
     from pipeline.metrics import RunMetrics
     from pipeline.pipeline_mode import set_legacy_mode
     from pipeline.run_context import RunContext
+    from pipeline.output_bootstrap import ensure_pipeline_ready
 
     set_legacy_mode(legacy)
     global PROJECT_ROOT, _run_ctx, PIPELINE_DIR
 
-    from pipeline.output_bootstrap import bootstrap_hermes, bootstrap_output_repo
-    from pipeline import pipeline_config as _pc
+    PIPELINE_DIR = ensure_pipeline_ready(hermes=True)
 
-    bootstrap_output_repo()
-    PIPELINE_DIR = _pc.reload_pipeline_dir()
-    bootstrap_hermes()
+    from pipeline.message_bus import MessageBus
 
     _ideas_path = pathlib.Path(ideas_file).resolve() if ideas_file else PROJECT_ROOT.resolve() / "master_ideas.md"
     _polish_path: pathlib.Path | None = None
@@ -255,14 +252,14 @@ def run_pipeline(
 
     try:
         from pipeline.pipeline_activity import log_activity
-        from pipeline.pipeline_config import PIPELINE_DIR
+        from pipeline.pipeline_config import get_pipeline_dir
 
         log_activity(
             "runner_start",
             run_mode=_run_ctx.mode if _run_ctx else "single",
             provider=provider,
             model=model,
-            pipeline_dir=str(PIPELINE_DIR),
+            pipeline_dir=str(get_pipeline_dir()),
         )
     except Exception:
         pass
@@ -598,12 +595,10 @@ def main():
 
     args = parser.parse_args()
 
-    if args.list_goals:
-        from pipeline.output_bootstrap import bootstrap_output_repo
-        from pipeline import pipeline_config as _pc
+    from pipeline.output_bootstrap import ensure_pipeline_ready
 
-        bootstrap_output_repo()
-        _pc.reload_pipeline_dir()
+    if args.list_goals:
+        ensure_pipeline_ready(hermes=False)
         from pipeline.goal_attempt import list_attemptable_goals
 
         for row in list_attemptable_goals():
@@ -614,12 +609,7 @@ def main():
         return
 
     if args.attempt_goal:
-        from pipeline.output_bootstrap import bootstrap_hermes, bootstrap_output_repo
-        from pipeline import pipeline_config as _pc
-
-        bootstrap_output_repo()
-        _pc.reload_pipeline_dir()
-        bootstrap_hermes()
+        ensure_pipeline_ready(hermes=True)
         from pipeline.goal_attempt import attempt_goal
 
         result = attempt_goal(

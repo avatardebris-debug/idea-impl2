@@ -28,20 +28,9 @@ _DOMAIN_KEYWORDS: dict[str, tuple[str, ...]] = {
 
 def _project_satisfied(slug: str) -> bool:
     """True if slug exists and is complete at max phase."""
-    from pathlib import Path
-    import json as _json
+    from pipeline.project_complete import is_project_complete
 
-    state_file = Path(__file__).parent.parent / ".pipeline" / "projects" / slug / "state" / "current_idea.json"
-    if not state_file.exists():
-        return False
-    try:
-        st = _json.loads(state_file.read_text(encoding="utf-8"))
-        return (
-            st.get("status") == "complete"
-            and int(st.get("phase", 0)) >= int(st.get("total_phases", 1))
-        )
-    except Exception:
-        return False
+    return is_project_complete(slug)
 
 
 def _requires_satisfied(requires_json: str) -> tuple[bool, list[str]]:

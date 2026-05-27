@@ -19,45 +19,12 @@ import logging
 import pathlib
 import re
 import sys
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Literal
 
 logger = logging.getLogger(__name__)
 
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT  # noqa: E402
-
-GOALS_DIR = PIPELINE_DIR / "goals"
-
-
-# ---------------------------------------------------------------------------
-# Data model
-# ---------------------------------------------------------------------------
-
-@dataclass
-class GoalBranch:
-    id: str
-    subgoal: str
-    type: Literal["software", "compound", "hermes_task", "robot_skill", "capability_gap"]
-    description: str = ""
-    requires: list[str] = field(default_factory=list)
-    hermes_prompt: str = ""
-    hermes_goal_check: str = ""
-    # Runtime state
-    status: str = "pending"  # pending | injected | complete | killed
-    pipeline_slug: str | None = None
-    mirofish_score: float | None = None
-
-
-@dataclass
-class GoalTree:
-    goal_id: str
-    goal_text: str
-    created_at: str
-    parent_goal_id: str | None = None
-    parent_branch_id: str | None = None
-    status: str = "active"  # active | complete | abandoned
-    branches: list[GoalBranch] = field(default_factory=list)
+from pipeline.pipeline_config import PROJECT_ROOT  # noqa: E402
+from pipeline.goal_tree import GoalBranch, GoalTree, goals_dir, save_goal_tree
 
 
 # ---------------------------------------------------------------------------
@@ -207,7 +174,7 @@ def decompose_goal(
     parent_branch_id: str | None = None,
 ) -> GoalTree:
     """Decompose a natural-language goal into a GoalTree and persist to disk."""
-    GOALS_DIR.mkdir(parents=True, exist_ok=True)
+    goals_dir().mkdir(parents=True, exist_ok=True)
 
     goal_id = re.sub(r"[^\w]", "_", goal_title.lower())[:40].strip("_")
     ts = datetime.now(timezone.utc).isoformat()
@@ -262,37 +229,9 @@ def decompose_goal(
         branches=branches,
     )
 
-    _save_goal_tree(tree)
+    save_goal_tree(tree)
     logger.info("goal_decomposer: decomposed '%s' → %d branches", goal_title, len(branches))
     return tree
-
-
-def _save_goal_tree(tree: GoalTree) -> None:
-    """Persist goal tree as JSON for inspection/resume."""
-    path = GOALS_DIR / f"{tree.goal_id}.json"
-    data = {
-        "goal_id": tree.goal_id,
-        "goal_text": tree.goal_text,
-        "created_at": tree.created_at,
-        "parent_goal_id": tree.parent_goal_id,
-        "parent_branch_id": tree.parent_branch_id,
-        "status": tree.status,
-        "branches": [
-            {
-                "id": b.id,
-                "subgoal": b.subgoal,
-                "type": b.type,
-                "description": b.description,
-                "requires": b.requires,
-                "hermes_prompt": b.hermes_prompt,
-                "hermes_goal_check": b.hermes_goal_check,
-                "status": b.status,
-                "pipeline_slug": b.pipeline_slug,
-            }
-            for b in tree.branches
-        ],
-    }
-    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -385,14 +324,14 @@ def inject_branches_into_ideas(tree: GoalTree, mi_path: pathlib.Path) -> int:
     try:
         from pipeline.goal_backlog import append_decomposed_goal
 
-        tree_path = GOALS_DIR / f"{tree.goal_id}.json"
+        tree_path = goals_dir() / f"{tree.goal_id}.json"
         append_decomposed_goal(
             tree.goal_id,
             tree.goal_text,
             branch_count=len(tree.branches),
             tree_path=tree_path,
         )
-        _save_goal_tree(tree)
+        save_goal_tree(tree)
     except Exception as exc:
         logger.debug("goal backlog update skipped: %s", exc)
 
@@ -444,5 +383,5 @@ def process_goal_line(
         return False
 
     injected = inject_branches_into_ideas(tree, mi_path)
-    _save_goal_tree(tree)
+    save_goal_tree(tree)
     return injected > 0

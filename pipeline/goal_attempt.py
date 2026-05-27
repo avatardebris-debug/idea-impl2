@@ -5,37 +5,27 @@ Attempt to achieve decomposed goals using built capabilities or Hermes.
 
 from __future__ import annotations
 
-import json
-import pathlib
-import re
 from typing import Any
 
-from pipeline.goal_backlog import GOALS_DIR, load_goal_tree, mark_goal_achieved
-from pipeline.pipeline_config import PIPELINE_DIR, PROJECT_ROOT
+from pipeline.goal_backlog import mark_goal_achieved
+from pipeline.goal_tree import (
+    GoalBranch,
+    GoalTree,
+    completion_branches,
+    goals_dir,
+    load_goal_tree,
+    save_goal_tree,
+)
+from pipeline.project_complete import is_project_complete
 
 
-def _project_complete(slug: str) -> bool:
-    state_file = PIPELINE_DIR / "projects" / slug / "state" / "current_idea.json"
-    if not state_file.exists():
-        return False
-    try:
-        st = json.loads(state_file.read_text(encoding="utf-8"))
-        return (
-            st.get("status") == "complete"
-            and int(st.get("phase", 0)) >= int(st.get("total_phases", 1))
-        )
-    except Exception:
-        return False
-
-
-def _branch_runnable(branch: dict[str, Any]) -> bool:
-    btype = branch.get("type", "software")
+def _branch_runnable(branch: GoalBranch) -> bool:
+    btype = branch.type
     if btype == "hermes_task":
-        return bool(branch.get("hermes_prompt"))
-    if btype in ("compound",):
+        return bool(branch.hermes_prompt)
+    if btype == "compound":
         return False
-    requires = branch.get("requires") or []
-    return all(_project_complete(r) for r in requires)
+    return all(is_project_complete(r) for r in branch.requires)
 
 
 def attempt_goal(
@@ -50,9 +40,9 @@ def attempt_goal(
     if not tree:
         return {"ok": False, "error": f"goal not found: {goal_id}"}
 
-    branches = tree.get("branches") or []
+    branches = list(tree.branches)
     if branch_id:
-        branches = [b for b in branches if b.get("id") == branch_id]
+        branches = [b for b in branches if b.id == branch_id]
         if not branches:
             return {"ok": False, "error": f"branch not found: {branch_id}"}
 
@@ -60,47 +50,41 @@ def attempt_goal(
     achieved = 0
 
     for branch in branches:
-        bid = branch.get("id", "?")
-        if branch.get("status") == "achieved":
+        bid = branch.id or "?"
+        if branch.status == "achieved":
             results.append({"branch": bid, "status": "already_achieved"})
             continue
         if not _branch_runnable(branch):
-            results.append({"branch": bid, "status": "not_runnable", "type": branch.get("type")})
+            results.append({"branch": bid, "status": "not_runnable", "type": branch.type})
             continue
 
-        btype = branch.get("type", "software")
-        if btype == "hermes_task":
+        if branch.type == "hermes_task":
             r = _attempt_hermes(branch, provider=provider, model=model)
-        elif btype in ("software", "robot_skill", "capability_gap"):
+        elif branch.type in ("software", "robot_skill", "capability_gap"):
             r = _attempt_capability(branch)
         else:
-            r = {"branch": bid, "status": "skipped", "reason": f"type={btype}"}
+            r = {"branch": bid, "status": "skipped", "reason": f"type={branch.type}"}
             results.append(r)
             continue
 
         results.append(r)
         if r.get("status") == "achieved":
             achieved += 1
-            branch["status"] = "achieved"
-            _save_tree(goal_id, tree)
+            branch.status = "achieved"
+            save_goal_tree(tree)
 
-    if achieved and all(b.get("status") == "achieved" for b in tree.get("branches") or []):
-        tree["status"] = "complete"
-        _save_tree(goal_id, tree)
+    required = completion_branches(tree)
+    if required and all(b.status == "achieved" for b in required):
+        tree.status = "complete"
+        save_goal_tree(tree)
         mark_goal_achieved(goal_id)
 
     return {"ok": True, "goal_id": goal_id, "achieved": achieved, "results": results}
 
 
-def _save_tree(goal_id: str, tree: dict[str, Any]) -> None:
-    path = GOALS_DIR / f"{goal_id}.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(tree, indent=2), encoding="utf-8")
-
-
-def _attempt_capability(branch: dict[str, Any]) -> dict[str, Any]:
-    bid = branch.get("id", "?")
-    text = branch.get("description") or branch.get("subgoal") or ""
+def _attempt_capability(branch: GoalBranch) -> dict[str, Any]:
+    bid = branch.id or "?"
+    text = branch.description or branch.subgoal or ""
     try:
         from pipeline.pipeline_mode import legacy_mode
 
@@ -117,7 +101,7 @@ def _attempt_capability(branch: dict[str, Any]) -> dict[str, Any]:
             if not slug:
                 continue
             out = invoke_capability(slug, args="")
-            if out and "error" not in out.lower()[:200]:
+            if out.startswith("OK (exit 0)"):
                 return {"branch": bid, "status": "achieved", "capability": slug, "output": out[:500]}
         return {"branch": bid, "status": "failed", "reason": "no invokable capability"}
     except Exception as exc:
@@ -125,14 +109,14 @@ def _attempt_capability(branch: dict[str, Any]) -> dict[str, Any]:
 
 
 def _attempt_hermes(
-    branch: dict[str, Any],
+    branch: GoalBranch,
     *,
     provider: str,
     model: str | None,
 ) -> dict[str, Any]:
-    bid = branch.get("id", "?")
-    prompt = branch.get("hermes_prompt") or branch.get("description") or ""
-    goal_check = branch.get("hermes_goal_check") or f"Was '{branch.get('subgoal')}' completed?"
+    bid = branch.id or "?"
+    prompt = branch.hermes_prompt or branch.description or ""
+    goal_check = branch.hermes_goal_check or f"Was '{branch.subgoal}' completed?"
     try:
         from pipeline.hermes_runner import HermesGoalRunner
 
@@ -156,20 +140,20 @@ def _attempt_hermes(
 
 def list_attemptable_goals() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
-    if not GOALS_DIR.exists():
+    gdir = goals_dir()
+    if not gdir.exists():
         return out
-    for path in sorted(GOALS_DIR.glob("*.json")):
-        try:
-            tree = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+    for path in sorted(gdir.glob("*.json")):
+        tree = load_goal_tree(path.stem)
+        if not tree:
             continue
-        gid = tree.get("goal_id") or path.stem
-        branches = tree.get("branches") or []
-        runnable = sum(1 for b in branches if _branch_runnable(b) and b.get("status") != "achieved")
+        runnable = sum(
+            1 for b in tree.branches if _branch_runnable(b) and b.status != "achieved"
+        )
         out.append({
-            "goal_id": gid,
-            "status": tree.get("status", "?"),
-            "branches": len(branches),
+            "goal_id": tree.goal_id,
+            "status": tree.status,
+            "branches": len(tree.branches),
             "runnable": runnable,
         })
     return out

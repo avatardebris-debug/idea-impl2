@@ -249,8 +249,6 @@ class ContextAggregator:
     a slug and we resolve the rest.
     """
 
-    _PIPELINE_DIR: pathlib.Path = pathlib.Path(__file__).parent.parent.resolve() / ".pipeline"
-
     def build(self, slug: str, force: bool = False) -> dict[str, Any]:
         """Build (or return cached) context for a project slug.
 
@@ -261,7 +259,9 @@ class ContextAggregator:
         Returns:
             The context cache dict, or {} if the project dir doesn't exist.
         """
-        project_dir = self._PIPELINE_DIR / "projects" / slug
+        from pipeline.pipeline_config import get_pipeline_dir
+
+        project_dir = get_pipeline_dir() / "projects" / slug
         if not project_dir.exists():
             return {}
         cache_path = project_dir / "state" / "context_cache.json"

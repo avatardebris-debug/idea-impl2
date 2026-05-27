@@ -45,11 +45,33 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 ROOT         = pathlib.Path(__file__).parent.parent.parent.resolve()
-PIPELINE_DIR = ROOT / ".pipeline"
-PROJECTS_DIR = PIPELINE_DIR / "projects"
-MEMORY_DIR   = PIPELINE_DIR / "memory"
-RACE_LOG     = MEMORY_DIR / "race_log.jsonl"
-DPO_RACE     = MEMORY_DIR / "dpo_race.jsonl"  # race-generated DPO pairs
+
+
+def _race_log() -> pathlib.Path:
+    return _memory_dir() / "race_log.jsonl"
+
+
+def _dpo_race() -> pathlib.Path:
+    return _memory_dir() / "dpo_race.jsonl"
+
+
+_pipeline_override: pathlib.Path | None = None
+
+
+def _pipeline_dir() -> pathlib.Path:
+    if _pipeline_override is not None:
+        return _pipeline_override
+    from pipeline.pipeline_config import get_pipeline_dir
+
+    return get_pipeline_dir()
+
+
+def _projects_dir() -> pathlib.Path:
+    return _pipeline_dir() / "projects"
+
+
+def _memory_dir() -> pathlib.Path:
+    return _pipeline_dir() / "memory"
 
 log = logging.getLogger(__name__)
 
@@ -167,10 +189,11 @@ def _workspace_as_document(workspace: pathlib.Path, max_files: int = 40) -> str:
 
 def _already_raced(slug: str, phase: int) -> bool:
     """Check race_log.jsonl for a prior result on this (slug, phase)."""
-    if not RACE_LOG.exists():
+    rlog = _race_log()
+    if not rlog.exists():
         return False
     try:
-        for line in RACE_LOG.read_text(encoding="utf-8").splitlines():
+        for line in rlog.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             rec = json.loads(line)
@@ -322,7 +345,7 @@ def run_replay(
     results: list[RaceResult] = []
     raced = 0
 
-    for proj_dir in sorted(PROJECTS_DIR.iterdir()):
+    for proj_dir in sorted(_projects_dir().iterdir()):
         if not proj_dir.is_dir():
             continue
         state_file = proj_dir / "state" / "current_idea.json"
@@ -357,7 +380,7 @@ def run_replay(
                 continue
 
             # Persist
-            _append_jsonl(RACE_LOG, result.to_log_dict())
+            _append_jsonl(_race_log(), result.to_log_dict())
             if not result.is_tie and result.chosen_text and result.rejected_text:
                 dpo_rec = {
                     "prompt":   result.chosen_text[:500] + "...",  # prompt summary
@@ -371,7 +394,7 @@ def run_replay(
                         "source":       "race",
                     },
                 }
-                _append_jsonl(DPO_RACE, dpo_rec)
+                _append_jsonl(_dpo_race(), dpo_rec)
 
             results.append(result)
             raced += 1
@@ -383,12 +406,13 @@ def run_replay(
 
 def run_stats() -> None:
     """Print a summary of all race results from race_log.jsonl."""
-    if not RACE_LOG.exists():
-        print("  No race log found at", RACE_LOG)
+    rlog = _race_log()
+    if not rlog.exists():
+        print("  No race log found at", rlog)
         return
 
     records: list[dict] = []
-    for line in RACE_LOG.read_text(encoding="utf-8").splitlines():
+    for line in rlog.read_text(encoding="utf-8").splitlines():
         if line.strip():
             try:
                 records.append(json.loads(line))
@@ -409,8 +433,9 @@ def run_stats() -> None:
 
     # DPO pairs generated
     dpo_count = 0
-    if DPO_RACE.exists():
-        dpo_count = sum(1 for l in DPO_RACE.read_text(encoding="utf-8").splitlines() if l.strip())
+    dpo_path = _dpo_race()
+    if dpo_path.exists():
+        dpo_count = sum(1 for l in dpo_path.read_text(encoding="utf-8").splitlines() if l.strip())
 
     SEP = "-" * 55
     print(f"\n  {SEP}")
@@ -423,8 +448,8 @@ def run_stats() -> None:
     print(f"  Avg score A:      {avg_a:.1f}")
     print(f"  Avg score B:      {avg_b:.1f}")
     print(f"  Avg margin:       {avg_margin:.1f}")
-    print(f"  DPO pairs gen:    {dpo_count}  →  {DPO_RACE}")
-    print(f"  Race log:         {RACE_LOG}")
+    print(f"  DPO pairs gen:    {dpo_count}  →  {dpo_path}")
+    print(f"  Race log:         {rlog}")
 
     # Per-model breakdown
     models_a = {}
@@ -509,13 +534,9 @@ Examples:
         return
 
     # Override pipeline dir if provided
-    global PROJECTS_DIR, RACE_LOG, DPO_RACE, MEMORY_DIR
+    global _pipeline_override
     if args.pipeline_dir:
-        pd = pathlib.Path(args.pipeline_dir)
-        PROJECTS_DIR = pd / "projects"
-        MEMORY_DIR   = pd / "memory"
-        RACE_LOG     = MEMORY_DIR / "race_log.jsonl"
-        DPO_RACE     = MEMORY_DIR / "dpo_race.jsonl"
+        _pipeline_override = pathlib.Path(args.pipeline_dir)
 
     import os
     model_b = args.model_b or os.environ.get("PIPELINE_MODEL", "qwen3.5:35b")
@@ -553,8 +574,8 @@ Examples:
         non_tie = [r for r in results if not r.is_tie]
         print(f"  Non-tie results: {len(non_tie)}")
         print(f"  DPO pairs added: {len(non_tie)}")
-        print(f"  Race log:        {RACE_LOG}")
-        print(f"  DPO pairs:       {DPO_RACE}\n")
+        print(f"  Race log:        {_race_log()}")
+        print(f"  DPO pairs:       {_dpo_race()}\n")
         run_stats()
 
 

@@ -130,6 +130,59 @@ def _make_record_id(base_id: str, part_index: int, total_parts: int) -> str:
     return f"{base_id}__p{part_index}of{total_parts}"
 
 
+def _build_continuation_records(
+    output_chunks: list[str],
+    instruction: str,
+    input: str,
+    *,
+    max_chars_per_input_continue: int,
+    sequence_id: str,
+    id_base: str,
+    source_slug: str,
+    granularity: str,
+    enricher_tags: list[str],
+    shared: dict[str, Any],
+) -> list[dict[str, Any]]:
+    tail_budget = max(
+        200,
+        max_chars_per_input_continue - _CONTINUE_INPUT_OVERHEAD - len(CONTINUE_MARKER),
+    )
+    total_parts = len(output_chunks)
+    records: list[dict[str, Any]] = []
+    prev_output = ""
+
+    for idx, chunk in enumerate(output_chunks):
+        part_index = idx + 1
+        rec_id = _make_record_id(id_base, part_index, total_parts)
+
+        if idx == 0:
+            rec_instruction = instruction
+            rec_input = input
+        else:
+            rec_instruction = CONTINUE_INSTRUCTION
+            tail = prev_output[-tail_budget:] if prev_output else ""
+            rec_input = _continuation_input(tail, part_index, total_parts)
+
+        record: dict[str, Any] = {
+            "id": rec_id,
+            "instruction": rec_instruction,
+            "input": rec_input,
+            "output": chunk,
+            "sequence_id": sequence_id,
+            "part_index": part_index,
+            "total_parts": total_parts,
+            "source_slug": source_slug,
+            "granularity": granularity,
+            "enricher_tags": enricher_tags,
+            "is_continuation": idx > 0,
+        }
+        record.update(shared)
+        records.append(record)
+        prev_output = chunk
+
+    return records
+
+
 def chunk_workspace_to_records(
     workspace: pathlib.Path | dict[str, str],
     instruction: str,
@@ -173,50 +226,22 @@ def chunk_workspace_to_records(
         return []
 
     output_chunks = _split_text_into_chunks(full_block, max_chars_per_output)
-    total_parts = len(output_chunks)
+    if not output_chunks:
+        return []
+
     seq_id = sequence_id or str(uuid.uuid4())
-    id_base = base_id or seq_id
-    tags = list(enricher_tags or [])
-    shared = dict(extra_fields or {})
-
-    tail_budget = max(
-        200,
-        max_chars_per_input_continue - _CONTINUE_INPUT_OVERHEAD - len(CONTINUE_MARKER),
+    return _build_continuation_records(
+        output_chunks,
+        instruction,
+        input,
+        max_chars_per_input_continue=max_chars_per_input_continue,
+        sequence_id=seq_id,
+        id_base=base_id or seq_id,
+        source_slug=source_slug,
+        granularity=granularity,
+        enricher_tags=list(enricher_tags or []),
+        shared=dict(extra_fields or {}),
     )
-
-    records: list[dict[str, Any]] = []
-    prev_output = ""
-
-    for idx, chunk in enumerate(output_chunks):
-        part_index = idx + 1  # 1-based for trainers/humans
-        rec_id = _make_record_id(id_base, part_index, total_parts)
-
-        if idx == 0:
-            rec_instruction = instruction
-            rec_input = input
-        else:
-            rec_instruction = CONTINUE_INSTRUCTION
-            tail = prev_output[-tail_budget:] if prev_output else ""
-            rec_input = _continuation_input(tail, part_index, total_parts)
-
-        record: dict[str, Any] = {
-            "id": rec_id,
-            "instruction": rec_instruction,
-            "input": rec_input,
-            "output": chunk,
-            "sequence_id": seq_id,
-            "part_index": part_index,
-            "total_parts": total_parts,
-            "source_slug": source_slug,
-            "granularity": granularity,
-            "enricher_tags": tags,
-            "is_continuation": idx > 0,
-        }
-        record.update(shared)
-        records.append(record)
-        prev_output = chunk
-
-    return records
 
 
 def records_from_code_block(
@@ -238,46 +263,19 @@ def records_from_code_block(
         return []
 
     output_chunks = _split_text_into_chunks(code_block, max_chars_per_output)
-    total_parts = len(output_chunks)
+    if not output_chunks:
+        return []
+
     seq_id = sequence_id or str(uuid.uuid4())
-    id_base = base_id or seq_id
-    tags = list(enricher_tags or [])
-    shared = dict(extra_fields or {})
-    tail_budget = max(
-        200,
-        max_chars_per_input_continue - _CONTINUE_INPUT_OVERHEAD - len(CONTINUE_MARKER),
+    return _build_continuation_records(
+        output_chunks,
+        instruction,
+        input,
+        max_chars_per_input_continue=max_chars_per_input_continue,
+        sequence_id=seq_id,
+        id_base=base_id or seq_id,
+        source_slug=source_slug,
+        granularity=granularity,
+        enricher_tags=list(enricher_tags or []),
+        shared=dict(extra_fields or {}),
     )
-
-    records: list[dict[str, Any]] = []
-    prev_output = ""
-
-    for idx, chunk in enumerate(output_chunks):
-        part_index = idx + 1
-        rec_id = _make_record_id(id_base, part_index, total_parts)
-
-        if idx == 0:
-            rec_instruction = instruction
-            rec_input = input
-        else:
-            rec_instruction = CONTINUE_INSTRUCTION
-            tail = prev_output[-tail_budget:] if prev_output else ""
-            rec_input = _continuation_input(tail, part_index, total_parts)
-
-        record: dict[str, Any] = {
-            "id": rec_id,
-            "instruction": rec_instruction,
-            "input": rec_input,
-            "output": chunk,
-            "sequence_id": seq_id,
-            "part_index": part_index,
-            "total_parts": total_parts,
-            "source_slug": source_slug,
-            "granularity": granularity,
-            "enricher_tags": tags,
-            "is_continuation": idx > 0,
-        }
-        record.update(shared)
-        records.append(record)
-        prev_output = chunk
-
-    return records

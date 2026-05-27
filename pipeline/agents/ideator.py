@@ -60,12 +60,9 @@ class IdeatorAgent(AgentProcess):
 
         mission_block = ""
         try:
-            from pipeline.mission import format_values_for_prompt, ideator_construct_prompt
+            from pipeline.mission import mission_prompt_block
 
-            mission_block = format_values_for_prompt()
-            construct = ideator_construct_prompt()
-            if construct:
-                mission_block = f"{mission_block}\n\nConstruct pass:\n{construct}".strip()
+            mission_block = mission_prompt_block(include_construct=True)
         except Exception:
             pass
 
@@ -150,12 +147,12 @@ class IdeatorAgent(AgentProcess):
         deconstruct_block = ""
         try:
             from pipeline.mission import (
-                format_values_for_prompt,
                 ideator_construct_prompt,
                 ideator_deconstruct_prompt,
+                mission_prompt_block,
             )
 
-            mission_block = format_values_for_prompt()
+            mission_block = mission_prompt_block()
             construct_block = ideator_construct_prompt()
             deconstruct_block = ideator_deconstruct_prompt()
         except Exception:

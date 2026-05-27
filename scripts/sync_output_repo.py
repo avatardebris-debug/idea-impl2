@@ -24,7 +24,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from pipeline.pipeline_config import PIPELINE_DIR  # noqa: E402
+from pipeline.output_bootstrap import ensure_pipeline_ready
+from pipeline.pipeline_config import get_pipeline_dir  # noqa: E402
 
 
 def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -44,7 +45,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
-    out_dir = PIPELINE_DIR
+    ensure_pipeline_ready(hermes=False)
+    out_dir = get_pipeline_dir()
     if not out_dir.is_dir():
         print(f"ERROR: PIPELINE_DIR not found: {out_dir}")
         return 1

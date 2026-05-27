@@ -49,11 +49,18 @@ def resolve_pipeline_dir() -> pathlib.Path:
 PIPELINE_DIR = resolve_pipeline_dir()
 
 
+def get_pipeline_dir() -> pathlib.Path:
+    """Live output root — always re-resolves from env and filesystem rules."""
+    return resolve_pipeline_dir()
+
+
 def reload_pipeline_dir() -> pathlib.Path:
     """Re-resolve after bootstrap sets PIPELINE_DIR env (cloud clone)."""
     global PIPELINE_DIR
     PIPELINE_DIR = resolve_pipeline_dir()
     return PIPELINE_DIR
+
+
 AGENTS_DIR = pathlib.Path(__file__).parent / "agents"
 
 AGENT_ROLES = [

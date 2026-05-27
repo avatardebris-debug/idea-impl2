@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
-import json
 import pathlib
+import re
 from datetime import datetime, timezone
 
-from pipeline.pipeline_config import PIPELINE_DIR
-
-GOALS_DIR = PIPELINE_DIR / "goals"
-BACKLOG_PATH = GOALS_DIR / "backlog.md"
+from pipeline.goal_tree import goals_dir
 
 
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _backlog_path() -> pathlib.Path:
+    return goals_dir() / "backlog.md"
 
 
 def append_decomposed_goal(
@@ -23,14 +24,15 @@ def append_decomposed_goal(
     branch_count: int,
     tree_path: pathlib.Path | None = None,
 ) -> None:
-    GOALS_DIR.mkdir(parents=True, exist_ok=True)
+    goals_dir().mkdir(parents=True, exist_ok=True)
     header = "## Active goals (decomposed, not achieved)\n"
     line = (
         f"- [ ] **{goal_text[:80]}** — goal:{goal_id} "
         f"decomposed branches:{branch_count} at {_now()}\n"
     )
-    if BACKLOG_PATH.exists():
-        content = BACKLOG_PATH.read_text(encoding="utf-8")
+    backlog = _backlog_path()
+    if backlog.exists():
+        content = backlog.read_text(encoding="utf-8")
     else:
         content = (
             "# Goal backlog\n\n"
@@ -38,32 +40,22 @@ def append_decomposed_goal(
         )
     if header.strip() not in content:
         content += f"\n{header}\n"
-    if f"goal:{goal_id}" not in content:
+    marker = f"goal:{goal_id}"
+    if marker not in content:
         content += line
-        BACKLOG_PATH.write_text(content, encoding="utf-8")
+        backlog.write_text(content, encoding="utf-8")
 
 
 def mark_goal_achieved(goal_id: str) -> None:
-    if not BACKLOG_PATH.exists():
+    backlog = _backlog_path()
+    if not backlog.exists():
         return
-    content = BACKLOG_PATH.read_text(encoding="utf-8")
-    content = content.replace(f"goal:{goal_id}", f"goal:{goal_id} achieved")
-    import re
-
-    content = re.sub(
-        rf"(- \[ \].*?goal:{re.escape(goal_id)}.*?)\n",
-        lambda m: m.group(0).replace("- [ ]", "- [x]", 1),
+    escaped = re.escape(goal_id)
+    line_pat = re.compile(rf"^(- \[ \].*?goal:{escaped}(?:\s|$|\]))", re.MULTILINE)
+    content = backlog.read_text(encoding="utf-8")
+    content = line_pat.sub(
+        lambda m: m.group(1).replace("- [ ]", "- [x]", 1),
         content,
         count=1,
     )
-    BACKLOG_PATH.write_text(content, encoding="utf-8")
-
-
-def load_goal_tree(goal_id: str) -> dict | None:
-    path = GOALS_DIR / f"{goal_id}.json"
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    backlog.write_text(content, encoding="utf-8")

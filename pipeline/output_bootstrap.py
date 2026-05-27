@@ -28,17 +28,13 @@ PIPELINE_MINIMAL = os.environ.get("PIPELINE_MINIMAL", "").strip().lower() in (
 
 
 def is_cloud_environment() -> bool:
-    if os.environ.get("PIPELINE_CLOUD", "").strip().lower() in ("1", "true", "yes", "on"):
-        return True
-    if Path("/workspace").is_dir():
-        return True
-    sibling = PROJECT_ROOT.parent / "thepipeline"
-    if sibling.is_dir() and (sibling / "projects").is_dir():
-        return False
-    nested = PROJECT_ROOT / ".pipeline"
-    if nested.is_dir() and (nested / "projects").is_dir():
-        return False
-    return not sibling.is_dir()
+    """Cloud bootstrap runs only when explicitly requested."""
+    return os.environ.get("PIPELINE_CLOUD", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 def cloud_output_dir() -> Path:
@@ -61,7 +57,16 @@ def _sparse_checkout_minimal(target: Path) -> None:
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     _git("clone", "--depth", "1", "--filter=blob:none", "--sparse", PIPELINE_REPO_URL, str(target))
-    _git("sparse-checkout", "set", "projects", "state", "finetune_corpus", "master_ideas.md", "workflows", cwd=target)
+    _git(
+        "sparse-checkout",
+        "set",
+        "projects",
+        "state",
+        "finetune_corpus",
+        "master_ideas.md",
+        "workflows",
+        cwd=target,
+    )
     _git("checkout", PIPELINE_REPO_BRANCH, cwd=target)
 
 
@@ -71,7 +76,9 @@ def bootstrap_output_repo(*, force: bool = False) -> Path:
     Returns the output directory path.
     """
     if not is_cloud_environment() and not force:
-        return cloud_output_dir()
+        from pipeline.pipeline_config import get_pipeline_dir
+
+        return get_pipeline_dir()
 
     target = cloud_output_dir()
     os.environ["PIPELINE_DIR"] = str(target)
@@ -123,3 +130,14 @@ def bootstrap_hermes() -> bool:
     except Exception as exc:
         print(f"  [bootstrap] Hermes skipped: {exc}")
         return False
+
+
+def ensure_pipeline_ready(*, hermes: bool = False) -> Path:
+    """Single entry: clone/pull output repo, reload paths, optionally bootstrap Hermes."""
+    bootstrap_output_repo()
+    from pipeline import pipeline_config as pc
+
+    out_dir = pc.reload_pipeline_dir()
+    if hermes:
+        bootstrap_hermes()
+    return out_dir
