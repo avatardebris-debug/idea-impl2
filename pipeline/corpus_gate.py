@@ -31,14 +31,7 @@ logger = logging.getLogger(__name__)
 
 GatePolicy = Literal["off", "warn", "enforce"]
 
-_VERDICT_PASS = re.compile(
-    r"(?:^|\n)\s*(?:##\s*)?Verdict\s*:?\s*PASS\b",
-    re.IGNORECASE | re.MULTILINE,
-)
-_VERDICT_FAIL = re.compile(
-    r"(?:^|\n)\s*(?:##\s*)?Verdict\s*:?\s*FAIL\b",
-    re.IGNORECASE | re.MULTILINE,
-)
+from pipeline.corpus_verdicts import verdict_from_report
 
 
 @dataclass
@@ -202,7 +195,7 @@ def _check_phase_artifacts(project_dir: pathlib.Path, total_phases: int) -> list
             ))
 
         val_text = _read_text(val_report)
-        val_v = _verdict_from_report(val_text)
+        val_v = verdict_from_report(val_text)
         if val_v == "FAIL":
             checks.append(GateCheck(
                 f"phase_{phase_num}_validation",
@@ -233,7 +226,7 @@ def _check_phase_artifacts(project_dir: pathlib.Path, total_phases: int) -> list
             ))
 
         review_text = _read_text(review)
-        review_v = _verdict_from_report(review_text)
+        review_v = verdict_from_report(review_text)
         if review_v == "FAIL":
             checks.append(GateCheck(
                 f"phase_{phase_num}_review",
@@ -266,7 +259,14 @@ def _check_phase_artifacts(project_dir: pathlib.Path, total_phases: int) -> list
     return checks
 
 
-def _check_quality_score(slug: str, *, policy: GatePolicy) -> list[GateCheck]:
+def _check_quality_score(
+    slug: str,
+    *,
+    policy: GatePolicy,
+    run_scorer: bool,
+) -> list[GateCheck]:
+    if not run_scorer:
+        return []
     checks: list[GateCheck] = []
     run_tests = os.environ.get("CORPUS_GATE_RUN_TESTS", "").strip() in ("1", "true", "yes")
     try:
@@ -316,6 +316,7 @@ def run_collect_gate(
     state: dict[str, Any],
     *,
     policy: GatePolicy | None = None,
+    run_quality_scorer: bool = False,
 ) -> CollectGateResult:
     """
     Run closeout checks before writing finetune corpus rows.
@@ -335,7 +336,12 @@ def run_collect_gate(
     checks: list[GateCheck] = []
     checks.extend(_check_workspace_code(project_dir))
     checks.extend(_check_phase_artifacts(project_dir, total_phases))
-    checks.extend(_check_quality_score(slug, policy=policy))
+    if run_quality_scorer or os.environ.get("CORPUS_GATE_RUN_SCORER", "").strip() in (
+        "1",
+        "true",
+        "yes",
+    ):
+        checks.extend(_check_quality_score(slug, policy=policy, run_scorer=True))
 
     if status == "budget_exceeded":
         checks.append(GateCheck(
@@ -408,12 +414,21 @@ def print_gate_result(slug: str, result: CollectGateResult) -> None:
         print(f"    - {msg}")
 
 
-def audit_closeout_on_complete(project_dir: pathlib.Path, state: dict[str, Any]) -> CollectGateResult:
+def audit_closeout_on_complete(
+    project_dir: pathlib.Path,
+    state: dict[str, Any],
+    *,
+    run_quality_scorer: bool = True,
+) -> CollectGateResult:
     """
-    Advisory closeout at project completion (does not block runner).
-    Persists corpus_gate.json and tags state when polish is recommended.
+    Closeout audit (CLI / manual). Prefer collect_on_project_complete for runner hook.
     """
-    result = run_collect_gate(project_dir, state, policy=gate_policy())
+    result = run_collect_gate(
+        project_dir,
+        state,
+        policy=gate_policy(),
+        run_quality_scorer=run_quality_scorer,
+    )
     persist_gate_result(project_dir, result)
     slug = state.get("_slug") or project_dir.name
     print_gate_result(slug, result)
@@ -443,7 +458,11 @@ def should_skip_collect(
     return not result.allow_collect, result
 
 
-def audit_all_projects(*, only_complete: bool = True) -> list[tuple[str, CollectGateResult]]:
+def audit_all_projects(
+    *,
+    only_complete: bool = True,
+    run_quality_scorer: bool = False,
+) -> list[tuple[str, CollectGateResult]]:
     from pipeline.paths import projects_dir
 
     rows: list[tuple[str, CollectGateResult]] = []
@@ -462,7 +481,7 @@ def audit_all_projects(*, only_complete: bool = True) -> list[tuple[str, Collect
             continue
         if only_complete and state.get("status") not in ("complete", "budget_exceeded"):
             continue
-        result = run_collect_gate(proj, state)
+        result = run_collect_gate(proj, state, run_quality_scorer=run_quality_scorer)
         rows.append((proj.name, result))
     return rows
 
@@ -477,6 +496,11 @@ def _cli() -> None:
     parser.add_argument("--audit", nargs="?", const="__all__", metavar="SLUG")
     parser.add_argument("--policy", choices=["off", "warn", "enforce"], default=None)
     parser.add_argument("--all-statuses", action="store_true")
+    parser.add_argument(
+        "--with-scorer",
+        action="store_true",
+        help="Run quality_scorer per project (slow; off by default for --audit all)",
+    )
     args = parser.parse_args()
 
     if args.policy:
@@ -487,7 +511,10 @@ def _cli() -> None:
         sys.exit(0)
 
     if args.audit == "__all__":
-        rows = audit_all_projects(only_complete=not args.all_statuses)
+        rows = audit_all_projects(
+            only_complete=not args.all_statuses,
+            run_quality_scorer=args.with_scorer,
+        )
         blocked = sum(1 for _, r in rows if not r.allow_collect)
         warned = sum(1 for _, r in rows if r.warnings)
         print(f"\n{'='*50}")
@@ -510,7 +537,7 @@ def _cli() -> None:
         print(f"Project not found: {proj}")
         sys.exit(1)
     state = json.loads(state_path.read_text(encoding="utf-8"))
-    result = run_collect_gate(proj, state)
+    result = run_collect_gate(proj, state, run_quality_scorer=True)
     persist_gate_result(proj, result)
     print(json.dumps(result.to_dict(), indent=2))
     sys.exit(0 if result.allow_collect else 1)

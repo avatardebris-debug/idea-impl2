@@ -7,16 +7,16 @@ from pathlib import Path
 
 from pipeline.corpus_gate import (
     CollectGateResult,
-    _verdict_from_report,
     run_collect_gate,
     should_skip_collect,
 )
+from pipeline.corpus_verdicts import verdict_from_report
 
 
 def test_verdict_parsing() -> None:
-    assert _verdict_from_report("## Verdict\nPASS\n") == "PASS"
-    assert _verdict_from_report("Verdict: FAIL\n") == "FAIL"
-    assert _verdict_from_report("") == "UNKNOWN"
+    assert verdict_from_report("## Verdict\nPASS\n") == "PASS"
+    assert verdict_from_report("Verdict: FAIL\n") == "FAIL"
+    assert verdict_from_report("") == "UNKNOWN"
 
 
 def test_gate_blocks_empty_workspace(tmp_path: Path, monkeypatch) -> None:

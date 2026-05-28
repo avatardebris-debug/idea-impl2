@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pipeline.corpus_polish import tag_polish_corpus_refresh
 from pipeline.message_bus import Message
 from pipeline.paths import projects_dir as pipeline_projects_dir
 from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
@@ -91,8 +92,6 @@ def requeue_polish_in_progress(
 
         project_dir = projects_dir / slug
         if _rebuild_single_project(bus, slug, state, project_dir):
-            from pipeline.corpus_polish import tag_polish_corpus_refresh
-
             tag_polish_corpus_refresh(state)
             try:
                 state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -148,8 +147,6 @@ def run_polish_mode(
 
                 project_dir = projects_dir / slug
                 if _rebuild_single_project(bus, slug, state, project_dir):
-                    from pipeline.corpus_polish import tag_polish_corpus_refresh
-
                     tag_polish_corpus_refresh(state)
                     try:
                         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
@@ -182,8 +179,6 @@ def run_polish_mode(
         state.pop("pre_budget_status", None)
         if notes:
             state["polish_notes"] = notes
-        from pipeline.corpus_polish import tag_polish_corpus_refresh
-
         tag_polish_corpus_refresh(state)
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 

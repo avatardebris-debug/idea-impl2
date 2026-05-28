@@ -183,12 +183,9 @@ def _extract_phase_pair(
     code_files   = _collect_workspace_code(workspace, max_file_chars=0)
     code_block   = _format_code_block(code_files)  # legacy single-block preview
 
-    # Parse verdicts
-    test_verdict   = "PASS" if "Verdict: PASS" in val_report else ("FAIL" if val_report else "UNKNOWN")
-    review_verdict = "PASS" if re.search(r"Verdict\s*\n\s*PASS", review_md, re.IGNORECASE) else (
-                     "PASS" if "## Verdict\nPASS" in review_md else (
-                     "PASS" if "Verdict: PASS" in review_md else (
-                     "FAIL" if review_md else "UNKNOWN")))
+    from pipeline.corpus_verdicts import parse_phase_verdicts
+
+    test_verdict, review_verdict = parse_phase_verdicts(val_report, review_md)
 
     # Count retries from fix_report
     retry_count = len(re.findall(r"^### Attempt \d+", fix_report, re.MULTILINE))
@@ -502,30 +499,32 @@ def _append_jsonl(path: pathlib.Path, record: dict) -> None:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def _already_collected(path: pathlib.Path, record_id: str) -> bool:
-    """Check if a record id already exists in a JSONL file (dedup guard)."""
+def _load_jsonl_ids(path: pathlib.Path) -> set[str]:
+    """Load record ids from a JSONL file."""
+    ids: set[str] = set()
     if not path.exists():
-        return False
-    needle = f'"id": "{record_id}"'
+        return ids
     try:
-        content = path.read_text(encoding="utf-8")
-        return needle in content
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            rid = rec.get("id")
+            if rid:
+                ids.add(str(rid))
     except Exception:
-        return False
+        pass
+    return ids
 
 
-def _write_corpus_records(
-    path: pathlib.Path,
+def _expand_corpus_records(
     records: list[dict],
     project_dir: pathlib.Path,
     *,
-    force_refresh: bool = False,
     run_enrichers: bool = False,
     enricher_names: list[str] | None = None,
-) -> int:
-    from pipeline.corpus_lineage import lineage_group_key, stamp_new_generation
-    from pipeline.corpus_qc import prepare_refresh_in_file
-
+) -> list[dict]:
     expanded: list[dict] = []
     for rec in records:
         batch = [rec]
@@ -533,25 +532,76 @@ def _write_corpus_records(
             from pipeline.corpus_enrichers import run_corpus_enrichers
             batch = run_corpus_enrichers(rec, project_dir, only=enricher_names)
         expanded.extend(batch)
+    return expanded
 
-    incoming_keys = {lineage_group_key(r) for r in expanded}
-    gen_plan: dict[str, tuple[int, str | None]] = {}
-    if force_refresh and incoming_keys:
-        gen_plan = prepare_refresh_in_file(path, incoming_keys)
+
+def _write_corpus_records(
+    path: pathlib.Path,
+    expanded: list[dict],
+    *,
+    force_refresh: bool = False,
+    gen_plan: dict[str, tuple[int, str | None]] | None = None,
+    existing_ids: set[str] | None = None,
+) -> int:
+    from pipeline.corpus_lineage import lineage_group_key, stamp_new_generation
+
+    if existing_ids is None:
+        existing_ids = _load_jsonl_ids(path)
 
     n = 0
     for out_rec in expanded:
+        rid = out_rec.get("id")
         key = lineage_group_key(out_rec)
-        if force_refresh and key in gen_plan:
+        if force_refresh and gen_plan and key in gen_plan:
             gen, sup = gen_plan[key]
             stamp_new_generation(out_rec, generation=gen, supersedes=sup)
             _append_jsonl(path, out_rec)
+            if rid:
+                existing_ids.add(str(rid))
             n += 1
-        elif not _already_collected(path, out_rec["id"]):
+        elif rid and rid not in existing_ids:
             stamp_new_generation(out_rec, generation=1, supersedes=None)
             _append_jsonl(path, out_rec)
+            existing_ids.add(str(rid))
             n += 1
     return n
+
+
+def _write_corpus_file(
+    path: pathlib.Path,
+    record_batches: list[list[dict]],
+    project_dir: pathlib.Path,
+    *,
+    force_refresh: bool = False,
+    run_enrichers: bool = False,
+    enricher_names: list[str] | None = None,
+) -> int:
+    """Write one slug JSONL file (batch refresh once, parse ids once)."""
+    from pipeline.corpus_lineage import lineage_group_key
+    from pipeline.corpus_qc import prepare_refresh_in_file
+
+    flat = [rec for batch in record_batches for rec in batch]
+    if not flat:
+        return 0
+    expanded = _expand_corpus_records(
+        flat,
+        project_dir,
+        run_enrichers=run_enrichers,
+        enricher_names=enricher_names,
+    )
+    gen_plan: dict[str, tuple[int, str | None]] = {}
+    if force_refresh:
+        keys = {lineage_group_key(r) for r in expanded}
+        if keys:
+            gen_plan = prepare_refresh_in_file(path, keys)
+    existing_ids = _load_jsonl_ids(path)
+    return _write_corpus_records(
+        path,
+        expanded,
+        force_refresh=force_refresh,
+        gen_plan=gen_plan,
+        existing_ids=existing_ids,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -567,6 +617,7 @@ def collect_project(
     enricher_names: list[str] | None = None,
     force_refresh: bool = False,
     skip_gate: bool = False,
+    gate_passed: bool | None = None,
 ) -> int:
     """
     Collect fine-tune pairs from a single project directory.
@@ -576,6 +627,7 @@ def collect_project(
         state:        Pre-loaded current_idea.json dict (loaded from disk if None)
         force_refresh: Re-collect with bumped corpus_generation; prior rows marked non-canonical.
         skip_gate: Skip autoreview-style closeout gate (retroactive harvest).
+        gate_passed: When skip_gate=True, use this for corpus_gate_passed on records.
 
     Returns:
         Number of new pairs written.
@@ -598,12 +650,15 @@ def collect_project(
     if final_status not in ("complete", "budget_exceeded"):
         return 0
 
-    from pipeline.corpus_gate import should_skip_collect
+    if not skip_gate:
+        from pipeline.corpus_gate import should_skip_collect
 
-    blocked, gate_result = should_skip_collect(project_dir, state, skip_gate=skip_gate)
-    if blocked:
-        return 0
-    gate_passed = gate_result.passed if gate_result else True
+        blocked, gate_result = should_skip_collect(project_dir, state, skip_gate=False)
+        if blocked:
+            return 0
+        gate_passed = gate_result.passed if gate_result else True
+    elif gate_passed is None:
+        gate_passed = True
 
     master_plan = _read_state(project_dir, "state/master_plan.md", 4_000)
 
@@ -614,8 +669,15 @@ def collect_project(
 
     written      = 0
     phase_pairs: list[dict] = []
+    task_batches: list[list[dict]] = []
+    phase_batches: list[list[dict]] = []
 
     workspace_path = project_dir / "workspace"
+    write_kw = dict(
+        force_refresh=force_refresh,
+        run_enrichers=run_enrichers,
+        enricher_names=enricher_names,
+    )
 
     for phase_num in range(1, total_phases + 1):
         pair = _extract_phase_pair(project_dir, state, phase_num, master_plan)
@@ -628,34 +690,18 @@ def collect_project(
             from pipeline.corpus_continuation import format_workspace_block
             pair["code"] = format_workspace_block(pair["code_files_map"])
         phase_pairs.append(pair)
+        task_batches.append(_to_task_alpaca(pair, use_continuation=use_continuation))
+        phase_batches.append(_to_phase_alpaca(pair, use_continuation=use_continuation))
 
-        write_kw = dict(
-            force_refresh=force_refresh,
-            run_enrichers=run_enrichers,
-            enricher_names=enricher_names,
-        )
-        written += _write_corpus_records(
-            task_file,
-            _to_task_alpaca(pair, use_continuation=use_continuation),
-            project_dir,
-            **write_kw,
-        )
-        written += _write_corpus_records(
-            phase_file,
-            _to_phase_alpaca(pair, use_continuation=use_continuation),
-            project_dir,
-            **write_kw,
-        )
+    written += _write_corpus_file(task_file, task_batches, project_dir, **write_kw)
+    written += _write_corpus_file(phase_file, phase_batches, project_dir, **write_kw)
 
-    # --- Project-level pair ---
     if phase_pairs:
-        written += _write_corpus_records(
+        written += _write_corpus_file(
             project_file,
-            _to_project_alpaca(slug, state, phase_pairs, use_continuation=use_continuation),
+            [_to_project_alpaca(slug, state, phase_pairs, use_continuation=use_continuation)],
             project_dir,
-            force_refresh=force_refresh,
-            run_enrichers=run_enrichers,
-            enricher_names=enricher_names,
+            **write_kw,
         )
 
     if written:
@@ -982,6 +1028,11 @@ def _cli() -> None:
         default=None,
         metavar="PATH",
         help="Polish queue file (default: polish_queue.md in project root)",
+    )
+    parser.add_argument(
+        "--skip-gate",
+        action="store_true",
+        help="Skip corpus closeout gate (retroactive --collect-all)",
     )
     args = parser.parse_args()
 

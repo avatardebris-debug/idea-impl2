@@ -130,16 +130,45 @@ def clear_refresh_flag(project_dir: Path, state: dict[str, Any]) -> None:
         logger.debug("corpus_polish: could not clear refresh flag: %s", exc)
 
 
+def _maybe_tag_recommend_polish(project_dir: Path, state: dict[str, Any], result) -> None:
+    if not result.recommend_polish or result.passed:
+        return
+    state["corpus_closeout_recommend_polish"] = True
+    state_path = project_dir / "state" / "current_idea.json"
+    try:
+        state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+
+
 def collect_on_project_complete(project_dir: Path, state: dict[str, Any]) -> int:
     """
-    Called from runner _mark_complete: collect corpus, force-refresh after polish.
+    Called from runner _mark_complete: gate once, then collect corpus.
     """
     from pipeline.corpus_collector import collect_project, _raw_dir
+    from pipeline.corpus_gate import should_skip_collect
     from pipeline.pipeline_activity import log_activity, maybe_sync_output_repo
 
     slug = state.get("_slug") or project_dir.name
     force = should_force_refresh_corpus(state)
-    n = collect_project(project_dir, state, force_refresh=force, skip_gate=False)
+
+    blocked, gate_result = should_skip_collect(project_dir, state)
+    if blocked:
+        if gate_result:
+            _maybe_tag_recommend_polish(project_dir, state, gate_result)
+        return 0
+
+    gate_passed = gate_result.passed if gate_result else True
+    if gate_result:
+        _maybe_tag_recommend_polish(project_dir, state, gate_result)
+
+    n = collect_project(
+        project_dir,
+        state,
+        force_refresh=force,
+        skip_gate=True,
+        gate_passed=gate_passed,
+    )
 
     if n:
         label = "refreshed" if force else "collected"

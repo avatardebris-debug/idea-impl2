@@ -475,6 +475,8 @@ python -m pipeline.corpus_workflow status
 python -m pipeline.corpus_workflow audit
 $env:CORPUS_GATE_POLICY = "enforce"
 python -m pipeline.corpus_workflow audit --policy enforce
+# Slow quality_scorer per project (single-project: python -m pipeline.corpus_gate --audit SLUG)
+python -m pipeline.corpus_gate --audit --with-scorer
 
 # Export training file (canonical rows only, tier weights in JSONL)
 python -m pipeline.corpus_workflow export --merge-policy weighted

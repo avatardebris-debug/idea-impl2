@@ -37,7 +37,7 @@ def cmd_audit(policy: str | None) -> int:
 
     if policy:
         os.environ["CORPUS_GATE_POLICY"] = policy
-    rows = audit_all_projects(only_complete=True)
+    rows = audit_all_projects(only_complete=True, run_quality_scorer=False)
     blocked = sum(1 for _, r in rows if not r.allow_collect)
     warned = sum(1 for _, r in rows if r.warnings)
     active_policy = policy or gate_policy()
@@ -75,7 +75,7 @@ def cmd_polish_candidates(*, append_queue: bool = False, dry_run: bool = False) 
     from pipeline.corpus_gate import audit_all_projects
     from pipeline.corpus_polish import resolve_polish_queue_path
 
-    rows = audit_all_projects(only_complete=True)
+    rows = audit_all_projects(only_complete=True, run_quality_scorer=False)
     candidates = [
         (slug, r)
         for slug, r in rows
