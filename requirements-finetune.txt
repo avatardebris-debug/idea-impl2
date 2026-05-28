@@ -1,0 +1,7 @@
+# Optional GPU SFT stack (see COMMANDS.md — pipeline.finetune.sft_train)
+torch>=2.1
+transformers>=4.40
+datasets>=2.18
+trl>=0.9
+peft>=0.10
+accelerate>=0.28

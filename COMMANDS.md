@@ -495,6 +495,19 @@ python -m pipeline.corpus_workflow polish-candidates --append-queue
 
 Low-level: `corpus_collector`, `corpus_qc`, `corpus_gate`, `corpus_polish` modules.
 
+### SFT train on weighted export
+
+```bash
+pip install torch transformers datasets trl peft accelerate  # GPU machine only
+
+python -m pipeline.corpus_workflow export --merge-policy weighted
+python -m pipeline.finetune.sft_train --dry-run
+python -m pipeline.finetune.sft_train --export-formatted
+python -m pipeline.finetune.sft_train --train --model Qwen/Qwen2.5-Coder-1.5B-Instruct --max-steps 100
+```
+
+Uses `train_weight` via `WeightedRandomSampler` (tier A/B/C from corpus QC).
+
 ---
 
 ## master_ideas.md Format

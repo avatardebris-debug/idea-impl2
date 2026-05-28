@@ -1,0 +1,21 @@
+"""Tests for SFT formatting (no GPU / trl required)."""
+
+from pipeline.finetune.formatting import alpaca_prompt, alpaca_text, record_to_text
+
+
+def test_alpaca_with_input() -> None:
+    text = alpaca_text("Do X", "context", "code here")
+    assert "### Instruction:" in text
+    assert "### Input:" in text
+    assert text.endswith("code here")
+
+
+def test_alpaca_no_input() -> None:
+    prompt = alpaca_prompt("Do X", "")
+    assert "### Input:" not in prompt
+    assert "### Response:" in prompt
+
+
+def test_record_to_text() -> None:
+    t = record_to_text({"instruction": "a", "input": "", "output": "b"})
+    assert t.endswith("b")
