@@ -20,7 +20,7 @@ from pipeline.paths import finetune_corpus_dir
 
 
 def cmd_status() -> None:
-    from pipeline.corpus_collector import corpus_stats
+    from pipeline.corpus_export import corpus_stats
     from pipeline.corpus_qc import build_report, load_records
 
     print("\n--- Raw corpus ---")
@@ -55,7 +55,7 @@ def cmd_export(
     struggled_rate: float = 0.15,
     merge_seed: int | None = 42,
 ) -> Path:
-    from pipeline.corpus_collector import merge_corpus
+    from pipeline.corpus_export import merge_corpus
 
     out = merge_corpus(
         granularity=granularity,

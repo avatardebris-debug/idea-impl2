@@ -43,31 +43,18 @@ def _utcnow() -> str:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Paths
+# Paths (shared with corpus_export)
 # ---------------------------------------------------------------------------
 
-from pipeline.paths import finetune_corpus_dir, projects_dir
-from pipeline.pipeline_config import PROJECT_ROOT
-
-
-def _corpus_dir() -> pathlib.Path:
-    return finetune_corpus_dir()
-
-
-def _raw_dir() -> pathlib.Path:
-    return _corpus_dir() / "raw"
-
-
-def _task_dir() -> pathlib.Path:
-    return _raw_dir() / "task"
-
-
-def _phase_dir() -> pathlib.Path:
-    return _raw_dir() / "phase"
-
-
-def _project_corpus_dir() -> pathlib.Path:
-    return _raw_dir() / "project"
+from pipeline.corpus_paths import (
+    corpus_dir as _corpus_dir,
+    phase_dir as _phase_dir,
+    project_corpus_dir as _project_corpus_dir,
+    raw_dir as _raw_dir,
+    task_dir as _task_dir,
+)
+from pipeline.corpus_export import corpus_stats, merge_corpus
+from pipeline.paths import projects_dir
 
 # Legacy hard limits (used only when use_continuation=False)
 _MAX_FILE_CHARS = 8_000
@@ -791,155 +778,14 @@ def collect_all_existing(
     return results
 
 
-# ---------------------------------------------------------------------------
-# Stats
-# ---------------------------------------------------------------------------
-
-def corpus_stats() -> None:
-    """Print a summary of the current corpus."""
-    if not _raw_dir().exists():
-        print("No corpus yet. Run --collect-all to build it.")
-        return
-
-    total_records    = 0
-    quality_counts: dict[str, int] = {}
-    model_counts: dict[str, int]   = {}
-
-    for jsonl_file in _raw_dir().rglob("*.jsonl"):
-        for line in jsonl_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-                total_records += 1
-                ql = rec.get("quality_label", "?")
-                quality_counts[ql] = quality_counts.get(ql, 0) + 1
-                m = rec.get("model", "?")
-                model_counts[m] = model_counts.get(m, 0) + 1
-            except Exception:
-                pass
-
-    task_count    = sum(1 for _ in _task_dir().glob("*.jsonl"))    if _task_dir().exists()    else 0
-    phase_count   = sum(1 for _ in _phase_dir().glob("*.jsonl"))   if _phase_dir().exists()   else 0
-    project_count = sum(1 for _ in _project_corpus_dir().glob("*.jsonl")) if _project_corpus_dir().exists() else 0
-
-    print(f"\n{'='*50}")
-    print(f"  Fine-Tune Corpus Stats")
-    print(f"{'='*50}")
-    print(f"  Total records:   {total_records}")
-    print(f"  Task files:      {task_count}   -> {_task_dir()}")
-    print(f"  Phase files:     {phase_count}   -> {_phase_dir()}")
-    print(f"  Project files:   {project_count}   -> {_project_corpus_dir()}")
-    print("")
-    print("  Quality breakdown:")
-    for label, count in sorted(quality_counts.items()):
-        bar = "#" * (count * 30 // max(total_records, 1))
-        print(f"    {label:<12} {count:>5}  {bar}")
-    print("")
-    print("  By model:")
-    for model, count in sorted(model_counts.items(), key=lambda x: -x[1]):
-        print(f"    {model:<40} {count:>5}")
-    print("=" * 50)
-
-
-# ---------------------------------------------------------------------------
-# Merge to single training file
-# ---------------------------------------------------------------------------
-
-def merge_corpus(
-    granularity: str = "task",
-    filter_quality: list[str] | None = None,
-    output_path: pathlib.Path | None = None,
-    *,
-    merge_policy: str = "strict",
-    struggled_sample_rate: float = 0.15,
-    merge_seed: int | None = None,
-    canonical_only: bool = True,
-) -> pathlib.Path:
-    """
-    Merge all JSONL files of the given granularity into a single file
-    ready for trl sft.
-
-    Args:
-        granularity:    "task", "phase", or "project"
-        filter_quality: Used when merge_policy=strict (default: clean + patched)
-        output_path:    Where to write. Default: _corpus_dir()/sft_{granularity}.jsonl
-        merge_policy:   strict | weighted | all
-        struggled_sample_rate: Fraction of tier-C rows to keep (weighted policy only)
-        merge_seed:     RNG seed for reproducible struggled subsampling
-        canonical_only: When True, drop rows with is_canonical=False (superseded generations)
-
-    Returns:
-        Path to the merged file.
-    """
-    import random
-
-    from pipeline.corpus_lineage import dedupe_by_id, ensure_lineage_defaults
-    from pipeline.corpus_weights import filter_records_for_merge
-
-    if filter_quality is None:
-        filter_quality = ["clean", "patched"]
-
-    src_dir = {"task": _task_dir(), "phase": _phase_dir(), "project": _project_corpus_dir()}.get(granularity)
-    if src_dir is None:
-        raise ValueError(f"Unknown granularity: {granularity}")
-
-    if output_path is None:
-        _corpus_dir().mkdir(parents=True, exist_ok=True)
-        suffix = "" if merge_policy == "strict" else f"_{merge_policy}"
-        output_path = _corpus_dir() / f"sft_{granularity}{suffix}.jsonl"
-
-    all_records: list[dict] = []
-    for jsonl_file in sorted(src_dir.glob("*.jsonl")):
-        for line in jsonl_file.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rec = json.loads(line)
-                ensure_lineage_defaults(rec)
-                if canonical_only and not rec.get("is_canonical", True):
-                    continue
-                all_records.append(rec)
-            except Exception:
-                pass
-
-    all_records = dedupe_by_id(all_records)
-
-    rng = random.Random(merge_seed)
-    selected = filter_records_for_merge(
-        all_records,
-        policy=merge_policy,
-        filter_quality=filter_quality,
-        struggled_sample_rate=struggled_sample_rate,
-        rng=rng,
-    )
-
-    seen_ids: set[str] = set()
-    tier_counts: dict[str, int] = {}
-    weight_sum = 0.0
-    written = 0
-
-    with output_path.open("w", encoding="utf-8") as out:
-        for rec in selected:
-            rid = rec.get("id")
-            if rid and rid in seen_ids:
-                continue
-            tier = rec.get("train_tier", "?")
-            tier_counts[tier] = tier_counts.get(tier, 0) + 1
-            weight_sum += float(rec.get("train_weight", 0))
-            out.write(json.dumps(rec, ensure_ascii=False) + "\n")
-            if rid:
-                seen_ids.add(rid)
-            written += 1
-
-    print(f"Merged {written} {granularity}-level records ({merge_policy}) -> {output_path}")
-    if merge_policy != "strict":
-        print("  Tier breakdown:", ", ".join(f"{k}={v}" for k, v in sorted(tier_counts.items())))
-        print(f"  Sum of train_weight: {weight_sum:.1f}")
-    return output_path
-
+# Re-export merge/stats from corpus_export (backward compatible imports).
+__all__ = [
+    "collect_all_existing",
+    "collect_project",
+    "collect_project_on_complete",
+    "corpus_stats",
+    "merge_corpus",
+]
 
 # ---------------------------------------------------------------------------
 # CLI

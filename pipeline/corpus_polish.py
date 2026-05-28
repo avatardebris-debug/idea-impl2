@@ -145,7 +145,8 @@ def collect_on_project_complete(project_dir: Path, state: dict[str, Any]) -> int
     """
     Called from runner _mark_complete: gate once, then collect corpus.
     """
-    from pipeline.corpus_collector import collect_project, _raw_dir
+    from pipeline.corpus_collector import collect_project
+    from pipeline.corpus_paths import raw_dir as _raw_dir
     from pipeline.corpus_gate import should_skip_collect
     from pipeline.pipeline_activity import log_activity, maybe_sync_output_repo
 
