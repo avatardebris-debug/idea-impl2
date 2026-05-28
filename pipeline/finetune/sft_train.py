@@ -32,6 +32,7 @@ from pipeline.finetune.corpus_dataset import (
     sampler_weights_for_trainer,
 )
 from pipeline.finetune.formatting import record_to_text
+from pipeline.finetune.weighted_trainer import validate_record_weights
 
 
 def _tier_report(records: list[dict]) -> None:
@@ -46,22 +47,27 @@ def cmd_dry_run(path: pathlib.Path, min_weight: float) -> None:
     records = load_weighted_sft_records(path, min_weight=min_weight)
     print(f"\nCorpus: {path}")
     _tier_report(records)
+    if not records:
+        print("  No records after filtering.")
+        return
+    validate_record_weights(records)
     w = sampler_weights_for_trainer(records)
-    print(f"  Weight range: {min(w):.3f} .. {max(w):.3f}")
-    if records:
-        sample = records[0]
-        print(f"  Sample id: {sample.get('id', '?')[:60]}")
-        print(f"  Prompt chars: {len(record_to_text(sample))}")
+    if w:
+        print(f"  Weight range: {min(w):.3f} .. {max(w):.3f}")
+    sample = records[0]
+    print(f"  Sample id: {sample.get('id', '?')[:60]}")
+    print(f"  Prompt chars: {len(record_to_text(sample))}")
 
 
 def cmd_export_formatted(path: pathlib.Path, out: pathlib.Path, min_weight: float) -> pathlib.Path:
     records = load_weighted_sft_records(path, min_weight=min_weight)
+    weights = validate_record_weights(records)
     out.parent.mkdir(parents=True, exist_ok=True)
     with out.open("w", encoding="utf-8") as f:
-        for rec in records:
+        for rec, weight in zip(records, weights, strict=True):
             row = {
                 "text": record_to_text(rec),
-                "train_weight": float(rec.get("train_weight", 1.0)),
+                "train_weight": float(weight),
                 "train_tier": rec.get("train_tier"),
                 "id": rec.get("id"),
             }
@@ -101,6 +107,7 @@ def cmd_train(
     if not records:
         print("No training records after min_weight filter.", file=sys.stderr)
         raise SystemExit(1)
+    validate_record_weights(records)
 
     dataset = load_weighted_sft_dataset(path, min_weight=min_weight)
 
@@ -164,11 +171,12 @@ def cmd_train(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="SFT train on pipeline finetune corpus")
+    mode = parser.add_mutually_exclusive_group()
     parser.add_argument("--corpus", type=pathlib.Path, default=None, help="sft JSONL path")
     parser.add_argument("--min-weight", type=float, default=0.0)
-    parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--export-formatted", metavar="PATH", nargs="?", const="auto")
-    parser.add_argument("--train", action="store_true")
+    mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--export-formatted", metavar="PATH", nargs="?", const="auto")
+    mode.add_argument("--train", action="store_true")
     parser.add_argument("--model", default="Qwen/Qwen2.5-Coder-1.5B-Instruct")
     parser.add_argument("--output-dir", type=pathlib.Path, default=pathlib.Path("finetune_runs/sft_corpus"))
     parser.add_argument("--max-steps", type=int, default=100)
