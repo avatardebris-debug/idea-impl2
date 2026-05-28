@@ -147,7 +147,7 @@ class MessageBus:
         # base_dir kept for API compat — we don't use it (single shared DB)
         self.base_dir = base_dir or queues_dir()
         self.base_dir.mkdir(parents=True, exist_ok=True)
-        self._db = str(message_bus_db())
+        self._db = message_bus_db()
         _init_db(self._db)
 
     # ------------------------------------------------------------------
