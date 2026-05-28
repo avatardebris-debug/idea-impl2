@@ -288,6 +288,14 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
         pass
 
     try:
+        from pipeline.corpus_gate import audit_closeout_on_complete
+
+        audit_closeout_on_complete(project_dir, state)
+    except Exception as _gate_err:
+        import logging as _log
+        _log.getLogger(__name__).debug("corpus_gate audit skipped (non-critical): %s", _gate_err)
+
+    try:
         from pipeline.corpus_collector import collect_project_on_complete
         collect_project_on_complete(project_dir, state)
     except Exception as _cc_err:

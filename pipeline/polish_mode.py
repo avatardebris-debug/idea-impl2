@@ -91,6 +91,13 @@ def requeue_polish_in_progress(
 
         project_dir = projects_dir / slug
         if _rebuild_single_project(bus, slug, state, project_dir):
+            from pipeline.corpus_polish import tag_polish_corpus_refresh
+
+            tag_polish_corpus_refresh(state)
+            try:
+                state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+            except OSError:
+                pass
             print(f"  [polish] Re-queued '{raw_title}' — resume {status}")
             seeded_session.add(raw_title)
             requeued += 1
@@ -141,6 +148,13 @@ def run_polish_mode(
 
                 project_dir = projects_dir / slug
                 if _rebuild_single_project(bus, slug, state, project_dir):
+                    from pipeline.corpus_polish import tag_polish_corpus_refresh
+
+                    tag_polish_corpus_refresh(state)
+                    try:
+                        state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                    except OSError:
+                        pass
                     print(f"  [polish] Re-queued '{raw_title}' — resume {current_status}")
                     seeded_session.add(raw_title)
                     queued += 1
@@ -168,6 +182,9 @@ def run_polish_mode(
         state.pop("pre_budget_status", None)
         if notes:
             state["polish_notes"] = notes
+        from pipeline.corpus_polish import tag_polish_corpus_refresh
+
+        tag_polish_corpus_refresh(state)
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
         master_plan_file = projects_dir / slug / "state" / "master_plan.md"

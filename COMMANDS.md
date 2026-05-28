@@ -463,6 +463,38 @@ Runner still owns completions/truth; run `harvest.py` as usual after PASS.
 
 ---
 
+## Finetune corpus QC (weighted export + polish refresh)
+
+Output lives under `thepipeline/finetune_corpus/` (or `PIPELINE_DIR/finetune_corpus`).
+
+```bash
+# Overview
+python -m pipeline.corpus_workflow status
+
+# Closeout gate audit (default warn; enforce blocks bad collects)
+python -m pipeline.corpus_workflow audit
+$env:CORPUS_GATE_POLICY = "enforce"
+python -m pipeline.corpus_workflow audit --policy enforce
+
+# Export training file (canonical rows only, tier weights in JSONL)
+python -m pipeline.corpus_workflow export --merge-policy weighted
+
+# After --polish fixes: refresh corpus for done queue entries
+python -m pipeline.corpus_workflow refresh-polish
+
+# Suggest polish_queue lines from gate failures
+python -m pipeline.corpus_workflow polish-candidates --append-queue
+```
+
+**On project complete:** gate runs automatically (`warn` by default). Polish runs set
+`corpus_force_refresh_on_complete` so the next completion bumps `corpus_generation`.
+
+**Retroactive harvest** (skips gate): `python -m pipeline.corpus_collector --collect-all --skip-gate`
+
+Low-level: `corpus_collector`, `corpus_qc`, `corpus_gate`, `corpus_polish` modules.
+
+---
+
 ## master_ideas.md Format
 
 ```markdown

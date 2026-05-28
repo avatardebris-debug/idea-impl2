@@ -281,14 +281,24 @@ def _phase_instruction(pair: dict) -> str:
 
 
 def _shared_alpaca_fields(pair: dict) -> dict[str, Any]:
-    return {
+    from pipeline.corpus_lineage import ensure_lineage_defaults
+    from pipeline.corpus_weights import enrich_record_weights
+
+    base = {
         "quality_label": pair["quality_label"],
         "retry_count":   pair["retry_count"],
+        "test_verdict":  pair.get("test_verdict", "PASS"),
+        "review_verdict": pair.get("review_verdict", "PASS"),
         "model":         pair["model"],
         "collected_at":  pair["collected_at"],
         "phase_num":     pair["phase_num"],
         "project_slug":  pair["project_slug"],
+        "corpus_generation": 1,
+        "is_canonical": True,
+        "supersedes": None,
+        "corpus_gate_passed": pair.get("corpus_gate_passed", True),
     }
+    return ensure_lineage_defaults(enrich_record_weights(base))
 
 
 def _to_task_alpaca(pair: dict, *, use_continuation: bool = True) -> list[dict]:
@@ -299,6 +309,8 @@ def _to_task_alpaca(pair: dict, *, use_continuation: bool = True) -> list[dict]:
     if not use_continuation:
         rec = {
             "id": pair["id"],
+            "sequence_id": pair["id"],
+            "granularity": "task",
             "instruction": instruction,
             "input": "",
             "output": pair["code"],
@@ -348,6 +360,8 @@ def _to_phase_alpaca(pair: dict, *, use_continuation: bool = True) -> list[dict]
     if not use_continuation:
         return [{
             "id": base_id,
+            "sequence_id": base_id,
+            "granularity": "phase",
             "instruction": instruction,
             "input": "",
             "output": pair["code"],
@@ -453,6 +467,8 @@ def _to_project_alpaca(
     if not use_continuation:
         return [{
             "id": base_id,
+            "sequence_id": base_id,
+            "granularity": "project",
             "instruction": instruction,
             "input": "",
             "output": combined_code,
@@ -498,6 +514,46 @@ def _already_collected(path: pathlib.Path, record_id: str) -> bool:
         return False
 
 
+def _write_corpus_records(
+    path: pathlib.Path,
+    records: list[dict],
+    project_dir: pathlib.Path,
+    *,
+    force_refresh: bool = False,
+    run_enrichers: bool = False,
+    enricher_names: list[str] | None = None,
+) -> int:
+    from pipeline.corpus_lineage import lineage_group_key, stamp_new_generation
+    from pipeline.corpus_qc import prepare_refresh_in_file
+
+    expanded: list[dict] = []
+    for rec in records:
+        batch = [rec]
+        if run_enrichers:
+            from pipeline.corpus_enrichers import run_corpus_enrichers
+            batch = run_corpus_enrichers(rec, project_dir, only=enricher_names)
+        expanded.extend(batch)
+
+    incoming_keys = {lineage_group_key(r) for r in expanded}
+    gen_plan: dict[str, tuple[int, str | None]] = {}
+    if force_refresh and incoming_keys:
+        gen_plan = prepare_refresh_in_file(path, incoming_keys)
+
+    n = 0
+    for out_rec in expanded:
+        key = lineage_group_key(out_rec)
+        if force_refresh and key in gen_plan:
+            gen, sup = gen_plan[key]
+            stamp_new_generation(out_rec, generation=gen, supersedes=sup)
+            _append_jsonl(path, out_rec)
+            n += 1
+        elif not _already_collected(path, out_rec["id"]):
+            stamp_new_generation(out_rec, generation=1, supersedes=None)
+            _append_jsonl(path, out_rec)
+            n += 1
+    return n
+
+
 # ---------------------------------------------------------------------------
 # Main public API
 # ---------------------------------------------------------------------------
@@ -509,6 +565,8 @@ def collect_project(
     use_continuation: bool = True,
     run_enrichers: bool = False,
     enricher_names: list[str] | None = None,
+    force_refresh: bool = False,
+    skip_gate: bool = False,
 ) -> int:
     """
     Collect fine-tune pairs from a single project directory.
@@ -516,6 +574,8 @@ def collect_project(
     Args:
         project_dir:  Path to the project (e.g. .pipeline/projects/csv_analyzer)
         state:        Pre-loaded current_idea.json dict (loaded from disk if None)
+        force_refresh: Re-collect with bumped corpus_generation; prior rows marked non-canonical.
+        skip_gate: Skip autoreview-style closeout gate (retroactive harvest).
 
     Returns:
         Number of new pairs written.
@@ -538,6 +598,13 @@ def collect_project(
     if final_status not in ("complete", "budget_exceeded"):
         return 0
 
+    from pipeline.corpus_gate import should_skip_collect
+
+    blocked, gate_result = should_skip_collect(project_dir, state, skip_gate=skip_gate)
+    if blocked:
+        return 0
+    gate_passed = gate_result.passed if gate_result else True
+
     master_plan = _read_state(project_dir, "state/master_plan.md", 4_000)
 
     # Output JSONL file paths keyed by slug
@@ -554,6 +621,7 @@ def collect_project(
         pair = _extract_phase_pair(project_dir, state, phase_num, master_plan)
         if not pair:
             continue
+        pair["corpus_gate_passed"] = gate_passed
         pair["_workspace_path"] = workspace_path
         pair["code_files_map"] = _collect_workspace_code(workspace_path, max_file_chars=0)
         if use_continuation:
@@ -561,41 +629,34 @@ def collect_project(
             pair["code"] = format_workspace_block(pair["code_files_map"])
         phase_pairs.append(pair)
 
-        def _write_records(path: pathlib.Path, records: list[dict]) -> int:
-            n = 0
-            for rec in records:
-                batch = [rec]
-                if run_enrichers:
-                    from pipeline.corpus_enrichers import run_corpus_enrichers
-                    batch = run_corpus_enrichers(rec, project_dir, only=enricher_names)
-                for out_rec in batch:
-                    if not _already_collected(path, out_rec["id"]):
-                        _append_jsonl(path, out_rec)
-                        n += 1
-            return n
-
-        written += _write_records(
+        write_kw = dict(
+            force_refresh=force_refresh,
+            run_enrichers=run_enrichers,
+            enricher_names=enricher_names,
+        )
+        written += _write_corpus_records(
             task_file,
             _to_task_alpaca(pair, use_continuation=use_continuation),
+            project_dir,
+            **write_kw,
         )
-        written += _write_records(
+        written += _write_corpus_records(
             phase_file,
             _to_phase_alpaca(pair, use_continuation=use_continuation),
+            project_dir,
+            **write_kw,
         )
 
     # --- Project-level pair ---
     if phase_pairs:
-        for proj_rec in _to_project_alpaca(
-            slug, state, phase_pairs, use_continuation=use_continuation
-        ):
-            batch = [proj_rec]
-            if run_enrichers:
-                from pipeline.corpus_enrichers import run_corpus_enrichers
-                batch = run_corpus_enrichers(proj_rec, project_dir, only=enricher_names)
-            for out_rec in batch:
-                if not _already_collected(project_file, out_rec["id"]):
-                    _append_jsonl(project_file, out_rec)
-                    written += 1
+        written += _write_corpus_records(
+            project_file,
+            _to_project_alpaca(slug, state, phase_pairs, use_continuation=use_continuation),
+            project_dir,
+            force_refresh=force_refresh,
+            run_enrichers=run_enrichers,
+            enricher_names=enricher_names,
+        )
 
     if written:
         logger.info(
@@ -612,20 +673,12 @@ def collect_project_on_complete(project_dir: pathlib.Path, state: dict) -> None:
     """
     Lightweight wrapper called from runner._mark_complete().
     Fires asynchronously-safe (no exceptions bubble up to caller).
+    Polish completions use force_refresh via pipeline.corpus_polish.
     """
     try:
-        n = collect_project(project_dir, state)
-        if n:
-            print(f"  [corpus] +{n} fine-tune pairs -> {_raw_dir()}")
-            from pipeline.pipeline_activity import log_activity, maybe_sync_output_repo
+        from pipeline.corpus_polish import collect_on_project_complete
 
-            log_activity(
-                "corpus_collected",
-                slug=project_dir.name,
-                pairs_added=n,
-                corpus_dir=str(_raw_dir()),
-            )
-            maybe_sync_output_repo(f"corpus: {project_dir.name} (+{n} pairs)")
+        collect_on_project_complete(project_dir, state)
     except Exception as exc:
         logger.debug("corpus_collector.collect_project_on_complete failed (non-critical): %s", exc)
 
@@ -639,6 +692,8 @@ def collect_all_existing(
     *,
     use_continuation: bool = True,
     run_enrichers: bool = False,
+    force_refresh: bool = False,
+    skip_gate: bool = False,
 ) -> dict[str, int]:
     """
     Scan all project directories and collect pairs from every terminal project.
@@ -676,6 +731,8 @@ def collect_all_existing(
             state,
             use_continuation=use_continuation,
             run_enrichers=run_enrichers,
+            force_refresh=force_refresh,
+            skip_gate=skip_gate,
         )
         results[project_dir.name] = n
         total_written += n
@@ -748,6 +805,11 @@ def merge_corpus(
     granularity: str = "task",
     filter_quality: list[str] | None = None,
     output_path: pathlib.Path | None = None,
+    *,
+    merge_policy: str = "strict",
+    struggled_sample_rate: float = 0.15,
+    merge_seed: int | None = None,
+    canonical_only: bool = True,
 ) -> pathlib.Path:
     """
     Merge all JSONL files of the given granularity into a single file
@@ -755,13 +817,21 @@ def merge_corpus(
 
     Args:
         granularity:    "task", "phase", or "project"
-        filter_quality: Only include records with these quality labels.
-                        Default: ["clean", "patched"] (excludes "struggled")
+        filter_quality: Used when merge_policy=strict (default: clean + patched)
         output_path:    Where to write. Default: _corpus_dir()/sft_{granularity}.jsonl
+        merge_policy:   strict | weighted | all
+        struggled_sample_rate: Fraction of tier-C rows to keep (weighted policy only)
+        merge_seed:     RNG seed for reproducible struggled subsampling
+        canonical_only: When True, drop rows with is_canonical=False (superseded generations)
 
     Returns:
         Path to the merged file.
     """
+    import random
+
+    from pipeline.corpus_lineage import dedupe_by_id, ensure_lineage_defaults
+    from pipeline.corpus_weights import filter_records_for_merge
+
     if filter_quality is None:
         filter_quality = ["clean", "patched"]
 
@@ -771,30 +841,57 @@ def merge_corpus(
 
     if output_path is None:
         _corpus_dir().mkdir(parents=True, exist_ok=True)
-        output_path = _corpus_dir() / f"sft_{granularity}.jsonl"
+        suffix = "" if merge_policy == "strict" else f"_{merge_policy}"
+        output_path = _corpus_dir() / f"sft_{granularity}{suffix}.jsonl"
 
-    written = 0
+    all_records: list[dict] = []
+    for jsonl_file in sorted(src_dir.glob("*.jsonl")):
+        for line in jsonl_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                ensure_lineage_defaults(rec)
+                if canonical_only and not rec.get("is_canonical", True):
+                    continue
+                all_records.append(rec)
+            except Exception:
+                pass
+
+    all_records = dedupe_by_id(all_records)
+
+    rng = random.Random(merge_seed)
+    selected = filter_records_for_merge(
+        all_records,
+        policy=merge_policy,
+        filter_quality=filter_quality,
+        struggled_sample_rate=struggled_sample_rate,
+        rng=rng,
+    )
+
     seen_ids: set[str] = set()
+    tier_counts: dict[str, int] = {}
+    weight_sum = 0.0
+    written = 0
 
     with output_path.open("w", encoding="utf-8") as out:
-        for jsonl_file in sorted(src_dir.glob("*.jsonl")):
-            for line in jsonl_file.read_text(encoding="utf-8").splitlines():
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    rec = json.loads(line)
-                    if rec.get("id") in seen_ids:
-                        continue
-                    if filter_quality and rec.get("quality_label") not in filter_quality:
-                        continue
-                    out.write(json.dumps(rec, ensure_ascii=False) + "\n")
-                    seen_ids.add(rec["id"])
-                    written += 1
-                except Exception:
-                    pass
+        for rec in selected:
+            rid = rec.get("id")
+            if rid and rid in seen_ids:
+                continue
+            tier = rec.get("train_tier", "?")
+            tier_counts[tier] = tier_counts.get(tier, 0) + 1
+            weight_sum += float(rec.get("train_weight", 0))
+            out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            if rid:
+                seen_ids.add(rid)
+            written += 1
 
-    print(f"Merged {written} {granularity}-level records -> {output_path}")
+    print(f"Merged {written} {granularity}-level records ({merge_policy}) -> {output_path}")
+    if merge_policy != "strict":
+        print("  Tier breakdown:", ", ".join(f"{k}={v}" for k, v in sorted(tier_counts.items())))
+        print(f"  Sum of train_weight: {weight_sum:.1f}")
     return output_path
 
 
@@ -829,7 +926,26 @@ def _cli() -> None:
         "--quality",
         nargs="+",
         default=["clean", "patched"],
-        help="Quality labels to include when merging (default: clean patched)",
+        help="Quality labels when --merge-policy strict (default: clean patched)",
+    )
+    parser.add_argument(
+        "--merge-policy",
+        choices=["strict", "weighted", "all"],
+        default="strict",
+        help="strict=filter by --quality; weighted=A+B full + sample struggled; all=tier A/B/C",
+    )
+    parser.add_argument(
+        "--struggled-rate",
+        type=float,
+        default=0.15,
+        metavar="FRAC",
+        help="Fraction of struggled (tier C) records to include (weighted policy, default 0.15)",
+    )
+    parser.add_argument(
+        "--merge-seed",
+        type=int,
+        default=None,
+        help="RNG seed for reproducible struggled subsampling",
     )
     parser.add_argument(
         "--project",
@@ -846,12 +962,39 @@ def _cli() -> None:
         action="store_true",
         help="Run registered corpus enrichers (architecture_notes, external_review_pair, ...)",
     )
+    parser.add_argument(
+        "--force-refresh",
+        action="store_true",
+        help="Re-collect even if ids exist; bump corpus_generation and mark prior rows non-canonical",
+    )
+    parser.add_argument(
+        "--include-superseded",
+        action="store_true",
+        help="When merging, include non-canonical (superseded) generations",
+    )
+    parser.add_argument(
+        "--collect-polish-queue",
+        action="store_true",
+        help="Force-refresh corpus for polish_queue projects that are fully complete",
+    )
+    parser.add_argument(
+        "--polish-queue",
+        default=None,
+        metavar="PATH",
+        help="Polish queue file (default: polish_queue.md in project root)",
+    )
     args = parser.parse_args()
 
     use_cont = not args.no_continuation
 
     if args.collect_all:
-        collect_all_existing(verbose=True, use_continuation=use_cont, run_enrichers=args.enrich)
+        collect_all_existing(
+            verbose=True,
+            use_continuation=use_cont,
+            run_enrichers=args.enrich,
+            force_refresh=args.force_refresh,
+            skip_gate=args.skip_gate,
+        )
 
     if args.project:
         project_dir = projects_dir() / args.project
@@ -862,16 +1005,42 @@ def _cli() -> None:
             project_dir,
             use_continuation=use_cont,
             run_enrichers=args.enrich,
+            force_refresh=args.force_refresh,
+            skip_gate=args.skip_gate,
         )
         print(f"Collected {n} records from {args.project}")
 
     if args.merge:
-        merge_corpus(granularity=args.merge, filter_quality=args.quality)
+        merge_corpus(
+            granularity=args.merge,
+            filter_quality=args.quality,
+            merge_policy=args.merge_policy,
+            struggled_sample_rate=args.struggled_rate,
+            merge_seed=args.merge_seed,
+            canonical_only=not args.include_superseded,
+        )
 
     if args.stats:
         corpus_stats()
 
-    if not any([args.collect_all, args.project, args.merge, args.stats]):
+    if args.collect_polish_queue:
+        from pathlib import Path
+
+        from pipeline.corpus_polish import collect_polish_queue_complete
+
+        pq = Path(args.polish_queue) if args.polish_queue else None
+        collect_polish_queue_complete(
+            polish_path=pq,
+            use_continuation=use_cont,
+        )
+
+    if not any([
+        args.collect_all,
+        args.project,
+        args.merge,
+        args.stats,
+        args.collect_polish_queue,
+    ]):
         parser.print_help()
 
 
