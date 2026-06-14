@@ -46,12 +46,12 @@ def test_dedupe_pending_tasks_keeps_newest(tmp_path, monkeypatch) -> None:
         lambda: db_dir / "messages.sqlite",
     )
     bus = MessageBus()
-    for _ in range(3):
+    for phase in (2, 3, 4):
         bus.send(Message.create(
             "runner", "phase_planner", type="task",
-            payload={"idea_slug": "movie_player", "phase": 2},
+            payload={"idea_slug": "movie_player", "phase": phase},
         ))
     assert bus.queue_depth("phase_planner") == 3
-    removed = bus.dedupe_pending_tasks("phase_planner", ("idea_slug", "phase"))
+    removed = bus.dedupe_pending_tasks("phase_planner", ("idea_slug",))
     assert removed == 2
     assert bus.queue_depth("phase_planner") == 1

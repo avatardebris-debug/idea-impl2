@@ -60,7 +60,7 @@ def resolve_initial_work(
     if shutdowns:
         print(f"  🧹 Discarded {shutdowns} stale SHUTDOWN signal(s) from prior run")
 
-    deduped = bus.dedupe_pending_tasks("phase_planner", ("idea_slug", "phase"))
+    deduped = bus.dedupe_pending_tasks("phase_planner", ("idea_slug",))
     deduped += bus.dedupe_pending_tasks("reviewer", ("idea_slug", "phase"))
     deduped += bus.dedupe_pending_tasks("executor", ("idea_slug", "phase"))
     if deduped:

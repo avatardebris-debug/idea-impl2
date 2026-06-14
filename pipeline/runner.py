@@ -532,6 +532,8 @@ def main():
     )
     parser.add_argument("idea", nargs="?", default=None,
                         help="Idea description to implement")
+    parser.add_argument("--idea", dest="idea_flag", default=None,
+                        help="Idea description (alias for positional idea arg)")
     parser.add_argument("--from-list", action="store_true",
                         help="Read ideas from master_ideas.md")
     parser.add_argument("--resume", action="store_true",
@@ -634,13 +636,14 @@ def main():
         print(json.dumps(result, indent=2))
         sys.exit(0 if result.get("ok") else 1)
 
-    if not args.idea and not args.from_list and not args.resume and not args.polish:
+    if not args.idea and not args.idea_flag and not args.from_list and not args.resume and not args.polish:
         parser.print_help()
         print("\nProvide an idea, use --from-list, --resume, or --polish.")
         sys.exit(1)
 
+    idea = args.idea or args.idea_flag
     run_pipeline(
-        idea=args.idea,
+        idea=idea,
         from_list=args.from_list,
         resume=args.resume,
         provider=args.provider,
