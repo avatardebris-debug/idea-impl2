@@ -53,7 +53,7 @@ def tick_reviewed_advance(
     return idea_state
 
 
-def read_task_progress(idea_state: dict[str, Any]) -> tuple[int, int]:
+def read_task_progress(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> tuple[int, int]:
     """Live task done/total from tasks.md for the active project phase."""
     tasks_done, tasks_total = 0, 0
     try:
@@ -77,7 +77,7 @@ def read_task_progress(idea_state: dict[str, Any]) -> tuple[int, int]:
     return tasks_done, tasks_total
 
 
-def read_workspace_activity(active_slug: str) -> tuple[int, float]:
+def read_workspace_activity(cfg: MainLoopConfig, active_slug: str) -> tuple[int, float]:
     """Return (file_count, latest_mtime) for project workspace."""
     _ws_file_count = 0
     _ws_last_mtime = 0.0
@@ -341,6 +341,7 @@ def _print_throughput_breakdown(cfg: MainLoopConfig, running_agents: int) -> Non
                             f"{r}×{n}" for r, n in sorted(_by_role.items())
                         )
                         print(f"     Stuck in processing: {_stuck_str}", flush=True)
+                        _try_recover_stalled_processing(cfg, _stuck)
                     else:
                         print(
                             "     No messages in 'processing' — queue empty, "
@@ -352,6 +353,25 @@ def _print_throughput_breakdown(cfg: MainLoopConfig, running_agents: int) -> Non
     except Exception:
         pass
     cfg.state.last_tps_print = _now
+
+
+def _try_recover_stalled_processing(cfg: MainLoopConfig, stuck: list[Any]) -> None:
+    """Reset processing messages back to pending when throughput has gone stale."""
+    if not stuck:
+        return
+    now = time.time()
+    if now - cfg.state.last_stall_recovery < cfg.stall_recovery_cooldown_s:
+        return
+    try:
+        reset = cfg.bus.reset_stale_processing()
+        if reset:
+            cfg.state.last_stall_recovery = now
+            print(
+                f"  🔧 Stall recovery: reset {reset} processing message(s) → pending",
+                flush=True,
+            )
+    except Exception as exc:
+        print(f"  [stall recovery] failed: {exc}", flush=True)
 
 
 def tick_project_metrics(

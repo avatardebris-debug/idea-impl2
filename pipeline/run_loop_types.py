@@ -26,6 +26,7 @@ class MainLoopState:
     last_orphan_requeue: float = 0.0
     status_count: int = 0
     last_tps_print: float = 0.0
+    last_stall_recovery: float = 0.0
     zero_progress_since: dict[str, float] = field(default_factory=dict)
     zero_task_warned: set[str] = field(default_factory=set)
     parallel_seeds: int = 1
@@ -56,6 +57,7 @@ class MainLoopConfig:
     dropbox_interval_s: float = 600.0
     ideation_timeout_s: float = 35 * 60
     orphan_requeue_cooldown_s: float = 660.0
+    stall_recovery_cooldown_s: float = 900.0
     zero_task_phase_kill_s: float = 15 * 60
     zero_task_warn_s: float = 10 * 60
     tuner: Any = None

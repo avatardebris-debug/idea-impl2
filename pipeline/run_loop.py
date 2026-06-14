@@ -74,9 +74,9 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
     idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)
     tick_seed_after_project_advance(cfg, idea_state)
 
-    tasks_done, tasks_total = read_task_progress(idea_state)
+    tasks_done, tasks_total = read_task_progress(cfg, idea_state)
     _active_slug = idea_state.get("_slug", "")
-    ws_file_count, ws_last_mtime = read_workspace_activity(_active_slug)
+    ws_file_count, ws_last_mtime = read_workspace_activity(cfg, _active_slug)
 
     tick_status_display(
         cfg,
