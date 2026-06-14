@@ -307,6 +307,39 @@ class MessageBus:
         conn.commit()
         return cur.rowcount
 
+    def dedupe_pending_tasks(
+        self,
+        to_agent: str,
+        key_fields: tuple[str, ...],
+    ) -> int:
+        """Collapse duplicate pending tasks for *to_agent* (keeps newest per payload key)."""
+        conn = _get_conn(self._db)
+        rows = conn.execute(
+            """SELECT rowid, payload FROM messages
+               WHERE to_agent=? AND status='pending' AND type='task'
+               ORDER BY created_at DESC""",
+            (to_agent,),
+        ).fetchall()
+        seen: set[tuple] = set()
+        removed = 0
+        for row in rows:
+            try:
+                payload = json.loads(row["payload"])
+            except Exception:
+                continue
+            key = tuple(payload.get(field) for field in key_fields)
+            if key in seen:
+                conn.execute(
+                    "UPDATE messages SET status='done' WHERE rowid=?",
+                    (row["rowid"],),
+                )
+                removed += 1
+            else:
+                seen.add(key)
+        if removed:
+            conn.commit()
+        return removed
+
     # ------------------------------------------------------------------
     # Signals
     # ------------------------------------------------------------------

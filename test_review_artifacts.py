@@ -36,3 +36,22 @@ def test_has_active_work_ignores_shutdown_signals(tmp_path, monkeypatch) -> None
     bus.send(Message.create("runner", "idea_planner", type="signal", payload={"signal": "SHUTDOWN"}))
     assert not bus.has_active_work()
     assert bus.discard_stale_shutdowns() == 1
+
+
+def test_dedupe_pending_tasks_keeps_newest(tmp_path, monkeypatch) -> None:
+    db_dir = tmp_path / "state"
+    db_dir.mkdir()
+    monkeypatch.setattr(
+        "pipeline.message_bus.message_bus_db",
+        lambda: db_dir / "messages.sqlite",
+    )
+    bus = MessageBus()
+    for _ in range(3):
+        bus.send(Message.create(
+            "runner", "phase_planner", type="task",
+            payload={"idea_slug": "movie_player", "phase": 2},
+        ))
+    assert bus.queue_depth("phase_planner") == 3
+    removed = bus.dedupe_pending_tasks("phase_planner", ("idea_slug", "phase"))
+    assert removed == 2
+    assert bus.queue_depth("phase_planner") == 1

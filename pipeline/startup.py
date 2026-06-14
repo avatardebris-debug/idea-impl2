@@ -60,6 +60,12 @@ def resolve_initial_work(
     if shutdowns:
         print(f"  🧹 Discarded {shutdowns} stale SHUTDOWN signal(s) from prior run")
 
+    deduped = bus.dedupe_pending_tasks("phase_planner", ("idea_slug", "phase"))
+    deduped += bus.dedupe_pending_tasks("reviewer", ("idea_slug", "phase"))
+    deduped += bus.dedupe_pending_tasks("executor", ("idea_slug", "phase"))
+    if deduped:
+        print(f"  🧹 Deduped {deduped} duplicate task message(s) in queue")
+
     advanced = advance_reviewed_projects(bus)
     if advanced:
         print(f"  ➡️  Advanced {advanced} project(s) from phase_X_reviewed")
