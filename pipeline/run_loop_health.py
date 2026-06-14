@@ -445,6 +445,7 @@ def _try_recover_stalled_processing(cfg: MainLoopConfig, stuck: list[Any]) -> No
     if now - cfg.state.last_stall_recovery < cfg.stall_recovery_cooldown_s:
         return
     try:
+        stuck_roles = sorted({m.to_agent for m in stuck})
         reset = cfg.bus.reset_stale_processing()
         if reset:
             cfg.state.last_stall_recovery = now
@@ -452,6 +453,11 @@ def _try_recover_stalled_processing(cfg: MainLoopConfig, stuck: list[Any]) -> No
                 f"  🔧 Stall recovery: reset {reset} processing message(s) → pending",
                 flush=True,
             )
+            for key in stuck_roles:
+                if key in cfg.supervisor.processes:
+                    cfg.supervisor.restart_role(key)
+                    print(f"  🔧 Stall recovery: restarted {key}", flush=True)
+            cfg.supervisor.save_registry()
     except Exception as exc:
         print(f"  [stall recovery] failed: {exc}", flush=True)
 

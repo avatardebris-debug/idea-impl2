@@ -25,6 +25,7 @@ class IdeaPlannerAgent(AgentProcess):
     model_tier = "light"
     num_ctx = 8192
     max_steps = 15
+    phase_timeout = 900   # 15 min — planning should not block the pipeline for 45m
     temperature = 0.5   # needs to reason about architecture — moderate creativity
     think = False       # thinking burns ctx/steps on local Qwen; plan in prose instead
 
@@ -73,13 +74,22 @@ class IdeaPlannerAgent(AgentProcess):
             f"2. Break it into exactly 3 phases by default. Phase 1 must be the smallest\n"
             f"   useful thing (MVP). Only use 4-6 phases if the idea genuinely requires it\n"
             f"   (e.g. multiple distinct subsystems that can't ship together).\n"
-            f"3. Write the master plan to `{master_plan_path}`.\n"
+            f"3. Output the full master plan as markdown in your response"
+            + (f" and also write it to `{master_plan_path}`." if dep_workspaces else ".")
+            + "\n"
             f"4. Each phase needs: description, deliverable, dependencies, success criteria.\n"
             f"5. Include architecture notes and risks.\n"
             f"6. Say DONE.\n"
         )
 
-        result = self.call_agent(task=task_prompt, verbose=False)
+        if dep_workspaces:
+            result = self.call_agent(task=task_prompt, verbose=False)
+        else:
+            # Tool-calling via Ollama on 35B models often hangs 10–30m; direct completion is reliable.
+            result = self.call_llm_direct(task_prompt)
+            plan_text = self._extract_plan_markdown(result.answer)
+            if plan_text:
+                self.write_state_file("state/master_plan.md", plan_text)
 
 
         # Read the master plan to extract Phase 1
@@ -137,6 +147,20 @@ class IdeaPlannerAgent(AgentProcess):
             tokens_used=result.tokens_used,
             steps_used=result.steps_used,
         )
+
+    def _extract_plan_markdown(self, text: str) -> str:
+        """Pull master-plan markdown from a direct LLM response."""
+        if not text:
+            return ""
+        fenced = re.search(r"```(?:markdown)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+        if fenced:
+            text = fenced.group(1).strip()
+        for marker in (r"#\s*Master Plan", r"##\s*Phase\s+1"):
+            match = re.search(marker, text, re.IGNORECASE)
+            if match:
+                text = text[match.start():]
+                break
+        return re.sub(r"\nDONE\s*$", "", text, flags=re.IGNORECASE).strip()
 
     def _extract_phase(self, master_plan: str, phase_num: int) -> str:
         """Extract a specific phase section from the master plan."""

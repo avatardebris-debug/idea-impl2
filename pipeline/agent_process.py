@@ -662,6 +662,43 @@ class AgentProcess:
 
         return result
 
+    def call_llm_direct(
+        self,
+        task: str,
+        *,
+        system_prompt_addon: str = "",
+    ) -> "AgentResult":
+        """Single-shot LLM call without tools — avoids Ollama tool-schema hangs on planners."""
+        from agent import AgentResult
+        from llm_interface import get_llm
+
+        system = self.load_system_prompt()
+        if system_prompt_addon:
+            system += f"\n\n{system_prompt_addon}"
+
+        llm = get_llm(
+            self.provider,
+            self.model,
+            temperature=self.temperature,
+            think=self.think,
+            num_ctx=self.num_ctx,
+            slug=self._current_slug,
+        )
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": task},
+        ]
+        resp = llm.chat(messages, tools=None)
+        content = resp.content or ""
+        tokens = resp.usage.total_tokens if resp.usage else 0
+        return AgentResult(
+            answer=content,
+            steps_used=1,
+            messages=messages,
+            completed="DONE" in content.upper(),
+            tokens_used=tokens,
+        )
+
     # --- Helper: read/write per-idea project state files ---
 
     def read_state_file(self, relative_path: str) -> str:

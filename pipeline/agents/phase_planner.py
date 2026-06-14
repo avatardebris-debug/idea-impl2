@@ -22,6 +22,7 @@ class PhasePlannerAgent(AgentProcess):
     model_tier = "light"
     num_ctx = 8192
     max_steps = 15
+    phase_timeout = 900
     temperature = 0.4   # slight creativity helps with edge-case task decomposition
     think = False       # keep tasks concrete; executor has limited steps per phase
 
@@ -85,7 +86,32 @@ class PhasePlannerAgent(AgentProcess):
         if bug_memory_block:
             task_prompt += f"\n\n{bug_memory_block}"
 
-        result = self.call_agent(task=task_prompt, verbose=False)
+        ws_path = pathlib.Path(workspace)
+        ws_empty = not ws_path.exists() or not any(
+            f for f in ws_path.rglob("*") if f.is_file()
+        )
+
+        if ws_empty:
+            direct_prompt = (
+                task_prompt.replace(
+                    f"1. Read the existing workspace with `list_tree` on {workspace} "
+                    f"to see what's already built.\n",
+                    "1. The workspace is empty — this is a greenfield phase.\n",
+                ).replace(
+                    f"3. Write the task list to `{tasks_full_path}` using EXACTLY this format:",
+                    "3. Output the task list in your response using EXACTLY this format:",
+                ).replace(
+                    "4. Before inventing new modules, use `suggest_capabilities` / `invoke_capability` "
+                    "if the executor context lists verified capabilities.\n",
+                    "",
+                )
+            )
+            result = self.call_llm_direct(direct_prompt)
+            tasks_text = self._extract_tasks_markdown(result.answer)
+            if tasks_text:
+                self.write_state_file(tasks_path, tasks_text)
+        else:
+            result = self.call_agent(task=task_prompt, verbose=False)
 
         # --- Validate tasks.md was written ---
         tasks_content = self.read_state_file(tasks_path)
@@ -263,6 +289,21 @@ class PhasePlannerAgent(AgentProcess):
             tokens_used=result.tokens_used,
             steps_used=result.steps_used,
         )
+
+    def _extract_tasks_markdown(self, text: str) -> str:
+        """Pull tasks.md content from a direct LLM response."""
+        import re as _re
+        if not text:
+            return ""
+        fenced = _re.search(r"```(?:markdown)?\s*(.*?)```", text, _re.DOTALL | _re.IGNORECASE)
+        if fenced:
+            text = fenced.group(1).strip()
+        header = _re.search(r"#\s*Phase\s+\d+\s+Tasks", text, _re.IGNORECASE)
+        if header:
+            text = text[header.start():]
+        elif _re.search(r"^- \[ \]", text, _re.MULTILINE):
+            text = f"# Phase Tasks\n\n{text}"
+        return _re.sub(r"\nDONE\s*$", "", text, flags=_re.IGNORECASE).strip()
 
     def _generate_fallback_tasks(self, phase_num: int, phase_spec: str, master_plan: str) -> str:
         """Generate a minimal tasks.md from the spec when the LLM fails to write one."""

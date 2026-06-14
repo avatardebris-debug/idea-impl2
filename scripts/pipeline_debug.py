@@ -47,7 +47,7 @@ def main() -> int:
         print(f"discarded stale SHUTDOWN signals: {shutdowns}")
     print(f"has_active_work={bus.has_active_work()}")
     stuck = bus.get_processing_messages()
-    print(f"processing={[(m.id, m.to_agent, m.type) for m in stuck]}")
+    print(f"processing={[(m.msg_id, m.to_agent, m.type) for m in stuck]}")
     for role in AGENT_ROLES:
         depth = bus.queue_depth(role)
         if depth:
@@ -103,6 +103,30 @@ def main() -> int:
             if line.strip().startswith("[ ]"):
                 print(f"  {line.strip()[:100]}")
                 break
+
+    _section("Logs (last 15 lines)")
+    logs_dir = pipe / "logs"
+    for name in ("idea_planner.out", "idea_planner.log", "phase_planner.out", "executor.out"):
+        log_path = logs_dir / name
+        if log_path.exists():
+            lines = log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+            print(f"  --- {name} ---")
+            for line in lines[-15:]:
+                print(f"    {line}")
+
+    _section("Latest run report")
+    metrics_root = pipe / "metrics"
+    if metrics_root.exists():
+        runs = sorted(metrics_root.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True)
+        if runs:
+            report = runs[0] / "report.md"
+            summary = runs[0] / "summary.json"
+            print(f"  run_dir={runs[0]}")
+            if summary.exists():
+                s = json.loads(summary.read_text(encoding="utf-8"))
+                print(f"  projects={s.get('projects_total', 0)} tokens={s.get('total_tokens', 0)}")
+            if report.exists():
+                print(f"  report: {report}")
 
     return 0
 

@@ -131,6 +131,22 @@ class AgentSupervisor:
                 status[role] = f"exited({ret})"
         return status
 
+    def restart_role(self, key: str) -> subprocess.Popen:
+        """Kill and restart one agent subprocess (used when stall recovery resets its queue)."""
+        proc = self.processes.get(key)
+        if proc is not None and proc.poll() is None:
+            proc.kill()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        role = key.rsplit("_", 1)[0] if key and key[-1].isdigit() else key
+        key_override = key if key != role else None
+        MessageBus().discard_stale_shutdowns()
+        new_proc = self.start_agent(role, key_override=key_override)
+        self.processes[key] = new_proc
+        return new_proc
+
     def restart_dead(self) -> list[str]:
         """Restart any agents that have died unexpectedly."""
         restarted = []
