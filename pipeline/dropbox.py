@@ -81,12 +81,22 @@ def _save_state(state: dict[str, Any]) -> None:
 
 
 def parse_user_messages(text: str) -> list[dict[str, str]]:
-    """Extract USER message blocks from dropbox.md."""
+    """Extract USER message blocks from dropbox.md (ignores fenced examples)."""
     messages: list[dict[str, str]] = []
     lines = text.splitlines()
     i = 0
+    in_fence = False
     while i < len(lines):
-        m = re.match(r"^###\s+USER\s+(msg-[\w-]+)\s*$", lines[i], re.IGNORECASE)
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            i += 1
+            continue
+        if in_fence:
+            i += 1
+            continue
+        m = re.match(r"^###\s+USER\s+(msg-[\w-]+)\s*$", line, re.IGNORECASE)
         if not m:
             i += 1
             continue
@@ -95,6 +105,8 @@ def parse_user_messages(text: str) -> list[dict[str, str]]:
         target = ""
         body_lines: list[str] = []
         while i < len(lines) and not lines[i].startswith("### "):
+            if lines[i].strip().startswith("```"):
+                break
             tm = TARGET_RE.match(lines[i])
             if tm and not body_lines:
                 target = tm.group(1).strip()
