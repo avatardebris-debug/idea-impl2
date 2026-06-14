@@ -21,6 +21,7 @@ from pipeline.seeding import (
     seed_idea,
 )
 from pipeline.project_ops import _rebuild_queues_from_state
+from pipeline.project_rebuild import advance_reviewed_projects
 
 if TYPE_CHECKING:
     from pipeline.message_bus import MessageBus
@@ -54,6 +55,14 @@ def resolve_initial_work(
     stale = bus.reset_stale_processing()
     if stale:
         print(f"  🔄 Reset {stale} stale message(s) from previous run")
+
+    shutdowns = bus.discard_stale_shutdowns()
+    if shutdowns:
+        print(f"  🧹 Discarded {shutdowns} stale SHUTDOWN signal(s) from prior run")
+
+    advanced = advance_reviewed_projects(bus)
+    if advanced:
+        print(f"  ➡️  Advanced {advanced} project(s) from phase_X_reviewed")
 
     if polish and run_ctx and run_ctx.polish_path:
         from pipeline.polish_mode import queue_pending, requeue_polish_in_progress, run_polish_mode

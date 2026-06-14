@@ -19,6 +19,11 @@ from pipeline.paths import projects_dir
 from pipeline.pipeline_config import PROJECT_ROOT
 from pipeline.project_state import _write_state
 from pipeline.project_tick import _tick_project
+from pipeline.review_artifacts import (
+    build_review_result,
+    review_artifacts_complete,
+    validation_passed,
+)
 
 if TYPE_CHECKING:
     pass
@@ -38,6 +43,80 @@ def _executor_recently_active(project_dir: pathlib.Path, cutoff_s: float = 600) 
                 except OSError:
                     pass
     return False
+
+
+def _try_finalize_review_without_llm(
+    bus: MessageBus,
+    slug: str,
+    title: str,
+    state: dict,
+    project_dir: pathlib.Path,
+    phase_num: int,
+    *,
+    tasks_path: str,
+    workspace_path: str,
+    report_path: str,
+    review_path: str,
+    log_requeue: bool = False,
+) -> bool:
+    """Skip reviewer LLM when validation PASS + review.md already complete."""
+    report_file = project_dir / report_path
+    review_file = project_dir / review_path
+    if not report_file.exists() or not review_file.exists():
+        return False
+    try:
+        validation_text = report_file.read_text(encoding="utf-8")
+        review_text = review_file.read_text(encoding="utf-8")
+    except Exception:
+        return False
+    if not validation_passed(validation_text) or not review_artifacts_complete(review_text):
+        return False
+
+    state["review_result"] = build_review_result(
+        review_content=review_text,
+        review_path=review_path,
+        tasks_path=tasks_path,
+        workspace_path=workspace_path,
+    )
+    reviewed_status = f"phase_{phase_num}_reviewed"
+    state["status"] = reviewed_status
+    (project_dir / "state" / "current_idea.json").write_text(
+        json.dumps(state, indent=2), encoding="utf-8",
+    )
+    if log_requeue:
+        print(
+            f"  [skip-review] '{title}' — existing PASS validation + review.md; advancing",
+        )
+    return bool(_tick_project(bus, project_dir, state, phase_num, slug))
+
+
+def advance_reviewed_projects(bus: MessageBus) -> int:
+    """Run _tick_project for projects stuck at phase_X_reviewed with empty queues."""
+    projects_root = projects_dir()
+    if not projects_root.exists():
+        return 0
+    for project_dir in sorted(projects_root.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.exists():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        status = state.get("status", "")
+        phase_match = re.match(r"phase_(\d+)_reviewed", status)
+        if not phase_match:
+            continue
+        phase_num = int(phase_match.group(1))
+        slug = project_dir.name
+        title = state.get("title", slug)
+        if dispatch_phase_requeue(
+            bus, slug, title, state, project_dir, status, log_requeue=True,
+        ):
+            return 1
+    return 0
 
 
 def dispatch_phase_requeue(
@@ -157,6 +236,15 @@ def dispatch_phase_requeue(
             ),
         }
     elif phase_step == "reviewing":
+        if _try_finalize_review_without_llm(
+            bus, slug, title, state, project_dir, phase_num,
+            tasks_path=tasks_path,
+            workspace_path=workspace_path,
+            report_path=report_path,
+            review_path=review_path,
+            log_requeue=log_requeue,
+        ):
+            return True
         agent = "reviewer"
         payload = {
             "phase": phase_num,

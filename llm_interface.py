@@ -11,9 +11,19 @@ Swap providers with a single string:
 """
 
 from __future__ import annotations
+import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any
+
+
+def _ollama_http_timeout_s() -> int:
+    """Wall-clock seconds to wait for Ollama HTTP response (cloud 35B needs headroom)."""
+    raw = os.environ.get("OLLAMA_HTTP_TIMEOUT", "900")
+    try:
+        return max(60, int(raw))
+    except ValueError:
+        return 900
 
 
 # ---------------------------------------------------------------------------
@@ -399,7 +409,7 @@ class OllamaAdapter(LLMBase):
                     prompt=_user,
                     slug=self.slug,
                     options=_kv_opts,
-                    timeout=300,
+                    timeout=_ollama_http_timeout_s(),
                 )
             except Exception:
                 _kv_resp = None  # fall back to /api/chat on any error
@@ -424,7 +434,7 @@ class OllamaAdapter(LLMBase):
                     method="POST",
                 )
                 try:
-                    with urllib.request.urlopen(req, timeout=300) as resp:
+                    with urllib.request.urlopen(req, timeout=_ollama_http_timeout_s()) as resp:
                         raw = _json.loads(resp.read().decode("utf-8"))
                     break  # success — exit retry loop
 

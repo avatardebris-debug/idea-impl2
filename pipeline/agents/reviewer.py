@@ -17,6 +17,13 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
 from pipeline.agent_process import AgentProcess, AgentOutput
 from pipeline.message_bus import Message
 from pipeline.paths import reusable_tools_md, shared_libs_dir
+from pipeline.review_artifacts import (
+    build_review_result,
+    count_blocking_bugs,
+    extract_non_blocking_notes,
+    review_artifacts_complete,
+    validation_passed,
+)
 
 
 class ReviewerAgent(AgentProcess):
@@ -26,6 +33,83 @@ class ReviewerAgent(AgentProcess):
     max_steps = 15
     temperature = 0.3   # structured assessment — slightly creative but mostly deterministic
     think = False       # follows fixed review template — no CoT needed
+
+    def _finalize_post_validation(
+        self,
+        msg: Message,
+        phase_num: int,
+        idea_slug: str,
+        review_path: str,
+        tasks_path: str,
+        workspace_path: str,
+        files_written: list,
+        review_content: str,
+        *,
+        tokens_used: int,
+        steps_used: int,
+        answer: str,
+    ) -> AgentOutput:
+        """Write review_result to state; runner routes via _tick_project()."""
+        try:
+            idea_state = self.read_json_state("state/current_idea.json")
+            if idea_state.get("status") in ("complete", "stalled", "budget_exceeded"):
+                return AgentOutput(
+                    success=True, answer=answer, outgoing=[],
+                    tokens_used=tokens_used, steps_used=steps_used,
+                )
+            idea_state["review_result"] = build_review_result(
+                review_content=review_content,
+                review_path=review_path,
+                tasks_path=tasks_path,
+                workspace_path=workspace_path,
+                files_written=files_written,
+            )
+            idea_state["status"] = f"phase_{phase_num}_reviewed"
+            self.write_json_state("state/current_idea.json", idea_state)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("[reviewer] Failed to write review verdict: %s", e)
+
+        try:
+            from pipeline.finetune_collector import collect_phase_pair
+            _fix_cycles = msg.payload.get("retry_count", 0)
+            if collect_phase_pair(
+                project_dir=self._project_dir,
+                phase_num=phase_num,
+                fix_cycles=_fix_cycles,
+                model=self.model,
+                tokens=tokens_used,
+                files_written=files_written,
+            ):
+                import logging as _log
+                _quality = "high" if _fix_cycles == 0 else ("medium" if _fix_cycles <= 2 else "low")
+                _log.getLogger(__name__).info(
+                    "[reviewer] Fine-tune pair collected: phase=%d fix_cycles=%d quality=%s",
+                    phase_num, _fix_cycles, _quality,
+                )
+        except Exception:
+            pass
+
+        try:
+            from pipeline.bug_memory import record_reviewer_pass
+            _fix_report = self.read_state_file(f"phases/phase_{phase_num}/fix_report.md")
+            record_reviewer_pass(
+                idea_slug,
+                phase_num,
+                review_content,
+                _fix_report,
+                msg.payload.get("retry_count", 0),
+            )
+        except Exception:
+            pass
+
+        return AgentOutput(
+            success=True,
+            answer=answer,
+            outgoing=[],
+            tokens_used=tokens_used,
+            steps_used=steps_used,
+        )
 
     def handle(self, msg: Message) -> AgentOutput:
         phase_num = msg.payload.get("phase", 1)
@@ -40,11 +124,28 @@ class ReviewerAgent(AgentProcess):
                                      f"phases/phase_{phase_num}/tasks.md")
         review_full_path = self._project_path(review_path)
 
+        validation_content = self.read_state_file(validation_path) or ""
+        review_content = self.read_state_file(review_path) or ""
+        is_post_validation = validation_passed(validation_content)
+
+        # Skip redundant 35B review when validator already passed and review.md exists.
+        if is_post_validation and review_artifacts_complete(review_content):
+            import logging
+
+            logging.getLogger(__name__).info(
+                "[reviewer] Skipping LLM — reusing existing review.md for phase %d",
+                phase_num,
+            )
+            return self._finalize_post_validation(
+                msg, phase_num, idea_slug, review_path, tasks_path,
+                workspace_path, files_written, review_content,
+                tokens_used=0, steps_used=0, answer="Reused existing review.md",
+            )
+
         self._update_idea_status(f"phase_{phase_num}_reviewing")
 
         # Read context
         tasks_content = self.read_state_file(tasks_path) or ""
-        validation_content = self.read_state_file(validation_path) or ""
 
         shared_libs_path = str(shared_libs_dir())
         reusable_tools_path = str(reusable_tools_md())
@@ -166,107 +267,16 @@ class ReviewerAgent(AgentProcess):
                 f"## Verdict\nFAIL — reviewer produced placeholder output\n"
             )
             self.write_state_file(review_path, review_content)
-        # Count only bullets under '## Blocking Bugs' — non-blocking notes are deferred work
-        bugs_section = re.search(
-            r'## Blocking Bugs.*?(?=## |$)', review_content, re.DOTALL | re.IGNORECASE
-        )
-        if bugs_section:
-            section_text = bugs_section.group()
-            if re.search(r'\bnone\b', section_text, re.IGNORECASE):
-                blocking_count = 0
-            else:
-                blocking_count = len(re.findall(r'^[-*]\s+', section_text, re.MULTILINE))
-        else:
-            blocking_count = 0
-
-        # Extract non-blocking notes to pass through for deferred scheduling
-        non_blocking_section = re.search(
-            r'## Non-Blocking Notes.*?(?=## |$)', review_content, re.DOTALL | re.IGNORECASE
-        )
-        non_blocking_notes = ""
-        if non_blocking_section:
-            raw = non_blocking_section.group().strip()
-            if re.search(r'^[-*]\s+', raw, re.MULTILINE):
-                non_blocking_notes = raw
-
-        # --- Determine review mode: pre-validation or post-validation ---
-        # Pre-validation: reviewer comes from executor BEFORE tests run
-        # Post-validation: reviewer comes from validator AFTER tests pass
-        validation_report_content = self.read_state_file(validation_path)
-        is_post_validation = (
-            validation_report_content
-            and "Verdict: PASS" in validation_report_content
-        )
+        blocking_count = count_blocking_bugs(review_content)
+        non_blocking_notes = extract_non_blocking_notes(review_content)
 
         if is_post_validation:
-            # --- POST-VALIDATION: Deep review → write verdict to state for runner ---
-            try:
-                idea_state = self.read_json_state("state/current_idea.json")
-
-                if idea_state.get("status") in ("complete", "stalled", "budget_exceeded"):
-                    return AgentOutput(
-                        success=True, answer=result.answer, outgoing=[],
-                        tokens_used=result.tokens_used, steps_used=result.steps_used,
-                    )
-
-                idea_state["review_result"] = {
-                    "blocking_bugs": blocking_count,
-                    "review_path": review_path,
-                    "tasks_path": tasks_path,
-                    "workspace_path": workspace_path,
-                    "files_written": files_written,
-                    "non_blocking_notes": non_blocking_notes[:1500],
-                    "review_content_preview": review_content[:1500],
-                }
-                idea_state["status"] = f"phase_{phase_num}_reviewed"
-                self.write_json_state("state/current_idea.json", idea_state)
-            except Exception as e:
-                import logging
-                logging.getLogger(__name__).error("[reviewer] Failed to write review verdict: %s", e)
-
-            # --- Fine-tuning data collection (never affects pipeline) ---
-            # Capture a (task list → working code) pair for future SFT training.
-            # fix_cycles=0 means clean first-pass — highest quality training signal.
-            try:
-                from pipeline.finetune_collector import collect_phase_pair
-                _fix_cycles = msg.payload.get("retry_count", 0)
-                _collected = collect_phase_pair(
-                    project_dir=self._project_dir,
-                    phase_num=phase_num,
-                    fix_cycles=_fix_cycles,
-                    model=self.model,
-                    tokens=result.tokens_used,
-                    files_written=files_written,
-                )
-                if _collected:
-                    import logging as _log
-                    _quality = "high" if _fix_cycles == 0 else ("medium" if _fix_cycles <= 2 else "low")
-                    _log.getLogger(__name__).info(
-                        "[reviewer] Fine-tune pair collected: phase=%d fix_cycles=%d quality=%s",
-                        phase_num, _fix_cycles, _quality,
-                    )
-            except Exception:
-                pass  # Data collection must never affect pipeline
-
-            try:
-                from pipeline.bug_memory import record_reviewer_pass
-                _fix_report = self.read_state_file(f"phases/phase_{phase_num}/fix_report.md")
-                record_reviewer_pass(
-                    idea_slug,
-                    phase_num,
-                    review_content,
-                    _fix_report,
-                    msg.payload.get("retry_count", 0),
-                )
-            except Exception:
-                pass
-
-            return AgentOutput(
-                success=True,
-                answer=result.answer,
-                outgoing=[],  # No outgoing messages — runner handles routing
+            return self._finalize_post_validation(
+                msg, phase_num, idea_slug, review_path, tasks_path,
+                workspace_path, files_written, review_content,
                 tokens_used=result.tokens_used,
                 steps_used=result.steps_used,
+                answer=result.answer,
             )
 
         else:

@@ -45,7 +45,10 @@ _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
 from pipeline.paths import get_pipeline_dir
 
 _OLLAMA_BASE = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-_DEFAULT_TIMEOUT = 600   # seconds — long enough for a 16k context generation
+try:
+    _DEFAULT_TIMEOUT = max(60, int(os.environ.get("OLLAMA_HTTP_TIMEOUT", "900")))
+except ValueError:
+    _DEFAULT_TIMEOUT = 900
 
 
 class OllamaKVCache:

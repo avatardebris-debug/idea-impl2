@@ -288,7 +288,10 @@ class DynamicParallelizer:
         """Return a compact one-line status string for the runner's status output."""
         if not self._history:
             if self._last_known_call_count == 0:
-                return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating (0/2 samples, waiting for LLM calls)..."
+                return (
+                    f"⚡ parallelizer: {current_seeds} seed(s) — "
+                    f"calibrating (0/2 samples; no completed LLM calls yet)..."
+                )
             return f"⚡ parallelizer: {current_seeds} seed(s) — calibrating (0/2 samples)..."
 
         last = self._history[-1]

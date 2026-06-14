@@ -286,12 +286,26 @@ class MessageBus:
         return (row[0] if row else 0) == 0
 
     def has_active_work(self) -> bool:
-        """True if any pending OR processing messages exist."""
+        """True if any pending OR processing task messages exist (not SHUTDOWN signals)."""
         conn = _get_conn(self._db)
         row = conn.execute(
-            "SELECT COUNT(*) FROM messages WHERE status IN ('pending','processing')",
+            """SELECT COUNT(*) FROM messages
+               WHERE status IN ('pending','processing')
+               AND NOT (type='signal' AND json_extract(payload, '$.signal')='SHUTDOWN')""",
         ).fetchone()
         return (row[0] if row else 0) > 0
+
+    def discard_stale_shutdowns(self) -> int:
+        """Mark leftover SHUTDOWN signals done (from prior Ctrl+C). Returns count cleared."""
+        conn = _get_conn(self._db)
+        cur = conn.execute(
+            """UPDATE messages SET status='done'
+               WHERE status IN ('pending','processing')
+               AND type='signal'
+               AND json_extract(payload, '$.signal')='SHUTDOWN'""",
+        )
+        conn.commit()
+        return cur.rowcount
 
     # ------------------------------------------------------------------
     # Signals

@@ -423,11 +423,11 @@ def check_workspace_imports(
                     if top not in stdlib and top not in local_modules:
                         missing_imports.add(top)
 
-    # Try to check if they're pip-installed
+    import importlib.util
+
+    # Try to check if missing imports are pip-installed (find_spec avoids import side effects)
     for mod in sorted(missing_imports):
-        try:
-            __import__(mod)
-        except (ImportError, SyntaxError, Exception):
+        if importlib.util.find_spec(mod) is None:
             results.append(HealthCheckResult(
                 "missing_import", "warning",
                 f"Module '{mod}' imported but not installed or in workspace",

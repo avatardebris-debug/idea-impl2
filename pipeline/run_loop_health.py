@@ -378,7 +378,6 @@ def tick_stall_recovery(cfg: MainLoopConfig, *, running_agents: int) -> None:
 
     if stuck:
         _try_recover_stalled_processing(cfg, stuck)
-        return
 
     if cfg.bus.has_active_work():
         return
