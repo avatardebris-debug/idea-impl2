@@ -21,6 +21,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent.parent.parent))
 
 from pipeline.agent_process import AgentProcess, AgentOutput
 from pipeline.message_bus import Message
+from pipeline.paths import get_pipeline_dir, project_dir, state_dir
 
 logger = logging.getLogger(__name__)
 
@@ -115,11 +116,17 @@ class ManagerAgent(AgentProcess):
         ideas_path = msg.payload.get("ideas_path", "master_ideas.md")
 
         mi = self._read_master_ideas()[:2500]
+        pipe = get_pipeline_dir()
         steer_path = ""
         if target:
-            sp = pathlib.Path(".pipeline/projects") / target / "state" / "user_steer.md"
+            sp = project_dir(target) / "state" / "user_steer.md"
             if sp.exists():
                 steer_path = sp.read_text(encoding="utf-8")[-1500:]
+                steer_path_display = str(sp)
+            else:
+                steer_path_display = str(sp)
+        else:
+            steer_path_display = str(project_dir("slug") / "state" / "user_steer.md")
 
         task_prompt = (
             f"You are the Manager handling a USER dropbox message while the pipeline runs.\n\n"
@@ -133,10 +140,10 @@ class ManagerAgent(AgentProcess):
             f"2. If steering a project, write concise bullet instructions agents should follow.\n"
             f"3. If NEEDS_INFO, ask specific clarifying questions.\n"
             f"4. Append files using write_file:\n"
-            f"   - Project steer: `.pipeline/projects/{target}/state/user_steer.md` (append)\n"
-            f"   - Plan tweak: `.pipeline/state/plan_amendments.md` (append `- [ ] ...`)\n"
+            f"   - Project steer: `{steer_path_display}` (append)\n"
+            f"   - Plan tweak: `{pipe / 'state' / 'plan_amendments.md'}` (append `- [ ] ...`)\n"
             f"   - New idea: `{ideas_path}` (append `- [ ] **Title** — desc` only if user asked)\n"
-            f"   - Gap: `.pipeline/state/capability_gaps.md` (append if tooling missing)\n"
+            f"   - Gap: `{pipe / 'state' / 'capability_gaps.md'}` (append if tooling missing)\n"
             f"5. End your answer with a block:\n"
             f"   DROPBOX_REPLY:\n"
             f"   status: ok | needs_info\n"
@@ -180,7 +187,7 @@ class ManagerAgent(AgentProcess):
             # Force-advance: write 'phase_N_reviewed' with 0 blocking bugs so
             # the runner's next _tick_project() call will advance to phase N+1.
             if idea_slug:
-                proj_dir   = pathlib.Path(".pipeline") / "projects" / idea_slug
+                proj_dir = project_dir(idea_slug)
                 state_file = proj_dir / "state" / "current_idea.json"
                 retry_file = proj_dir / "state" / "phase_retries.json"
                 try:
@@ -228,7 +235,7 @@ class ManagerAgent(AgentProcess):
         # Read the full fix report
         fix_report_content = ""
         if fix_report_path and idea_slug:
-            proj_dir = pathlib.Path(".pipeline") / "projects" / idea_slug
+            proj_dir = project_dir(idea_slug)
             fr_full = proj_dir / fix_report_path
             if fr_full.exists():
                 fix_report_content = fr_full.read_text(encoding="utf-8")
@@ -250,7 +257,7 @@ class ManagerAgent(AgentProcess):
             f"   - Missing dependencies (imports that can't resolve)\n"
             f"   - Test environment issues (tests assume something unavailable)\n"
             f"   - Fundamental design mistake (wrong approach entirely)\n"
-            f"3. Write your analysis to `.pipeline/state/manager_decisions.md`.\n"
+            f"3. Write your analysis to `{state_dir() / 'manager_decisions.md'}`.\n"
             f"4. Make ONE of these decisions:\n\n"
             f"   **DECISION A — RETRY WITH STRATEGY**: If you can identify a specific,\n"
             f"   different approach that hasn't been tried. Write a clear strategy the\n"
@@ -314,7 +321,7 @@ class ManagerAgent(AgentProcess):
             ))
 
             if idea_slug:
-                proj_dir = pathlib.Path(".pipeline") / "projects" / idea_slug
+                proj_dir = project_dir(idea_slug)
                 state_file = proj_dir / "state" / "current_idea.json"
                 retry_file = proj_dir / "state" / "phase_retries.json"
                 try:
@@ -377,7 +384,7 @@ class ManagerAgent(AgentProcess):
         if note:
             entry += f"- **Note**: {note}\n"
 
-        decisions_path = pathlib.Path(".pipeline/state/manager_decisions.md")
+        decisions_path = state_dir() / "manager_decisions.md"
         decisions_path.parent.mkdir(parents=True, exist_ok=True)
         with open(decisions_path, "a", encoding="utf-8") as f:
             f.write(entry)
