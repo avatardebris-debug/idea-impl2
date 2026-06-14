@@ -105,8 +105,11 @@ class OllamaKVCache:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            data = _json.loads(r.read().decode("utf-8"))
+        from pipeline.ollama_lock import ollama_singleflight
+
+        with ollama_singleflight():
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                data = _json.loads(r.read().decode("utf-8"))
 
         # Save returned context for next call
         if "context" in data and data["context"]:

@@ -338,7 +338,7 @@ class OllamaAdapter(LLMBase):
         except Exception as exc:
             log.warning("OllamaAdapter: restart attempt failed: %s", exc)
 
-    def chat(self, messages, tools=None) -> Message:
+    def chat(self, messages, tools=None, *, request_timeout: int | None = None) -> Message:
         import json as _json
         import time
         import logging
@@ -346,6 +346,8 @@ class OllamaAdapter(LLMBase):
         import urllib.error
 
         log = logging.getLogger(__name__)
+        timeout_s = request_timeout if request_timeout is not None else _ollama_http_timeout_s()
+        max_retries = 0 if request_timeout is not None else 5
 
         options: dict[str, Any] = {
             "temperature": self.temperature,
@@ -389,6 +391,8 @@ class OllamaAdapter(LLMBase):
         if _use_kv_cache:
             try:
                 from pipeline.kv_cache import get_cache as _get_kv_cache
+                from pipeline.ollama_lock import ollama_singleflight
+
                 _cache = _get_kv_cache()
                 # Extract system + last user message for /api/generate
                 _system = next(
@@ -403,19 +407,19 @@ class OllamaAdapter(LLMBase):
                 }
                 if self.think is not None:
                     _kv_opts["think"] = self.think  # type: ignore[assignment]
-                _kv_resp = _cache.generate(
-                    model=self.model,
-                    system=_system,
-                    prompt=_user,
-                    slug=self.slug,
-                    options=_kv_opts,
-                    timeout=_ollama_http_timeout_s(),
-                )
+                with ollama_singleflight():
+                    _kv_resp = _cache.generate(
+                        model=self.model,
+                        system=_system,
+                        prompt=_user,
+                        slug=self.slug,
+                        options=_kv_opts,
+                        timeout=timeout_s,
+                    )
             except Exception:
                 _kv_resp = None  # fall back to /api/chat on any error
 
         # Retry with exponential backoff for transient Ollama failures (OOM/EOF/500)
-        max_retries = 5
         backoff = 30  # seconds — start at 30s, double each attempt
         last_error: Exception | None = None
 
@@ -426,6 +430,8 @@ class OllamaAdapter(LLMBase):
             # Normalise to the same structure that the /api/chat path produces.
             raw["message"] = {"content": raw.get("response", ""), "role": "assistant"}
         else:
+            from pipeline.ollama_lock import ollama_singleflight
+
             for attempt in range(max_retries + 1):
                 req = urllib.request.Request(
                     f"{self.base_url}/api/chat",
@@ -434,8 +440,9 @@ class OllamaAdapter(LLMBase):
                     method="POST",
                 )
                 try:
-                    with urllib.request.urlopen(req, timeout=_ollama_http_timeout_s()) as resp:
-                        raw = _json.loads(resp.read().decode("utf-8"))
+                    with ollama_singleflight():
+                        with urllib.request.urlopen(req, timeout=timeout_s) as resp:
+                            raw = _json.loads(resp.read().decode("utf-8"))
                     break  # success — exit retry loop
 
                 except urllib.error.HTTPError as e:

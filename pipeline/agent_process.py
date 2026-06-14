@@ -667,12 +667,23 @@ class AgentProcess:
         task: str,
         *,
         system_prompt_addon: str = "",
+        request_timeout_s: int | None = None,
     ) -> "AgentResult":
         """Single-shot LLM call without tools — avoids Ollama tool-schema hangs on planners."""
         from agent import AgentResult
         from llm_interface import get_llm
 
+        if request_timeout_s is None:
+            try:
+                request_timeout_s = max(
+                    60, int(os.environ.get("OLLAMA_PLANNER_TIMEOUT", "180"))
+                )
+            except ValueError:
+                request_timeout_s = 180
+
         system = self.load_system_prompt()
+        if len(system) > 4000:
+            system = system[:4000] + "\n...(truncated for direct planner call)"
         if system_prompt_addon:
             system += f"\n\n{system_prompt_addon}"
 
@@ -682,15 +693,18 @@ class AgentProcess:
             self.model,
             temperature=self.temperature,
             think=self.think,
-            num_ctx=self.num_ctx,
+            num_ctx=min(self.num_ctx, 8192),
             slug="",
         )
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": task},
         ]
-        logger.info("[%s] Direct LLM call starting (model=%s, ctx=%d)", self.role, self.model, self.num_ctx)
-        resp = llm.chat(messages, tools=None)
+        logger.info(
+            "[%s] Direct LLM call starting (model=%s, ctx=%d, timeout=%ds)",
+            self.role, self.model, self.num_ctx, request_timeout_s,
+        )
+        resp = llm.chat(messages, tools=None, request_timeout=request_timeout_s)
         content = resp.content or ""
         tokens = resp.usage.total_tokens if resp.usage else 0
         logger.info("[%s] Direct LLM call done (tokens=%d, chars=%d)", self.role, tokens, len(content))

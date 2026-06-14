@@ -87,6 +87,17 @@ def main() -> int:
             if validation_passed(val) and review_artifacts_complete(rev):
                 print("    ⚠ skip-review eligible — pull 903dca0+ and restart runner")
 
+    _section("Ollama")
+    import urllib.error
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as resp:
+            print(f"  tags API: HTTP {resp.status}")
+    except Exception as exc:
+        print(f"  tags API: FAILED ({exc})")
+        print("  → Run: python scripts/pipeline_reset_stuck.py")
+
     _section("Throughput")
     tp = pipe / "state" / "throughput.json"
     if tp.exists():

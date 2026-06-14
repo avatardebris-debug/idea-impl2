@@ -86,6 +86,13 @@ class PhasePlannerAgent(AgentProcess):
         if bug_memory_block:
             task_prompt += f"\n\n{bug_memory_block}"
 
+        MAX_TASKS_PER_PHASE = 8
+        MIN_TASKS_PER_PHASE = 2
+        import re as _re
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         ws_path = pathlib.Path(workspace)
         ws_empty = not ws_path.exists() or not any(
             f for f in ws_path.rglob("*") if f.is_file()
@@ -106,21 +113,24 @@ class PhasePlannerAgent(AgentProcess):
                     "",
                 )
             )
-            result = self.call_llm_direct(direct_prompt)
-            tasks_text = self._extract_tasks_markdown(result.answer)
-            if tasks_text:
-                self.write_state_file(tasks_path, tasks_text)
+            try:
+                result = self.call_llm_direct(direct_prompt)
+                tasks_text = self._extract_tasks_markdown(result.answer)
+                if tasks_text:
+                    self.write_state_file(tasks_path, tasks_text)
+            except Exception as exc:
+                logger.warning(
+                    "[phase_planner] Direct LLM failed (%s) — using fallback tasks",
+                    exc,
+                )
+                from agent import AgentResult
+
+                result = AgentResult(answer="", steps_used=0, completed=False, tokens_used=0)
         else:
             result = self.call_agent(task=task_prompt, verbose=False)
 
         # --- Validate tasks.md was written ---
         tasks_content = self.read_state_file(tasks_path)
-
-        MAX_TASKS_PER_PHASE = 8
-        MIN_TASKS_PER_PHASE = 2
-        import re as _re
-        import logging
-        logger = logging.getLogger(__name__)
 
         if tasks_content:
             lines = tasks_content.split("\n")
