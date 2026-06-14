@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import threading
 import time
 from typing import Any
@@ -81,11 +82,11 @@ def tick_seed_after_project_advance(cfg: MainLoopConfig, idea_state: dict[str, A
         )
 
 
-def _any_project_recently_working() -> bool:
+def _any_project_recently_working(pipeline_dir: pathlib.Path) -> bool:
     """True if any project has a working-state status modified in the last 15 min."""
     _working_states = ("_executing", "_validating", "_reviewing", "_planning")
     _recency_cutoff = time.time() - 900
-    _projects_dir = cfg.pipeline_dir / "projects"
+    _projects_dir = pipeline_dir / "projects"
     if not _projects_dir.exists():
         return False
     for _pd in _projects_dir.iterdir():
@@ -108,7 +109,7 @@ def tick_seed_idle_when_empty(cfg: MainLoopConfig, all_empty: bool, *, orphaned:
     """Seed or re-polish when all queues are empty but list mode is on (after orphan tick)."""
     if not all_empty or not cfg.from_list:
         return
-    if _any_project_recently_working():
+    if _any_project_recently_working(cfg.pipeline_dir):
         return
     if not cfg.bus.has_active_work():
         if orphaned:
