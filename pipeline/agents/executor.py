@@ -206,6 +206,12 @@ class ExecutorAgent(AgentProcess):
             {p for p in workspace.rglob("*") if p.is_file()}
             if workspace.exists() else set()
         )
+        # Loose .py at idea project root (not factory repo root)
+        _idea_root = self._project_dir
+        before_root_py = (
+            {p.name for p in _idea_root.glob("*.py")}
+            if _idea_root.exists() else set()
+        )
 
         if fix_required:
             # Read the persistent fix report (full history of all attempts)
@@ -392,8 +398,8 @@ class ExecutorAgent(AgentProcess):
         # Pattern 1: workspace/workspace/ double-nesting
         _rescued_total += _rescue_dir(workspace / "workspace", workspace, "workspace/workspace/")
 
-        # Pattern 2: src/ and tests/ at project root (very common LLM mistake)
-        _project_root = self._run_dir
+        # Pattern 2: src/ and tests/ at idea project root (very common LLM mistake)
+        _project_root = _idea_root
         for _stray_name in ("src", "tests", "test"):
             _stray_dir = _project_root / _stray_name
             if _stray_dir.exists() and _stray_dir.is_dir():
@@ -413,9 +419,10 @@ class ExecutorAgent(AgentProcess):
         # Pattern 4: loose .py files at project root (not part of pipeline infra)
         from pipeline.path_health import is_root_infra_file
 
-        _before_names = {p.name for p in before_files}
         for _f in _project_root.glob("*.py"):
-            if is_root_infra_file(_f.name) or _f.name in _before_names:
+            if is_root_infra_file(_f.name) or _f.name in before_root_py:
+                continue
+            if hasattr(result, "started_at") and _f.stat().st_mtime <= result.started_at:
                 continue
             _dst = workspace / _f.name
             if not _dst.exists():
