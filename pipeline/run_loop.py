@@ -69,7 +69,7 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
     """One health-check cycle. Return True to break the main loop."""
     health = tick_health_preamble(cfg)
     all_empty = cfg.bus.all_queues_empty()
-    idea_state = _get_active_idea_state(cfg.pipeline_dir)
+    idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=cfg.focus_slug)
 
     idea_state = tick_budget_enforcement(cfg, idea_state)
     idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)

@@ -63,5 +63,6 @@ class MainLoopConfig:
     zero_task_warn_s: float = 10 * 60
     tuner: Any = None
     tuner_log_path: Path | None = None
+    focus_slug: str | None = None
     count_active_projects: Callable[[], int] | None = None
     warm_upcoming_projects: Callable[..., None] | None = None

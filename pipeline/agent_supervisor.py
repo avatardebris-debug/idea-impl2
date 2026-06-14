@@ -79,6 +79,7 @@ class AgentSupervisor:
 
     def start_all(self) -> None:
         """Start all agent subprocesses."""
+        MessageBus().discard_stale_shutdowns()
         for role in AGENT_ROLES:
             if role == "executor" and self.num_executors > 1:
                 # Spawn multiple executor instances — SQLite bus competing consumers
@@ -139,6 +140,7 @@ class AgentSupervisor:
                 # Derive role from key: "executor_0" -> "executor", "manager" -> "manager"
                 role = key.rsplit("_", 1)[0] if key[-1].isdigit() else key
                 key_override = key if key != role else None
+                MessageBus().discard_stale_shutdowns()
                 self.start_agent(role, key_override=key_override)
                 restarted.append(key)
                 time.sleep(1)

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipeline.pipeline_config import AGENT_ROLES, PROJECT_ROOT, get_pipeline_dir
+from pipeline.slug_util import slugify_title as _slugify
 from pipeline.seeding import (
     SEED_BLOCKED,
     SEED_SEEDED,
@@ -33,6 +34,7 @@ class StartupResult:
     has_work: bool
     from_list: bool
     stop_early: bool = False
+    focus_slug: str | None = None
 
 
 def resolve_initial_work(
@@ -129,8 +131,17 @@ def resolve_initial_work(
             else:
                 print("  No active pipeline to resume.")
 
-    if not has_work and idea:
-        seed_idea(bus, idea.split(".")[0][:50], idea)
+    focus_slug: str | None = None
+    if idea:
+        title = idea.split(".")[0][:50].strip()
+        if not title:
+            print("  ✗ Idea text is empty — provide a description after --seed-idea or as positional arg.")
+            return StartupResult(has_work=False, from_list=from_list, stop_early=True)
+        focus_slug = _slugify(title)
+        seed_idea(bus, title, idea)
+        purged = bus.purge_tasks_not_matching_slug(focus_slug)
+        if purged:
+            print(f"  🎯 Single-idea mode — cleared {purged} queued message(s) for other projects")
         has_work = True
 
     # --polish only replays polish_queue.md; never seed master_ideas / --goal / --hermes.
@@ -173,4 +184,9 @@ def resolve_initial_work(
         print(f"  🔄 Found {pending_total} pending queue message(s) — starting agents")
         has_work = True
 
-    return StartupResult(has_work=has_work, from_list=from_list, stop_early=stop_early)
+    return StartupResult(
+        has_work=has_work,
+        from_list=from_list,
+        stop_early=stop_early,
+        focus_slug=focus_slug,
+    )

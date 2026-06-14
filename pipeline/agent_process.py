@@ -34,6 +34,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from pipeline.message_bus import MessageBus, Message
 from pipeline.paths import logs_dir, projects_dir
+from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +56,8 @@ _NEXT_ROLE_MAP: dict[str, str] = {
 # Single source of truth for the default model.
 # The runner sets PIPELINE_MODEL env var before spawning agents so all
 # subprocesses automatically use the same model without hardcoding.
-# Override: PIPELINE_MODEL=qwen3.6:35b-a3b-q4_K_M python pipeline/runner.py ...
-DEFAULT_MODEL = os.environ.get("PIPELINE_MODEL", "qwen3.5:35b")
+# Override: PIPELINE_MODEL=... python pipeline/runner.py ...
+DEFAULT_MODEL = DEFAULT_PIPELINE_MODEL
 DEFAULT_PROVIDER = os.environ.get("PIPELINE_PROVIDER", "ollama")
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
@@ -799,7 +800,7 @@ class AgentProcess:
         # Discard stale SHUTDOWN signals left from a previous pipeline run
         cur = conn.execute(
             """UPDATE messages SET status='done'
-               WHERE to_agent=? AND status='pending'
+               WHERE to_agent=? AND status IN ('pending','processing')
                AND type='signal'
                AND json_extract(payload, '$.signal')='SHUTDOWN'""",
             (self.role,),

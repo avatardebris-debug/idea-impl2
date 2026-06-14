@@ -77,14 +77,32 @@ def init_pipeline_dirs() -> None:
 
 
 
-def _get_active_idea_state(pipeline_dir: pathlib.Path) -> dict:
+def _get_active_idea_state(
+    pipeline_dir: pathlib.Path,
+    preferred_slug: str | None = None,
+) -> dict:
     """Return the current_idea.json from the most recently modified IN-PROGRESS project.
 
     Skips projects in terminal states (complete, budget_exceeded) so that
     manually-edited state files don't permanently hijack the active slot.
     Falls back to the old global .pipeline/state/current_idea.json for
     backwards compatibility with runs that predate the per-project isolation.
+
+    When *preferred_slug* is set (single-idea runs), that project wins for display.
     """
+    if preferred_slug:
+        preferred_path = (
+            pipeline_dir / "projects" / preferred_slug / "state" / "current_idea.json"
+        )
+        if preferred_path.exists():
+            try:
+                state = _read_json_file(preferred_path)
+                state.setdefault("_slug", preferred_slug)
+                if state.get("status", "") not in ("complete", "budget_exceeded", "dep_waiting"):
+                    return state
+            except Exception:
+                pass
+
     INACTIVE = {"complete", "budget_exceeded", "dep_waiting"}
     projects_dir = pipeline_dir / "projects"
     candidates: list[pathlib.Path] = []

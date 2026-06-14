@@ -23,12 +23,13 @@ Modes:
 Usage:
     python pipeline/finetune/race.py --replay --provider-a grok --model-a grok-3-fast
     python pipeline/finetune/race.py --live   --provider-a grok --model-a grok-3-fast \\
-                                              --provider-b ollama --model-b qwen3.5:35b
+                                              --provider-b ollama --model-b qwen3.6:35b-a3b-q4_K_M
     python pipeline/finetune/race.py --stats
 """
 
 from __future__ import annotations
 
+from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
 import argparse
 import json
 import logging
@@ -495,7 +496,7 @@ Examples:
   # Replay with a local fine-tuned challenger:
   python pipeline/finetune/race.py --replay \\
       --provider-a ollama --model-a qwen3_finetune:35b \\
-      --provider-b ollama --model-b qwen3.5:35b \\
+      --provider-b ollama --model-b qwen3.6:35b-a3b-q4_K_M \\
       --max-races 20
 
   # Show race statistics:
@@ -516,11 +517,11 @@ Examples:
                         help="Provider for challenger B / pipeline (default: ollama)")
     parser.add_argument("--model-b",
                         default=None,
-                        help="Model for challenger B (default: reads PIPELINE_MODEL env or qwen3.5:35b)")
+                        help=f"Model for challenger B (default: {DEFAULT_PIPELINE_MODEL})")
     parser.add_argument("--judge-provider", default="ollama",
                         help="Provider for the judge LLM (default: ollama)")
-    parser.add_argument("--judge-model", default="qwen3.5:35b",
-                        help="Model for the judge LLM (default: qwen3.5:35b)")
+    parser.add_argument("--judge-model", default=DEFAULT_PIPELINE_MODEL,
+                        help=f"Model for the judge LLM (default: {DEFAULT_PIPELINE_MODEL})")
     parser.add_argument("--max-races", type=int, default=0,
                         help="Stop after N races (0 = unlimited, default: 0)")
     parser.add_argument("--status", default="complete",
@@ -547,7 +548,7 @@ Examples:
         _pipeline_override = pathlib.Path(args.pipeline_dir)
 
     import os
-    model_b = args.model_b or os.environ.get("PIPELINE_MODEL", "qwen3.5:35b")
+    model_b = args.model_b or DEFAULT_PIPELINE_MODEL
 
     print(f"\n  Challenger A:  {args.provider_a} / {args.model_a}")
     print(f"  Challenger B:  {args.provider_b} / {model_b}  (pipeline baseline)")

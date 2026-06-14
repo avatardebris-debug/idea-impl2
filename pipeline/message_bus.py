@@ -307,6 +307,19 @@ class MessageBus:
         conn.commit()
         return cur.rowcount
 
+    def purge_tasks_not_matching_slug(self, keep_slug: str) -> int:
+        """Drop pending/processing work for other projects (single-idea isolation)."""
+        conn = _get_conn(self._db)
+        cur = conn.execute(
+            """UPDATE messages SET status='done'
+               WHERE status IN ('pending','processing')
+               AND type IN ('task', 'generate_ideas')
+               AND COALESCE(json_extract(payload, '$.idea_slug'), '') != ?""",
+            (keep_slug,),
+        )
+        conn.commit()
+        return cur.rowcount
+
     def dedupe_pending_tasks(
         self,
         to_agent: str,

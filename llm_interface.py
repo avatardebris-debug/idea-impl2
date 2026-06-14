@@ -6,7 +6,7 @@ Swap providers with a single string:
     llm = get_llm("openai")
     llm = get_llm("claude")
     llm = get_llm("gemini")
-    llm = get_llm("ollama", model="qwen3.5:35b")
+    llm = get_llm("ollama", model="qwen3.6:35b-a3b-q4_K_M")
     llm = get_llm("grok", model="grok-3")   # requires XAI_API_KEY env var
 """
 
@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
 
 
 def _ollama_http_timeout_s() -> int:
@@ -261,7 +261,7 @@ class OllamaAdapter(LLMBase):
 
     def __init__(
         self,
-        model: str = "qwen3.5:35b",
+        model: str = DEFAULT_PIPELINE_MODEL,
         temperature: float = 0.2,
         base_url: str | None = None,
         num_ctx: int = 16384,

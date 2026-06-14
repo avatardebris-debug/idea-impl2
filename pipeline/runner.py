@@ -8,7 +8,7 @@ Usage:
     python pipeline/runner.py "Build a web scraper for Hacker News"
     python pipeline/runner.py --from-list
     python pipeline/runner.py --resume
-    python pipeline/runner.py --from-list --provider ollama --model qwen3.5:35b --time-limit 480
+    python pipeline/runner.py --from-list --provider ollama --model qwen3.6:35b-a3b-q4_K_M --time-limit 480
 """
 
 from __future__ import annotations
@@ -57,6 +57,7 @@ from pipeline.pipeline_config import (
     AGENTS_DIR,
     DEFAULT_BASE_BUDGET,
     DEFAULT_PHASE_BUDGET,
+    DEFAULT_PIPELINE_MODEL,
     MAX_PHASE_RETRIES,
     MAX_PROJECT_LIFETIME_RETRIES,
     PIPELINE_DIR,
@@ -134,7 +135,7 @@ def run_pipeline(
     from_list: bool = False,
     resume: bool = False,
     provider: str = "ollama",
-    model: str = os.environ.get("PIPELINE_MODEL", "qwen3.5:35b"),
+    model: str = DEFAULT_PIPELINE_MODEL,
     time_limit_minutes: float = 0,
     base_budget: int = DEFAULT_BASE_BUDGET,
     phase_budget: int = DEFAULT_PHASE_BUDGET,
@@ -252,6 +253,7 @@ def run_pipeline(
         return
     from_list = startup.from_list
     has_work = startup.has_work
+    focus_slug = startup.focus_slug
     if polish:
         from_list = True  # polish replays queue only; never master_ideas seeding
 
@@ -303,6 +305,7 @@ def run_pipeline(
 
     # Start all agents
     print(f"\n  Starting agents...")
+    bus.discard_stale_shutdowns()
     supervisor = AgentSupervisor(provider, model, num_executors=num_executors, legacy=legacy)
 
     # Handle Ctrl+C
@@ -458,6 +461,7 @@ def run_pipeline(
             tuner_log_path=_tuner_log_path,
             count_active_projects=_count_active_projects,
             warm_upcoming_projects=_warm_upcoming_projects,
+            focus_slug=focus_slug,
         ))
 
     finally:
@@ -519,11 +523,12 @@ def main():
     parser = argparse.ArgumentParser(
         description="Multi-agent idea development pipeline",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        allow_abbrev=False,
         epilog=textwrap.dedent("""
             Examples:
               python pipeline/runner.py "Build a CLI tool that converts CSV to JSON"
               python pipeline/runner.py --from-list
-              python pipeline/runner.py --from-list --provider ollama --model qwen3.5:35b --time-limit 480
+              python pipeline/runner.py --from-list --provider ollama --model qwen3.6:35b-a3b-q4_K_M --time-limit 480
               python pipeline/runner.py --resume
               python pipeline/runner.py --from-list --legacy
               python pipeline/runner.py --list-goals
@@ -532,7 +537,7 @@ def main():
     )
     parser.add_argument("idea", nargs="?", default=None,
                         help="Idea description to implement")
-    parser.add_argument("--idea", dest="idea_flag", default=None,
+    parser.add_argument("--seed-idea", dest="seed_idea", default=None,
                         help="Idea description (alias for positional idea arg)")
     parser.add_argument("--from-list", action="store_true",
                         help="Read ideas from master_ideas.md")
@@ -541,8 +546,8 @@ def main():
     parser.add_argument("--provider", default="ollama",
                         choices=["openai", "claude", "gemini", "ollama", "grok"],
                         help="LLM provider (default: ollama)")
-    parser.add_argument("--model", default=os.environ.get("PIPELINE_MODEL", "qwen3.5:35b"),
-                        help="LLM model (default: qwen3.5:35b, or $PIPELINE_MODEL env var)")
+    parser.add_argument("--model", default=DEFAULT_PIPELINE_MODEL,
+                        help=f"LLM model (default: {DEFAULT_PIPELINE_MODEL}, or $PIPELINE_MODEL env var)")
     parser.add_argument("--time-limit", type=float, default=0,
                         help="Time limit in minutes (0 = unlimited)")
     parser.add_argument("--base-budget", type=int, default=DEFAULT_BASE_BUDGET,
@@ -636,12 +641,12 @@ def main():
         print(json.dumps(result, indent=2))
         sys.exit(0 if result.get("ok") else 1)
 
-    if not args.idea and not args.idea_flag and not args.from_list and not args.resume and not args.polish:
+    if not args.idea and not args.seed_idea and not args.from_list and not args.resume and not args.polish:
         parser.print_help()
         print("\nProvide an idea, use --from-list, --resume, or --polish.")
         sys.exit(1)
 
-    idea = args.idea or args.idea_flag
+    idea = args.idea or args.seed_idea
     run_pipeline(
         idea=idea,
         from_list=args.from_list,

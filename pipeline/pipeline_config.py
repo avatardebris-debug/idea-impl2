@@ -63,6 +63,11 @@ def reload_pipeline_dir() -> pathlib.Path:
 
 AGENTS_DIR = pathlib.Path(__file__).parent / "agents"
 
+# Default Ollama model for pipeline agents (override via --model or PIPELINE_MODEL).
+DEFAULT_PIPELINE_MODEL = os.environ.get(
+    "PIPELINE_MODEL", "qwen3.6:35b-a3b-q4_K_M"
+)
+
 AGENT_ROLES = [
     "idea_planner",
     "phase_planner",
