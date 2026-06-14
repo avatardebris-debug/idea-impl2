@@ -536,10 +536,69 @@ def tick_project_metrics(
 
 def check_single_idea_complete(cfg: MainLoopConfig, all_empty: bool) -> bool:
     """Return True if single-idea mode should exit the main loop."""
-    if not all_empty or cfg.from_list:
+    if cfg.from_list:
         return False
+
+    # pending=0 while an agent holds a message in 'processing' is not complete.
+    if cfg.bus.has_active_work():
+        return False
+    if not all_empty:
+        return False
+
+    slug, status = _single_idea_focus_status(cfg)
+    if slug and status not in _TERMINAL_PROJECT_STATUSES:
+        if _try_requeue_focus_project(cfg, slug):
+            return False
+        return False
+
     time.sleep(10)
-    if cfg.bus.all_queues_empty():
-        print("\n  ✓ All queues empty — pipeline complete.")
+    if cfg.bus.has_active_work() or not cfg.bus.all_queues_empty():
+        return False
+
+    slug, status = _single_idea_focus_status(cfg)
+    if slug and status not in _TERMINAL_PROJECT_STATUSES:
+        if _try_requeue_focus_project(cfg, slug):
+            return False
+        return False
+
+    print("\n  ✓ All queues empty — pipeline complete.")
+    return True
+
+
+_TERMINAL_PROJECT_STATUSES = frozenset({"complete", "budget_exceeded", "evicted"})
+
+
+def _single_idea_focus_status(cfg: MainLoopConfig) -> tuple[str, str]:
+    slug = (cfg.focus_slug or "").strip()
+    if not slug:
+        idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=cfg.focus_slug)
+        slug = (idea_state.get("_slug") or "").strip()
+    if not slug:
+        return "", ""
+    state_file = cfg.pipeline_dir / "projects" / slug / "state" / "current_idea.json"
+    if not state_file.exists():
+        return slug, ""
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        return slug, ""
+    return slug, state.get("status", "")
+
+
+def _try_requeue_focus_project(cfg: MainLoopConfig, slug: str) -> bool:
+    if cfg.fresh_list_only:
+        return False
+    from pipeline.project_rebuild import _rebuild_single_project
+
+    project_dir = cfg.pipeline_dir / "projects" / slug
+    state_file = project_dir / "state" / "current_idea.json"
+    if not state_file.exists():
+        return False
+    try:
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if _rebuild_single_project(cfg.bus, slug, state, project_dir):
+        print(f"  🔁 Re-queued orphaned project '{slug}' — continuing")
         return True
     return False
