@@ -676,21 +676,24 @@ class AgentProcess:
         if system_prompt_addon:
             system += f"\n\n{system_prompt_addon}"
 
+        # slug="" disables Ollama KV-cache (/api/generate), which can hang on 35B models.
         llm = get_llm(
             self.provider,
             self.model,
             temperature=self.temperature,
             think=self.think,
             num_ctx=self.num_ctx,
-            slug=self._current_slug,
+            slug="",
         )
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": task},
         ]
+        logger.info("[%s] Direct LLM call starting (model=%s, ctx=%d)", self.role, self.model, self.num_ctx)
         resp = llm.chat(messages, tools=None)
         content = resp.content or ""
         tokens = resp.usage.total_tokens if resp.usage else 0
+        logger.info("[%s] Direct LLM call done (tokens=%d, chars=%d)", self.role, tokens, len(content))
         return AgentResult(
             answer=content,
             steps_used=1,

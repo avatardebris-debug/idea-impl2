@@ -94,7 +94,8 @@ def main() -> int:
         print(f"  call_count={data.get('call_count', 0)} tps={data.get('tps', 0)}")
         print(f"  updated_at={data.get('updated_at', '?')}")
     else:
-        print("  (no throughput.json — no completed LLM calls this session)")
+        print("  (no throughput.json — no LLM call has completed yet this session)")
+        print("  Runner deletes this file on startup; it appears after the first successful Ollama response.")
 
     _section("master_ideas.md (first unchecked)")
     mi = ROOT / "master_ideas.md"
