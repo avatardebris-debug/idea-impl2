@@ -20,6 +20,8 @@ import pathlib
 import sys
 import zipfile
 
+from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
+
 
 # Locations to search for zips when no path is given (newest match wins)
 _AUTO_SEARCH_DIRS = [
@@ -80,6 +82,52 @@ def should_skip(name: str) -> bool:
     return False
 
 
+def resolve_import_dest(explicit: str) -> tuple[pathlib.Path, bool, pathlib.Path]:
+    """
+    Return (dest_root, strip_pipeline_prefix, factory_root).
+
+    Cloud zips use paths like `.pipeline/projects/...` under the factory root.
+    Local output lives in ../thepipeline with `projects/` at repo root (no .pipeline/).
+    """
+    factory = PROJECT_ROOT.resolve()
+    pipeline_dir = get_pipeline_dir().resolve()
+    nested = (factory / ".pipeline").resolve()
+
+    if explicit and explicit not in (".", ""):
+        dest = pathlib.Path(explicit).expanduser().resolve()
+        if dest == factory:
+            return dest, False, factory
+        if dest == pipeline_dir or (dest / "projects").is_dir():
+            return dest, True, factory
+        return dest, False, factory
+
+    if pipeline_dir == nested:
+        return factory, False, factory
+    return pipeline_dir, True, factory
+
+
+def dest_path_for_entry(
+    name: str,
+    dest_root: pathlib.Path,
+    strip_pipeline_prefix: bool,
+    factory_root: pathlib.Path,
+) -> pathlib.Path:
+    """Map a zip entry path to the on-disk destination."""
+    if name in ("polish_queue.md", "master_ideas.md"):
+        return factory_root / name
+    parts = pathlib.PurePosixPath(name).parts
+    if strip_pipeline_prefix and parts and parts[0] == ".pipeline":
+        return dest_root.joinpath(*parts[1:])
+    return dest_root / name
+
+
+def project_slug_from_entry(name: str) -> str | None:
+    parts = pathlib.PurePosixPath(name).parts
+    if len(parts) >= 3 and parts[0] == ".pipeline" and parts[1] == "projects":
+        return parts[2]
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -102,8 +150,11 @@ def main() -> None:
                         help="Skip importing files for projects that already exist on disk")
     parser.add_argument("--yes", "-y", action="store_true",
                         help="Skip confirmation prompt and import immediately")
-    parser.add_argument("--dest", default=".",
-                        help="Destination root directory (default: current directory)")
+    parser.add_argument(
+        "--dest",
+        default="",
+        help="Destination root (default: auto — ../thepipeline locally, idea impl/.pipeline on cloud)",
+    )
     args = parser.parse_args()
 
     zip_path: pathlib.Path | None = None
@@ -126,7 +177,9 @@ def main() -> None:
             sys.exit(1)
         print(f"  Auto-detected: {zip_path}")
 
-    dest_root = pathlib.Path(args.dest).resolve()
+    dest_root, strip_prefix, factory_root = resolve_import_dest(args.dest)
+    layout = "thepipeline (strip .pipeline/)" if strip_prefix else "nested .pipeline under dest"
+    print(f"  Layout:   {layout}")
 
     new_files     = []
     changed_files = []
@@ -148,12 +201,12 @@ def main() -> None:
             # Skip-existing filter: skip any file belonging to a project
             # that already has a directory on disk
             if args.skip_existing:
-                p = pathlib.PurePosixPath(name)
-                parts = p.parts
-                if (len(parts) >= 3
-                        and parts[0] == ".pipeline"
-                        and parts[1] == "projects"):
-                    existing_proj_dir = dest_root / parts[0] / parts[1] / parts[2]
+                slug = project_slug_from_entry(name)
+                if slug:
+                    if strip_prefix:
+                        existing_proj_dir = dest_root / "projects" / slug
+                    else:
+                        existing_proj_dir = dest_root / ".pipeline" / "projects" / slug
                     if existing_proj_dir.is_dir():
                         skipped_filter.append(name)
                         continue
@@ -174,7 +227,7 @@ def main() -> None:
                     skipped_filter.append(name)
                     continue
 
-            dest_file = dest_root / name
+            dest_file = dest_path_for_entry(name, dest_root, strip_prefix, factory_root)
             if not dest_file.exists():
                 new_files.append(name)
             else:
@@ -222,14 +275,16 @@ def main() -> None:
 
         written = 0
         for name in new_files + changed_files:
-            dest_file = dest_root / name
+            dest_file = dest_path_for_entry(name, dest_root, strip_prefix, factory_root)
             dest_file.parent.mkdir(parents=True, exist_ok=True)
             dest_file.write_bytes(zf.read(name))
             written += 1
 
         print(f"\n  Imported {written} files to {dest_root}")
-        ps = dest_root / ".pipeline" / "state" / "polish_status.json"
-        pq = dest_root / "polish_queue.md"
+        ps = (dest_root / "state" / "polish_status.json") if strip_prefix else (
+            dest_root / ".pipeline" / "state" / "polish_status.json"
+        )
+        pq = factory_root / "polish_queue.md"
         if pq.exists():
             print(f"  Polish queue imported: {pq.name}")
         if ps.exists():
@@ -242,15 +297,16 @@ def main() -> None:
         print("  After import: python reset_budget_exceeded.py --generate-polish")
         print("                python pipeline/runner.py --polish ...")
         try:
-            sys.path.insert(0, str(dest_root))
+            sys.path.insert(0, str(factory_root))
             from pipeline.pipeline_mode import legacy_mode
 
             if not legacy_mode():
                 from pathlib import Path as _Path
 
                 export_candidates = [
+                    dest_root / "state/capability_registry_export.json",
                     dest_root / ".pipeline/state/capability_registry_export.json",
-                    dest_root / "capability_registry_export.json",
+                    factory_root / "capability_registry_export.json",
                 ]
                 merged = False
                 for exp in export_candidates:
