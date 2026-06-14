@@ -27,6 +27,7 @@ class MainLoopState:
     status_count: int = 0
     last_tps_print: float = 0.0
     last_stall_recovery: float = 0.0
+    last_stall_warning: float = 0.0
     zero_progress_since: dict[str, float] = field(default_factory=dict)
     zero_task_warned: set[str] = field(default_factory=set)
     parallel_seeds: int = 1

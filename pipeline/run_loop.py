@@ -17,6 +17,7 @@ from pipeline.run_loop_health import (
     tick_health_preamble,
     tick_project_metrics,
     tick_reviewed_advance,
+    tick_stall_recovery,
     tick_status_display,
 )
 from pipeline.run_loop_orphan import tick_orphan_requeue, tick_zero_task_stall_kill
@@ -104,6 +105,7 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
         tick_seed_idle_when_empty(cfg, all_empty, orphaned=orphaned)
 
     tick_project_metrics(cfg, idea_state, tasks_done=tasks_done)
+    tick_stall_recovery(cfg, running_agents=sum(1 for s in health.values() if s == "running"))
     cfg.state.last_health_check = time.time()
     return False
 

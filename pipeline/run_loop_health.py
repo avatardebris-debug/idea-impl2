@@ -20,9 +20,12 @@ from pipeline.pipeline_status import _get_active_idea_state, _get_all_active_ide
 from pipeline.project_ops import _tick_project
 from pipeline.text_util import clean_ansi as _clean
 
+from pipeline.project_rebuild import dispatch_phase_requeue
 from pipeline.run_loop_types import MainLoopConfig
 
 _TPS_PRINT_INTERVAL = 900.0
+_STALL_THRESHOLD_S = 600.0
+_STALL_WARN_INTERVAL_S = 900.0
 
 
 def tick_reviewed_advance(
@@ -275,6 +278,117 @@ def tick_status_display(
     _print_throughput_breakdown(cfg, running_agents)
 
 
+def _throughput_age_s(cfg: MainLoopConfig) -> float | None:
+    """Seconds since last completed LLM call, or None if unknown."""
+    path = cfg.pipeline_dir / "state" / "throughput.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        updated_at = data.get("updated_at")
+        if updated_at is None:
+            return None
+        return time.time() - float(updated_at)
+    except Exception:
+        return None
+
+
+def _warn_stall(cfg: MainLoopConfig, *, age_s: float, running_agents: int, stuck: list[Any]) -> None:
+    now = time.time()
+    if now - cfg.state.last_stall_warning < _STALL_WARN_INTERVAL_S:
+        return
+    cfg.state.last_stall_warning = now
+    age_m = int(age_s // 60) if age_s != float("inf") else int((now - cfg.start_time) // 60)
+    print(
+        f"  ⚠️  STALL DETECTED: no LLM call in {age_m}m "
+        f"({running_agents} agents running)",
+        flush=True,
+    )
+    if stuck:
+        by_role: dict[str, int] = {}
+        for msg in stuck:
+            by_role[msg.to_agent] = by_role.get(msg.to_agent, 0) + 1
+        stuck_str = ", ".join(f"{role}×{count}" for role, count in sorted(by_role.items()))
+        print(f"     Stuck in processing: {stuck_str}", flush=True)
+    else:
+        print(
+            "     No messages in 'processing' — queue empty, "
+            "agents idle (phase transition stall?)",
+            flush=True,
+        )
+
+
+def _recover_reviewing_deadlock(cfg: MainLoopConfig) -> bool:
+    """Re-queue projects stuck in phase_X_reviewing with all tasks complete."""
+    projects_root = cfg.pipeline_dir / "projects"
+    if not projects_root.exists():
+        return False
+    for project_dir in sorted(projects_root.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.exists():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        status = state.get("status", "")
+        if not status.endswith("_reviewing"):
+            continue
+        slug = project_dir.name
+        phase_num = state.get("phase", 1)
+        tasks_done, tasks_total = read_task_progress(
+            cfg,
+            {"_slug": slug, "phase": phase_num, **state},
+        )
+        if tasks_total <= 0 or tasks_done < tasks_total:
+            continue
+        title = state.get("title", slug)
+        if dispatch_phase_requeue(
+            cfg.bus,
+            slug,
+            title,
+            state,
+            project_dir,
+            status,
+            log_requeue=True,
+        ):
+            print(
+                f"  🔧 Reviewing deadlock recovery: re-queued '{title}' -> reviewer",
+                flush=True,
+            )
+            return True
+    return False
+
+
+def tick_stall_recovery(cfg: MainLoopConfig, *, running_agents: int) -> None:
+    """Detect idle/processing stalls and attempt queue recovery."""
+    now = time.time()
+    if running_agents <= 0 or (now - cfg.start_time) < _STALL_THRESHOLD_S:
+        return
+
+    age_s = _throughput_age_s(cfg)
+    no_llm_recently = age_s is None or age_s > _STALL_THRESHOLD_S
+    if not no_llm_recently:
+        return
+
+    stuck = cfg.bus.get_processing_messages()
+    _warn_stall(cfg, age_s=age_s if age_s is not None else float("inf"), running_agents=running_agents, stuck=stuck)
+
+    if stuck:
+        _try_recover_stalled_processing(cfg, stuck)
+        return
+
+    if cfg.bus.has_active_work():
+        return
+
+    if now - cfg.state.last_stall_recovery < cfg.stall_recovery_cooldown_s:
+        return
+    if _recover_reviewing_deadlock(cfg):
+        cfg.state.last_stall_recovery = now
+
+
 def _print_throughput_breakdown(cfg: MainLoopConfig, running_agents: int) -> None:
     _now = time.time()
     if cfg.provider != "ollama" or (_now - cfg.state.last_tps_print) < _TPS_PRINT_INTERVAL:
@@ -319,37 +433,6 @@ def _print_throughput_breakdown(cfg: MainLoopConfig, running_agents: int) -> Non
                 f"(last: {_age_str})",
                 flush=True,
             )
-            _STALL_THRESHOLD_S = 600
-            _run_elapsed_s = _now - cfg.start_time
-            if (
-                _run_elapsed_s > _STALL_THRESHOLD_S
-                and _age_s > _STALL_THRESHOLD_S
-                and running_agents > 0
-            ):
-                print(
-                    f"  ⚠️  STALL DETECTED: no LLM call in {int(_age_s // 60)}m "
-                    f"({running_agents} agents running)",
-                    flush=True,
-                )
-                try:
-                    _stuck = cfg.bus.get_processing_messages()
-                    if _stuck:
-                        _by_role: dict[str, int] = {}
-                        for _sm in _stuck:
-                            _by_role[_sm.to_agent] = _by_role.get(_sm.to_agent, 0) + 1
-                        _stuck_str = ", ".join(
-                            f"{r}×{n}" for r, n in sorted(_by_role.items())
-                        )
-                        print(f"     Stuck in processing: {_stuck_str}", flush=True)
-                        _try_recover_stalled_processing(cfg, _stuck)
-                    else:
-                        print(
-                            "     No messages in 'processing' — queue empty, "
-                            "agents idle (phase transition stall?)",
-                            flush=True,
-                        )
-                except Exception:
-                    pass
     except Exception:
         pass
     cfg.state.last_tps_print = _now
