@@ -190,6 +190,7 @@ class ExecutorAgent(AgentProcess):
         tasks_path = msg.payload.get("tasks_path", f"phases/phase_{phase_num}/tasks.md")
         fix_required = msg.payload.get("fix_required", False)
         ship_fix = msg.payload.get("ship_fix", False)
+        thermo_refactor = msg.payload.get("thermo_refactor", False)
         review_path = msg.payload.get("review_path", "")
 
         # Always read these upfront — scoped to current phase only
@@ -251,16 +252,36 @@ class ExecutorAgent(AgentProcess):
                     stale_block = scan_workspace(workspace).format_block()
                 except Exception:
                     pass
+                debug_report = ""
+                debug_path = msg.payload.get("debug_report_path", "")
+                if debug_path:
+                    debug_report = self.read_state_file(debug_path)
+                fix_context = debug_report or field_results
                 task_prompt = (
                     f"You are fixing a COMPLETED project that FAILED field tests (ship-prove).\n\n"
                     f"## Workspace\n{workspace}\n\n"
                     + pending_section
-                    + f"## Field test failures\n{field_results[:8000]}\n\n"
+                    + f"## Debug / field test report\n{fix_context[:8000]}\n\n"
+                    + (f"## Field test output\n{field_results[:4000]}\n\n" if field_results and not debug_report else "")
                     + (f"## Stale references\n{stale_block}\n\n" if stale_block else "")
                     + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
                     + "## Instructions\n"
-                    "1. Fix ONLY what field tests require — do not rewrite unrelated code.\n"
+                    "1. Follow the fix plan — do not rewrite unrelated code.\n"
                     "2. Check cross-file imports if stale-reference issues are listed.\n"
+                    "3. Say DONE and list every file you changed.\n"
+                )
+            elif thermo_refactor:
+                thermo_review = ""
+                tr_path = msg.payload.get("thermo_review_path", "phases/ship/thermo_review.md")
+                thermo_review = self.read_state_file(tr_path)
+                task_prompt = (
+                    f"You are applying thermo-nuclear refactor fixes (ship-prove).\n\n"
+                    f"## Workspace\n{workspace}\n\n"
+                    + pending_section
+                    + f"## Thermo review\n{thermo_review[:8000]}\n\n"
+                    + "## Instructions\n"
+                    "1. Address ONLY blocking issues and refactor plan items.\n"
+                    "2. Preserve behavior — split oversized files, fix imports.\n"
                     "3. Say DONE and list every file you changed.\n"
                 )
             else:
@@ -283,7 +304,7 @@ class ExecutorAgent(AgentProcess):
                   f"6. Update tasks file at `{tasks_full_path}` marking fixed tasks [x].\n"
                   "7. Say DONE and list every file you changed.\n"
             )
-        elif not tasks_content and not ship_fix:
+        elif not tasks_content and not ship_fix and not thermo_refactor:
             return AgentOutput(
                 success=False,
                 error=f"No tasks file found at {tasks_full_path}",
@@ -535,9 +556,27 @@ class ExecutorAgent(AgentProcess):
         # and the stall-kill guard sees fresh data.
         self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
-        # Route: ship fix → re-run field tests; else reviewer/validator loop
+        # Route: ship track vs normal phase loop
         retry_count = msg.payload.get("retry_count", 0)
-        if ship_fix:
+        if thermo_refactor:
+            try:
+                from pipeline.ship_snapshots import snapshot_workspace
+
+                snapshot_workspace(workspace, self._project_dir / "workspace_post_review")
+            except Exception:
+                pass
+            self._update_idea_status("thermo_reviewing")
+            out_msg = Message.create(
+                from_agent=self.role,
+                to_agent="thermo_reviewer",
+                type="task",
+                payload={
+                    "phase": phase_num,
+                    "idea_slug": idea_slug,
+                    "workspace_path": str(workspace),
+                },
+            )
+        elif ship_fix:
             self._update_idea_status("field_test_planning")
             out_msg = Message.create(
                 from_agent=self.role,

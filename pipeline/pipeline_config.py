@@ -81,7 +81,10 @@ AGENT_ROLES = [
 # Subset started by --ship-prove (separate loop).
 SHIP_AGENT_ROLES = [
     "field_test_planner",
+    "debug_loop",
     "executor",
+    "thermo_reviewer",
+    "ship_evaluator",
 ]
 
 DEFAULT_BASE_BUDGET = 90

@@ -146,6 +146,7 @@ def run_pipeline(
     polish_queue_file: str | None = None,
     ship_prove: bool = False,
     ship_slug: str = "",
+    ship_skip_thermo: bool = False,
     parallel_seeds: int = 1,
     auto_tune: bool = False,
     max_seeds: int = 4,
@@ -223,6 +224,9 @@ def run_pipeline(
         print(f"  Mode:     SHIP-PROVE - field-test complete projects (separate loop)")
         if ship_slug:
             print(f"  Filter:   slug contains '{ship_slug}'")
+        if ship_skip_thermo:
+            os.environ["SHIP_SKIP_THERMO"] = "1"
+            print(f"  Thermo:   skipped (--ship-skip-thermo)")
     if legacy:
         print(f"  Mode:     LEGACY - capability registry disabled (reusable_tools.md only)")
     else:
@@ -591,6 +595,8 @@ def main():
                         help="Separate loop: LLM field-test projects with status=complete.")
     parser.add_argument("--ship-slug", default="", metavar="SLUG",
                         help="With --ship-prove, only projects whose slug contains this string.")
+    parser.add_argument("--ship-skip-thermo", action="store_true",
+                        help="With --ship-prove, skip thermo_reviewer and go straight to ship_evaluator.")
     parser.add_argument("--parallel-seeds", type=int, default=1, metavar="N",
                         help="Seed up to N independent projects simultaneously. "
                              "With --auto-tune this becomes the starting value (default: 1). "
@@ -684,6 +690,7 @@ def main():
         polish_queue_file=args.polish_queue,
         ship_prove=args.ship_prove,
         ship_slug=args.ship_slug,
+        ship_skip_thermo=args.ship_skip_thermo,
         parallel_seeds=args.parallel_seeds,
         auto_tune=args.auto_tune,
         max_seeds=args.max_seeds,

@@ -112,7 +112,8 @@ def resolve_initial_work(
         )
 
     if ship_prove:
-        from pipeline.ship_mode import run_ship_prove_mode, SHIP_AGENT_ROLES
+        from pipeline.pipeline_config import SHIP_AGENT_ROLES
+        from pipeline.ship_mode import run_ship_prove_mode
 
         n = run_ship_prove_mode(bus, slug_filter=ship_slug)
         pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)

@@ -82,3 +82,31 @@ def set_maturity(project_dir: Path, stage: str) -> None:
 def maturity_multiplier(project_dir: Path) -> float:
     prov = load_provenance(project_dir)
     return MATURITY_MULTIPLIER.get(prov.get("maturity_stage", "M1"), 1.0)
+
+
+def mark_goal_proven_for_goal(goal_id: str) -> int:
+    """
+    When a goal is achieved, bump linked projects to M4.
+
+    Matches ship_provenance.goal_id on projects under projects/.
+    Returns count updated.
+    """
+    if not goal_id:
+        return 0
+    from pipeline.paths import projects_dir
+
+    updated = 0
+    root = projects_dir()
+    if not root.is_dir():
+        return 0
+    for project_dir in root.iterdir():
+        if not project_dir.is_dir():
+            continue
+        prov = load_provenance(project_dir)
+        if prov.get("goal_id") != goal_id:
+            continue
+        prov["goal_proven"] = True
+        prov["maturity_stage"] = "M4"
+        save_provenance(project_dir, prov)
+        updated += 1
+    return updated

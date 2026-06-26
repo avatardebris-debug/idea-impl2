@@ -18,6 +18,9 @@ DEFAULT_AGENTS = (
     "validator",
     "reviewer",
     "field_test_planner",
+    "debug_loop",
+    "thermo_reviewer",
+    "ship_evaluator",
 )
 
 

@@ -19,7 +19,7 @@ from pipeline.field_test_runner import (
 )
 from pipeline.import_graph import scan_workspace
 from pipeline.message_bus import Message
-from pipeline.ship_provenance import load_provenance, set_maturity
+from pipeline.ship_provenance import load_provenance
 
 
 class FieldTestPlannerAgent(AgentProcess):
@@ -132,8 +132,36 @@ class FieldTestPlannerAgent(AgentProcess):
 
         outgoing: list[Message] = []
         if run.all_passed:
-            self._update_idea_status("field_proven")
-            set_maturity(self._project_dir, "M2")
+            self._update_idea_status("field_test_passed")
+            from pipeline.ship_config import skip_thermo_review
+
+            if skip_thermo_review():
+                self._update_idea_status("ship_evaluating")
+                outgoing.append(
+                    Message.create(
+                        from_agent=self.role,
+                        to_agent="ship_evaluator",
+                        type="task",
+                        payload={
+                            "idea_slug": idea_slug,
+                            "phase": msg.payload.get("phase", 1),
+                        },
+                        priority=1,
+                    )
+                )
+            else:
+                outgoing.append(
+                    Message.create(
+                        from_agent=self.role,
+                        to_agent="thermo_reviewer",
+                        type="task",
+                        payload={
+                            "idea_slug": idea_slug,
+                            "phase": msg.payload.get("phase", 1),
+                        },
+                        priority=1,
+                    )
+                )
         else:
             loops = int(prov.get("field_test_loops", 0)) + 1
             from pipeline.ship_provenance import save_provenance
@@ -156,21 +184,12 @@ class FieldTestPlannerAgent(AgentProcess):
             outgoing.append(
                 Message.create(
                     from_agent=self.role,
-                    to_agent="executor",
+                    to_agent="debug_loop",
                     type="task",
                     payload={
-                        "phase": msg.payload.get("phase", 1),
                         "idea_slug": idea_slug,
-                        "ship_fix": True,
+                        "phase": msg.payload.get("phase", 1),
                         "field_test_results_path": results_path,
-                        "tasks_path": f"phases/phase_{msg.payload.get('phase', 1)}/tasks.md",
-                        "workspace_path": str(workspace),
-                        "fix_required": True,
-                        "error_summary": (
-                            f"Field tests failed ({run.failed} failed, {run.passed} passed). "
-                            f"See {results_path}."
-                        ),
-                        "validation_report": results_md[:4000],
                     },
                     priority=1,
                 )

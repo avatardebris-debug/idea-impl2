@@ -78,6 +78,14 @@ def attempt_goal(
         tree.status = "complete"
         save_goal_tree(tree)
         mark_goal_achieved(goal_id)
+        try:
+            from pipeline.ship_provenance import mark_goal_proven_for_goal
+
+            n = mark_goal_proven_for_goal(goal_id)
+            if n:
+                print(f"  [ship] M4 maturity set on {n} project(s) for goal {goal_id}")
+        except Exception:
+            pass
 
     return {"ok": True, "goal_id": goal_id, "achieved": achieved, "results": results}
 

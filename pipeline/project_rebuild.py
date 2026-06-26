@@ -146,7 +146,14 @@ def dispatch_phase_requeue(
             print(f"  [re-queue] Re-queued '{title}' -> idea_planner (was: planning)")
         return True
 
-    if status in ("field_test_planning", "field_test_failed"):
+    if status in (
+        "field_test_planning",
+        "field_test_failed",
+        "field_test_passed",
+        "thermo_reviewing",
+        "thermo_refactoring",
+        "ship_evaluating",
+    ):
         from pipeline.ship_mode import dispatch_ship_requeue
 
         if dispatch_ship_requeue(bus, slug, title, state, project_dir, status):
