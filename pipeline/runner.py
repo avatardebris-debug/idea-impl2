@@ -62,6 +62,7 @@ from pipeline.pipeline_config import (
     MAX_PROJECT_LIFETIME_RETRIES,
     PIPELINE_DIR,
     PROJECT_ROOT,
+    SHIP_AGENT_ROLES,
 )
 from pipeline.slug_util import slugify_title as _slugify
 from pipeline.agent_supervisor import AgentSupervisor
@@ -143,6 +144,8 @@ def run_pipeline(
     fresh_list_only: bool = False,
     polish: bool = False,
     polish_queue_file: str | None = None,
+    ship_prove: bool = False,
+    ship_slug: str = "",
     parallel_seeds: int = 1,
     auto_tune: bool = False,
     max_seeds: int = 4,
@@ -176,8 +179,11 @@ def run_pipeline(
             ideas_file=ideas_file,
         )
         _ideas_path = _polish_path
+    _run_mode = "ship_prove" if ship_prove else (
+        "polish" if polish else ("resume" if resume else ("from_list" if from_list else "single"))
+    )
     _run_ctx = RunContext(
-        mode="polish" if polish else ("resume" if resume else ("from_list" if from_list else "single")),
+        mode=_run_mode,
         ideas_path=_ideas_path,
         legacy=legacy,
         polish_path=_polish_path,
@@ -213,6 +219,10 @@ def run_pipeline(
         print(f"  Mode:     FRESH LIST ONLY — skipping all stray/in-progress projects")
     if polish:
         print(f"  Mode:     POLISH - resuming complete projects with missing phases")
+    if ship_prove:
+        print(f"  Mode:     SHIP-PROVE - field-test complete projects (separate loop)")
+        if ship_slug:
+            print(f"  Filter:   slug contains '{ship_slug}'")
     if legacy:
         print(f"  Mode:     LEGACY - capability registry disabled (reusable_tools.md only)")
     else:
@@ -245,6 +255,8 @@ def run_pipeline(
         from_list=from_list,
         resume=resume,
         polish=polish,
+        ship_prove=ship_prove,
+        ship_slug=ship_slug,
         fresh_list_only=fresh_list_only,
         parallel_seeds=parallel_seeds,
         save_pipeline_status=save_pipeline_status,
@@ -258,7 +270,7 @@ def run_pipeline(
         from_list = True  # polish replays queue only; never master_ideas seeding
 
     if not has_work:
-        print("\n  ✗ Nothing to do. Provide an idea, use --from-list, or --resume.")
+        print("\n  ✗ Nothing to do. Provide an idea, use --from-list, --resume, --polish, or --ship-prove.")
         print("    python pipeline/runner.py \"Your idea here\"")
         print("    python pipeline/runner.py --from-list")
         return
@@ -306,7 +318,13 @@ def run_pipeline(
     # Start all agents
     print(f"\n  Starting agents...")
     bus.discard_stale_shutdowns()
-    supervisor = AgentSupervisor(provider, model, num_executors=num_executors, legacy=legacy)
+    supervisor = AgentSupervisor(
+        provider,
+        model,
+        num_executors=num_executors,
+        legacy=legacy,
+        roles=list(SHIP_AGENT_ROLES) if ship_prove else None,
+    )
 
     # Handle Ctrl+C
     from pipeline.run_loop import LoopControl, MainLoopConfig, MainLoopState, run_main_loop
@@ -569,6 +587,10 @@ def main():
     parser.add_argument("--polish-queue", default=None, metavar="PATH",
                         help="Alternate polish queue file (default: polish_queue.md). "
                              "Not the same as --ideas-file (which is for master_ideas only).")
+    parser.add_argument("--ship-prove", action="store_true",
+                        help="Separate loop: LLM field-test projects with status=complete.")
+    parser.add_argument("--ship-slug", default="", metavar="SLUG",
+                        help="With --ship-prove, only projects whose slug contains this string.")
     parser.add_argument("--parallel-seeds", type=int, default=1, metavar="N",
                         help="Seed up to N independent projects simultaneously. "
                              "With --auto-tune this becomes the starting value (default: 1). "
@@ -641,9 +663,9 @@ def main():
         print(json.dumps(result, indent=2))
         sys.exit(0 if result.get("ok") else 1)
 
-    if not args.idea and not args.seed_idea and not args.from_list and not args.resume and not args.polish:
+    if not args.idea and not args.seed_idea and not args.from_list and not args.resume and not args.polish and not args.ship_prove:
         parser.print_help()
-        print("\nProvide an idea, use --from-list, --resume, or --polish.")
+        print("\nProvide an idea, use --from-list, --resume, --polish, or --ship-prove.")
         sys.exit(1)
 
     idea = args.idea or args.seed_idea
@@ -660,6 +682,8 @@ def main():
         fresh_list_only=args.fresh_list_only,
         polish=args.polish,
         polish_queue_file=args.polish_queue,
+        ship_prove=args.ship_prove,
+        ship_slug=args.ship_slug,
         parallel_seeds=args.parallel_seeds,
         auto_tune=args.auto_tune,
         max_seeds=args.max_seeds,

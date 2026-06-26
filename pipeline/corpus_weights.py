@@ -15,6 +15,13 @@ TIER_WEIGHT: dict[str, float] = {
 
 DEFAULT_STRUGGLED_SAMPLE_RATE = 0.15
 
+MATURITY_MULTIPLIER: dict[str, float] = {
+    "M1": 1.0,
+    "M2": 1.25,
+    "M3": 1.5,
+    "M4": 2.0,
+}
+
 
 def train_tier_from_record(rec: dict[str, Any]) -> str:
     """Map a corpus record to train tier A–D from quality_label and verdicts."""
@@ -42,7 +49,9 @@ def enrich_record_weights(rec: dict[str, Any]) -> dict[str, Any]:
     """Add train_tier and train_weight to a record (mutates and returns rec)."""
     tier = train_tier_from_record(rec)
     rec["train_tier"] = tier
-    rec["train_weight"] = train_weight_for_record(rec, tier=tier)
+    base = train_weight_for_record(rec, tier=tier)
+    maturity = str(rec.get("maturity_stage", "M1"))
+    rec["train_weight"] = base * MATURITY_MULTIPLIER.get(maturity, 1.0)
     return rec
 
 

@@ -247,6 +247,13 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     _write_state_dict(project_dir, state)
     print(f"  ✅ '{title}' completed all phases!")
 
+    try:
+        from pipeline.ship_provenance import set_maturity
+
+        set_maturity(project_dir, "M1")
+    except Exception:
+        pass
+
     if state.get("phase_template") == "phase_tetra":
         try:
             from pipeline.phase_tetra import maybe_run_phase_tetra_hook

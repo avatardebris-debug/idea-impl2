@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-RunMode = Literal["single", "from_list", "polish", "resume"]
+RunMode = Literal["single", "from_list", "polish", "resume", "ship_prove"]
 
 
 @dataclass(frozen=True)

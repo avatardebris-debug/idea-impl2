@@ -189,6 +189,7 @@ class ExecutorAgent(AgentProcess):
         idea_slug = msg.payload.get("idea_slug", self._current_slug)
         tasks_path = msg.payload.get("tasks_path", f"phases/phase_{phase_num}/tasks.md")
         fix_required = msg.payload.get("fix_required", False)
+        ship_fix = msg.payload.get("ship_fix", False)
         review_path = msg.payload.get("review_path", "")
 
         # Always read these upfront — scoped to current phase only
@@ -224,6 +225,9 @@ class ExecutorAgent(AgentProcess):
                 fix_report_content = (msg.payload.get("validation_report", "")
                                       or msg.payload.get("fix_instructions", ""))
 
+            field_results_path = msg.payload.get("field_test_results_path", "")
+            field_results = self.read_state_file(field_results_path) if field_results_path else ""
+
             review_content = self.read_state_file(review_path) if review_path else ""
             error_summary = msg.payload.get("error_summary", "") or ""
             bug_memory_block = ""
@@ -240,7 +244,27 @@ class ExecutorAgent(AgentProcess):
             pending_section = ""
             if pending_fixes:
                 pending_section = f"## ⚠️ Health Check Findings (fix these FIRST)\n{pending_fixes[:1500]}\n\n"
-            task_prompt = (
+            if ship_fix:
+                stale_block = ""
+                try:
+                    from pipeline.import_graph import scan_workspace
+                    stale_block = scan_workspace(workspace).format_block()
+                except Exception:
+                    pass
+                task_prompt = (
+                    f"You are fixing a COMPLETED project that FAILED field tests (ship-prove).\n\n"
+                    f"## Workspace\n{workspace}\n\n"
+                    + pending_section
+                    + f"## Field test failures\n{field_results[:8000]}\n\n"
+                    + (f"## Stale references\n{stale_block}\n\n" if stale_block else "")
+                    + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
+                    + "## Instructions\n"
+                    "1. Fix ONLY what field tests require — do not rewrite unrelated code.\n"
+                    "2. Check cross-file imports if stale-reference issues are listed.\n"
+                    "3. Say DONE and list every file you changed.\n"
+                )
+            else:
+                task_prompt = (
                 f"You are fixing Phase {phase_num} code that failed validation/review.\n\n"
                 f"## Workspace\n{workspace}\n\n"
                 + pending_section
@@ -259,7 +283,7 @@ class ExecutorAgent(AgentProcess):
                   f"6. Update tasks file at `{tasks_full_path}` marking fixed tasks [x].\n"
                   "7. Say DONE and list every file you changed.\n"
             )
-        elif not tasks_content:
+        elif not tasks_content and not ship_fix:
             return AgentOutput(
                 success=False,
                 error=f"No tasks file found at {tasks_full_path}",
@@ -511,30 +535,37 @@ class ExecutorAgent(AgentProcess):
         # and the stall-kill guard sees fresh data.
         self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
-        # Route: reviewer on first execution + even retries, validator on odd retries
-        # This gives structural review coverage every other pass:
-        #   1st execution → reviewer → validator
-        #   retry 1 → validator (fast, no review overhead)
-        #   retry 2 → reviewer → validator
-        #   retry 3 → validator (fast)
+        # Route: ship fix → re-run field tests; else reviewer/validator loop
         retry_count = msg.payload.get("retry_count", 0)
-        use_reviewer = not fix_required or (retry_count % 2 == 0)
-        next_agent = "reviewer" if use_reviewer else "validator"
-
-        out_msg = Message.create(
-            from_agent=self.role,
-            to_agent=next_agent,
-            type="task",
-            payload={
-                "phase": phase_num,
-                "tasks_path": tasks_path,
-                "workspace_path": str(workspace),
-                "files_written": files_written,
-                "validation_report_path": f"phases/phase_{phase_num}/validation_report.md",
-                "idea_slug": idea_slug,
-                "retry_count": retry_count,
-            },
-        )
+        if ship_fix:
+            self._update_idea_status("field_test_planning")
+            out_msg = Message.create(
+                from_agent=self.role,
+                to_agent="field_test_planner",
+                type="task",
+                payload={
+                    "phase": phase_num,
+                    "idea_slug": idea_slug,
+                    "workspace_path": str(workspace),
+                },
+            )
+        else:
+            use_reviewer = not fix_required or (retry_count % 2 == 0)
+            next_agent = "reviewer" if use_reviewer else "validator"
+            out_msg = Message.create(
+                from_agent=self.role,
+                to_agent=next_agent,
+                type="task",
+                payload={
+                    "phase": phase_num,
+                    "tasks_path": tasks_path,
+                    "workspace_path": str(workspace),
+                    "files_written": files_written,
+                    "validation_report_path": f"phases/phase_{phase_num}/validation_report.md",
+                    "idea_slug": idea_slug,
+                    "retry_count": retry_count,
+                },
+            )
 
         return AgentOutput(
             success=result.completed,

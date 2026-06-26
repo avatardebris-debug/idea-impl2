@@ -266,6 +266,23 @@ class AgentProcess:
                             self.role, msg.msg_id, output.success,
                             output.tokens_used, output.steps_used)
 
+                try:
+                    from pipeline.step_collector import collect_agent_step
+
+                    collect_agent_step(
+                        slug=self._current_slug,
+                        agent_role=self.role,
+                        msg_type=msg.type,
+                        payload=msg.payload if msg.type != "signal" else {},
+                        answer=output.answer or "",
+                        tokens_used=output.tokens_used,
+                        steps_used=output.steps_used,
+                        success=output.success,
+                        project_dir=self._project_dir,
+                    )
+                except Exception:
+                    pass
+
                 # Executor continuity: immediately try next message without any poll delay.
                 # This eliminates idle time between back-to-back tasks for busy agents.
                 # The back-off will reset to _POLL_MIN at the top of the loop anyway,

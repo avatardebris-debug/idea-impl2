@@ -42,7 +42,7 @@ def dep_status_satisfied(status: str, *, context: DepContext) -> bool:
     All contexts share this rule; ``context`` documents the call site.
     """
     _ = context  # reserved for future context-specific rules
-    return status == "complete"
+    return status in ("complete", "field_proven")
 
 
 def dep_blocking_reason(

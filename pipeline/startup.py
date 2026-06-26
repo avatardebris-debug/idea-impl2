@@ -46,6 +46,8 @@ def resolve_initial_work(
     from_list: bool,
     resume: bool,
     polish: bool,
+    ship_prove: bool = False,
+    ship_slug: str = "",
     fresh_list_only: bool,
     parallel_seeds: int,
     save_pipeline_status,
@@ -109,6 +111,18 @@ def resolve_initial_work(
             pending_messages=pending,
         )
 
+    if ship_prove:
+        from pipeline.ship_mode import run_ship_prove_mode, SHIP_AGENT_ROLES
+
+        n = run_ship_prove_mode(bus, slug_filter=ship_slug)
+        pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)
+        if n == 0 and pending == 0 and not bus.has_active_work():
+            print("  [ship-prove] No complete projects eligible for field testing.")
+            return StartupResult(has_work=False, from_list=False, stop_early=True)
+        has_work = True
+        from_list = False
+        print(f"  [ship-prove] Queued {n} project(s); pending messages={pending}")
+
     purged = _purge_dep_blocked_messages(bus)
     if purged:
         print(f"  🚫 Purged {purged} dep-blocked queue(s) — will resume when deps complete")
@@ -145,7 +159,7 @@ def resolve_initial_work(
         has_work = True
 
     # --polish only replays polish_queue.md; never seed master_ideas / --goal / --hermes.
-    if not polish and not has_work and from_list:
+    if not polish and not ship_prove and not has_work and from_list:
         if not fresh_list_only:
             rebuilt = _rebuild_queues_from_state(bus, ideas_path=ideas_path)
             if rebuilt:
@@ -160,7 +174,7 @@ def resolve_initial_work(
             )
             has_work = seed_result in (SEED_SEEDED, SEED_BLOCKED)
 
-    if not polish and has_work and from_list and parallel_seeds > 1:
+    if not polish and not ship_prove and has_work and from_list and parallel_seeds > 1:
         from pipeline.pipeline_status import _get_all_active_idea_states
 
         already_active = len(_get_all_active_idea_states(get_pipeline_dir()))

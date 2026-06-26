@@ -119,7 +119,8 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
 
 def seed_idea(bus: MessageBus, title: str, description: str,
               deps: list | None = None, locked: bool = False,
-              priority_tier: int = 0) -> None:
+              priority_tier: int = 0,
+              idea_tags: dict | None = None) -> None:
     """Send the initial idea to the Idea Planner to kick off the pipeline."""
     if title in _seeded_this_session:
         return  # already seeded this run — don't duplicate
@@ -140,7 +141,7 @@ def seed_idea(bus: MessageBus, title: str, description: str,
     stub_state_file = project_state_file(idea_slug)
     if not stub_state_file.exists():
         stub_state_file.parent.mkdir(parents=True, exist_ok=True)
-        stub_state_file.write_text(json.dumps({
+        stub_payload = {
             "title": title,
             "slug": idea_slug,
             "status": "phase_1_planning",
@@ -148,7 +149,19 @@ def seed_idea(bus: MessageBus, title: str, description: str,
             "budget_lock": locked,
             "priority_tier": priority_tier,
             "started_at": datetime.now(timezone.utc).isoformat(),
-        }, indent=2), encoding="utf-8")
+        }
+        if idea_tags:
+            if idea_tags.get("goal_id"):
+                stub_payload["goal_id"] = idea_tags["goal_id"]
+            if idea_tags.get("system_id"):
+                stub_payload["system_id"] = idea_tags["system_id"]
+        stub_state_file.write_text(json.dumps(stub_payload, indent=2), encoding="utf-8")
+        if idea_tags:
+            try:
+                from pipeline.ship_provenance import merge_idea_tags
+                merge_idea_tags(project_dir(idea_slug), idea_tags)
+            except Exception:
+                pass
 
     msg = Message.create(
         from_agent="runner",
@@ -417,6 +430,11 @@ def seed_from_master_list(
         if description_raw.startswith("[") and description_raw.endswith("]"):
             description_raw = description_raw[1:-1].strip()
 
+        from pipeline.idea_tags import parse_idea_tags, strip_idea_tags
+
+        idea_tags = parse_idea_tags(description_raw)
+        description_for_tags = strip_idea_tags(description_raw)
+
         # --- Detect --goal tag: decompose into subgoals instead of seeding ---
         if re.search(r'\s--goal\s*$', line, re.IGNORECASE):
             # Strip the --goal tag from description before passing to decomposer
@@ -516,17 +534,17 @@ def seed_from_master_list(
             continue
 
         # --- Parse 'priority: N' or 'priority_tier: N' ---
-        priority_match = re.search(r'\b(?:priority|priority_tier):\s*(\d+)', description_raw, re.IGNORECASE)
+        priority_match = re.search(r'\b(?:priority|priority_tier):\s*(\d+)', description_for_tags, re.IGNORECASE)
         priority_tier = 0
         if priority_match:
             priority_tier = int(priority_match.group(1))
-            description_raw = re.sub(r'\s*[,;.-]?\s*\b(?:priority|priority_tier):\s*\d+\s*', '', description_raw, flags=re.IGNORECASE).strip()
+            description_for_tags = re.sub(r'\s*[,;.-]?\s*\b(?:priority|priority_tier):\s*\d+\s*', '', description_for_tags, flags=re.IGNORECASE).strip()
 
         # --- Parse '[lock]' tag — prevents budget_exceeded from ever firing ---
-        locked = bool(re.search(r'\[lock\]', description_raw, re.IGNORECASE))
+        locked = bool(re.search(r'\[lock\]', description_for_tags, re.IGNORECASE))
 
         # --- Parse 'requires: slug1, slug2' dependency declarations ---
-        description = re.sub(r'\s*\[lock\]', '', description_raw, flags=re.IGNORECASE).strip()
+        description = re.sub(r'\s*\[lock\]', '', description_for_tags, flags=re.IGNORECASE).strip()
         description, deps = split_requires_from_description(description)
         description = re.sub(r'\s*\[lock\]', '', description, flags=re.IGNORECASE).strip()
 
@@ -552,7 +570,7 @@ def seed_from_master_list(
                 print(f"  [blocked]  '{title}' blocked - waiting for: {', '.join(blocking)}")
                 continue  # try the next idea in the list
 
-        seed_idea(bus, title, description, deps=deps or None, locked=locked, priority_tier=priority_tier)
+        seed_idea(bus, title, description, deps=deps or None, locked=locked, priority_tier=priority_tier, idea_tags=idea_tags)
         return _SEED_SEEDED
 
     if blocked_count > 0:

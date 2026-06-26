@@ -18,11 +18,19 @@ from pipeline.pipeline_config import AGENT_ROLES, AGENTS_DIR, PROJECT_ROOT
 class AgentSupervisor:
     """Manages agent subprocesses."""
 
-    def __init__(self, provider: str, model: str, num_executors: int = 1, legacy: bool = False):
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        num_executors: int = 1,
+        legacy: bool = False,
+        roles: list[str] | None = None,
+    ):
         self.provider = provider
         self.model = model
         self.num_executors = max(1, num_executors)
         self.legacy = legacy
+        self.roles = roles if roles is not None else list(AGENT_ROLES)
         self.processes: dict[str, subprocess.Popen] = {}
         self._stop_requested = False
 
@@ -80,7 +88,7 @@ class AgentSupervisor:
     def start_all(self) -> None:
         """Start all agent subprocesses."""
         MessageBus().discard_stale_shutdowns()
-        for role in AGENT_ROLES:
+        for role in self.roles:
             if role == "executor" and self.num_executors > 1:
                 # Spawn multiple executor instances — SQLite bus competing consumers
                 # handles mutual exclusion so they never double-claim the same message.
@@ -101,7 +109,7 @@ class AgentSupervisor:
         # Send shutdown signal via message bus.
         # Send multiple SHUTDOWN signals to executor if multiple instances running.
         bus = MessageBus()
-        for role in AGENT_ROLES:
+        for role in self.roles:
             if role == "executor" and self.num_executors > 1:
                 for _ in range(self.num_executors):
                     bus.send_signal("runner", "executor", "SHUTDOWN")
