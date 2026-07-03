@@ -70,9 +70,10 @@ def resolve_initial_work(
     if deduped:
         print(f"  🧹 Deduped {deduped} duplicate task message(s) in queue")
 
-    advanced = advance_reviewed_projects(bus)
-    if advanced:
-        print(f"  ➡️  Advanced {advanced} project(s) from phase_X_reviewed")
+    if not ship_prove:
+        advanced = advance_reviewed_projects(bus)
+        if advanced:
+            print(f"  ➡️  Advanced {advanced} project(s) from phase_X_reviewed")
 
     if polish and run_ctx and run_ctx.polish_path:
         from pipeline.polish_mode import queue_pending, requeue_polish_in_progress, run_polish_mode
@@ -113,16 +114,16 @@ def resolve_initial_work(
 
     if ship_prove:
         from pipeline.pipeline_config import SHIP_AGENT_ROLES
-        from pipeline.ship_mode import run_ship_prove_mode
+        from pipeline.ship_mode import run_ship_prove_mode, ship_bus_has_work
 
         n = run_ship_prove_mode(bus, slug_filter=ship_slug)
         pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)
-        if n == 0 and pending == 0 and not bus.has_active_work():
+        if n == 0 and pending == 0 and not ship_bus_has_work(bus):
             print("  [ship-prove] No complete projects eligible for field testing.")
             return StartupResult(has_work=False, from_list=False, stop_early=True)
         has_work = True
         from_list = False
-        print(f"  [ship-prove] Queued {n} project(s); pending messages={pending}")
+        print(f"  [ship-prove] Queued {n} project(s); pending ship messages={pending}")
 
     purged = _purge_dep_blocked_messages(bus)
     if purged:
@@ -194,7 +195,7 @@ def resolve_initial_work(
                 if sr != SEED_SEEDED:
                     break
 
-    if not has_work and not fresh_list_only and bus.has_active_work():
+    if not has_work and not fresh_list_only and not ship_prove and bus.has_active_work():
         pending_total = sum(bus.queue_depth(r) for r in AGENT_ROLES)
         print(f"  🔄 Found {pending_total} pending queue message(s) — starting agents")
         has_work = True

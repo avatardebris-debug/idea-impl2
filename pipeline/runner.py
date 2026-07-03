@@ -270,6 +270,10 @@ def run_pipeline(
     from_list = startup.from_list
     has_work = startup.has_work
     focus_slug = startup.focus_slug
+    if ship_prove and ship_slug and not focus_slug:
+        from pipeline.ship_mode import resolve_slug_prefix
+
+        focus_slug = resolve_slug_prefix(ship_slug) or ship_slug
     if polish:
         from_list = True  # polish replays queue only; never master_ideas seeding
 
@@ -484,6 +488,8 @@ def run_pipeline(
             count_active_projects=_count_active_projects,
             warm_upcoming_projects=_warm_upcoming_projects,
             focus_slug=focus_slug,
+            ship_prove=ship_prove,
+            ship_slug=ship_slug,
         ))
 
     finally:

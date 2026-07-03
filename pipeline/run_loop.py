@@ -8,6 +8,7 @@ from __future__ import annotations
 import time
 
 from pipeline.pipeline_status import _get_active_idea_state
+from pipeline.pipeline_config import SHIP_AGENT_ROLES
 from pipeline.project_state import _check_priority_eviction
 from pipeline.run_loop_budget import tick_budget_enforcement
 from pipeline.run_loop_health import (
@@ -33,6 +34,8 @@ __all__ = [
 
 
 def _tick_dropbox(cfg: MainLoopConfig) -> None:
+    if cfg.ship_prove:
+        return
     if time.time() - cfg.state.last_dropbox_check < cfg.dropbox_interval_s:
         return
     try:
@@ -48,6 +51,8 @@ def _tick_dropbox(cfg: MainLoopConfig) -> None:
 
 
 def _tick_eviction(cfg: MainLoopConfig) -> None:
+    if cfg.ship_prove:
+        return
     try:
         _check_priority_eviction(cfg.bus, cfg.state.parallel_seeds, ideas_path=cfg.ideas_path)
     except Exception as _ee:
@@ -68,12 +73,20 @@ def _tick_time_limit(cfg: MainLoopConfig) -> bool:
 def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
     """One health-check cycle. Return True to break the main loop."""
     health = tick_health_preamble(cfg)
-    all_empty = cfg.bus.all_queues_empty()
-    idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=cfg.focus_slug)
+    if cfg.ship_prove:
+        all_empty = all(cfg.bus.queue_depth(r) == 0 for r in SHIP_AGENT_ROLES)
+    else:
+        all_empty = cfg.bus.all_queues_empty()
 
-    idea_state = tick_budget_enforcement(cfg, idea_state)
-    idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)
-    tick_seed_after_project_advance(cfg, idea_state)
+    focus = cfg.focus_slug
+    if cfg.ship_prove and cfg.ship_slug and not focus:
+        focus = cfg.ship_slug
+    idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=focus)
+
+    if not cfg.ship_prove:
+        idea_state = tick_budget_enforcement(cfg, idea_state)
+        idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)
+        tick_seed_after_project_advance(cfg, idea_state)
 
     tasks_done, tasks_total = read_task_progress(cfg, idea_state)
     _active_slug = idea_state.get("_slug", "")
@@ -88,19 +101,20 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
         ws_file_count=ws_file_count,
     )
 
-    tick_zero_task_stall_kill(
-        cfg,
-        idea_state,
-        tasks_done=tasks_done,
-        tasks_total=tasks_total,
-        ws_file_count=ws_file_count,
-        ws_last_mtime=ws_last_mtime,
-    )
+    if not cfg.ship_prove:
+        tick_zero_task_stall_kill(
+            cfg,
+            idea_state,
+            tasks_done=tasks_done,
+            tasks_total=tasks_total,
+            ws_file_count=ws_file_count,
+            ws_last_mtime=ws_last_mtime,
+        )
 
     if check_single_idea_complete(cfg, all_empty):
         return True
 
-    if all_empty and cfg.from_list and not cfg.bus.has_active_work():
+    if not cfg.ship_prove and all_empty and cfg.from_list and not cfg.bus.has_active_work():
         orphaned = tick_orphan_requeue(cfg)
         tick_seed_idle_when_empty(cfg, all_empty, orphaned=orphaned)
 

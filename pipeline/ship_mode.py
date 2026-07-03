@@ -26,23 +26,53 @@ def slugify_title(title: str) -> str:
     return slug.strip("_") or "unknown"
 
 
+def resolve_slug_prefix(prefix: str) -> str:
+    """Map --ship-slug substring filter to a project folder name for status display."""
+    if not prefix:
+        return ""
+    root = projects_dir()
+    if not root.is_dir():
+        return prefix
+    exact = root / prefix
+    if exact.is_dir():
+        return prefix
+    matches = sorted(p.name for p in root.iterdir() if p.is_dir() and prefix in p.name)
+    if len(matches) == 1:
+        return matches[0]
+    return prefix
+
+
+def ship_bus_has_work(bus: "MessageBus") -> bool:
+    """True if ship-prove agents have pending or in-flight tasks."""
+    pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)
+    if pending > 0:
+        return True
+    try:
+        processing = bus.get_processing_messages()
+    except Exception:
+        return False
+    ship_roles = set(SHIP_AGENT_ROLES)
+    return any(getattr(m, "to_agent", "") in ship_roles for m in processing)
+
+
 def queue_ship_prove_projects(
     bus: "MessageBus",
     *,
     slug_filter: str = "",
     limit: int = 0,
-) -> int:
+) -> tuple[int, set[str]]:
     """
     Queue field_test_planner for projects with status=complete.
 
     Skips projects already field_proven or ship_insufficient.
-    Returns count queued.
+    Returns (count queued, slugs freshly queued).
     """
     root = projects_dir()
     if not root.is_dir():
-        return 0
+        return 0, set()
 
     queued = 0
+    fresh_slugs: set[str] = set()
     for project_dir in sorted(root.iterdir()):
         if not project_dir.is_dir():
             continue
@@ -88,9 +118,10 @@ def queue_ship_prove_projects(
         )
         print(f"  [ship-prove] Queued field tests for '{state.get('title', slug)}'")
         queued += 1
+        fresh_slugs.add(slug)
         if limit and queued >= limit:
             break
-    return queued
+    return queued, fresh_slugs
 
 
 def dispatch_ship_requeue(
@@ -180,11 +211,17 @@ def dispatch_ship_requeue(
     return False
 
 
-def requeue_in_progress_ship_projects(bus: "MessageBus", *, slug_filter: str = "") -> int:
+def requeue_in_progress_ship_projects(
+    bus: "MessageBus",
+    *,
+    slug_filter: str = "",
+    skip_slugs: set[str] | None = None,
+) -> int:
     """Resume ship-track projects that are mid-flight (not complete/terminal)."""
     root = projects_dir()
     if not root.is_dir():
         return 0
+    skip = skip_slugs or set()
     requeued = 0
     for project_dir in sorted(root.iterdir()):
         if not project_dir.is_dir():
@@ -204,6 +241,8 @@ def requeue_in_progress_ship_projects(bus: "MessageBus", *, slug_filter: str = "
             continue
         if not is_ship_status(status):
             continue
+        if slug in skip and status == "field_test_planning":
+            continue
         title = state.get("title", slug)
         if dispatch_ship_requeue(bus, slug, title, state, project_dir, status):
             print(f"  [ship-prove] Re-queued '{title}' ({status})")
@@ -217,6 +256,9 @@ def run_ship_prove_mode(
     slug_filter: str = "",
 ) -> int:
     """Entry for startup: queue complete projects and resume in-progress ship track."""
-    n = queue_ship_prove_projects(bus, slug_filter=slug_filter)
-    n += requeue_in_progress_ship_projects(bus, slug_filter=slug_filter)
+    n, fresh = queue_ship_prove_projects(bus, slug_filter=slug_filter)
+    n += requeue_in_progress_ship_projects(bus, slug_filter=slug_filter, skip_slugs=fresh)
+    deduped = bus.dedupe_pending_tasks("field_test_planner", ("idea_slug",))
+    if deduped:
+        print(f"  [ship-prove] Deduped {deduped} duplicate field_test_planner task(s)")
     return n

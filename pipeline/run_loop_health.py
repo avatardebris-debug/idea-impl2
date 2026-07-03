@@ -15,6 +15,7 @@ from pipeline.pipeline_config import (
     AGENT_ROLES,
     MAX_PROJECT_LIFETIME_RETRIES,
     PROJECT_ROOT,
+    SHIP_AGENT_ROLES,
 )
 from pipeline.pipeline_status import _get_active_idea_state, _get_all_active_idea_states
 from pipeline.project_ops import _tick_project
@@ -167,6 +168,32 @@ def tick_health_preamble(cfg: MainLoopConfig) -> dict[str, Any]:
     return health
 
 
+def _ship_artifact_hint(cfg: MainLoopConfig, slug: str) -> str:
+    """Latest phases/ship artifact for status line."""
+    if not slug:
+        return ""
+    ship_dir = cfg.pipeline_dir / "projects" / slug / "phases" / "ship"
+    if not ship_dir.is_dir():
+        return ""
+    names = (
+        "field_tests.md",
+        "field_test_results.md",
+        "debug_report.md",
+        "thermo_review.md",
+        "ship_evaluation.md",
+    )
+    latest_name = ""
+    latest_mtime = 0.0
+    for name in names:
+        path = ship_dir / name
+        if path.is_file():
+            mtime = path.stat().st_mtime
+            if mtime > latest_mtime:
+                latest_mtime = mtime
+                latest_name = name
+    return f" ship:{latest_name}" if latest_name else ""
+
+
 def tick_status_display(
     cfg: MainLoopConfig,
     health: dict[str, Any],
@@ -177,12 +204,17 @@ def tick_status_display(
     ws_file_count: int,
 ) -> None:
     """Print status line, throughput breakdown, and tuner updates."""
+    role_list = SHIP_AGENT_ROLES if cfg.ship_prove else AGENT_ROLES
     running_agents = sum(1 for s in health.values() if s == "running")
-    pending_total = sum(cfg.bus.queue_depth(r) for r in AGENT_ROLES)
+    pending_total = sum(cfg.bus.queue_depth(r) for r in role_list)
     elapsed_m = (time.time() - cfg.start_time) / 60
     phase = idea_state.get("status", "?")
     title = idea_state.get("title", "")
-    if cfg.state.parallel_seeds > 1:
+    _active_slug = idea_state.get("_slug", "")
+    ship_hint = _ship_artifact_hint(cfg, _active_slug) if cfg.ship_prove else ""
+    if cfg.ship_prove:
+        title_str = f" | [{title[:28]}]" if title else ""
+    elif cfg.state.parallel_seeds > 1:
         _all_active = _get_all_active_idea_states(cfg.pipeline_dir)
         if len(_all_active) > 1:
             title_str = " | " + " / ".join(
@@ -195,9 +227,8 @@ def tick_status_display(
     else:
         title_str = f" | [{title[:28]}]" if title else ""
 
-    task_str = f" {tasks_done}/{tasks_total}✓" if tasks_total else ""
-    _active_slug = idea_state.get("_slug", "")
-    if tasks_total and tasks_done == 0 and ws_file_count > 0:
+    task_str = f" {tasks_done}/{tasks_total}✓" if tasks_total and not cfg.ship_prove else ""
+    if not cfg.ship_prove and tasks_total and tasks_done == 0 and ws_file_count > 0:
         task_str = f" 0/{tasks_total}✓ ({ws_file_count} files)"
 
     gpu_str = ""
@@ -264,12 +295,14 @@ def tick_status_display(
         except Exception:
             pass
 
+    mode_prefix = "[ship] " if cfg.ship_prove else ""
     status_line = _clean(
-        f"  [{elapsed_m:.0f}m] agents={running_agents}/{len(AGENT_ROLES)} "
-        f"pending={pending_total} phase={phase}{task_str}"
+        f"  {mode_prefix}[{elapsed_m:.0f}m] agents={running_agents}/{len(role_list)} "
+        f"pending={pending_total} status={phase}{ship_hint}{task_str}"
         f"{gpu_str}{_tps_str}{title_str}"
     )
-    if cfg.state.status_count % 4 == 0:
+    print_every = 1 if cfg.ship_prove else 4
+    if cfg.state.status_count % print_every == 0:
         print(status_line, flush=True)
         if _tuner_str:
             print(_tuner_str, flush=True)
@@ -379,7 +412,12 @@ def tick_stall_recovery(cfg: MainLoopConfig, *, running_agents: int) -> None:
     if stuck:
         _try_recover_stalled_processing(cfg, stuck)
 
-    if cfg.bus.has_active_work():
+    if cfg.ship_prove:
+        from pipeline.ship_mode import ship_bus_has_work
+
+        if ship_bus_has_work(cfg.bus):
+            return
+    elif cfg.bus.has_active_work():
         return
 
     if now - cfg.state.last_stall_recovery < cfg.stall_recovery_cooldown_s:
