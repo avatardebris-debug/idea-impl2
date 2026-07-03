@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -53,6 +54,50 @@ def ship_bus_has_work(bus: "MessageBus") -> bool:
         return False
     ship_roles = set(SHIP_AGENT_ROLES)
     return any(getattr(m, "to_agent", "") in ship_roles for m in processing)
+
+
+def _stamp_ship_session(state: dict) -> None:
+    """Fresh session clock for ship-prove (avoids stale main-pipeline session_started_at)."""
+    state["session_started_at"] = datetime.now(timezone.utc).isoformat()
+
+
+def restore_ship_budget_killed(*, slug_filter: str = "") -> int:
+    """
+    Unstick projects budget-killed mid ship-prove (pre_budget_status is a ship status).
+    """
+    root = projects_dir()
+    if not root.is_dir():
+        return 0
+    restored = 0
+    for project_dir in sorted(root.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        slug = project_dir.name
+        if slug_filter and slug_filter not in slug:
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.exists():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if state.get("status") != "budget_exceeded":
+            continue
+        pre = state.get("pre_budget_status", "")
+        if not is_ship_status(pre):
+            continue
+        state["status"] = pre
+        state.pop("pre_budget_status", None)
+        state.pop("budget_note", None)
+        _stamp_ship_session(state)
+        state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        print(
+            f"  [ship-prove] Restored '{state.get('title', slug)}' "
+            f"from budget_exceeded → {pre}"
+        )
+        restored += 1
+    return restored
 
 
 def queue_ship_prove_projects(
@@ -102,6 +147,9 @@ def queue_ship_prove_projects(
             continue
 
         state["status"] = "field_test_planning"
+        state.pop("pre_budget_status", None)
+        state.pop("budget_note", None)
+        _stamp_ship_session(state)
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
         bus.send(
@@ -256,6 +304,7 @@ def run_ship_prove_mode(
     slug_filter: str = "",
 ) -> int:
     """Entry for startup: queue complete projects and resume in-progress ship track."""
+    restore_ship_budget_killed(slug_filter=slug_filter)
     n, fresh = queue_ship_prove_projects(bus, slug_filter=slug_filter)
     n += requeue_in_progress_ship_projects(bus, slug_filter=slug_filter, skip_slugs=fresh)
     deduped = bus.dedupe_pending_tasks("field_test_planner", ("idea_slug",))

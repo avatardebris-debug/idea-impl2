@@ -19,6 +19,7 @@ from pipeline.pipeline_config import (
 )
 from pipeline.pipeline_status import _get_active_idea_state, _get_all_active_idea_states
 from pipeline.project_ops import _tick_project
+from pipeline.ship_status import is_ship_status
 from pipeline.text_util import clean_ansi as _clean
 
 from pipeline.project_rebuild import dispatch_phase_requeue
@@ -533,6 +534,7 @@ def tick_project_metrics(
                     if (
                         retries >= MAX_PROJECT_LIFETIME_RETRIES
                         and st not in ("complete", "budget_exceeded", "", "dep_waiting")
+                        and not (cfg.ship_prove and is_ship_status(st))
                     ):
                         ci["status"] = "budget_exceeded"
                         ci["budget_note"] = (

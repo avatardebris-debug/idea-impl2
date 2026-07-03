@@ -7,17 +7,23 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.pipeline_config import AGENT_ROLES
+from pipeline.ship_status import is_ship_status
 
 from pipeline.run_loop_types import MainLoopConfig
 
 
 def tick_budget_enforcement(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> dict[str, Any]:
     """Enforce per-session time budget; may mutate idea_state and project file."""
+    if cfg.ship_prove:
+        return idea_state
     _active_slug = idea_state.get("_slug", "")
     _active_status_for_budget = idea_state.get("status", "")
+    if is_ship_status(_active_status_for_budget):
+        return idea_state
     _active_started = idea_state.get("session_started_at", "")
     if (
         _active_slug
