@@ -236,7 +236,7 @@ def run_pipeline(
 
             db = registry_db()
             if db.exists():
-                print(f"  Registry: {db.relative_to(PROJECT_ROOT)}")
+                print(f"  Registry: {_display_path(db)}")
             else:
                 print("  Registry: missing — run python scripts/build_capability_registry.py")
         except Exception as _reg_err:
@@ -538,7 +538,7 @@ def run_pipeline(
         except Exception:
             pass
         if metrics_report and metrics_report.exists():
-            print(f"  Run Report: {metrics_report.relative_to(PROJECT_ROOT)}")
+            print(f"  Run Report: {_display_path(metrics_report)}")
             print(f"  Prompt Ver: {run_metrics.prompt_version}")
         print("=" * 60)
 
