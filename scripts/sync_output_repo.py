@@ -12,11 +12,15 @@ Usage:
   python scripts/sync_output_repo.py --dry-run
 
 Requires PIPELINE_DIR (or auto-detect via pipeline.pipeline_config).
+
+Author for commits (no git config required): set GIT_COMMIT_AUTHOR="Name <email>"
+or GIT_COMMIT_NAME + GIT_COMMIT_EMAIL.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -36,6 +40,19 @@ def _git(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
+
+
+def _commit_author_arg() -> list[str]:
+    """Build git commit --author=… from env (avoids needing git config on cloud)."""
+    author = os.environ.get("GIT_COMMIT_AUTHOR", "").strip()
+    if not author:
+        name = os.environ.get("GIT_COMMIT_NAME", os.environ.get("GIT_AUTHOR_NAME", "")).strip()
+        email = os.environ.get("GIT_COMMIT_EMAIL", os.environ.get("GIT_AUTHOR_EMAIL", "")).strip()
+        if name and email:
+            author = f"{name} <{email}>"
+    if author:
+        return ["--author", author]
+    return []
 
 
 def main() -> int:
@@ -76,12 +93,17 @@ def main() -> int:
         print(add.stderr or add.stdout)
         return 1
 
-    commit = _git("commit", "-m", args.message, cwd=out_dir)
+    commit = _git("commit", *_commit_author_arg(), "-m", args.message, cwd=out_dir)
     if commit.returncode != 0:
         if "nothing to commit" in (commit.stdout or "") + (commit.stderr or ""):
             print("Nothing to commit.")
             return 0
         print(commit.stderr or commit.stdout)
+        if "tell me who you are" in (commit.stderr or "").lower() or "user.email" in (commit.stderr or ""):
+            print(
+                "\nSet commit identity without git config, then retry:\n"
+                '  export GIT_COMMIT_AUTHOR="Your Name <you@example.com>"'
+            )
         return 1
 
     print(commit.stdout or "Committed.")
