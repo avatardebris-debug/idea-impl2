@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 from pipeline.message_bus import Message, MessageBus
 from pipeline.dep_policy import (
     dep_blocking_reason,
+    is_build_terminal,
+    is_seed_list_skip,
     parse_requires_from_description,
     split_requires_from_description,
 )
@@ -85,7 +87,7 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
                 try:
                     dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
                     reason = dep_blocking_reason(
-                        dep_slug, dep_st.get("status"), context="purge",
+                        dep_slug, dep_st.get("status"), context="purge", state=dep_st,
                     )
                     if reason:
                         blocking.append(reason)
@@ -93,24 +95,17 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
                     blocking.append(f"{dep_slug} (unreadable)")
 
             if blocking:
-                q_path = bus._queue_path(role)
                 try:
-                    lines = q_path.read_text(encoding="utf-8").splitlines()
-                    kept = [l for l in lines if msg.id not in l]
-                    if len(kept) < len(lines):
-                        q_path.write_text("\n".join(kept) + ("\n" if kept else ""),
-                                          encoding="utf-8")
-                        # Mark the project as dep_waiting so _rebuild skips it
-                        try:
-                            st = json.loads(state_file.read_text(encoding="utf-8"))
-                            if st.get("status") not in ("complete", "budget_exceeded", "dep_waiting"):
-                                st["status"] = "dep_waiting"
-                                state_file.write_text(json.dumps(st, indent=2), encoding="utf-8")
-                        except Exception:
-                            pass
-                        print(f"  \U0001f6ab Purged dep-blocked queue for '{slug}' "
-                              f"(waiting for: {', '.join(blocking)})")
-                        purged += 1
+                    bus.fail(msg)
+                    st = json.loads(state_file.read_text(encoding="utf-8"))
+                    if not is_build_terminal(st.get("status", "")):
+                        st["status"] = "dep_waiting"
+                        state_file.write_text(json.dumps(st, indent=2), encoding="utf-8")
+                    print(
+                        f"  \U0001f6ab Purged dep-blocked queue for '{slug}' "
+                        f"(waiting for: {', '.join(blocking)})"
+                    )
+                    purged += 1
                 except Exception:
                     pass
 
@@ -120,7 +115,8 @@ def _purge_dep_blocked_messages(bus: "MessageBus") -> int:
 def seed_idea(bus: MessageBus, title: str, description: str,
               deps: list | None = None, locked: bool = False,
               priority_tier: int = 0,
-              idea_tags: dict | None = None) -> None:
+              idea_tags: dict | None = None,
+              suggested_reuse: list | None = None) -> None:
     """Send the initial idea to the Idea Planner to kick off the pipeline."""
     if title in _seeded_this_session:
         return  # already seeded this run — don't duplicate
@@ -163,6 +159,17 @@ def seed_idea(bus: MessageBus, title: str, description: str,
             except Exception:
                 pass
 
+    if suggested_reuse:
+        from pipeline.capability_reuse import SeedReuseDecision, write_suggested_reuse
+
+        if isinstance(suggested_reuse, SeedReuseDecision):
+            write_suggested_reuse(idea_slug, suggested_reuse)
+        else:
+            write_suggested_reuse(
+                idea_slug,
+                SeedReuseDecision(suggestions=list(suggested_reuse)),
+            )
+
     msg = Message.create(
         from_agent="runner",
         to_agent="idea_planner",
@@ -179,6 +186,8 @@ def seed_idea(bus: MessageBus, title: str, description: str,
     bus.send(msg)
     dep_note = f" [deps: {', '.join(deps)}]" if deps else ""
     print(f"\n  Seeded idea: {title} (slug: {idea_slug}){dep_note}")
+    from pipeline.pipeline_activity import log_activity
+    log_activity("seed", title=title, slug=idea_slug)
 
 
 def _request_ideation(bus: MessageBus) -> None:
@@ -277,6 +286,7 @@ def seed_from_master_list(
     ideas_path: pathlib.Path | None = None,
     resume_inprogress: bool = False,
     run_ctx: "RunContext | None" = None,
+    max_active: int | None = None,
 ) -> str:
     """Find the first unchecked, unblocked idea in master_ideas.md and seed it.
 
@@ -288,6 +298,9 @@ def seed_from_master_list(
 
     Blocked ideas (deps not yet complete) are skipped with a status message.
     They unblock automatically once their dependencies reach 'complete'.
+
+    *max_active*: if set (e.g. ``--parallel-seeds``), refuse new greenfield
+    seeds when that many non-terminal projects already exist on disk.
     """
     if run_ctx and run_ctx.mode == "polish":
         # Polish runs only use polish_queue.md via run_polish_mode / queue_pending.
@@ -354,19 +367,20 @@ def seed_from_master_list(
             try:
                 state = json.loads(project_state.read_text(encoding="utf-8"))
                 status = state.get("status", "?")
-                if status in ("complete", "budget_exceeded"):
-                    # Locked projects with budget_exceeded get auto-reset and re-seeded
-                    if status == "budget_exceeded" and state.get("budget_lock"):
-                        resume_status = state.get("pre_budget_status", "phase_1_executing")
-                        state["status"] = resume_status
-                        state["budget_note"] = ""
-                        state["session_started_at"] = ""  # reset timer
-                        project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                        print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
-                        # Fall through to dep check + re-queue below
-                    else:
-                        _seeded_this_session.add(title)
-                        continue
+                # Locked budget_exceeded: auto-reset then fall through to re-queue
+                if status == "budget_exceeded" and state.get("budget_lock"):
+                    resume_status = state.get("pre_budget_status", "phase_1_executing")
+                    state["status"] = resume_status
+                    state["budget_note"] = ""
+                    state["session_started_at"] = ""  # reset timer
+                    project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                    print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
+                    status = resume_status
+                elif is_seed_list_skip(status):
+                    # Terminal / mvp / ship done — skip line, keep scanning list
+                    # (returning SEED_SEEDED here starves every later idea)
+                    _seeded_this_session.add(title)
+                    continue
 
                 # --- Dep check for already-in-progress projects ---
                 # If this project has deps that aren't done, put it in dep_waiting
@@ -388,7 +402,7 @@ def seed_from_master_list(
                         try:
                             _ds = json.loads(_df.read_text(encoding="utf-8"))
                             reason = dep_blocking_reason(
-                                _dep, _ds.get("status"), context="seeding",
+                                _dep, _ds.get("status"), context="seeding", state=_ds,
                             )
                             if reason:
                                 _blocking.append(reason)
@@ -410,18 +424,30 @@ def seed_from_master_list(
                     _seeded_this_session.add(title)
                     continue
 
-                if resume_inprogress and status not in ("dep_waiting",):
-                    # --fresh-list-only: queues were cleared, so re-queue this project
-                    # by running a targeted rebuild for just this slug.
-                    requeued = _rebuild_single_project(bus, slug, state, project_state.parent.parent)
+                # Active in-progress: requeue if needed; only hold the list when work exists
+                proj_dir = project_state.parent.parent
+                if resume_inprogress or not bus.has_active_work():
+                    requeued = _rebuild_single_project(bus, slug, state, proj_dir)
                     if requeued:
                         print(f"  🔄 Re-queued '{title}' from list ({status})")
+                        _seeded_this_session.add(title)
                         return _SEED_SEEDED
-                    # If rebuild couldn't queue it (dep_waiting, etc.), fall through
 
-                print(f"  ⏭  Skipping '{title}' — already in progress ({status}), resuming from queue")
+                if bus.has_active_work():
+                    print(
+                        f"  ⏭  Skipping '{title}' — already in progress ({status}), "
+                        f"bus has active work"
+                    )
+                    _seeded_this_session.add(title)
+                    return _SEED_SEEDED
+
+                # Stale in-progress, empty bus, unrequeueable — do not starve the backlog
+                print(
+                    f"  ⏭  Skipping '{title}' — in progress ({status}) but idle/"
+                    f"unrequeueable; scanning for next seedable idea"
+                )
                 _seeded_this_session.add(title)
-                return _SEED_SEEDED  # Work already exists — do NOT seed another project
+                continue
             except Exception:
                 pass  # Can't read state — seed it fresh
 
@@ -466,7 +492,6 @@ def seed_from_master_list(
             _hgc_match = re.search(r'goal_check:\s*([^\.\]]+)', hermes_description, re.IGNORECASE)
             hermes_goal_check = _hgc_match.group(1).strip() if _hgc_match else f"Has the task '{title}' been completed?"
             print(f"\n  🤖 Routing to Hermes: {title}")
-            _seeded_this_session.add(title)
             try:
                 from pipeline.hermes_runner import HermesGoalRunner
                 _hr = HermesGoalRunner()
@@ -491,20 +516,34 @@ def seed_from_master_list(
                         )
                 except Exception:
                     pass
-                # Mark the line as done in master_ideas.md
-                try:
-                    _mi_content = mi_path.read_text(encoding="utf-8")
-                    _mi_content = _mi_content.replace(
-                        f"- [ ] **[{title}]",
-                        f"- [x] **[{title}]",
-                        1,
-                    )
-                    mi_path.write_text(_mi_content, encoding="utf-8")
-                except Exception:
-                    pass
+                if _hr_result.get("status") == "achieved":
+                    # Mark the line as done in master_ideas.md
+                    try:
+                        _mi_content = mi_path.read_text(encoding="utf-8")
+                        for _pat in (
+                            f"- [ ] **[{title}]",
+                            f"- [ ] **{title}**",
+                            f"[ ] [{title}]",
+                        ):
+                            if _pat in _mi_content:
+                                _mi_content = _mi_content.replace(
+                                    _pat, _pat.replace("[ ]", "[x]", 1), 1,
+                                )
+                                break
+                        mi_path.write_text(_mi_content, encoding="utf-8")
+                    except Exception:
+                        pass
+                    _seeded_this_session.add(title)
+                    return _SEED_SEEDED
+                # Not achieved — leave unchecked; skip for this session only
+                print(f"  ⚠ Hermes '{title}' not achieved — leaving unchecked for later retry")
+                _seeded_this_session.add(title)
+                continue
             except Exception as _he:
+                # Must NOT return SEED_SEEDED — that starves every later idea in the list
                 print(f"  ✗ Hermes runner failed for '{title}': {_he}")
-            return _SEED_SEEDED
+                _seeded_this_session.add(title)
+                continue
 
         # --- kind:connector → run workflow YAML, not a 7-phase project ---
         if re.search(r"\bkind:\s*connector\b", line, re.IGNORECASE):
@@ -559,7 +598,7 @@ def seed_from_master_list(
                 try:
                     dep_state = json.loads(dep_state_file.read_text(encoding="utf-8"))
                     reason = dep_blocking_reason(
-                        dep_slug, dep_state.get("status"), context="seeding",
+                        dep_slug, dep_state.get("status"), context="seeding", state=dep_state,
                     )
                     if reason:
                         blocking.append(reason)
@@ -570,7 +609,49 @@ def seed_from_master_list(
                 print(f"  [blocked]  '{title}' blocked - waiting for: {', '.join(blocking)}")
                 continue  # try the next idea in the list
 
-        seed_idea(bus, title, description, deps=deps or None, locked=locked, priority_tier=priority_tier, idea_tags=idea_tags)
+        # --- Capacity: do not oversubscribe beyond parallel seed slots ---
+        if max_active is not None and max_active > 0:
+            from pipeline.project_state import count_active_pipeline_projects
+
+            n_active = count_active_pipeline_projects()
+            if n_active >= max_active:
+                print(
+                    f"  [cap] {n_active} active project(s) >= max_active={max_active} "
+                    f"— not seeding '{title}' (resolve stuck projects, --polish, "
+                    f"or raise --parallel-seeds)"
+                )
+                return _SEED_BLOCKED
+
+        # --- Capability reuse: soft suggestions always; hard skip does not check off ideas ---
+        from pipeline.capability_reuse import evaluate_seed_reuse
+        from pipeline.pipeline_activity import log_activity
+
+        reuse = evaluate_seed_reuse(title, description)
+        if reuse.skip_seed:
+            print(
+                f"  [reuse] SKIP seed '{title}' — covered by capability "
+                f"'{reuse.slug}' (score={reuse.score}); leave unchecked for human confirm"
+            )
+            log_activity(
+                "capability_reuse_skip",
+                title=title,
+                slug=reuse.slug,
+                score=reuse.score,
+            )
+            # Do not check off master_ideas — skip this line this session only
+            _seeded_this_session.add(title)
+            continue
+
+        seed_idea(
+            bus,
+            title,
+            description,
+            deps=deps or None,
+            locked=locked,
+            priority_tier=priority_tier,
+            idea_tags=idea_tags,
+            suggested_reuse=reuse if reuse.suggestions else None,
+        )
         return _SEED_SEEDED
 
     if blocked_count > 0:

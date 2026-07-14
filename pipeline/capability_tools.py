@@ -9,6 +9,7 @@ import json
 import re
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +18,29 @@ from pipeline.paths import registry_db
 from pipeline.capability_router import route_task
 from pipeline.pipeline_mode import legacy_mode
 
-# Whitelisted command prefixes for invoke_capability
-_ALLOWED_PREFIXES = (
-    "python ",
-    "python3 ",
-)
+# Whitelisted command prefixes for invoke_capability (incl. Windows)
+def _allowed_prefixes() -> tuple[str, ...]:
+    exe = Path(sys.executable).name.lower()
+    prefixes = [
+        "python ",
+        "python3 ",
+        "py ",
+        "py.exe ",
+    ]
+    # Full path to current interpreter (quoted or unquoted)
+    try:
+        full = str(Path(sys.executable).resolve())
+        prefixes.append(full + " ")
+        if " " in full:
+            prefixes.append(f'"{full}" ')
+    except Exception:
+        pass
+    if exe and not exe.startswith("python"):
+        prefixes.append(exe + " ")
+    return tuple(prefixes)
+
+
+_ALLOWED_PREFIXES = _allowed_prefixes()
 
 
 def _get_capability(slug: str) -> dict[str, Any] | None:
@@ -125,8 +144,11 @@ def invoke_capability(slug: str, args: str = "", cwd: str = "") -> str:
     if not entry:
         return f"ERROR: Capability '{slug}' has no entrypoint"
 
-    entry_lower = entry.lower()
-    if not any(entry_lower.startswith(p) for p in _ALLOWED_PREFIXES):
+    entry_norm = entry.strip()
+    entry_lower = entry_norm.lower()
+    allowed = _allowed_prefixes()
+    # Case-insensitive prefix match (Windows paths vary)
+    if not any(entry_lower.startswith(p.lower()) for p in allowed):
         return f"ERROR: Entrypoint not allowed for invoke_capability: {entry}"
 
     # Block shell metacharacters in user args

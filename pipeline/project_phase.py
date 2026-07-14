@@ -238,23 +238,46 @@ def _advance_phase(
 
 
 def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_path: pathlib.Path | None = None) -> None:
-    """Mark a project as complete in state, registry, and master_ideas.md (slug-aware)."""
-    state["status"] = "complete"
+    """Mark a project terminal after plan exhaustion.
+
+    Full completion (phase >= total_phases) → status=complete, truth, corpus, M1.
+    Early plan end (phase < total_phases) → status=mvp_complete, polish queue only.
+    """
+    from pipeline.dep_policy import phases_fully_built
+
     state.pop("review_result", None)
     slug = state.get("_slug") or project_dir.name
     state["_slug"] = slug
     state["completed_at"] = datetime.now(timezone.utc).isoformat()
-    _write_state_dict(project_dir, state)
-    print(f"  ✅ '{title}' completed all phases!")
 
-    try:
-        from pipeline.ship_provenance import set_maturity
+    phase = int(state.get("phase", 0) or 0)
+    total = int(state.get("total_phases", 1) or 1)
+    full = phases_fully_built(state)
 
-        set_maturity(project_dir, "M1")
-    except Exception:
-        pass
+    if full:
+        state["status"] = "complete"
+        _write_state_dict(project_dir, state)
+        print(f"  ✅ '{title}' completed all phases!")
+    else:
+        state["status"] = "mvp_complete"
+        _write_state_dict(project_dir, state)
+        print(
+            f"  📦 '{title}' MVP complete (phase {phase}/{total}) — "
+            f"remaining phases queued for polish"
+        )
+        from pipeline.polish_mode import append_polish_queue_entry
 
-    if state.get("phase_template") == "phase_tetra":
+        append_polish_queue_entry(slug, title, phase, total, status_label="mvp_complete")
+
+    if full:
+        try:
+            from pipeline.ship_provenance import set_maturity
+
+            set_maturity(project_dir, "M1")
+        except Exception:
+            pass
+
+    if full and state.get("phase_template") == "phase_tetra":
         try:
             from pipeline.phase_tetra import maybe_run_phase_tetra_hook
 
@@ -264,42 +287,46 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
 
     from pipeline.pipeline_status import get_runner_ideas_path
 
-    mi_path = ideas_path or get_runner_ideas_path() or (PROJECT_ROOT / "master_ideas.md")
-    try:
-        from pipeline.ideas_sync import record_completion
-        n = record_completion(
-            slug,
-            title,
-            ideas_path=mi_path if mi_path.exists() else None,
-            description=state.get("description", ""),
-            workspace=str(project_dir / "workspace"),
-        )
-        if n:
-            print(f"  [truth] removed {n} line(s) from {mi_path.name}")
-    except Exception as _is_err:
-        import logging as _log
-        _log.getLogger(__name__).debug("truth/completion record skipped: %s", _is_err)
+    # Only full complete removes ideas from master_ideas / truth.md
+    if full:
+        mi_path = ideas_path or get_runner_ideas_path() or (PROJECT_ROOT / "master_ideas.md")
+        try:
+            from pipeline.ideas_sync import record_completion
+            n = record_completion(
+                slug,
+                title,
+                ideas_path=mi_path if mi_path.exists() else None,
+                description=state.get("description", ""),
+                workspace=str(project_dir / "workspace"),
+            )
+            if n:
+                print(f"  [truth] removed {n} line(s) from {mi_path.name}")
+        except Exception as _is_err:
+            import logging as _log
+            _log.getLogger(__name__).debug("truth/completion record skipped: %s", _is_err)
 
-    # --- Fine-tune corpus: emit training pairs for this completed project ---
     try:
         from pipeline.pipeline_activity import log_activity
 
         log_activity(
-            "project_complete",
+            "project_complete" if full else "project_mvp_complete",
             slug=slug,
             title=title,
             status=state.get("status", "complete"),
-            phases=state.get("total_phases", 0),
+            phase=phase,
+            total_phases=total,
         )
     except Exception:
         pass
 
-    try:
-        from pipeline.corpus_collector import collect_project_on_complete
-        collect_project_on_complete(project_dir, state)
-    except Exception as _cc_err:
-        import logging as _log
-        _log.getLogger(__name__).debug("corpus_collector skipped (non-critical): %s", _cc_err)
+    # Corpus: full complete only (mvp stays out of high-quality harvest)
+    if full:
+        try:
+            from pipeline.corpus_collector import collect_project_on_complete
+            collect_project_on_complete(project_dir, state)
+        except Exception as _cc_err:
+            import logging as _log
+            _log.getLogger(__name__).debug("corpus_collector skipped (non-critical): %s", _cc_err)
 
     try:
         from pipeline.capability_registry import refresh_capability

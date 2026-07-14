@@ -21,6 +21,17 @@ TERMINAL_SHIP_STATUSES: frozenset[str] = frozenset({
 })
 
 
+def is_ship_in_flight(status: str) -> bool:
+    """True while ship-prove agents may still have work for this project."""
+    if status in TERMINAL_SHIP_STATUSES:
+        return False
+    if status == "complete":
+        return False
+    if status == "budget_exceeded":
+        return False
+    return is_ship_status(status)
+
+
 def ship_status_rank(status: str) -> int:
     try:
         return SHIP_STATUS_ORDER.index(status)

@@ -20,6 +20,12 @@ from pipeline.field_test_runner import (
 from pipeline.import_graph import scan_workspace
 from pipeline.message_bus import Message
 from pipeline.ship_provenance import load_provenance
+from pipeline.workspace_layout import (
+    ensure_package_layout,
+    format_layout_block,
+    infer_package_name,
+    sanity_check_module,
+)
 
 
 class FieldTestPlannerAgent(AgentProcess):
@@ -38,6 +44,17 @@ class FieldTestPlannerAgent(AgentProcess):
         results_path = "phases/ship/field_test_results.md"
         tests_full = self._project_path(tests_path)
         results_full = self._project_path(results_path)
+
+        pkg_name = infer_package_name(workspace, idea_slug)
+        changed, repair_msg = ensure_package_layout(workspace, pkg_name)
+        if changed:
+            self.logger.info("[field_test_planner] Layout repair: %s", repair_msg)
+        layout_block = format_layout_block(workspace, pkg_name)
+        ok, check_detail = sanity_check_module(workspace, pkg_name)
+        if not ok and changed:
+            self.logger.warning(
+                "[field_test_planner] Entry check after repair failed: %s", check_detail[:200]
+            )
 
         self._update_idea_status("field_test_planning")
 
@@ -83,6 +100,10 @@ class FieldTestPlannerAgent(AgentProcess):
             f"## Tags\n{tags_block}\n\n"
             f"## Master plan\n{master_plan[:2500]}\n\n"
             f"## Stale-reference scan (address in integration tests)\n{graph_block}\n\n"
+            f"## Workspace layout (use for commands)\n{layout_block}\n\n"
+            f"Package name for `-m` imports: `{pkg_name}`. "
+            f"Commands must use `{sys.executable}` and work from workspace root on Windows.\n"
+            f"Do NOT use /tmp, /venv/, or `cat` — use relative paths and Python only.\n\n"
             f"## Workspace code (preview)\n{files_block}\n\n"
             f"## Your job\n"
             f"Write product and integration field tests to `{tests_full}`.\n"
@@ -98,34 +119,41 @@ class FieldTestPlannerAgent(AgentProcess):
             f"- [ ] Task P1: <short title>\n"
             f"  - Kind: product\n"
             f"  - Command: `<shell command run from workspace root>`\n"
-            f"  - Expect: <substring that must appear in stdout/stderr, or 'exit 0'>\n"
+            f"  - Expect: <substring in output, or `exit 0` for exit-code-only>\n"
+            f"Use `--output-path` not `--output-dir`. Use `%TEMP%\\subdir` on Windows, never `/tmp` or `cat`.\n"
+            f"Use `{sys.executable}` in every Command line.\n"
             f"```\n\n"
             f"Kind must be product or integration. Commands must use relative paths only.\n"
             f"Say DONE when the file is written.\n"
         )
 
-        self._update_idea_status("field_testing")
         result = self.call_llm_direct(task_prompt)
 
-        llm_tests = self.read_state_file(tests_path)
+        llm_tests = self._extract_tests_markdown(result.answer)
         if not llm_tests.strip():
-            llm_tests = self._extract_tests_markdown(result.answer)
-            if llm_tests:
+            llm_tests = self.read_state_file(tests_path)
+        if llm_tests.strip():
+            if llm_tests.startswith("# Field Tests"):
                 self.write_state_file(tests_path, llm_tests)
-
-        # Prepend baseline section (documented; runner merges programmatically)
-        baseline_doc = "# Field Tests\n\n## Baseline (automatic)\n"
-        for t in baseline_tasks(workspace):
-            baseline_doc += f"- {t.task_id}: {t.title}\n"
-        if llm_tests and not llm_tests.startswith("# Field Tests"):
-            self.write_state_file(tests_path, baseline_doc + "\n## LLM tests\n\n" + llm_tests)
-        elif not self.read_state_file(tests_path).strip():
+            else:
+                baseline_doc = "# Field Tests\n\n## Baseline (automatic)\n"
+                for t in baseline_tasks(workspace, package_name=pkg_name):
+                    baseline_doc += f"- {t.task_id}: {t.title}\n"
+                self.write_state_file(
+                    tests_path, baseline_doc + "\n## LLM tests\n\n" + llm_tests
+                )
+        else:
+            baseline_doc = "# Field Tests\n\n## Baseline (automatic)\n"
+            for t in baseline_tasks(workspace, package_name=pkg_name):
+                baseline_doc += f"- {t.task_id}: {t.title}\n"
             self.write_state_file(tests_path, baseline_doc + "\n(no LLM tests generated)\n")
 
+        self._update_idea_status("field_testing")
         run = run_all_field_tests(
             workspace,
             self._project_dir / tests_path,
             include_baseline=True,
+            package_name=pkg_name,
         )
         results_md = format_results_markdown(run)
         self.write_state_file(results_path, results_md)
@@ -173,6 +201,9 @@ class FieldTestPlannerAgent(AgentProcess):
             max_loops = int(__import__("os").environ.get("MAX_FIELD_TEST_LOOPS", "3"))
             if loops >= max_loops:
                 self._update_idea_status("ship_insufficient")
+                from pipeline.ship_recovery import try_advance_ship_queue
+
+                try_advance_ship_queue(self.bus)
                 return AgentOutput(
                     success=False,
                     answer=result.answer,

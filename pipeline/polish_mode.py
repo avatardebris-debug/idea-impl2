@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipeline.corpus_polish import tag_polish_corpus_refresh
+from pipeline.dep_policy import is_polishable
 from pipeline.message_bus import Message
 from pipeline.paths import projects_dir as pipeline_projects_dir
 from pipeline.pipeline_config import PROJECT_ROOT, get_pipeline_dir
@@ -84,7 +85,7 @@ def requeue_polish_in_progress(
             continue
 
         status = state.get("status", "")
-        if status in ("complete", "budget_exceeded", "", "dep_waiting"):
+        if is_polishable(status) or status in ("", "dep_waiting"):
             continue
         if not _PHASE_STATUS.match(status):
             print(f"  [polish] SKIP '{raw_title}' — status is '{status}' (not a polish phase state)")
@@ -141,7 +142,7 @@ def run_polish_mode(
         current_phase = state.get("phase", 1)
         total_phases = state.get("total_phases", 1)
 
-        if current_status not in ("complete", "budget_exceeded"):
+        if not is_polishable(current_status):
             if _PHASE_STATUS.match(current_status):
                 from pipeline.project_ops import _rebuild_single_project
 
@@ -160,11 +161,16 @@ def run_polish_mode(
             else:
                 print(
                     f"  [polish] SKIP '{raw_title}' — status is '{current_status}' "
-                    "(not complete/budget_exceeded or phase_N_*)"
+                    "(not polishable terminal or phase_N_*)"
                 )
             continue
 
-        next_phase = int(current_phase) + 1 if current_status == "complete" else int(current_phase)
+        # complete/mvp_complete: next phase after last finished; budget_exceeded: resume same
+        next_phase = (
+            int(current_phase) + 1
+            if current_status != "budget_exceeded"
+            else int(current_phase)
+        )
         if next_phase > int(total_phases):
             print(
                 f"  [polish] SKIP '{raw_title}' — already at max phase "
@@ -261,7 +267,7 @@ def write_polish_queue_template(path: Path) -> None:
                 phase = s.get("phase", 1)
                 total = s.get("total_phases", 1)
                 title = s.get("title", proj_dir.name)
-                if status in ("complete", "budget_exceeded") and int(phase) < int(total):
+                if is_polishable(status) and int(phase) < int(total):
                     lines.append(
                         f"- [ ] **[{proj_dir.name}]** — "
                         f"p{phase}/{total} {status}. Continue phases {int(phase)+1}-{total}. "
@@ -270,6 +276,44 @@ def write_polish_queue_template(path: Path) -> None:
             except Exception:
                 continue
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def append_polish_queue_entry(
+    slug: str,
+    title: str,
+    phase: int,
+    total_phases: int,
+    *,
+    status_label: str = "mvp_complete",
+    polish_path: Path | None = None,
+) -> None:
+    """Append an unchecked polish_queue line if not already present for *slug*."""
+    path = polish_path or (PROJECT_ROOT / "polish_queue.md")
+    line = (
+        f"- [ ] **[{slug}]** — p{phase}/{total_phases} {status_label}. "
+        f"Continue phases {phase + 1}-{total_phases}. Original title: {title[:50]}"
+    )
+    try:
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
+        for raw in existing.splitlines():
+            if slug in raw and raw.strip().startswith("- [ ]"):
+                return
+        if not existing.strip():
+            header = (
+                "# Polish Queue\n\n"
+                "Projects marked complete but with missing phases.\n"
+                "The --polish flag resumes them from their last completed phase.\n\n"
+            )
+            path.write_text(header + line + "\n", encoding="utf-8")
+        else:
+            with path.open("a", encoding="utf-8") as f:
+                if not existing.endswith("\n"):
+                    f.write("\n")
+                f.write(line + "\n")
+        print(f"  [polish] Appended '{slug}' to {path.name}")
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).debug("polish queue append skipped: %s", exc)
 
 
 def resolve_polish_path(

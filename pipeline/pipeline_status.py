@@ -98,12 +98,15 @@ def _get_active_idea_state(
             try:
                 state = _read_json_file(preferred_path)
                 state.setdefault("_slug", preferred_slug)
-                if state.get("status", "") not in ("complete", "budget_exceeded", "dep_waiting"):
+                from pipeline.dep_policy import is_runner_inactive
+
+                if not is_runner_inactive(state.get("status", "")):
                     return state
             except Exception:
                 pass
 
-    INACTIVE = {"complete", "budget_exceeded", "dep_waiting"}
+    from pipeline.dep_policy import is_runner_inactive
+
     projects_dir = pipeline_dir / "projects"
     candidates: list[pathlib.Path] = []
 
@@ -115,7 +118,7 @@ def _get_active_idea_state(
         def sort_key(p: pathlib.Path):
             try:
                 state = _read_json_file(p)
-                is_terminal = state.get("status", "") in INACTIVE
+                is_terminal = is_runner_inactive(state.get("status", ""))
                 return (1 if is_terminal else 0, -p.stat().st_mtime)
             except Exception:
                 return (2, 0.0)
@@ -147,7 +150,8 @@ def _get_all_active_idea_states(pipeline_dir: pathlib.Path) -> list[dict]:
     project, this returns ALL in-progress projects for multi-project status display
     and checkpoint-on-interrupt.
     """
-    INACTIVE = {"complete", "budget_exceeded", "dep_waiting", ""}
+    from pipeline.dep_policy import is_runner_inactive
+
     projects_dir = pipeline_dir / "projects"
     results: list[tuple[float, dict]] = []
 
@@ -157,7 +161,7 @@ def _get_all_active_idea_states(pipeline_dir: pathlib.Path) -> list[dict]:
     for p in projects_dir.glob("*/state/current_idea.json"):
         try:
             state = _read_json_file(p)
-            if state.get("status", "") not in INACTIVE:
+            if not is_runner_inactive(state.get("status", "")):
                 state.setdefault("_slug", p.parent.parent.name)
                 results.append((p.stat().st_mtime, state))
         except Exception:
@@ -180,3 +184,76 @@ def load_pipeline_status() -> dict:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return {}
+
+
+def print_dashboard(*, activity_tail: int = 12) -> None:
+    """Print a compact ops summary (active projects, status file, recent activity)."""
+    pipeline_dir = get_pipeline_dir()
+    print(f"Pipeline dir: {pipeline_dir}")
+    status = load_pipeline_status()
+    if status:
+        print(f"Runner status: {json.dumps({k: status.get(k) for k in list(status)[:12]}, default=str)}")
+    else:
+        print("Runner status: (none)")
+
+    active = _get_all_active_idea_states(pipeline_dir)
+    print(f"\nActive projects: {len(active)}")
+    for st in active[:20]:
+        slug = st.get("_slug") or st.get("slug") or "?"
+        print(
+            f"  - {slug}: {st.get('status', '?')} "
+            f"phase={st.get('phase', '?')}/{st.get('total_phases', '?')}"
+        )
+    if not active:
+        # Show a few terminals for context
+        projects = pipeline_dir / "projects"
+        if projects.exists():
+            n = 0
+            for p in sorted(projects.glob("*/state/current_idea.json"))[:8]:
+                try:
+                    st = _read_json_file(p)
+                    print(
+                        f"  · {p.parent.parent.name}: {st.get('status', '?')} "
+                        f"p{st.get('phase', '?')}/{st.get('total_phases', '?')}"
+                    )
+                    n += 1
+                except Exception:
+                    pass
+            if n == 0:
+                print("  (no projects)")
+
+    try:
+        from pipeline.paths import activity_jsonl
+
+        act = activity_jsonl()
+        if act.exists():
+            lines = act.read_text(encoding="utf-8", errors="replace").splitlines()
+            tail = lines[-activity_tail:] if lines else []
+            print(f"\nRecent activity ({len(tail)} of {len(lines)}):")
+            for line in tail:
+                try:
+                    row = json.loads(line)
+                    print(f"  {row.get('ts', '')[:19]}  {row.get('event', '?')}  "
+                          f"{row.get('slug') or row.get('title') or ''}")
+                except Exception:
+                    print(f"  {line[:120]}")
+        else:
+            print("\nActivity log: (none yet)")
+    except Exception as exc:
+        print(f"\nActivity log: error {exc}")
+
+    try:
+        from pipeline import bug_memory
+        if hasattr(bug_memory, "print_stats"):
+            print("\nBug memory:")
+            bug_memory.print_stats()
+    except Exception:
+        pass
+
+
+def main() -> None:
+    print_dashboard()
+
+
+if __name__ == "__main__":
+    main()

@@ -601,13 +601,15 @@ class GrokAdapter(LLMBase):
         self.model = model
         self.temperature = temperature
 
-    def chat(self, messages, tools=None) -> Message:
+    def chat(self, messages, tools=None, *, request_timeout: int | None = None) -> Message:
         import json
         kwargs: dict[str, Any] = dict(
             model=self.model,
             messages=messages,
             temperature=self.temperature,
         )
+        if request_timeout is not None:
+            kwargs["timeout"] = float(request_timeout)
         if tools:
             kwargs["tools"] = [
                 {"type": "function", "function": t} for t in tools

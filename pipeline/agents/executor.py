@@ -70,6 +70,31 @@ class ExecutorAgent(AgentProcess):
             except Exception:
                 pass
 
+        # 4. Suggested capability reuse + first-pass bug memory
+        try:
+            import json as _json
+            rf = pathlib.Path(self._project_path("state/suggested_reuse.json"))
+            if rf.exists():
+                data = _json.loads(rf.read_text(encoding="utf-8"))
+                summary = (data.get("summary") or "").strip()
+                if summary:
+                    parts.append(f"## Suggested capability reuse\n{summary}")
+        except Exception:
+            pass
+        try:
+            from pipeline.bug_memory import format_for_prompt
+            phase = 1
+            try:
+                phase = int((getattr(msg, "payload", None) or {}).get("phase", 1))
+            except Exception:
+                phase = 1
+            query = self.read_state_file(f"phases/phase_{phase}/tasks.md") or ""
+            mem = format_for_prompt(query[:2000] if query else "implement code", top_n=3)
+            if mem:
+                parts.append(mem)
+        except Exception:
+            pass
+
         return "\n\n".join(parts)
 
     def _save_interrupt_checkpoint(self) -> None:
@@ -201,7 +226,15 @@ class ExecutorAgent(AgentProcess):
         workspace = self.get_workspace_path()
         tasks_full_path = pathlib.Path(self._project_path(tasks_path))
 
-        self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
+        # Ship-prove paths must not bleed into main-pipeline phase_X_executing —
+        # that confuses health checks, lifetime-retry, and the status line.
+        if thermo_refactor:
+            self._update_idea_status("thermo_refactoring", phase_num=phase_num)
+        elif ship_fix:
+            # Leave field_test_failed (or current ship status); do not rewrite.
+            pass
+        else:
+            self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
         # Snapshot workspace BEFORE so we only report newly created files
         before_files = (
@@ -274,11 +307,20 @@ class ExecutorAgent(AgentProcess):
                 thermo_review = ""
                 tr_path = msg.payload.get("thermo_review_path", "phases/ship/thermo_review.md")
                 thermo_review = self.read_state_file(tr_path)
+                if not bug_memory_block:
+                    try:
+                        from pipeline.bug_memory import format_for_fix_loop
+                        bug_memory_block = format_for_fix_loop(
+                            thermo_review, "", "thermo_refactor", top_n=5,
+                        )
+                    except Exception:
+                        pass
                 task_prompt = (
                     f"You are applying thermo-nuclear refactor fixes (ship-prove).\n\n"
                     f"## Workspace\n{workspace}\n\n"
                     + pending_section
                     + f"## Thermo review\n{thermo_review[:8000]}\n\n"
+                    + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
                     + "## Instructions\n"
                     "1. Address ONLY blocking issues and refactor plan items.\n"
                     "2. Preserve behavior — split oversized files, fix imports.\n"
@@ -554,7 +596,8 @@ class ExecutorAgent(AgentProcess):
         # tasks_done=0 from the start-of-execution snapshot.  Update it now so
         # the runner's next status tick shows the real count (e.g. 6/6 not 0/6)
         # and the stall-kill guard sees fresh data.
-        self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
+        if not ship_fix and not thermo_refactor:
+            self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
         # Route: ship track vs normal phase loop
         retry_count = msg.payload.get("retry_count", 0)

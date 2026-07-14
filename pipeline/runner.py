@@ -146,6 +146,7 @@ def run_pipeline(
     polish_queue_file: str | None = None,
     ship_prove: bool = False,
     ship_slug: str = "",
+    ship_serial: bool = False,
     ship_skip_thermo: bool = False,
     parallel_seeds: int = 1,
     auto_tune: bool = False,
@@ -167,7 +168,7 @@ def run_pipeline(
     set_legacy_mode(legacy)
     global PROJECT_ROOT, _run_ctx, PIPELINE_DIR
 
-    PIPELINE_DIR = ensure_pipeline_ready(hermes=True)
+    PIPELINE_DIR = ensure_pipeline_ready(hermes=not ship_prove)
 
     from pipeline.message_bus import MessageBus
 
@@ -227,6 +228,11 @@ def run_pipeline(
         if ship_skip_thermo:
             os.environ["SHIP_SKIP_THERMO"] = "1"
             print(f"  Thermo:   skipped (--ship-skip-thermo)")
+        # Strict quality profile for ship (setdefault: operator can pre-set 0 to soft)
+        if os.environ.setdefault("PIPELINE_REQUIRE_TESTS", "1") == "1":
+            print("  Quality:  PIPELINE_REQUIRE_TESTS=1 (ship strict)")
+        if os.environ.setdefault("PIPELINE_STRUCTURAL_GATE", "1") == "1":
+            print("  Quality:  PIPELINE_STRUCTURAL_GATE=1 (ship strict)")
     if legacy:
         print(f"  Mode:     LEGACY - capability registry disabled (reusable_tools.md only)")
     else:
@@ -261,6 +267,7 @@ def run_pipeline(
         polish=polish,
         ship_prove=ship_prove,
         ship_slug=ship_slug,
+        ship_serial=ship_serial,
         fresh_list_only=fresh_list_only,
         parallel_seeds=parallel_seeds,
         save_pipeline_status=save_pipeline_status,
@@ -408,24 +415,10 @@ def run_pipeline(
         # Count how many distinct non-terminal projects are currently active.
         # When active_count < parallel_seeds, we can seed another project.
         def _count_active_projects() -> int:
-            """Count projects that are in-flight (not complete/budget_exceeded)."""
-            pd = _output_dir / "projects"
-            if not pd.exists():
-                return 0
-            active = 0
-            for p in pd.iterdir():
-                if not p.is_dir():
-                    continue
-                sf = p / "state" / "current_idea.json"
-                if not sf.exists():
-                    continue
-                try:
-                    s = json.loads(sf.read_text(encoding="utf-8"))
-                    if s.get("status", "") not in ("complete", "budget_exceeded", "evicted", ""):
-                        active += 1
-                except Exception:
-                    pass
-            return active
+            """Count in-flight projects (uses dep_policy terminal set)."""
+            from pipeline.project_state import count_active_pipeline_projects
+
+            return count_active_pipeline_projects(_output_dir / "projects")
 
         # --- Strategy 7: Environment pooling — pre-warm context caches ---
         # Mirrors PufferLib's environment pool: spin up N environments before
@@ -490,6 +483,7 @@ def run_pipeline(
             focus_slug=focus_slug,
             ship_prove=ship_prove,
             ship_slug=ship_slug,
+            ship_serial=ship_serial,
         ))
 
     finally:
@@ -601,6 +595,10 @@ def main():
                         help="Separate loop: LLM field-test projects with status=complete.")
     parser.add_argument("--ship-slug", default="", metavar="SLUG",
                         help="With --ship-prove, only projects whose slug contains this string.")
+    parser.add_argument("--ship-serial", action="store_true",
+                        help="With --ship-prove (no --ship-slug), process one project at a "
+                             "time (fresh complete OR one in-flight resume); auto-advance "
+                             "when each reaches field_proven or ship_insufficient.")
     parser.add_argument("--ship-skip-thermo", action="store_true",
                         help="With --ship-prove, skip thermo_reviewer and go straight to ship_evaluator.")
     parser.add_argument("--parallel-seeds", type=int, default=1, metavar="N",
@@ -647,9 +645,40 @@ def main():
         help="List decomposed goals and runnable branch counts, then exit.",
     )
 
+    parser.add_argument(
+        "--list-ship-eligible",
+        action="store_true",
+        help="List projects and ship-prove eligibility (status=complete), then exit.",
+    )
+
     args = parser.parse_args()
 
     from pipeline.output_bootstrap import ensure_pipeline_ready
+
+    if args.list_ship_eligible:
+        ensure_pipeline_ready(hermes=False)
+        from pipeline.ship_mode import list_ship_eligible_projects
+
+        rows = list_ship_eligible_projects(slug_filter=args.ship_slug)
+        if not rows:
+            print("  (no projects found)")
+            return
+        yes_count = sum(1 for r in rows if r["eligible"] == "yes")
+        print(f"  Ship-prove eligible (status=complete): {yes_count} of {len(rows)} project(s)\n")
+        for row in rows:
+            flag = row["eligible"]
+            if flag == "yes":
+                label = "ELIGIBLE"
+            elif flag == "done":
+                label = "done"
+            elif flag == "in_flight":
+                label = "in-flight"
+            elif flag == "skip_maturity":
+                label = "skip (M2+)"
+            else:
+                label = "not complete"
+            print(f"  [{label:12}] {row['slug']:40} status={row['status']}")
+        return
 
     if args.list_goals:
         ensure_pipeline_ready(hermes=False)
@@ -696,6 +725,7 @@ def main():
         polish_queue_file=args.polish_queue,
         ship_prove=args.ship_prove,
         ship_slug=args.ship_slug,
+        ship_serial=args.ship_serial,
         ship_skip_thermo=args.ship_skip_thermo,
         parallel_seeds=args.parallel_seeds,
         auto_tune=args.auto_tune,

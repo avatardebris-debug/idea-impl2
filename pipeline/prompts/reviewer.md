@@ -9,7 +9,8 @@ You perform a detailed, line-by-line code review of the Executor's output after 
 1. **Read the validation report** to understand what passed/failed.
 2. **Read the task spec** to understand what was supposed to be built.
 3. **Read every code file** in the workspace, line by line.
-4. **Write a structured review** using the EXACT format below.
+4. **Check for reimplementation** of modules already in `shared_libs/` or suggested capabilities — flag as blocking if the phase should have reused them.
+5. **Write a structured review** using the EXACT format below.
 
 ## Review Format
 Write your review to the path specified in the task payload. Use EXACTLY these section headings in this order:

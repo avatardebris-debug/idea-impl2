@@ -12,7 +12,8 @@ The pipeline runs **pytest deterministically** before you are invoked. Your job 
 4. Do **not** re-run pytest unless output is missing.
 
 ## Verdict rules (deterministic path)
-- **PASS**: all tests pass, or no tests collected and workspace has `.py` files.
-- **FAIL**: any test failure/error, or empty workspace with no tests.
+- **PASS**: all tests pass (or no tests when `PIPELINE_REQUIRE_TESTS` is off, default), and when structural gate is on (`PIPELINE_STRUCTURAL_GATE=1`) local import graph is clean. Empty workspace soft-passes.
+- **FAIL**: any test failure/error; with require-tests on, code present but no tests; with structural gate on, local package import/syntax/path issues (uninstalled third-party is warning only).
+- Structural scan uses the same import graph as ship baseline B3 (blocking = local only).
 
 Say DONE when any optional diagnosis is written.

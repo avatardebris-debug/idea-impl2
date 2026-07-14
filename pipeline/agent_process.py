@@ -38,20 +38,8 @@ from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Strategy 1: Pipeline role ordering — used by async double-buffering
-# Maps each agent to the role most likely to receive its output next.
-# Preloading context for that role while current LLM generates = zero wait.
-# ---------------------------------------------------------------------------
-_NEXT_ROLE_MAP: dict[str, str] = {
-    "idea_planner":  "phase_planner",
-    "phase_planner": "executor",
-    "executor":      "reviewer",
-    "reviewer":      "validator",
-    "validator":     "executor",   # retries go back to executor
-    "manager":       "phase_planner",
-    "documenter":    "manager",
-}
+# Strategy 1: next-role map (extracted — keeps this module smaller)
+from pipeline.agent_role_map import NEXT_ROLE_MAP as _NEXT_ROLE_MAP
 
 # Single source of truth for the default model.
 # The runner sets PIPELINE_MODEL env var before spawning agents so all
@@ -187,7 +175,7 @@ class AgentProcess:
                             time.sleep(2.0)
                             continue
                     except Exception:
-                        pass
+                        logger.debug("[%s] evicted-status check failed", self.role, exc_info=True)
 
                 # Measure queue wait time (time from message creation to now)
                 try:
@@ -195,6 +183,7 @@ class AgentProcess:
                     _created = datetime.fromisoformat(msg.created_at)
                     _queue_wait_s = (datetime.now(timezone.utc) - _created).total_seconds()
                 except Exception:
+                    logger.debug("[%s] queue wait parse failed", self.role, exc_info=True)
                     _queue_wait_s = 0.0
                 _handle_start = time.time()
 
@@ -213,24 +202,36 @@ class AgentProcess:
                 t.join(timeout=self.phase_timeout)
 
                 if t.is_alive():
-                    # Agent timed out — escalate to manager
+                    # Agent timed out — escalate to manager (main pipeline) or ship recovery
                     timeout_min = self.phase_timeout // 60
                     logger.warning(
                         "[%s] Timed out after %d min on message %s",
                         self.role, timeout_min, msg.msg_id
                     )
-                    timeout_msg = Message.create(
-                        from_agent=self.role,
-                        to_agent="manager",
-                        type="signal",
-                        payload={
-                            "signal": "PHASE_STUCK",
-                            "reason": f"{self.role} timed out after {timeout_min} minutes",
-                            "phase": msg.payload.get("phase", "?"),
-                            "idea_slug": self._current_slug,
-                        },
-                    )
-                    self.bus.send(timeout_msg)
+                    from pipeline.pipeline_config import SHIP_AGENT_ROLES
+
+                    if self.role in SHIP_AGENT_ROLES:
+                        from pipeline.ship_recovery import handle_ship_agent_failure
+
+                        handle_ship_agent_failure(
+                            self.bus,
+                            self._current_slug,
+                            self.role,
+                            f"timed out after {timeout_min} minutes",
+                        )
+                    else:
+                        timeout_msg = Message.create(
+                            from_agent=self.role,
+                            to_agent="manager",
+                            type="signal",
+                            payload={
+                                "signal": "PHASE_STUCK",
+                                "reason": f"{self.role} timed out after {timeout_min} minutes",
+                                "phase": msg.payload.get("phase", "?"),
+                                "idea_slug": self._current_slug,
+                            },
+                        )
+                        self.bus.send(timeout_msg)
                     self.bus.fail(msg)   # Don't retry a timed-out message
                     continue
 
@@ -265,6 +266,16 @@ class AgentProcess:
                 logger.info("[%s] Completed message %s (success=%s, tokens=%d, steps=%d)",
                             self.role, msg.msg_id, output.success,
                             output.tokens_used, output.steps_used)
+
+                try:
+                    from pipeline.pipeline_config import SHIP_AGENT_ROLES
+
+                    if self.role in SHIP_AGENT_ROLES and output.success:
+                        from pipeline.ship_recovery import reset_ship_failure_counters
+
+                        reset_ship_failure_counters(self._project_dir)
+                except Exception:
+                    pass
 
                 try:
                     from pipeline.step_collector import collect_agent_step
@@ -305,23 +316,41 @@ class AgentProcess:
                     logger.critical("[%s] Message %s exceeded maximum retries (%d). Marking as failed and escalating.",
                                     self.role, msg.msg_id, retries)
                     self.bus.fail(msg)
-                    
-                    # Escalate to manager with PHASE_STUCK signal
-                    stuck_msg = Message.create(
-                        from_agent=self.role,
-                        to_agent="manager",
-                        type="signal",
-                        payload={
-                            "signal": "PHASE_STUCK",
-                            "reason": f"{self.role} repeatedly crashed ({retries}+ times) processing message {msg.msg_id}: {e}",
-                            "phase": msg.payload.get("phase", "?"),
-                            "idea_slug": self._current_slug,
-                        },
-                    )
-                    try:
-                        self.bus.send(stuck_msg)
-                    except Exception as send_err:
-                        logger.error("[%s] Failed to send STUCK escalation to manager: %s", self.role, send_err)
+
+                    from pipeline.pipeline_config import SHIP_AGENT_ROLES
+
+                    if self.role in SHIP_AGENT_ROLES:
+                        from pipeline.ship_recovery import handle_ship_agent_failure
+
+                        handle_ship_agent_failure(
+                            self.bus,
+                            self._current_slug,
+                            self.role,
+                            str(e),
+                        )
+                    else:
+                        stuck_msg = Message.create(
+                            from_agent=self.role,
+                            to_agent="manager",
+                            type="signal",
+                            payload={
+                                "signal": "PHASE_STUCK",
+                                "reason": (
+                                    f"{self.role} repeatedly crashed ({retries}+ times) "
+                                    f"processing message {msg.msg_id}: {e}"
+                                ),
+                                "phase": msg.payload.get("phase", "?"),
+                                "idea_slug": self._current_slug,
+                            },
+                        )
+                        try:
+                            self.bus.send(stuck_msg)
+                        except Exception as send_err:
+                            logger.error(
+                                "[%s] Failed to send STUCK escalation to manager: %s",
+                                self.role,
+                                send_err,
+                            )
                 else:
                     self.bus.nack(msg)
                 time.sleep(5)  # back off on failure
@@ -373,22 +402,24 @@ class AgentProcess:
         Also reads task checkbox counts from the phase tasks.md so the status
         line can show '3/8 tasks' alongside the phase name.
 
-        IMPORTANT: Never overwrites 'complete' or 'stalled' — those are terminal
-        states set by the runner/manager.  In-flight agents may finish after a
+        IMPORTANT: Never overwrites terminal states — those are set by the
+        runner/manager/ship-evaluator. In-flight agents may finish after a
         force-complete; their status writes must be silently ignored.
         """
         try:
             existing = self.read_json_state("state/current_idea.json")
 
             # Guard: terminal states are sacred — never overwrite them
-            if existing.get("status") in ("complete", "stalled", "budget_exceeded"):
+            old_status = existing.get("status", "")
+            from pipeline.dep_policy import is_agent_sacred
+
+            if is_agent_sacred(old_status):
                 return
 
             existing["status"] = status
 
             # Invalidate rolling context when phase boundary is crossed
             # (new phase = fresh workspace state; prior exchanges no longer relevant)
-            old_status = existing.get("status", "")
             if (
                 old_status != status
                 and "_planning" in status

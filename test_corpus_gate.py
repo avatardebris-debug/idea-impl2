@@ -48,7 +48,7 @@ def test_gate_passes_minimal_project(tmp_path: Path, monkeypatch) -> None:
 
     proj = tmp_path / "ok_proj"
     (proj / "workspace").mkdir(parents=True)
-    (proj / "workspace" / "main.py").write_text("def hello():\n    return 1\n", encoding="utf-8")
+    (proj / "workspace" / "app.py").write_text("def hello():\n    return 1\n", encoding="utf-8")
     (proj / "phases" / "phase_1").mkdir(parents=True)
     (proj / "phases" / "phase_1" / "tasks.md").write_text("- [ ] task\n", encoding="utf-8")
     (proj / "phases" / "phase_1" / "validation_report.md").write_text(

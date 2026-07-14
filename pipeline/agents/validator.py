@@ -401,19 +401,64 @@ def run_pytest(workspace: pathlib.Path, timeout_per_test: int = 120) -> dict:
     }
 
 
+def _structural_gate_enabled() -> bool:
+    # Soft default: off until pipelines opt in (legacy workspaces lack tests/import hygiene)
+    from pipeline.env_flags import env_bool
+    return env_bool("PIPELINE_STRUCTURAL_GATE", default=False)
+
+
+def _require_tests_enabled() -> bool:
+    # Soft default: off — set PIPELINE_REQUIRE_TESTS=1 for strict quality runs
+    from pipeline.env_flags import env_bool
+    return env_bool("PIPELINE_REQUIRE_TESTS", default=False)
+
+
+def _run_structural_scan(workspace: pathlib.Path) -> tuple[bool, str]:
+    """Return (ok, report_section).
+
+    When the gate is enabled, only **local** graph issues (and scan crashes) fail.
+    Uninstalled third-party imports are non-blocking warnings.
+    """
+    if not _structural_gate_enabled() or not workspace.exists():
+        return True, ""
+    try:
+        from pipeline.import_graph import scan_workspace
+
+        graph = scan_workspace(workspace)
+        block = graph.format_block() if hasattr(graph, "format_block") else ""
+        if not graph.has_blocking_issues:
+            if graph.warnings:
+                warn = "\n".join(f"- {w}" for w in graph.warnings[:15])
+                return True, f"\n## Structural / import issues\n- None blocking\n### Warnings\n{warn}\n"
+            return True, "\n## Structural / import issues\n- None\n"
+        return False, f"\n## Structural / import issues\n{block}\n"
+    except Exception as exc:
+        logger.warning("[validator] structural scan error (fail closed when gate on): %s", exc)
+        return False, f"\n## Structural / import issues\n- FAIL (scan error): {exc}\n"
+
+
 def build_validation_report(
     phase_num: int,
     pytest_result: dict,
     tasks_content: str,
     workspace: pathlib.Path,
+    *,
+    structural_ok: bool = True,
+    structural_section: str = "",
 ) -> tuple[str, bool]:
     """Build validation_report.md content and return (report, is_pass)."""
     pr = pytest_result
     py_count = _count_py_files(workspace)
+    has_code = py_count > 0
+    require_tests = _require_tests_enabled()
 
     if pr["no_tests"]:
         test_line = "- Tests: no tests collected (0 run)"
-        tests_ok = True
+        if require_tests and has_code:
+            tests_ok = False
+            test_line += " — FAIL (PIPELINE_REQUIRE_TESTS: code present but no tests)"
+        else:
+            tests_ok = True
     else:
         test_line = (
             f"- Tests: {pr['passed']} passed, {pr['failed']} failed, "
@@ -422,12 +467,21 @@ def build_validation_report(
         tests_ok = pr["returncode"] == 0 and pr["failed"] == 0 and pr["errors"] == 0
 
     files_line = f"- Python files in workspace: {py_count}"
-    has_code = py_count > 0
+    structural_line = (
+        f"- Structural gate: {'PASS' if structural_ok else 'FAIL'}"
+        if _structural_gate_enabled()
+        else "- Structural gate: disabled"
+    )
 
-    if tests_ok and (has_code or pr["no_tests"]):
+    # Empty workspace (no code, no tests): soft PASS — scaffolding / docs phases.
+    # require_tests only applies when code is present.
+    if tests_ok and structural_ok and (has_code or pr["no_tests"]):
+        if not has_code and pr["no_tests"]:
+            files_line += " (empty workspace — soft pass)"
         verdict = "Verdict: PASS"
         is_pass = True
     elif pr["no_tests"] and not has_code:
+        # Unreachable when tests_ok True; keep FAIL path if structural failed
         verdict = "Verdict: FAIL"
         is_pass = False
         files_line += " (no .py files found)"
@@ -450,8 +504,10 @@ def build_validation_report(
         f"## Summary\n"
         f"{test_line}\n"
         f"{files_line}\n"
-        f"(Deterministic pytest — no LLM validator steps used.)\n"
+        f"{structural_line}\n"
+        f"(Deterministic pytest + structural gate — no LLM validator steps used.)\n"
         f"{tasks_block}"
+        f"{structural_section}"
         f"{details}\n"
         f"## {verdict}\n"
     )
@@ -542,17 +598,34 @@ class ValidatorAgent(AgentProcess):
                 "summary_line": "",
             }
 
+        ws_path = ws if ws.exists() else pathlib.Path(workspace_path)
+        structural_ok, structural_section = _run_structural_scan(ws_path)
         report_content, is_pass = build_validation_report(
-            phase_num, pytest_result, tasks_content, ws if ws.exists() else pathlib.Path(workspace_path),
+            phase_num,
+            pytest_result,
+            tasks_content,
+            ws_path,
+            structural_ok=structural_ok,
+            structural_section=structural_section,
         )
         report_full_path.parent.mkdir(parents=True, exist_ok=True)
         report_full_path.write_text(report_content, encoding="utf-8")
         logger.info(
-            "[validator] Deterministic verdict phase %d: %s (rc=%s)",
+            "[validator] Deterministic verdict phase %d: %s (rc=%s structural=%s)",
             phase_num,
             "PASS" if is_pass else "FAIL",
             pytest_result.get("returncode"),
+            "ok" if structural_ok else "fail",
         )
+        if not is_pass:
+            from pipeline.pipeline_activity import log_activity
+            log_activity(
+                "validator_fail",
+                phase=phase_num,
+                slug=idea_slug,
+                structural_ok=structural_ok,
+                no_tests=bool(pytest_result.get("no_tests")),
+            )
 
         # Optional legacy LLM path for extra diagnosis on failure
         if not is_pass and use_llm:

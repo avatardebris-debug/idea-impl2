@@ -13,7 +13,11 @@ import time
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
+from pipeline.dep_policy import (
+    dep_blocking_reason,
+    is_rebuild_skip,
+    parse_requires_from_description,
+)
 from pipeline.message_bus import Message, MessageBus
 from pipeline.paths import projects_dir
 from pipeline.pipeline_config import PROJECT_ROOT
@@ -148,6 +152,7 @@ def dispatch_phase_requeue(
 
     if status in (
         "field_test_planning",
+        "field_testing",
         "field_test_failed",
         "field_test_passed",
         "thermo_reviewing",
@@ -285,7 +290,7 @@ def _rebuild_single_project(bus: MessageBus, slug: str, state: dict, project_dir
     status = state.get("status", "")
     title = state.get("title", slug)
 
-    if status in ("", "complete", "budget_exceeded", "dep_waiting"):
+    if is_rebuild_skip(status):
         return False
 
     _now = datetime.now(timezone.utc).isoformat()
@@ -359,11 +364,13 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
                 still_blocked.append(dep_blocking_reason(dep_slug, None, context="rebuild"))
                 continue
             try:
-                dep_status = json.loads(dep_file.read_text(encoding="utf-8")).get("status")
+                dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
             except Exception:
                 still_blocked.append(f"{dep_slug} (unreadable)")
                 continue
-            reason = dep_blocking_reason(dep_slug, dep_status, context="rebuild")
+            reason = dep_blocking_reason(
+                dep_slug, dep_st.get("status"), context="rebuild", state=dep_st,
+            )
             if reason:
                 still_blocked.append(reason)
         if still_blocked:
@@ -407,7 +414,8 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
             state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
             status = pre_status
 
-        if status in ("", "complete", "budget_exceeded", "dep_waiting"):
+        # Skip terminals (incl. field_proven / ship_insufficient) — no session_started_at churn
+        if is_rebuild_skip(status):
             continue
 
         state["session_started_at"] = datetime.now(timezone.utc).isoformat()
@@ -443,7 +451,7 @@ def _rebuild_queues_from_state(bus: MessageBus, ideas_path: pathlib.Path | None 
                 try:
                     dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
                     reason = dep_blocking_reason(
-                        dep_slug, dep_st.get("status"), context="rebuild",
+                        dep_slug, dep_st.get("status"), context="rebuild", state=dep_st,
                     )
                     if reason:
                         dep_blocked.append(reason)

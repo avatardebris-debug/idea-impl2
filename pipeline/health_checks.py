@@ -60,20 +60,26 @@ def run_all_checks(
     project_root: pathlib.Path,
     pipeline_dir: pathlib.Path,
     active_slug: str = "",
+    *,
+    ship_prove: bool = False,
 ) -> list[HealthCheckResult]:
     """Run all deterministic health checks. Returns list of findings.
 
     Auto-fixes what it can, reports what it can't.
     Call this from the runner's health-check loop (every ~60s).
+
+    When ship_prove=True, skip stray-file rescue from the factory repo root —
+    that pattern copies idea impl's own test_*.py into the active workspace.
     """
     results: list[HealthCheckResult] = []
 
-    results.extend(check_stray_files(project_root, pipeline_dir, active_slug))
+    if not ship_prove:
+        results.extend(check_stray_files(project_root, pipeline_dir, active_slug))
     results.extend(prune_workspace_shadow_leaks(pipeline_dir, active_slug))
     results.extend(prune_phantom_tests(pipeline_dir, active_slug))
     results.extend(fix_datetime_utcnow(pipeline_dir, active_slug))
     results.extend(check_workspace_imports(pipeline_dir, active_slug))
-    results.extend(check_state_consistency(pipeline_dir, active_slug))
+    results.extend(check_state_consistency(pipeline_dir, active_slug, ship_prove=ship_prove))
     results.extend(check_workspace_file_paths(pipeline_dir, active_slug))
     results.extend(check_stale_reviews(pipeline_dir))
 
@@ -457,6 +463,8 @@ def check_workspace_imports(
 def check_state_consistency(
     pipeline_dir: pathlib.Path,
     active_slug: str,
+    *,
+    ship_prove: bool = False,
 ) -> list[HealthCheckResult]:
     """Check for inconsistencies between state files and actual state."""
     results: list[HealthCheckResult] = []
@@ -478,6 +486,18 @@ def check_state_consistency(
 
     status = state.get("status", "")
     phase = state.get("phase", 1)
+
+    # Ship-prove owns its own status track — never auto-reset to phase_X_*.
+    if ship_prove:
+        try:
+            from pipeline.ship_status import is_ship_status
+            if is_ship_status(status):
+                return results
+        except Exception:
+            pass
+        # Even if status briefly looks like phase_X_executing during ship work,
+        # do not rewrite it back onto the main pipeline track.
+        return results
 
     # Check A: status says "executing" but tasks.md doesn't exist
     if "executing" in status:

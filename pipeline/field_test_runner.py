@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.import_graph import scan_workspace
+from pipeline.workspace_layout import analyze_layout, ensure_package_layout, infer_package_name
 
 
 @dataclass
@@ -49,38 +50,63 @@ def find_entrypoint(workspace: Path) -> Path | None:
     return None
 
 
-def baseline_tasks(workspace: Path) -> list[FieldTestTask]:
+def baseline_tasks(workspace: Path, *, package_name: str = "") -> list[FieldTestTask]:
     tasks: list[FieldTestTask] = []
-    entry = find_entrypoint(workspace)
-    if entry:
-        rel = entry.name
+    pkg = package_name or infer_package_name(workspace)
+    ensure_package_layout(workspace, pkg)
+    layout = analyze_layout(workspace, pkg)
+
+    if layout["mode"] == "package":
+        mod = layout["package_name"]
         tasks.append(
             FieldTestTask(
                 task_id="B1",
-                title=f"Run entrypoint {rel}",
+                title=f"Run package entrypoint {mod}.main --help",
                 kind="baseline",
-                command=f"{sys.executable} {rel}",
+                command=f"{sys.executable} -m {mod}.main --help",
                 expect_exit=0,
             )
         )
         tasks.append(
             FieldTestTask(
                 task_id="B2",
-                title=f"Syntax-check {rel}",
+                title=f"Syntax-check {mod}/main.py",
                 kind="baseline",
-                command=f"{sys.executable} -m py_compile {rel}",
+                command=f"{sys.executable} -m py_compile {mod}/main.py",
                 expect_exit=0,
             )
         )
     else:
-        tasks.append(
-            FieldTestTask(
-                task_id="B1",
-                title="Workspace has at least one .py file",
-                kind="baseline",
-                notes="manual_check:py_exists",
+        entry = find_entrypoint(workspace)
+        if entry:
+            rel = entry.relative_to(workspace).as_posix()
+            tasks.append(
+                FieldTestTask(
+                    task_id="B1",
+                    title=f"Run entrypoint {rel}",
+                    kind="baseline",
+                    command=f"{sys.executable} {rel} --help",
+                    expect_exit=0,
+                )
             )
-        )
+            tasks.append(
+                FieldTestTask(
+                    task_id="B2",
+                    title=f"Syntax-check {rel}",
+                    kind="baseline",
+                    command=f"{sys.executable} -m py_compile {rel}",
+                    expect_exit=0,
+                )
+            )
+        else:
+            tasks.append(
+                FieldTestTask(
+                    task_id="B1",
+                    title="Workspace has at least one .py file",
+                    kind="baseline",
+                    notes="manual_check:py_exists",
+                )
+            )
 
     graph = scan_workspace(workspace)
     tasks.append(
@@ -89,7 +115,10 @@ def baseline_tasks(workspace: Path) -> list[FieldTestTask]:
             title="No stale local imports",
             kind="baseline",
             notes="stale_ref_check",
-            expect_substr="PASS" if not graph.has_issues else "FAIL",
+            expect_substr=(
+                "PASS" if not getattr(graph, "has_blocking_issues", graph.has_issues)
+                else "FAIL"
+            ),
         )
     )
     return tasks
@@ -104,6 +133,19 @@ _EXPECT_LINE = re.compile(
     r"^\s*-\s*Expect:\s*(.+)$", re.MULTILINE | re.IGNORECASE
 )
 _KIND_LINE = re.compile(r"^\s*-\s*Kind:\s*(\w+)", re.MULTILINE | re.IGNORECASE)
+_EXIT_EXPECT = re.compile(r"^exit\s+(\d+)\s*$", re.IGNORECASE)
+
+# Workspace harness scripts — not part of the shipped package.
+_HARNESS_ROOT_FILES = frozenset({"conftest.py", "quick_test.py", "sweep_test.py"})
+
+
+def _parse_expect_line(raw: str) -> tuple[int | None, str]:
+    """Parse Expect: line — supports exit N or output substring (quotes stripped)."""
+    text = raw.strip().strip("'\"")
+    exit_m = _EXIT_EXPECT.match(text)
+    if exit_m:
+        return int(exit_m.group(1)), ""
+    return None, text
 
 
 def parse_field_tests_md(content: str) -> list[FieldTestTask]:
@@ -120,7 +162,15 @@ def parse_field_tests_md(content: str) -> list[FieldTestTask]:
         cmd_m = _CMD_LINE.search(block)
         exp_m = _EXPECT_LINE.search(block)
         command = cmd_m.group(1).strip() if cmd_m else ""
-        expect_substr = exp_m.group(1).strip() if exp_m else ""
+        expect_exit: int | None = 0
+        expect_substr = ""
+        if exp_m:
+            parsed_exit, expect_substr = _parse_expect_line(exp_m.group(1))
+            if parsed_exit is not None:
+                expect_exit = parsed_exit
+            elif expect_substr:
+                # Output substring checks still require a successful command.
+                expect_exit = 0
         tasks.append(
             FieldTestTask(
                 task_id=task_id,
@@ -128,6 +178,7 @@ def parse_field_tests_md(content: str) -> list[FieldTestTask]:
                 kind=kind,
                 command=command,
                 expect_substr=expect_substr,
+                expect_exit=expect_exit,
             )
         )
     return tasks
@@ -151,7 +202,8 @@ def _run_shell(workspace: Path, command: str, timeout: int = 120) -> tuple[int, 
 def run_task(workspace: Path, task: FieldTestTask) -> dict[str, Any]:
     if task.notes == "stale_ref_check":
         graph = scan_workspace(workspace)
-        ok = not graph.has_issues
+        # Only local graph / syntax / path issues block ship B3
+        ok = not getattr(graph, "has_blocking_issues", graph.has_issues)
         return {
             "task_id": task.task_id,
             "title": task.title,
@@ -191,8 +243,15 @@ def run_task(workspace: Path, task: FieldTestTask) -> dict[str, Any]:
     passed = True
     if task.expect_exit is not None and rc != task.expect_exit:
         passed = False
-    if task.expect_substr and task.expect_substr.upper() not in output.upper():
-        passed = False
+    if task.expect_substr:
+        # Normalize JSON-ish output: match substring after collapsing whitespace.
+        needle = task.expect_substr
+        haystack = output
+        if needle not in haystack and needle.upper() not in haystack.upper():
+            collapsed_needle = " ".join(needle.split())
+            collapsed_hay = " ".join(haystack.split())
+            if collapsed_needle.upper() not in collapsed_hay.upper():
+                passed = False
 
     return {
         "task_id": task.task_id,
@@ -210,11 +269,16 @@ def run_all_field_tests(
     field_tests_md: Path,
     *,
     include_baseline: bool = True,
+    package_name: str = "",
 ) -> FieldTestRunResult:
     run = FieldTestRunResult()
+    pkg = package_name or infer_package_name(workspace)
+    changed, repair_msg = ensure_package_layout(workspace, pkg)
+    if changed:
+        print(f"  [field-test] Layout repair: {repair_msg}")
     tasks: list[FieldTestTask] = []
     if include_baseline:
-        tasks.extend(baseline_tasks(workspace))
+        tasks.extend(baseline_tasks(workspace, package_name=pkg))
     if field_tests_md.is_file():
         content = field_tests_md.read_text(encoding="utf-8", errors="replace")
         tasks.extend(parse_field_tests_md(content))

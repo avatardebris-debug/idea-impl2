@@ -34,6 +34,15 @@ SICA/
 # Factory resolves output via PIPELINE_DIR env or ../thepipeline when present.
 .pipeline/
 
+# --- Secrets / local env (never commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.json
+
 # --- Runtime / local-only (factory repo) ---
 .agent/
 experiments.tsv

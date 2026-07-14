@@ -22,6 +22,8 @@ def default_provenance() -> dict[str, Any]:
         "maturity_stage": "M1",
         "field_test_loops": 0,
         "debug_loops": 0,
+        "agent_failures": 0,
+        "stall_recoveries": 0,
         "thermo_reviewed": False,
         "goal_proven": False,
         "goal_id": "",

@@ -25,6 +25,13 @@ MATURITY_MULTIPLIER: dict[str, float] = {
 
 def train_tier_from_record(rec: dict[str, Any]) -> str:
     """Map a corpus record to train tier A–D from quality_label and verdicts."""
+    # Force-advanced / quality-risk / incomplete phases → exclude from training
+    if rec.get("force_advanced") or rec.get("quality_risk"):
+        return "D"
+    status = str(rec.get("final_status") or rec.get("status") or "").lower()
+    if status in ("mvp_complete", "budget_exceeded"):
+        return "D"
+
     test_v = str(rec.get("test_verdict", "PASS")).upper()
     review_v = str(rec.get("review_verdict", "PASS")).upper()
     if test_v != "PASS" or review_v != "PASS":
@@ -50,7 +57,8 @@ def enrich_record_weights(rec: dict[str, Any]) -> dict[str, Any]:
     tier = train_tier_from_record(rec)
     rec["train_tier"] = tier
     base = train_weight_for_record(rec, tier=tier)
-    maturity = str(rec.get("maturity_stage", "M1"))
+    # Use recorded maturity only — do not invent stages from final_status
+    maturity = str(rec.get("maturity_stage") or "M1")
     rec["train_weight"] = base * MATURITY_MULTIPLIER.get(maturity, 1.0)
     return rec
 

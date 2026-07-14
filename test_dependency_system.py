@@ -24,6 +24,16 @@ import traceback
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+# Script-style suite: when collected by pytest, skip module-level execution.
+# Run directly: python test_dependency_system.py
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Script-style suite — run: python test_dependency_system.py",
+        allow_module_level=True,
+    )
+
 
 # ---------------------------------------------------------------------------
 # Minimal stubs — no Ollama, no real message bus needed
@@ -297,8 +307,8 @@ for title, expected in cases:
     check(f"_slugify('{title}') == '{expected}'", got == expected,
           f"got: '{got}'")
 
-# ── Test 10: budget_exceeded dep counts as complete ───────────────────────────
-print("\nTest 10: budget_exceeded dep is treated as 'done enough' to unblock")
+# ── Test 10: budget_exceeded dep does NOT unblock (must fully complete) ───────
+print("\nTest 10: budget_exceeded dep does NOT unblock dependents")
 with tempfile.TemporaryDirectory() as tmp:
     tmp = pathlib.Path(tmp)
     pipeline_dir = tmp / ".pipeline"
@@ -307,7 +317,9 @@ with tempfile.TemporaryDirectory() as tmp:
     bus, result = run_seed(tmp, """
         - [ ] **[Dependent Tool]** — [needs suite. requires: suite_tool]
     """)
-    check("budget_exceeded dep unblocks dependent", result)
+    # Dep policy: budget_exceeded is NOT full complete — must not seed dependents
+    check("budget_exceeded dep does not return seeded", result != "seeded")
+    check("no idea_planner message for blocked dep", len(bus.sent) == 0)
 
 
 # ---------------------------------------------------------------------------

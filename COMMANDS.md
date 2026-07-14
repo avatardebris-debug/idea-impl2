@@ -5,6 +5,46 @@ across local Windows and cloud (Vast.ai / RunPod) instances.
 
 ---
 
+## Quality & ops flags
+
+**Legacy-compatible defaults:** `PIPELINE_REQUIRE_TESTS` and `PIPELINE_STRUCTURAL_GATE`
+default **off** so existing in-flight workspaces without tests still validate.
+Turn them **on** for strict quality / pre-release runs.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PIPELINE_POLISH_FIRST=1` | off | List mode drains `polish_queue.md` before seeding greenfield ideas |
+| `PIPELINE_STRUCTURAL_GATE=1` | **off** | Enable local import-graph gate in validator (third-party missing = warning only) |
+| `PIPELINE_REQUIRE_TESTS=1` | **off** | Fail validation when code exists but no tests collected |
+| `PIPELINE_INVOKE_BEFORE_SEED=1` | off | Skip seeding when a verified capability strongly matches the idea |
+| `CAPABILITY_REUSE_MIN_SCORE` | `4.0` | Score threshold for hard reuse skip |
+| `PIPELINE_FORCE_ADVANCE_QUALITY_RISK=0` | on (risk tag default) | Set `=0` to skip quality_risk on force-advance |
+| `CORPUS_GATE_POLICY=enforce` | `warn` | Block finetune corpus collect on gate failure |
+
+```bash
+# Ops dashboard (active projects + recent activity.jsonl)
+python -m pipeline.pipeline_status
+
+# Strict quality profile (new projects / pre-release)
+export PIPELINE_REQUIRE_TESTS=1
+export PIPELINE_STRUCTURAL_GATE=1
+# Ship-prove enables both automatically via setdefault (override with =0 before run)
+# Corpus harvest (--collect-all) defaults CORPUS_GATE_POLICY=enforce
+
+# Polish incomplete / mvp_complete projects first
+export PIPELINE_POLISH_FIRST=1
+python pipeline/runner.py --from-list --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+
+# Finetune harvest (prefer quality wins)
+export CORPUS_GATE_POLICY=enforce
+python -m pipeline.corpus_collector --collect-all
+```
+
+Statuses: `complete` = all planned phases done; `mvp_complete` = plan exhausted early
+(phase &lt; total_phases) — does **not** unlock `requires:` deps; use `--polish` or polish-first.
+
+---
+
 ## GPU & System Monitoring
 
 ```bash

@@ -13,6 +13,16 @@ import traceback
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+# Script-style suite: when collected by pytest, skip module-level execution.
+# Run directly: python test_priority_eviction_unit.py
+if __name__ != "__main__":
+    import pytest
+
+    pytest.skip(
+        "Script-style suite — run: python test_priority_eviction_unit.py",
+        allow_module_level=True,
+    )
+
 # ---------------------------------------------------------------------------
 # Setup Mocks & Stubs
 # ---------------------------------------------------------------------------

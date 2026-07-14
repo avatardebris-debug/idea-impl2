@@ -68,11 +68,26 @@ class IdeaPlannerAgent(AgentProcess):
                 f"Design your plan to integrate cleanly with these projects.\n\n"
             )
 
+        reuse_context = ""
+        try:
+            reuse_path = pathlib.Path(self._project_path("state/suggested_reuse.json"))
+            if reuse_path.exists():
+                data = json.loads(reuse_path.read_text(encoding="utf-8"))
+                summary = (data.get("summary") or "").strip()
+                if summary:
+                    reuse_context = (
+                        "## Suggested capability reuse (prefer invoke/import over rebuild)\n"
+                        f"{summary}\n\n"
+                    )
+        except Exception:
+            pass
+
         task_prompt = (
             f"You are the Idea Planner. Create a multi-phase implementation plan.\n\n"
             f"## Idea\n**{idea_title}**\n\n{idea_description}\n\n"
-            + dep_context +
-            f"## Instructions\n"
+            + dep_context
+            + reuse_context
+            + f"## Instructions\n"
             f"1. Analyze the idea and identify the core deliverable.\n"
             f"2. Break it into exactly 3 phases by default. Phase 1 must be the smallest\n"
             f"   useful thing (MVP). Only use 4-6 phases if the idea genuinely requires it\n"

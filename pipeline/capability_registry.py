@@ -105,15 +105,13 @@ def _guess_domains(title: str, description: str) -> list[str]:
 
 
 def _project_status(state: dict) -> tuple[str, int, int]:
+    from pipeline.dep_policy import is_full_complete
+
     phase = int(state.get("phase", 0))
     total = int(state.get("total_phases", 1))
     status = state.get("status", "")
-    if status == "complete" and phase >= total:
+    if is_full_complete({"status": status, "phase": phase, "total_phases": total}):
         return "verified", phase, total
-    if status in ("budget_exceeded", "dep_waiting"):
-        return "draft", phase, total
-    if status:
-        return "draft", phase, total
     return "draft", phase, total
 
 

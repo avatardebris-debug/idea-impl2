@@ -21,11 +21,47 @@ from pipeline.pipeline_config import (
     MAX_PROJECT_LIFETIME_RETRIES,
     PROJECT_ROOT,
 )
-from pipeline.dep_policy import dep_blocking_reason, parse_requires_from_description
+from pipeline.dep_policy import (
+    dep_blocking_reason,
+    is_eviction_skip,
+    is_runner_inactive,
+    parse_requires_from_description,
+)
 from pipeline.slug_util import slugify_title as _slugify
 
 if TYPE_CHECKING:
     pass
+
+
+def count_active_pipeline_projects(
+    projects_root: pathlib.Path | None = None,
+) -> int:
+    """Count in-flight projects (not terminal / not empty status / not evicted).
+
+    Used for ``--parallel-seeds`` capacity so zombies and mid-phase work fill
+    slots and new greenfield seeds do not unbounded-oversubscribe.
+    """
+    root = projects_root if projects_root is not None else projects_dir()
+    if not root.exists():
+        return 0
+    active = 0
+    for p in root.iterdir():
+        if not p.is_dir():
+            continue
+        sf = p / "state" / "current_idea.json"
+        if not sf.exists():
+            continue
+        try:
+            s = json.loads(sf.read_text(encoding="utf-8"))
+            status = s.get("status", "") or ""
+            if status == "evicted":
+                continue
+            if not is_runner_inactive(status):
+                active += 1
+        except Exception:
+            pass
+    return active
+
 
 def _write_state(project_dir: pathlib.Path, state: dict, new_status: str) -> None:
     """Update status in current_idea.json."""
@@ -104,7 +140,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
                 "state_file": sf,
                 "state": state
             }
-            if status in ("complete", "budget_exceeded", "dep_waiting", ""):
+            if is_eviction_skip(status):
                 continue
             elif status == "evicted":
                 evicted_projects.append(project_info)
@@ -158,7 +194,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
                     try:
                         dep_state = json.loads(dep_state_file.read_text(encoding="utf-8"))
                         reason = dep_blocking_reason(
-                            dep_slug, dep_state.get("status"), context="seeding",
+                            dep_slug, dep_state.get("status"), context="seeding", state=dep_state,
                         )
                         if reason:
                             blocking.append(reason)
@@ -188,7 +224,7 @@ def _check_priority_eviction(bus: MessageBus, parallel_seeds: int, ideas_path: p
             try:
                 dep_st = json.loads(dep_file.read_text(encoding="utf-8"))
                 reason = dep_blocking_reason(
-                    dep_slug, dep_st.get("status"), context="seeding",
+                    dep_slug, dep_st.get("status"), context="seeding", state=dep_st,
                 )
                 if reason:
                     blocking.append(reason)

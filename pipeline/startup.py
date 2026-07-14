@@ -48,6 +48,7 @@ def resolve_initial_work(
     polish: bool,
     ship_prove: bool = False,
     ship_slug: str = "",
+    ship_serial: bool = False,
     fresh_list_only: bool,
     parallel_seeds: int,
     save_pipeline_status,
@@ -116,14 +117,16 @@ def resolve_initial_work(
         from pipeline.pipeline_config import SHIP_AGENT_ROLES
         from pipeline.ship_mode import run_ship_prove_mode, ship_bus_has_work
 
-        n = run_ship_prove_mode(bus, slug_filter=ship_slug)
+        queue_limit = 1 if ship_serial and not ship_slug else 0
+        n = run_ship_prove_mode(bus, slug_filter=ship_slug, queue_limit=queue_limit)
         pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)
         if n == 0 and pending == 0 and not ship_bus_has_work(bus):
             print("  [ship-prove] No complete projects eligible for field testing.")
             return StartupResult(has_work=False, from_list=False, stop_early=True)
         has_work = True
         from_list = False
-        print(f"  [ship-prove] Queued {n} project(s); pending ship messages={pending}")
+        mode = "serial" if queue_limit == 1 else "batch"
+        print(f"  [ship-prove] Queued {n} project(s) ({mode}); pending ship messages={pending}")
 
     purged = _purge_dep_blocked_messages(bus)
     if purged:

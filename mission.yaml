@@ -11,6 +11,7 @@ values:
     - id: complete_only_deps
       rule: Only mark dependencies satisfied when prerequisite projects are complete.
     - id: invoke_before_rebuild
+      # Enforced when PIPELINE_INVOKE_BEFORE_SEED=1 (soft suggestions always via suggested_reuse.json).
       rule: When a verified capability matches a goal, attempt invoke_capability before seeding a new project.
     - id: no_unsandboxed_shell
       rule: Capability invoke must use whitelisted command prefixes only.

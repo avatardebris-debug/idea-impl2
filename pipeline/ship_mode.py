@@ -15,7 +15,12 @@ from pipeline.message_bus import Message
 from pipeline.paths import projects_dir
 from pipeline.pipeline_config import SHIP_AGENT_ROLES
 from pipeline.ship_provenance import load_provenance
-from pipeline.ship_status import TERMINAL_SHIP_STATUSES, is_ship_prove_eligible, is_ship_status
+from pipeline.ship_status import (
+    TERMINAL_SHIP_STATUSES,
+    is_ship_in_flight,
+    is_ship_prove_eligible,
+    is_ship_status,
+)
 
 if TYPE_CHECKING:
     from pipeline.message_bus import MessageBus
@@ -43,10 +48,18 @@ def resolve_slug_prefix(prefix: str) -> str:
     return prefix
 
 
+def ship_queues_empty(bus: "MessageBus") -> bool:
+    """True when no ship-agent role has pending messages."""
+    return all(bus.queue_depth(r) == 0 for r in SHIP_AGENT_ROLES)
+
+
 def ship_bus_has_work(bus: "MessageBus") -> bool:
-    """True if ship-prove agents have pending or in-flight tasks."""
-    pending = sum(bus.queue_depth(r) for r in SHIP_AGENT_ROLES)
-    if pending > 0:
+    """True if ship-prove agents have pending or in-flight tasks.
+
+    Ignores main-pipeline queues (phase_planner, reviewer, …) so stale
+    leftover messages cannot block ship-prove exit or stall recovery.
+    """
+    if not ship_queues_empty(bus):
         return True
     try:
         processing = bus.get_processing_messages()
@@ -54,6 +67,17 @@ def ship_bus_has_work(bus: "MessageBus") -> bool:
         return False
     ship_roles = set(SHIP_AGENT_ROLES)
     return any(getattr(m, "to_agent", "") in ship_roles for m in processing)
+
+
+def dedupe_ship_pending(bus: "MessageBus") -> int:
+    """Collapse duplicate pending ship tasks (by idea_slug) across ship roles."""
+    total = 0
+    for role in SHIP_AGENT_ROLES:
+        try:
+            total += bus.dedupe_pending_tasks(role, ("idea_slug",))
+        except Exception:
+            continue
+    return total
 
 
 def _stamp_ship_session(state: dict) -> None:
@@ -98,6 +122,82 @@ def restore_ship_budget_killed(*, slug_filter: str = "") -> int:
         )
         restored += 1
     return restored
+
+
+_SHIP_RUN_ARTIFACTS = (
+    "phases/ship/field_tests.md",
+    "phases/ship/field_test_results.md",
+    "phases/ship/debug_report.md",
+)
+
+
+def clear_ship_run_artifacts(project_dir: Path) -> list[str]:
+    """Remove prior field-test outputs so a fresh ship run regenerates them."""
+    removed: list[str] = []
+    for rel in _SHIP_RUN_ARTIFACTS:
+        path = project_dir / rel
+        if path.is_file():
+            path.unlink()
+            removed.append(rel)
+    return removed
+
+
+def read_project_status(slug: str) -> str:
+    state_file = projects_dir() / slug / "state" / "current_idea.json"
+    if not state_file.is_file():
+        return ""
+    try:
+        return json.loads(state_file.read_text(encoding="utf-8")).get("status", "")
+    except Exception:
+        return ""
+
+
+def ship_slugs_in_scope(slug_filter: str = "") -> list[str]:
+    root = projects_dir()
+    if not root.is_dir():
+        return []
+    if slug_filter:
+        resolved = resolve_slug_prefix(slug_filter) or slug_filter
+        return [resolved] if (root / resolved).is_dir() else []
+    return sorted(p.name for p in root.iterdir() if p.is_dir())
+
+
+def check_ship_prove_complete(
+    bus: "MessageBus",
+    *,
+    slug_filter: str = "",
+    queues_empty: bool,
+) -> tuple[bool, str]:
+    """
+    Return (True, message) when ship-prove has nothing left to do and may exit.
+
+    Exits when every in-scope project is terminal (field_proven / ship_insufficient)
+    or still complete (never started), ship queues are empty, and no ship
+    processing messages. Main-pipeline bus traffic is ignored.
+    """
+    # Prefer live ship-bus check; queues_empty is a hint from the caller.
+    if ship_bus_has_work(bus) or not queues_empty:
+        return False, ""
+
+    slugs = ship_slugs_in_scope(slug_filter)
+    if not slugs:
+        return True, "no matching projects"
+
+    in_flight: list[str] = []
+    terminal: list[str] = []
+    for slug in slugs:
+        status = read_project_status(slug)
+        if status in TERMINAL_SHIP_STATUSES:
+            terminal.append(f"{slug}→{status}")
+        elif is_ship_in_flight(status):
+            in_flight.append(f"{slug}→{status}")
+
+    if in_flight:
+        return False, ""
+
+    if terminal:
+        return True, ", ".join(terminal)
+    return True, "no in-flight ship projects"
 
 
 def queue_ship_prove_projects(
@@ -152,6 +252,13 @@ def queue_ship_prove_projects(
         _stamp_ship_session(state)
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
+        cleared = clear_ship_run_artifacts(project_dir)
+        if cleared:
+            print(
+                f"  [ship-prove] Cleared prior ship artifacts for '{slug}': "
+                f"{', '.join(cleared)}"
+            )
+
         bus.send(
             Message.create(
                 from_agent="runner",
@@ -184,7 +291,7 @@ def dispatch_ship_requeue(
     phase = state.get("phase", 1)
     base = {"idea_slug": slug, "phase": phase}
 
-    if status == "field_test_planning":
+    if status in ("field_test_planning", "field_testing"):
         bus.send(
             Message.create(
                 from_agent="runner",
@@ -264,8 +371,12 @@ def requeue_in_progress_ship_projects(
     *,
     slug_filter: str = "",
     skip_slugs: set[str] | None = None,
+    limit: int = 0,
 ) -> int:
-    """Resume ship-track projects that are mid-flight (not complete/terminal)."""
+    """Resume ship-track projects that are mid-flight (not complete/terminal).
+
+    When *limit* > 0, requeue at most that many projects (used by --ship-serial).
+    """
     root = projects_dir()
     if not root.is_dir():
         return 0
@@ -295,19 +406,81 @@ def requeue_in_progress_ship_projects(
         if dispatch_ship_requeue(bus, slug, title, state, project_dir, status):
             print(f"  [ship-prove] Re-queued '{title}' ({status})")
             requeued += 1
+            if limit and requeued >= limit:
+                break
     return requeued
+
+
+def list_ship_eligible_projects(*, slug_filter: str = "") -> list[dict[str, str]]:
+    """Projects that would be picked up by --ship-prove (status=complete)."""
+    root = projects_dir()
+    if not root.is_dir():
+        return []
+    rows: list[dict[str, str]] = []
+    for project_dir in sorted(root.iterdir()):
+        if not project_dir.is_dir():
+            continue
+        slug = project_dir.name
+        if slug_filter and slug_filter not in slug:
+            continue
+        state_file = project_dir / "state" / "current_idea.json"
+        if not state_file.is_file():
+            continue
+        try:
+            state = json.loads(state_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        status = state.get("status", "")
+        prov = load_provenance(project_dir)
+        if status in TERMINAL_SHIP_STATUSES:
+            rows.append({"slug": slug, "title": state.get("title", slug), "status": status, "eligible": "done"})
+        elif is_ship_prove_eligible(status):
+            if prov.get("maturity_stage") in ("M2", "M3", "M4"):
+                rows.append({"slug": slug, "title": state.get("title", slug), "status": status, "eligible": "skip_maturity"})
+            else:
+                rows.append({"slug": slug, "title": state.get("title", slug), "status": status, "eligible": "yes"})
+        elif is_ship_status(status):
+            rows.append({"slug": slug, "title": state.get("title", slug), "status": status, "eligible": "in_flight"})
+        else:
+            rows.append({"slug": slug, "title": state.get("title", slug), "status": status, "eligible": "no"})
+    return rows
 
 
 def run_ship_prove_mode(
     bus: "MessageBus",
     *,
     slug_filter: str = "",
+    queue_limit: int = 0,
 ) -> int:
-    """Entry for startup: queue complete projects and resume in-progress ship track."""
+    """Entry for startup: queue complete projects and resume in-progress ship track.
+
+    When *queue_limit* > 0 (--ship-serial), at most that many projects are
+    active: prefer a fresh ``complete`` pick; only resume in-flight if none
+    were freshly queued (and then only up to the remaining limit).
+    """
     restore_ship_budget_killed(slug_filter=slug_filter)
-    n, fresh = queue_ship_prove_projects(bus, slug_filter=slug_filter)
-    n += requeue_in_progress_ship_projects(bus, slug_filter=slug_filter, skip_slugs=fresh)
-    deduped = bus.dedupe_pending_tasks("field_test_planner", ("idea_slug",))
+    n, fresh = queue_ship_prove_projects(
+        bus, slug_filter=slug_filter, limit=queue_limit
+    )
+    if queue_limit:
+        remaining = max(0, queue_limit - n)
+        if remaining:
+            n += requeue_in_progress_ship_projects(
+                bus,
+                slug_filter=slug_filter,
+                skip_slugs=fresh,
+                limit=remaining,
+            )
+        else:
+            print(
+                "  [ship-prove] Serial mode: skipped mass in-flight requeue "
+                f"(already queued {n} project(s))",
+            )
+    else:
+        n += requeue_in_progress_ship_projects(
+            bus, slug_filter=slug_filter, skip_slugs=fresh
+        )
+    deduped = dedupe_ship_pending(bus)
     if deduped:
-        print(f"  [ship-prove] Deduped {deduped} duplicate field_test_planner task(s)")
+        print(f"  [ship-prove] Deduped {deduped} duplicate ship task(s)")
     return n

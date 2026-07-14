@@ -12,6 +12,7 @@ from pipeline.pipeline_config import SHIP_AGENT_ROLES
 from pipeline.project_state import _check_priority_eviction
 from pipeline.run_loop_budget import tick_budget_enforcement
 from pipeline.run_loop_health import (
+    check_ship_prove_complete,
     check_single_idea_complete,
     read_task_progress,
     read_workspace_activity,
@@ -110,6 +111,9 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
             ws_file_count=ws_file_count,
             ws_last_mtime=ws_last_mtime,
         )
+
+    if check_ship_prove_complete(cfg):
+        return True
 
     if check_single_idea_complete(cfg, all_empty):
         return True

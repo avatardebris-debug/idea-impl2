@@ -177,7 +177,8 @@ def refresh_all_projects(pipeline_dir: pathlib.Path, active_only: bool = True) -
     projects_dir = pipeline_dir / "projects"
     if not projects_dir.exists():
         return 0
-    INACTIVE = {"complete", "budget_exceeded", "dep_waiting"}
+    from pipeline.dep_policy import is_runner_inactive
+
     count = 0
     for proj in projects_dir.iterdir():
         if proj.is_dir():
@@ -186,7 +187,7 @@ def refresh_all_projects(pipeline_dir: pathlib.Path, active_only: bool = True) -
                 if active_only:
                     try:
                         state_data = json.loads(state_file.read_text(encoding="utf-8"))
-                        if state_data.get("status", "") in INACTIVE:
+                        if is_runner_inactive(state_data.get("status", "")):
                             continue
                     except Exception:
                         pass

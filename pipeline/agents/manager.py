@@ -84,17 +84,18 @@ class ManagerAgent(AgentProcess):
             f"3. **ADD_TO_BACKLOG** — a distinct new project idea for the future\n"
             f"4. **CAPABILITY_GAP** — no existing verified tool covers this; pipeline should build it\n"
             f"5. **ARCHIVE** — interesting but not actionable right now\n\n"
-            f"Then write EACH category to its own file (append, don't overwrite):\n\n"
-            f"- **ADD_TO_PLAN** items → append to `.pipeline/state/plan_amendments.md`\n"
-            f"  Format each as: `- [ ] <title>: <what to add and why>`\n\n"
-            f"- **REUSABLE_TOOL** items → append to `.pipeline/state/reusable_tools.md`\n"
-            f"  Format each as: `- <tool name>: <what it does, which agents/files it lives near>`\n\n"
-            f"- **ADD_TO_BACKLOG** items → append to `master_ideas.md`\n"
-            f"  Format each as: `- [ ] **<title>** — <one line description>`\n\n"
-            f"- **CAPABILITY_GAP** items → append to `.pipeline/state/capability_gaps.md`\n"
-            f"  Format each as: `- [ ] **<title>** — <what tool is missing and why>`\n\n"
-            f"- **ARCHIVE** items → append to `.pipeline/state/archived_ideas.md`\n"
-            f"  Format each as: `- <title>: <reason archived>`\n\n"
+            f"Then write EACH category to its own file (append, don't overwrite).\n"
+            f"Use these absolute paths (pipeline output dir — not a hardcoded .pipeline):\n\n"
+            f"- **ADD_TO_PLAN** → `{get_pipeline_dir() / 'state' / 'plan_amendments.md'}`\n"
+            f"  Format: `- [ ] <title>: <what to add and why>`\n\n"
+            f"- **REUSABLE_TOOL** → `{get_pipeline_dir() / 'state' / 'reusable_tools.md'}`\n"
+            f"  Format: `- <tool name>: <what it does>`\n\n"
+            f"- **ADD_TO_BACKLOG** → `master_ideas.md` (repo root or configured ideas path)\n"
+            f"  Format: `- [ ] **<title>** — <one line description>`\n\n"
+            f"- **CAPABILITY_GAP** → `{get_pipeline_dir() / 'state' / 'capability_gaps.md'}`\n"
+            f"  Format: `- [ ] **<title>** — <what tool is missing and why>`\n\n"
+            f"- **ARCHIVE** → `{get_pipeline_dir() / 'state' / 'archived_ideas.md'}`\n"
+            f"  Format: `- <title>: <reason archived>`\n\n"
             f"Write ALL five files even if a category is empty (just skip writing that one).\n"
             f"Before categorizing, call suggest_capabilities mentally: prefer REUSABLE_TOOL or "
             f"ADD_TO_BACKLOG with requires: slugs when a verified capability already fits.\n"
@@ -178,38 +179,25 @@ class ManagerAgent(AgentProcess):
         if sig == "FIX_ANALYSIS_NEEDED":
             return self._handle_fix_analysis(msg)
         elif sig == "PHASE_STUCK":
-            phase      = msg.payload.get("phase", 0)
-            idea_slug  = msg.payload.get("idea_slug", "")
-            reason     = msg.payload.get("reason", "unknown")
+            phase = msg.payload.get("phase", 0)
+            idea_slug = msg.payload.get("idea_slug", "")
+            reason = msg.payload.get("reason", "unknown")
 
             self._log_decision(msg, [], note=f"PHASE_STUCK phase={phase}: {reason} — force-advancing now")
 
-            # Force-advance: write 'phase_N_reviewed' with 0 blocking bugs so
-            # the runner's next _tick_project() call will advance to phase N+1.
             if idea_slug:
-                proj_dir = project_dir(idea_slug)
-                state_file = proj_dir / "state" / "current_idea.json"
-                retry_file = proj_dir / "state" / "phase_retries.json"
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    state["status"] = f"phase_{phase}_reviewed"
-                    state["review_result"] = {
-                        "blocking_bugs": 0,
-                        "non_blocking_notes": f"Force-advanced by manager: {reason}",
-                        "tasks_path": f"phases/phase_{phase}/tasks.md",
-                        "workspace_path": str(proj_dir / "workspace"),
-                        "review_path": f"phases/phase_{phase}/review.md",
-                    }
-                    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                    if retry_file.exists():
-                        retries = json.loads(retry_file.read_text(encoding="utf-8"))
-                        for key in list(retries.keys()):
-                            if f"phase_{phase}" in key:
-                                retries.pop(key)
-                        retry_file.write_text(json.dumps(retries, indent=2), encoding="utf-8")
+                from pipeline.force_advance import force_advance_phase
+
+                ok = force_advance_phase(
+                    idea_slug,
+                    int(phase or 0),
+                    f"Force-advanced by manager (PHASE_STUCK): {reason}",
+                    retry_count=3,
+                )
+                if ok:
                     logger.info("[manager] Force-advanced '%s' past phase %d (PHASE_STUCK)", idea_slug, phase)
-                except Exception as e:
-                    logger.error("[manager] Failed to force-advance '%s': %s", idea_slug, e)
+                else:
+                    logger.error("[manager] Failed to force-advance '%s'", idea_slug)
 
         elif sig == "PHASE_COMPLETE":
             phase = msg.payload.get("phase", 0)
@@ -321,36 +309,26 @@ class ManagerAgent(AgentProcess):
             ))
 
             if idea_slug:
-                proj_dir = project_dir(idea_slug)
-                state_file = proj_dir / "state" / "current_idea.json"
-                retry_file = proj_dir / "state" / "phase_retries.json"
-                try:
-                    state = json.loads(state_file.read_text(encoding="utf-8"))
-                    state["status"] = f"phase_{phase_num}_reviewed"
-                    state["review_result"] = {
-                        "blocking_bugs": 0,
-                        "non_blocking_notes": (
-                            f"Manager force-advanced: {current_failures} failures "
-                            f"after {retry_count} attempts. {answer[:500]}"
-                        ),
-                        "tasks_path": tasks_path,
-                        "workspace_path": workspace_path,
-                        "review_path": f"phases/phase_{phase_num}/review.md",
-                    }
-                    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                    # Clear retry counters
-                    if retry_file.exists():
-                        retries = json.loads(retry_file.read_text(encoding="utf-8"))
-                        for key in list(retries.keys()):
-                            if f"phase_{phase_num}" in key:
-                                retries.pop(key)
-                        retry_file.write_text(json.dumps(retries, indent=2), encoding="utf-8")
+                from pipeline.force_advance import force_advance_phase
+
+                ok = force_advance_phase(
+                    idea_slug,
+                    int(phase_num or 0),
+                    (
+                        f"Manager force-advanced: {current_failures} failures "
+                        f"after {retry_count} attempts. {answer[:500]}"
+                    ),
+                    tasks_path=tasks_path or None,
+                    workspace_path=workspace_path or None,
+                    retry_count=max(int(retry_count or 0), 3),
+                )
+                if ok:
                     logger.info(
                         "[manager] Force-advanced '%s' past phase %d after %d retries",
                         idea_slug, phase_num, retry_count,
                     )
-                except Exception as e:
-                    logger.error("[manager] Failed to force-advance '%s': %s", idea_slug, e)
+                else:
+                    logger.error("[manager] Failed to force-advance '%s'", idea_slug)
 
             return []
 

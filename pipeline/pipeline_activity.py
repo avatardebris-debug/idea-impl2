@@ -24,12 +24,14 @@ def activity_log_path() -> Path:
 def log_activity(event: str, **fields: Any) -> None:
     """Append one JSON line to state/activity.jsonl (never raises)."""
     try:
+        from pipeline.paths import get_pipeline_dir
+
         path = activity_jsonl()
         path.parent.mkdir(parents=True, exist_ok=True)
         row = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "event": event,
-            "pipeline_dir": str(root),
+            "pipeline_dir": str(get_pipeline_dir()),
             **fields,
         }
         with open(path, "a", encoding="utf-8") as f:

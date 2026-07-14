@@ -42,6 +42,14 @@ class DebugLoopAgent(AgentProcess):
         field_results = self.read_state_file(results_path) or ""
         tests_spec = self.read_state_file("phases/ship/field_tests.md") or ""
         stale_block = scan_workspace(workspace).format_block()
+        bug_memory_block = ""
+        try:
+            from pipeline.bug_memory import format_for_fix_loop
+            bug_memory_block = format_for_fix_loop(
+                field_results, tests_spec, "field_test_failed", top_n=5,
+            )
+        except Exception:
+            pass
 
         task_prompt = (
             f"You are debugging a completed project that FAILED field tests.\n\n"
@@ -49,7 +57,8 @@ class DebugLoopAgent(AgentProcess):
             f"## Field test results\n{field_results[:6000]}\n\n"
             f"## Field test plan\n{tests_spec[:3000]}\n\n"
             f"## Stale references\n{stale_block}\n\n"
-            f"## Workflow (bug-investigate-fix)\n"
+            + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
+            + f"## Workflow (bug-investigate-fix)\n"
             f"1. Reproduce: state minimal repro steps from the failures.\n"
             f"2. Hypotheses: 1-4 ranked, falsifiable root-cause guesses.\n"
             f"3. Confirmed cause: which hypothesis the evidence supports.\n"
@@ -72,6 +81,9 @@ class DebugLoopAgent(AgentProcess):
         outgoing: list[Message] = []
         if loops >= max_debug_loops():
             self._update_idea_status("ship_insufficient")
+            from pipeline.ship_recovery import try_advance_ship_queue
+
+            try_advance_ship_queue(self.bus)
             return AgentOutput(
                 success=False,
                 answer=result.answer,

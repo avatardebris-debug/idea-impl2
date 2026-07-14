@@ -142,7 +142,9 @@ def tick_health_preamble(cfg: MainLoopConfig) -> dict[str, Any]:
 
             _active_for_health = _get_active_idea_state(cfg.pipeline_dir)
             _health_slug = _active_for_health.get("_slug", "")
-            hc_results = run_all_checks(PROJECT_ROOT, cfg.pipeline_dir, _health_slug)
+            hc_results = run_all_checks(
+                PROJECT_ROOT, cfg.pipeline_dir, _health_slug, ship_prove=cfg.ship_prove
+            )
             if hc_results:
                 fixes = sum(1 for r in hc_results if r.auto_fixed)
                 issues = len(hc_results) - fixes
@@ -410,15 +412,60 @@ def tick_stall_recovery(cfg: MainLoopConfig, *, running_agents: int) -> None:
     stuck = cfg.bus.get_processing_messages()
     _warn_stall(cfg, age_s=age_s if age_s is not None else float("inf"), running_agents=running_agents, stuck=stuck)
 
-    if stuck:
-        _try_recover_stalled_processing(cfg, stuck)
-
     if cfg.ship_prove:
-        from pipeline.ship_mode import ship_bus_has_work
+        # During ship-prove, only reset ship-role processing messages so a
+        # long field_test_planner / thermo_reviewer isn't interrupted by
+        # unrelated main-pipeline leftovers, and vice versa.
+        ship_roles = set(SHIP_AGENT_ROLES)
+        ship_stuck = [m for m in stuck if getattr(m, "to_agent", "") in ship_roles]
+        if ship_stuck:
+            _try_recover_stalled_processing(cfg, ship_stuck)
+
+        from pipeline.ship_mode import (
+            dedupe_ship_pending,
+            requeue_in_progress_ship_projects,
+            ship_bus_has_work,
+        )
+        from pipeline.ship_recovery import (
+            handle_ship_stall_idle,
+            ship_stall_recovery_cooldown_s,
+        )
 
         if ship_bus_has_work(cfg.bus):
             return
-    elif cfg.bus.has_active_work():
+        cooldown = ship_stall_recovery_cooldown_s()
+        if now - cfg.state.last_stall_recovery < cooldown:
+            return
+        requeue_limit = 1 if cfg.ship_serial else 0
+        requeued = requeue_in_progress_ship_projects(
+            cfg.bus,
+            slug_filter=cfg.ship_slug or "",
+            limit=requeue_limit,
+        )
+        if requeued:
+            dedupe_ship_pending(cfg.bus)
+            cfg.state.last_stall_recovery = now
+            print(
+                f"  🔧 Ship stall recovery: re-queued {requeued} in-flight project(s)",
+                flush=True,
+            )
+        stuck_slugs: set[str] = set()
+        for m in ship_stuck:
+            slug = (getattr(m, "payload", None) or {}).get("idea_slug", "")
+            if slug:
+                stuck_slugs.add(slug)
+        handle_ship_stall_idle(
+            cfg.bus,
+            slug_filter=cfg.ship_slug or cfg.focus_slug or "",
+            requeued=requeued,
+            stuck_slugs=stuck_slugs or None,
+        )
+        return
+
+    if stuck:
+        _try_recover_stalled_processing(cfg, stuck)
+
+    if cfg.bus.has_active_work():
         return
 
     if now - cfg.state.last_stall_recovery < cfg.stall_recovery_cooldown_s:
@@ -534,7 +581,8 @@ def tick_project_metrics(
                     if (
                         retries >= MAX_PROJECT_LIFETIME_RETRIES
                         and st not in ("complete", "budget_exceeded", "", "dep_waiting")
-                        and not (cfg.ship_prove and is_ship_status(st))
+                        and not cfg.ship_prove
+                        and not is_ship_status(st)
                     ):
                         ci["status"] = "budget_exceeded"
                         ci["budget_note"] = (
@@ -578,6 +626,48 @@ def tick_project_metrics(
                 cfg.state.last_tasks_snapshot[_active_slug] = tasks_done
     except Exception:
         pass
+
+
+def check_ship_prove_complete(cfg: MainLoopConfig) -> bool:
+    """Exit ship-prove run when terminal status reached and queues are idle."""
+    if not cfg.ship_prove:
+        return False
+
+    from pipeline.ship_mode import (
+        check_ship_prove_complete as _ship_done,
+        ship_queues_empty,
+    )
+
+    all_empty = ship_queues_empty(cfg.bus)
+    done, detail = _ship_done(
+        cfg.bus,
+        slug_filter=cfg.ship_slug or cfg.focus_slug or "",
+        queues_empty=all_empty,
+    )
+    if not done:
+        return False
+
+    from pipeline.ship_recovery import try_advance_ship_queue
+
+    advanced = try_advance_ship_queue(
+        cfg.bus, slug_filter=cfg.ship_slug or cfg.focus_slug or ""
+    )
+    if advanced:
+        return False
+
+    time.sleep(10)
+    all_empty = ship_queues_empty(cfg.bus)
+    done, detail = _ship_done(
+        cfg.bus,
+        slug_filter=cfg.ship_slug or cfg.focus_slug or "",
+        queues_empty=all_empty,
+    )
+    if not done:
+        return False
+
+    print(f"\n  ✓ Ship-prove complete ({detail}). Exiting.")
+    cfg.control.stop_requested = True
+    return True
 
 
 def check_single_idea_complete(cfg: MainLoopConfig, all_empty: bool) -> bool:

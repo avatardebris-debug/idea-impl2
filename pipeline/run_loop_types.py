@@ -66,5 +66,6 @@ class MainLoopConfig:
     focus_slug: str | None = None
     ship_prove: bool = False
     ship_slug: str = ""
+    ship_serial: bool = False
     count_active_projects: Callable[[], int] | None = None
     warm_upcoming_projects: Callable[..., None] | None = None

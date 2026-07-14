@@ -213,6 +213,13 @@ def _extract_phase_pair(
         "blocking_bugs":    blocking_bugs,
         "retry_count":      retry_count,
         "quality_label":    quality,
+        "final_status":     state.get("status", ""),
+        "force_advanced":   bool(
+            state.get("force_advanced")
+            or state.get("quality_risk")
+            or (state.get("review_result") or {}).get("force_advanced")
+        ),
+        "quality_risk":     bool(state.get("quality_risk")),
         # ── metadata ──
         "model":            model,
         "provider":         provider,
@@ -633,9 +640,12 @@ def collect_project(
     final_status = state.get("status", "")
     total_phases = state.get("total_phases", 1)
 
-    # Only collect from terminal states — in-progress projects have incomplete code
-    if final_status not in ("complete", "budget_exceeded"):
+    # Only collect from terminal full/ship statuses — not mvp or in-progress
+    if final_status not in ("complete", "budget_exceeded", "field_proven"):
         return 0
+    if state.get("quality_risk") or (state.get("review_result") or {}).get("force_advanced"):
+        # Still allow collect for audit trails but tag for D-weight export
+        state = {**state, "quality_risk": True, "force_advanced": True}
 
     if not skip_gate:
         from pipeline.corpus_gate import should_skip_collect
@@ -795,6 +805,12 @@ def _cli() -> None:
     import argparse
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [corpus] %(message)s")
+
+    # Harvest/strict quality: prefer enforce gate unless operator pre-set CORPUS_GATE_POLICY
+    if any(a in ("--collect-all", "--collect-polish-queue", "--project") for a in sys.argv[1:]):
+        if os.environ.get("CORPUS_GATE_POLICY", "").strip() == "":
+            os.environ["CORPUS_GATE_POLICY"] = "enforce"
+            print("[corpus] CORPUS_GATE_POLICY=enforce (harvest default; set env to override)")
 
     parser = argparse.ArgumentParser(
         description="Pipeline fine-tune corpus collector",
