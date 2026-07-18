@@ -1,5 +1,10 @@
 # Product mission and values for ideator / goal decomposition / seed policy.
 # Hard values block or reject; soft values are preferences in prompts and scoring.
+#
+# Day-to-day product missions & adjustable soft values live in master_ideas.md
+# (lines ending with --mission / --values / --hardvalue). This file is the rare
+# "factory constitution" touchpoint — immutable pipeline hard rules + default mission.
+# Ideator merges both via pipeline/mission.py.
 
 mission: >
   Build reusable software that compounds capability across projects: prefer invoking

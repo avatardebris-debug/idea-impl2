@@ -1,6 +1,6 @@
-"""Tests for master_ideas [[tag]] parsing."""
+"""Tests for master_ideas [[tag]] and --mission/--values parsing."""
 
-from pipeline.idea_tags import parse_idea_tags, strip_idea_tags
+from pipeline.idea_tags import is_steering_line, parse_idea_tags, strip_idea_tags
 
 
 def test_parse_goal_system_mission_values():
@@ -22,3 +22,23 @@ def test_parse_goal_system_mission_values():
 def test_strip_preserves_requires():
     text = "desc requires: foo [[system] x]"
     assert "requires: foo" in strip_idea_tags(text)
+
+
+def test_mission_flag_steering():
+    line = "Develop abundance tools gently. [[mission] increase human flourishing] --mission"
+    assert is_steering_line(f"- [x] **[increase human flourishing]** — {line}")
+    tags = parse_idea_tags(line, title="increase human flourishing")
+    assert tags["steering"] == "mission"
+    assert any("flourishing" in m.lower() for m in tags["mission"])
+    assert "--mission" not in strip_idea_tags(line)
+
+
+def test_values_and_hardvalue_flags():
+    soft = parse_idea_tags("preference for peace --values", title="peace")
+    assert soft["steering"] == "values"
+    assert soft["values"][0]["kind"] == "soft"
+    assert "peace" in soft["values"][0]["rule"].lower()
+
+    hard = parse_idea_tags("never violate consent --hardvalue", title="consent")
+    assert hard["steering"] == "hardvalue"
+    assert hard["values"][0]["kind"] == "hard"

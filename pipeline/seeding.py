@@ -456,9 +456,18 @@ def seed_from_master_list(
         if description_raw.startswith("[") and description_raw.endswith("]"):
             description_raw = description_raw[1:-1].strip()
 
-        from pipeline.idea_tags import parse_idea_tags, strip_idea_tags
+        from pipeline.idea_tags import is_steering_line, parse_idea_tags, strip_idea_tags
 
-        idea_tags = parse_idea_tags(description_raw)
+        # --- Missions / values: steering registry, never seed as software ---
+        if is_steering_line(line):
+            print(
+                f"  🧭 Steering line (not a project): '{title}' "
+                f"— edit master_ideas.md; loaded into ideator via mission.py"
+            )
+            _seeded_this_session.add(title)
+            continue
+
+        idea_tags = parse_idea_tags(description_raw, title=title)
         description_for_tags = strip_idea_tags(description_raw)
 
         # --- Detect --goal tag: decompose into subgoals instead of seeding ---

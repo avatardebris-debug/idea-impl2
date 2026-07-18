@@ -1,126 +1,277 @@
 # Idea Development Pipeline (Factory)
 
-A multi-agent system that autonomously implements ideas. Give it an idea → it plans, codes, tests, reviews, and iterates — designed to run unattended for hours.
+A multi-agent **software factory** that turns ideas into working projects: plan → code → test → review → iterate, then optionally **ship-prove** with field tests. Designed to run unattended for hours on a local machine or a cloud GPU box.
 
-**Factory vs output:** This repo (`idea impl`) holds code, agents, and prompts. Runtime state (projects, queues, finetune corpus) lives in a separate **output** directory resolved by `pipeline/pipeline_config.py`:
+Give it a backlog (or a single idea). It seeds projects, manages budgets and queues, reuses capabilities when possible, and can harvest finetune data from completed work.
 
-| Environment | Output directory |
+---
+
+## What this is
+
+| | |
 |---|---|
-| Local dev (default) | `../thepipeline` if it has `projects/` |
-| Custom | Set `PIPELINE_DIR` (e.g. `C:\Users\avata\aicompete\.pipeline`) |
-| Cloud | `idea impl/.pipeline` (clone of [avatardebris-debug/pipeline](https://github.com/avatardebris-debug/pipeline)) when `PIPELINE_CLOUD=1` |
+| **Factory repo (this code)** | Agents, runner, prompts, scripts, constitution/mission |
+| **Output directory** | Projects, message bus, registry, goals, finetune corpus — **not** mixed into git history of the factory by default |
 
-On startup, `runner.py` calls `bootstrap_output_repo()` and prints the resolved output path.
+**Not** a single-chat coding assistant. It is a long-running orchestration system with specialized agents, disk-backed state, and separate **build** vs **ship** loops.
 
-## Quick Start
+### Mission (short)
 
-```bash
-# One idea, run until done
-python pipeline/runner.py "Build a CLI tool that converts markdown to HTML"
+Build **reusable** software that compounds: prefer verified capabilities over greenfield rebuilds, keep modules maintainable, capture training signal from runs. See `mission.yaml` and `constitution.yaml`.
 
-# Run from your idea backlog (master_ideas.md in output dir or repo root)
-python pipeline/runner.py --from-list
+---
 
-# Run overnight with a time limit
-python pipeline/runner.py --from-list --provider ollama --model qwen3.6:35b-a3b-q4_K_M --time-limit 480
+## Factory vs output
 
-# Resume a stopped pipeline
-python pipeline/runner.py --resume
+Runtime state is resolved by `pipeline/pipeline_config.py`:
 
-# Decomposed goals (--goal entries in master_ideas.md)
-python pipeline/runner.py --list-goals
-python pipeline/runner.py --attempt-goal my_goal_id --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+| Environment | Output root |
+|---|---|
+| Local (default) | Sibling `../thepipeline` if it has `projects/` |
+| Explicit | `PIPELINE_DIR=/path/to/output` |
+| Cloud | Factory `.pipeline/` when `PIPELINE_CLOUD=1` (often a clone of the output repo) |
+
+On startup, `pipeline/runner.py` bootstraps the output tree and prints the resolved path.
+
+```
+factory/  (this repo)          output/  (PIPELINE_DIR)
+├── pipeline/                  ├── projects/<slug>/
+├── agent.py                   │   ├── workspace/     # generated code
+├── mission.yaml               │   ├── state/         # current_idea.json, plans
+├── master_ideas.md            │   └── phases/ship/   # field tests, results
+└── scripts/                   ├── state/             # bus DB, registry, metrics
+                               ├── shared_libs/
+                               ├── goals/
+                               ├── finetune_corpus/
+                               └── queues/
 ```
 
-## How It Works
+---
 
-7 specialized agents run as subprocesses, communicating via file-based message queues:
+## Two loops: build and ship
+
+### 1. Main pipeline (build)
+
+Subprocess agents + SQLite message bus (legacy JSONL still migrates in):
 
 ```
 Idea → Idea Planner → Phase Planner → Executor → Validator → Reviewer → Manager
-                                         ↑                                  │
-                                         └──── fix bugs ───────────────────┘
-                                                                            │
-                                                              Ideator ◄─────┘
-                                                         (brainstorms next ideas)
+                         ↑                                              │
+                         └──────────── rework / fix ────────────────────┘
+                                                                        │
+                                                          Ideator ◄─────┘
 ```
 
 | Agent | Role |
 |---|---|
-| **Idea Planner** | Turns raw idea into multi-phase master plan |
-| **Phase Planner** | Decomposes each phase into 3-8 coding tasks |
-| **Executor** | Writes the actual code |
-| **Validator** | Runs tests + linting, gates quality |
-| **Reviewer** | Line-by-line code review |
-| **Manager** | Routes everything, manages queues, never interrupts (except emergencies) |
-| **Ideator** | Always-on brainstorming engine; uses `mission.yaml` for construct/deconstruct passes |
+| **Idea Planner** | Raw idea → multi-phase master plan |
+| **Phase Planner** | Phase → 3–8 coding tasks |
+| **Executor** | Writes code in the project workspace |
+| **Validator** | Pytest + optional structural import graph |
+| **Reviewer** | Structured code review (blocking vs non-blocking) |
+| **Manager** | Routing, queues, non-interrupt except emergencies |
+| **Ideator** | Always-on brainstorming (`mission.yaml` construct/deconstruct) |
 
-## File Structure
+**Statuses (build track, simplified):**
+
+| Status | Meaning |
+|---|---|
+| `phase_N_planning` / executing / … | In flight |
+| `complete` | All planned phases finished — **eligible for ship-prove** |
+| `mvp_complete` | Plan exhausted early; **does not** unlock `requires:` deps; polish later |
+| `budget_exceeded` | Time/budget stop; may polish or reset |
+| `dep_waiting` | Blocked on prerequisite projects |
+
+### 2. Ship-prove (field test)
+
+Separate agent set (`--ship-prove`). Does **not** seed new ideas from `master_ideas.md`.
 
 ```
-idea impl/                     # Factory (this repo)
-├── pipeline/
-│   ├── runner.py              # Main entry point — starts everything
-│   ├── pipeline_config.py     # Resolves PIPELINE_DIR (output)
-│   ├── output_bootstrap.py    # Cloud: clone/pull output repo + Hermes
-│   ├── goal_decomposer.py     # --goal lines → branches + goals/*.json
-│   ├── goal_attempt.py        # --attempt-goal CLI
-│   ├── mission.py             # Loads mission.yaml
-│   ├── message_bus.py         # JSONL queue system
-│   ├── agent_process.py       # Base class for all agents
-│   ├── agents/                # 7 agent implementations
-│   └── prompts/               # System prompts (markdown, easy to edit)
-│
-├── agent.py                   # Core ReAct loop (used by all agents)
-├── llm_interface.py           # Model-agnostic LLM adapter
-├── mission.yaml               # Mission, hard/soft values, ideator passes
-├── master_ideas.md            # Idea backlog (also synced in output repo)
-├── cloud_setup.sh             # One-shot cloud GPU setup
-│
-└── _archive/                  # Original self-improvement system (preserved)
-
-thepipeline/ or .pipeline/     # Output (separate repo or cloud clone)
-├── projects/                  # One folder per built project
-├── queues/                    # Agent message queues
-├── state/                     # Registry, activity, completions
-├── finetune_corpus/           # Training data shards
-└── goals/                     # Decomposed goal trees (JSON)
+complete → field_test_planner → field tests
+                ↓ fail                    ↓ pass
+           debug_loop → executor     thermo_reviewer (optional)
+                ↓                         ↓
+           retest / ship_insufficient   ship_evaluator
+                                              ↓
+                                   field_proven | needs more tests | ship_insufficient
 ```
+
+| Ship agent | Role |
+|---|---|
+| **field_test_planner** | LLM product/integration tests + baseline runner |
+| **debug_loop** | Structured investigation after field failures |
+| **thermo_reviewer** | Deep quality pass (skippable) |
+| **ship_evaluator** | Final verdict: `FIELD_PROVEN` / more tests / insufficient |
+| **executor** | Shared fixer for ship rework |
+
+**Eligibility:** only `status=complete` is freshly queued. Terminals: `field_proven`, `ship_insufficient`.
+
+**Controlled entry (recommended):**
+
+```bash
+./scripts/run_ship_prove.sh --slug my_project --provider grok --model grok-4.3
+# or Windows:
+.\scripts\run_ship_prove.ps1 -Slug my_project -Provider grok -Model grok-4.3
+```
+
+The script clears **stale ship-agent** bus messages first. Avoid unfiltered mass ship-prove over old `field_test_planning` piles without a clean bus.
+
+Prompts: `pipeline/prompts/field_test_planner.md`, `ship_evaluator.md`.
+
+---
+
+## Major subsystems (beyond the original 7 agents)
+
+| Area | What it does |
+|---|---|
+| **Quality gates** | Soft-by-default `PIPELINE_REQUIRE_TESTS` / `PIPELINE_STRUCTURAL_GATE`; ship-prove turns them on via setdefault |
+| **Import graph / layout** | Local stale imports (B3); package layout repair before field tests |
+| **Capability registry** | Search/reuse verified tools (`shared_libs/`, registry DB); optional invoke-before-seed |
+| **Dependency policy** | `requires:` on ideas; only full complete / field_proven unlock deps (not bare `mvp_complete`) |
+| **Seed capacity** | Parallel seed slots, idle seeding policy, starvation fixes |
+| **Polish mode** | `--polish` / `PIPELINE_POLISH_FIRST` drain incomplete / mvp work before greenfield |
+| **Goals** | `--goal` lines → goal trees; `--attempt-goal`; optional **Hermes** for research-style goals |
+| **Finetune corpus** | Collect / weight / gate / polish shards under output `finetune_corpus/` |
+| **Workflows** | Registered workflows + n8n-style connectors (optional) |
+| **Ops** | `pipeline_status`, activity log, health checks, force-advance, metrics reports |
+
+Full flag tables and cloud ops: **`COMMANDS.md`**.
+
+---
+
+## Quick start
+
+```bash
+# Install
+pip install -r requirements.txt
+# Optional: openai (Grok/xAI), anthropic, etc.
+
+# One idea until done
+python pipeline/runner.py "Build a CLI that converts markdown to HTML"
+
+# Backlog (master_ideas.md in output or factory root)
+python pipeline/runner.py --from-list
+
+# Overnight (Ollama example)
+python pipeline/runner.py --from-list --provider ollama \
+  --model qwen3.6:35b-a3b-q4_K_M --time-limit 0 \
+  --base-budget 120 --phase-budget 45
+
+# Resume
+python pipeline/runner.py --resume
+
+# Status dashboard
+python -m pipeline.pipeline_status
+
+# Ship-prove one completed project
+./scripts/run_ship_prove.sh --slug <project_slug> --provider grok --model grok-4.3
+
+# Goals
+python pipeline/runner.py --list-goals
+python pipeline/runner.py --attempt-goal <goal_id> --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+```
+
+### Cloud sketch
+
+```bash
+git clone https://github.com/avatardebris-debug/idea.git
+cd idea
+pip install -r requirements.txt
+bash cloud_setup.sh          # Ollama, model, .pipeline bootstrap
+source .venv/bin/activate
+export PIPELINE_CLOUD=1
+export PYTHONUTF8=1
+
+# Build overnight (safer default when few projects are complete)
+SHIP_PROVE_BACKGROUND=1 ./scripts/run_ship_prove.sh --main-pipeline \
+  --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+```
+
+---
 
 ## Configuration
 
-Edit `constitution.yaml` to tune quality standards, agent weights, ideator settings, and pipeline limits.
+| File | Purpose |
+|---|---|
+| `mission.yaml` | Mission text, hard/soft values, ideator pass wording |
+| `constitution.yaml` | Quality standards, agent weights, pipeline limits |
+| `master_ideas.md` | Idea backlog (`requires:`, tags, `--goal`, `--hermes`, …) |
+| `pipeline/prompts/*.md` | Per-role system prompts |
+| `.env` | Local secrets/paths (`PIPELINE_DIR`, `XAI_API_KEY`, `PIPELINE_MODEL`, …) — do not commit secrets |
 
-Edit `mission.yaml` for product mission, hard/soft values, and ideator construct/deconstruct prompt blocks.
-
-## Environment Variables
+### Environment variables (common)
 
 | Variable | Purpose |
 |---|---|
-| `PIPELINE_DIR` | Override output directory path |
-| `PIPELINE_CLOUD=1` | Use `.pipeline/` inside factory repo (cloud) |
-| `PIPELINE_MODEL` | Default model when `--model` omitted |
-| `PIPELINE_REPO_URL` | Output repo to clone (default: avatardebris-debug/pipeline) |
-| Ollama | *(none — runs locally)* |
-| OpenAI | `OPENAI_API_KEY` |
-| Claude | `ANTHROPIC_API_KEY` |
-| Gemini | `GOOGLE_API_KEY` |
+| `PIPELINE_DIR` | Output root override |
+| `PIPELINE_CLOUD=1` | Use factory `.pipeline/` |
+| `PIPELINE_MODEL` / `PIPELINE_PROVIDER` | Defaults when CLI omits them |
+| `PIPELINE_LIGHT_MODEL` | Smaller model for light-tier agents |
+| `PIPELINE_REQUIRE_TESTS` | Require tests at validation (default off; on for ship) |
+| `PIPELINE_STRUCTURAL_GATE` | Local import-graph gate (default off; on for ship) |
+| `PIPELINE_POLISH_FIRST` | Prefer polish queue before new seeds |
+| `PIPELINE_INVOKE_BEFORE_SEED` | Capability reuse hard skip when match is strong |
+| `MAX_FIELD_TEST_LOOPS` | Field-test retry budget (script default often `2`) |
+| `XAI_API_KEY` | Grok / xAI (`--provider grok`) |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_API_KEY` | Other providers |
+| `PYTHONUTF8=1` | Recommended on Windows |
 
-**Windows**: Set `PYTHONUTF8=1` for consistent encoding.
+---
 
-## Cloud Setup
+## Repository map
 
-```bash
-git clone https://github.com/avatardebris-debug/idea.git "idea impl"
-cd "idea impl"
-pip install pyyaml ruff pytest
-bash cloud_setup.sh   # Ollama, qwen3.6, .pipeline clone, Hermes, venv
-
-source .venv/bin/activate
-export PIPELINE_CLOUD=1
-python pipeline/runner.py --from-list --provider ollama \
-    --model qwen3.6:35b-a3b-q4_K_M --parallel-seeds 3 --executors 2 \
-    --auto-tune --max-seeds 4
+```
+.
+├── pipeline/
+│   ├── runner.py              # Main entry — build or --ship-prove
+│   ├── startup.py / run_loop* # Startup, budgets, stalls, seed idle
+│   ├── message_bus.py         # SQLite-backed agent queues
+│   ├── agents/                # Build + ship agent processes
+│   ├── prompts/               # System prompts (markdown)
+│   ├── field_test_runner.py   # Baseline + LLM field tests
+│   ├── ship_*.py              # Ship-prove mode, status, recovery
+│   ├── capability_*.py        # Registry, reuse, metrics
+│   ├── corpus_*.py            # Finetune harvest / gates / weights
+│   ├── goal_*.py              # Goal trees and attempts
+│   ├── hermes_runner.py       # Optional Hermes research tasks
+│   └── workspace_layout.py    # Package layout repair for ship
+├── agent.py                   # Shared ReAct loop
+├── llm_interface.py           # Ollama / Grok / OpenAI / Claude / Gemini
+├── scripts/
+│   ├── run_ship_prove.sh|.ps1 # Controlled ship or main overnight
+│   ├── build_capability_registry.py
+│   └── sync_output_repo.py
+├── cloud_setup.sh
+├── COMMANDS.md                # Full ops reference
+├── mission.yaml
+├── constitution.yaml
+└── _archive/                  # Earlier self-improvement stack (preserved)
 ```
 
-See `COMMANDS.md` for the full command reference.
+---
+
+## Design notes worth knowing
+
+1. **Honest completion** — `complete` vs `mvp_complete` matter for dependencies and ship eligibility.  
+2. **Soft defaults for legacy workspaces** — strict tests/structural gates are opt-in for the main loop; ship-prove prefers strict.  
+3. **Ship bus isolation** — main-pipeline noise should not block ship exit; still **clear ship queues** before a controlled prove (use the run script).  
+4. **Capabilities > copy-paste** — registry + `shared_libs/` reduce rebuild of the same primitives.  
+5. **Training loop** — finished projects can feed `finetune_corpus/` with optional quality gates.
+
+---
+
+## Documentation
+
+| Doc | Contents |
+|---|---|
+| **`COMMANDS.md`** | Flags, Ollama, cloud, polish, ship-prove, corpus, registry, resume |
+| **`mission.yaml`** | Product mission and values |
+| **`constitution.yaml`** | Governance / quality knobs |
+| **`notes/`** | Design discussion notes (futures, not runtime config) |
+| **`BACKLOG_AUDIT.md`** | Backlog / dependency audit snapshots (generated ops) |
+
+---
+
+## License / origin
+
+Internal factory for autonomous idea implementation. Output projects live in the configured `PIPELINE_DIR` (often a separate git remote for cloud sync).
