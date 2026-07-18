@@ -40,6 +40,35 @@ export CORPUS_GATE_POLICY=enforce
 python -m pipeline.corpus_collector --collect-all
 ```
 
+### Ship-prove (controlled)
+
+Clears stale **ship-agent** bus messages, then runs field-test → evaluate.
+Prompts: `pipeline/prompts/field_test_planner.md`, `ship_evaluator.md`.
+
+```bash
+# Cloud / Linux — one slug (recommended for first proof)
+chmod +x scripts/run_ship_prove.sh
+./scripts/run_ship_prove.sh --slug ship_canary --provider grok --model grok-4.3
+
+# Serial ship over status=complete only (do not mass-requeue old field_test_planning)
+./scripts/run_ship_prove.sh --serial --provider grok --model grok-4.3
+
+# Detach overnight ship-prove
+SHIP_PROVE_BACKGROUND=1 ./scripts/run_ship_prove.sh --serial --provider grok --model grok-4.3
+
+# Overnight main list/polish instead of ship (safer when complete count is 0)
+./scripts/run_ship_prove.sh --main-pipeline --provider ollama --model qwen3.6:35b-a3b-q4_K_M
+# or: SHIP_PROVE_BACKGROUND=1 ./scripts/run_ship_prove.sh --main-pipeline ...
+
+# Windows
+.\scripts\run_ship_prove.ps1 -Slug ship_canary -Provider grok -Model grok-4.3
+.\scripts\run_ship_prove.ps1 -MainPipeline
+```
+
+**Do not** run unfiltered `--ship-prove` while dozens of projects sit in `field_test_planning` /
+`ship_insufficient` without clearing the ship bus — use the script. Eligibility is
+`status=complete` only (terminals are skipped).
+
 Statuses: `complete` = all planned phases done; `mvp_complete` = plan exhausted early
 (phase &lt; total_phases) — does **not** unlock `requires:` deps; use `--polish` or polish-first.
 
