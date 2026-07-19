@@ -38,6 +38,22 @@ def force_advance_phase(
         return False
 
     try:
+        # Refuse force-advance while phase tasks still have open checkboxes
+        try:
+            from pipeline.task_checkboxes import phase_tasks_closed, stats_for_phase
+
+            if not phase_tasks_closed(proj, phase):
+                st = stats_for_phase(proj, phase)
+                logger.warning(
+                    "[force_advance] blocked '%s' phase %d — %d open task(s)",
+                    idea_slug,
+                    phase,
+                    st.open_count,
+                )
+                return False
+        except Exception:
+            pass
+
         state: dict[str, Any] = json.loads(state_file.read_text(encoding="utf-8"))
         state["status"] = f"phase_{phase}_reviewed"
         if env_bool("PIPELINE_FORCE_ADVANCE_QUALITY_RISK", default=True):

@@ -7,6 +7,16 @@ across local Windows and cloud (Vast.ai / RunPod) instances.
 
 ## Quality & ops flags
 
+**Task checkbox honesty:** phase advance and full `complete` are blocked while any
+`- [ ]` remain in `phases/phase_*/tasks.md`. Review **FAIL** counts as blocking even
+if Blocking Bugs says None. Force-advance is refused while checkboxes are open.
+Executor must mark tasks `[x]` when Done-when is met (no bulk auto-check).
+
+**File rescue hints:** when the executor auto-moves stray files into the real
+project workspace, it writes `state/file_rescue.json` + `state/file_rescue_hint.md`
+and injects that block into the **next** executor prompt so the model knows the
+canonical path and what was moved.
+
 **Legacy-compatible defaults:** `PIPELINE_REQUIRE_TESTS` and `PIPELINE_STRUCTURAL_GATE`
 default **off** so existing in-flight workspaces without tests still validate.
 Turn them **on** for strict quality / pre-release runs.
@@ -20,6 +30,66 @@ Turn them **on** for strict quality / pre-release runs.
 | `CAPABILITY_REUSE_MIN_SCORE` | `4.0` | Score threshold for hard reuse skip |
 | `PIPELINE_FORCE_ADVANCE_QUALITY_RISK=0` | on (risk tag default) | Set `=0` to skip quality_risk on force-advance |
 | `CORPUS_GATE_POLICY=enforce` | `warn` | Block finetune corpus collect on gate failure |
+
+### Dual-engine (Grok Build factory track)
+
+**Default remains classic multi-agent.** Grok Build is optional and only owns
+implement → validate → review → fix for projects with `"engine": "grok_build"`.
+Planners (`idea_planner`, `phase_planner`) stay classic in v1. **Orca is not used.**
+
+Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish, ship-prove.
+
+| Variable | Default | Effect |
+|---|---|---|
+| `PIPELINE_ENGINE` | `classic` | `classic` = today’s agents. `grok_build` = set `"engine": "grok_build"` on **new seeds only** |
+| `PIPELINE_ENGINE_GROK_FRACTION` | `0` | Canary: fraction of new seeds (0–1) get grok_build when `PIPELINE_ENGINE` is not forced to grok_build |
+| `PIPELINE_ENGINE_FALLBACK` | `classic` | Documented fallback target (always classic in v1) |
+| `GROK_BUILD_CMD` | unset | CLI template with `{workspace}` `{prompt_file}` `{skill}` `{log_file}` |
+| `GROK_BUILD_DRY_RUN=1` | off | Log intended command under `phases/phase_N/grok_<step>.log` without executing |
+| `GROK_BUILD_TIMEOUT_S` | `1800` | Per-step subprocess timeout |
+| `GROK_BUILD_DEEP_REVIEW=1` | off | Run optional deep review skill every grok phase |
+| `GROK_BUILD_DEEP_REVIEW_LAST=1` | off | Deep review only on last planned phase |
+
+```bash
+# Dry-run adapter smoke (no real Grok CLI required)
+export GROK_BUILD_DRY_RUN=1
+export GROK_BUILD_CMD='echo skill={skill} ws={workspace} >> {log_file}'
+python -m pipeline.engines.grok_build --help
+python -m pipeline.engines.grok_build --slug my_slug --phase 1 --step implement --dry-run
+
+# Enable Grok Build for new seeds only (classic always remains fallback)
+export PIPELINE_ENGINE=grok_build
+export GROK_BUILD_CMD='your-grok-cli --workspace {workspace} --prompt {prompt_file} --skill {skill}'
+
+# 10% canary on new seeds (while default stays classic)
+export PIPELINE_ENGINE_GROK_FRACTION=0.1
+
+# Force one in-flight project back to classic agents
+# Edit projects/<slug>/state/current_idea.json → "engine": "classic"
+```
+
+**Fallback:** hard invoke failure / timeout sets `engine=classic`, logs activity
+`engine_fallback`, and enqueues the classic executor. Concurrent Grok sessions
+are **serial (1)** in v1. Integration hook: `pipeline.engines.hook.tick_grok_build_engines`
+from the main health cycle (at most **one** grok project per health tick).
+
+**Hard vs soft exits (driver policy)**
+
+| Step | Hard (→ classic fallback) | Soft |
+|------|---------------------------|------|
+| implement | any non-success (except dry-run) | dry-run success |
+| debug / review / fix | exit **127** (missing CLI) or **124** (timeout) | other non-zero: continue only if a real `review.md` with `## Verdict` exists |
+| missing / incomplete review | n/a | **blocked** (FAIL stub written — **never** auto-PASS) |
+| pytest red after debug | n/a | **blocked** (no advance/complete) |
+| gate blocked ≥5 cycles | demote to classic | earlier cycles re-enter after backoff |
+
+Overflow batches (`phase_N_overflow/tasks.md`) under `engine=grok_build` re-enter the
+Grok driver — classic executor is **not** dual-scheduled.
+
+**Ship handoff unchanged:** complete → GitHub publish + ship-prove use the same scripts.
+
+Plan + scorecard: `notes/2026-07-19-grok-build-factory-dual-engine-plan.md`,
+`notes/experiments/grok-build-engine-README.md`.
 
 ```bash
 # Ops dashboard (active projects + recent activity.jsonl)
@@ -253,7 +323,10 @@ python health_check.py --fix        # delete import_zip/health_check/pipeline/ n
 # Hermes tasks (--hermes at end of a master_ideas line): auto-clones on first use
 # hermes-agent-main/ is gitignored; runner clones https://github.com/NousResearch/hermes-agent
 # and pip install -e hermes-agent-main unless HERMES_AUTO_INSTALL=0
+# export HERMES_AUTO_INSTALL=1   # default — auto clone + pip on first --hermes task
 # export HERMES_AUTO_INSTALL=0   # fail fast, manual clone instead
+# export HERMES_INSTALL_RETRY_MINUTES=15  # after bootstrap fail, skip that idea this long
+# export HERMES_INSTALL_ATTEMPTS=3       # clone/pip retries within one ensure call
 # export HERMES_SKIP_PIP=1       # clone only, you install deps yourself
 
 # Single idea (quick test)

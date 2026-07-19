@@ -60,12 +60,29 @@ def _tick_project(
     """
     review = state.get("review_result", {})
     blocking_bugs = review.get("blocking_bugs", 0)
+    if review.get("review_fail") and blocking_bugs <= 0:
+        blocking_bugs = 1
     review_content = review.get("review_content_preview", "")
     non_blocking_notes = review.get("non_blocking_notes", "")
     tasks_path = review.get("tasks_path", f"phases/phase_{phase_num}/tasks.md")
     workspace_path = review.get("workspace_path", str(project_dir / "workspace"))
     review_path = review.get("review_path", f"phases/phase_{phase_num}/review.md")
     title = state.get("title", slug)
+
+    # Sync checkbox counts into state for status display / honesty
+    try:
+        from pipeline.task_checkboxes import (
+            format_open_tasks_message,
+            phase_tasks_closed,
+            stats_for_phase,
+            sync_task_counts_to_state,
+        )
+
+        sync_task_counts_to_state(state, project_dir, phase_num)
+    except Exception:
+        phase_tasks_closed = None  # type: ignore
+        stats_for_phase = None  # type: ignore
+        format_open_tasks_message = None  # type: ignore
 
     # Check for emergency rework indicators
     rework_indicators = sum(1 for word in ["fundamental", "architectural",
@@ -145,45 +162,86 @@ def _tick_project(
         print(f"  ⚠️  Emergency cap hit for '{title}' phase {phase_num} — switching to incremental fix path")
         blocking_bugs = max(blocking_bugs, 1)  # ensure we enter the fix path
 
+    # Task checkbox gate: never advance/complete with open - [ ] tasks
+    tasks_closed = True
+    task_stats = None
+    if phase_tasks_closed is not None:
+        try:
+            tasks_closed = phase_tasks_closed(project_dir, phase_num)
+            task_stats = stats_for_phase(project_dir, phase_num)
+        except Exception:
+            tasks_closed = True
+
+    if not tasks_closed:
+        # Treat open checkboxes as blocking work (even on review PASS)
+        blocking_bugs = max(int(blocking_bugs or 0), 1)
+
     if blocking_bugs > 0:
         # Increment retry counter
         retries = _increment_retries(project_dir, phase_num)
 
-        if retries >= MAX_PHASE_RETRIES:
-            # Too many retries — force-advance
-            print(f"  ⚠️  Force-advancing '{title}' phase {phase_num} after {retries} retries ({blocking_bugs} bugs remain)")
+        if retries >= MAX_PHASE_RETRIES and tasks_closed:
+            # Too many retries — force-advance only if checkboxes are closed
+            print(
+                f"  ⚠️  Force-advancing '{title}' phase {phase_num} after {retries} "
+                f"retries ({blocking_bugs} bugs remain)"
+            )
             _reset_retries(project_dir, phase_num)
+            state["quality_risk"] = True
+            state["force_advanced"] = True
             advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
             if not advanced:
                 _mark_complete(project_dir, state, title)
                 print(f"  ✅ '{title}' completed all phases (force-advanced past last phase)!")
             return True
+
+        # Open tasks or review bugs → executor (no advance while [ ] remain)
+        review_full = str(project_dir / review_path) if review_path else ""
+        if not tasks_closed and task_stats is not None and format_open_tasks_message:
+            open_msg = format_open_tasks_message(task_stats, phase=phase_num)
+            fix_instructions = (
+                f"TASK CHECKBOX GATE: {open_msg}\n"
+                f"Finish remaining work, then mark each finished task `- [x]` in `{tasks_path}`. "
+                f"Do NOT mark [x] unless the Done-when criteria are met. "
+                f"Also address any blocking review bugs (attempt {retries}/{MAX_PHASE_RETRIES}). "
+                f"Read `{review_full}` for review details."
+            )
+            print(
+                f"  ☑️  '{title}' phase {phase_num}: open tasks → executor "
+                f"(retry {retries}/{MAX_PHASE_RETRIES})"
+            )
         else:
-            # Send back to executor with fix instructions
-            review_full = str(project_dir / review_path) if review_path else ""
-            bus.send(Message.create(
-                from_agent="runner",
-                to_agent="executor",
-                type="task",
-                payload={
-                    "phase": phase_num,
-                    "tasks_path": tasks_path,
-                    "workspace_path": workspace_path,
-                    "fix_required": True,
-                    "review_path": review_path,
-                    "blocking_bugs": blocking_bugs,
-                    "fix_instructions": (
-                        f"Fix {blocking_bugs} blocking bugs from review (attempt {retries}/{MAX_PHASE_RETRIES}). "
-                        f"Read `{review_full}` for details."
-                    ),
-                    "idea_slug": slug,
-                },
-            ))
-            _write_state(project_dir, state, f"phase_{phase_num}_executing")
-            print(f"  🔧 '{title}' phase {phase_num}: {blocking_bugs} bugs → executor (retry {retries}/{MAX_PHASE_RETRIES})")
-            return True
+            fix_instructions = (
+                f"Fix {blocking_bugs} blocking bugs from review "
+                f"(attempt {retries}/{MAX_PHASE_RETRIES}). "
+                f"Read `{review_full}` for details. "
+                f"Mark completed tasks [x] in `{tasks_path}`."
+            )
+            print(
+                f"  🔧 '{title}' phase {phase_num}: {blocking_bugs} bugs → executor "
+                f"(retry {retries}/{MAX_PHASE_RETRIES})"
+            )
+
+        bus.send(Message.create(
+            from_agent="runner",
+            to_agent="executor",
+            type="task",
+            payload={
+                "phase": phase_num,
+                "tasks_path": tasks_path,
+                "workspace_path": workspace_path,
+                "fix_required": True,
+                "review_path": review_path,
+                "blocking_bugs": blocking_bugs,
+                "open_tasks": not tasks_closed,
+                "fix_instructions": fix_instructions,
+                "idea_slug": slug,
+            },
+        ))
+        _write_state(project_dir, state, f"phase_{phase_num}_executing")
+        return True
     else:
-        # Clean pass — save non-blocking notes, advance or complete
+        # Clean pass + all tasks closed — save non-blocking notes, advance or complete
         if non_blocking_notes:
             _append_polish(project_dir, phase_num, non_blocking_notes)
 

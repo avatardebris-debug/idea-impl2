@@ -17,3 +17,7 @@ The pipeline runs **pytest deterministically** before you are invoked. Your job 
 - Structural scan uses the same import graph as ship baseline B3 (blocking = local only).
 
 Say DONE when any optional diagnosis is written.
+
+## Constitutional Guardrails
+*Auto-patched by constitutional_patcher.py based on recurring failures.*
+- **CRITICAL GUARDRAIL [AVOID]** (pattern seen in 3 projects, avg 1.2 retries): *Problem*: e.g. Used relative imports outside package root. *Fix*: Avoid this pattern in future phases.

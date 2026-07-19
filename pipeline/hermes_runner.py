@@ -46,11 +46,45 @@ HERMES_REPO_URL = os.environ.get(
     "https://github.com/NousResearch/hermes-agent.git",
 )
 # Set HERMES_AUTO_INSTALL=0 to disable clone/pip bootstrap (fail fast instead).
-HERMES_AUTO_INSTALL = os.environ.get("HERMES_AUTO_INSTALL", "1").strip().lower() not in (
-    "0",
-    "false",
-    "no",
-)
+# Read live via _auto_install_enabled() so .env / runtime changes apply.
+
+
+def _auto_install_enabled() -> bool:
+    return os.environ.get("HERMES_AUTO_INSTALL", "1").strip().lower() not in (
+        "0",
+        "false",
+        "no",
+    )
+
+
+def _install_retry_minutes() -> float:
+    raw = os.environ.get("HERMES_INSTALL_RETRY_MINUTES", "15").strip()
+    try:
+        return max(1.0, float(raw))
+    except ValueError:
+        return 15.0
+
+
+# title -> unix time when next hermes attempt is allowed (seeding cooldown)
+_hermes_retry_after: dict[str, float] = {}
+
+
+def hermes_on_cooldown(title: str) -> float:
+    """Seconds remaining on retry cooldown, or 0 if ready."""
+    until = _hermes_retry_after.get(title, 0.0)
+    rem = until - time.time()
+    return rem if rem > 0 else 0.0
+
+
+def schedule_hermes_retry(title: str, *, minutes: float | None = None) -> float:
+    """Block re-attempts of this Hermes idea for *minutes* (default env). Returns wait minutes."""
+    mins = minutes if minutes is not None else _install_retry_minutes()
+    _hermes_retry_after[title] = time.time() + mins * 60.0
+    return mins
+
+
+def clear_hermes_retry(title: str) -> None:
+    _hermes_retry_after.pop(title, None)
 
 # ---------------------------------------------------------------------------
 # Provider resolution (mirrors what runner.py uses for pipeline agents)
@@ -131,11 +165,18 @@ def _critic_verdict(
         m = re.search(r"\{.*\}", raw, re.DOTALL)
         if m:
             return json.loads(m.group(0))
+        return {
+            "achieved": False,
+            "confidence": 0.0,
+            "reason": "Critic returned non-JSON or empty verdict",
+        }
     except Exception as exc:
         logger.warning("Critic LLM call failed: %s", exc)
-
-    # Fallback: assume not yet achieved (don't give up prematurely)
-    return {"achieved": False, "confidence": 0.0, "reason": f"Critic call failed: {exc}"}
+        return {
+            "achieved": False,
+            "confidence": 0.0,
+            "reason": f"Critic call failed: {exc}",
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -154,9 +195,12 @@ def _clone_hermes_repo() -> None:
         print(f"  [hermes] Removing incomplete {HERMES_DIR.name}/ (no run_agent.py)")
         shutil.rmtree(HERMES_DIR, ignore_errors=True)
 
+    if _hermes_present():
+        return
+
     HERMES_DIR.parent.mkdir(parents=True, exist_ok=True)
     print(f"  [hermes] Cloning {HERMES_REPO_URL} → {HERMES_DIR}")
-    subprocess.run(
+    proc = subprocess.run(
         [
             "git",
             "clone",
@@ -165,9 +209,16 @@ def _clone_hermes_repo() -> None:
             HERMES_REPO_URL,
             str(HERMES_DIR),
         ],
-        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(PROJECT_ROOT),
+        check=False,
     )
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or "").strip()
+        raise RuntimeError(f"git clone hermes failed (exit {proc.returncode}): {err[:500]}")
     if not _hermes_present():
         raise RuntimeError(
             f"Clone finished but {HERMES_RUN_AGENT} is missing — check HERMES_REPO_URL"
@@ -203,16 +254,45 @@ def _clear_local_agent_shadow() -> None:
                 del sys.modules[key]
 
 
-def ensure_hermes_available() -> None:
+def ensure_hermes_available(*, install_attempts: int | None = None) -> None:
     """
     Ensure hermes-agent-main/ exists and run_agent.AIAgent is importable.
 
-    Required on cloud hosts: hermes-agent-main/ is in .gitignore and is not deployed
-    via git pull. First --hermes task triggers clone + pip install automatically
-    unless HERMES_AUTO_INSTALL=0.
+    First --hermes task triggers clone + pip when HERMES_AUTO_INSTALL=1 (default).
+    Retries bootstrap a few times on transient network/pip failure.
     """
+    attempts = install_attempts
+    if attempts is None:
+        raw = os.environ.get("HERMES_INSTALL_ATTEMPTS", "3").strip()
+        try:
+            attempts = max(1, int(raw))
+        except ValueError:
+            attempts = 3
+
+    last_err: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            _ensure_hermes_available_once()
+            return
+        except Exception as exc:
+            last_err = exc
+            if attempt >= attempts or not _auto_install_enabled():
+                break
+            wait_s = min(30 * attempt, 120)
+            print(
+                f"  [hermes] bootstrap attempt {attempt}/{attempts} failed: {exc}\n"
+                f"  [hermes] retrying in {wait_s}s…"
+            )
+            logger.warning("Hermes bootstrap attempt %s failed: %s", attempt, exc)
+            time.sleep(wait_s)
+
+    assert last_err is not None
+    raise last_err
+
+
+def _ensure_hermes_available_once() -> None:
     if not _hermes_present():
-        if not HERMES_AUTO_INSTALL:
+        if not _auto_install_enabled():
             raise RuntimeError(
                 f"Hermes not found at {HERMES_DIR}. Set HERMES_AUTO_INSTALL=1 (default) "
                 f"or clone manually: git clone {HERMES_REPO_URL} {HERMES_DIR.name}"
@@ -233,7 +313,7 @@ def ensure_hermes_available() -> None:
     try:
         import run_agent  # noqa: F401
     except ImportError as exc:
-        if not HERMES_AUTO_INSTALL:
+        if not _auto_install_enabled():
             raise RuntimeError(
                 f"Hermes present at {HERMES_DIR} but import failed: {exc}. "
                 f"Run: pip install -e {HERMES_DIR.name}"

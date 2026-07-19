@@ -88,6 +88,13 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
         idea_state = tick_budget_enforcement(cfg, idea_state)
         idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)
         tick_seed_after_project_advance(cfg, idea_state)
+        # Dual-engine: drive grok_build skill chain when status is phase_N_executing
+        try:
+            from pipeline.engines.hook import tick_grok_build_engines
+
+            tick_grok_build_engines(cfg.bus, pipeline_dir=cfg.pipeline_dir)
+        except Exception as _ge:
+            print(f"  [grok_build] hook error: {_ge}")
 
     tasks_done, tasks_total = read_task_progress(cfg, idea_state)
     _active_slug = idea_state.get("_slug", "")

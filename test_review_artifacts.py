@@ -9,6 +9,16 @@ def test_validation_passed() -> None:
     assert not validation_passed("## Verdict: FAIL\n")
 
 
+def test_fail_verdict_forces_blocking_bug() -> None:
+    from pipeline.review_artifacts import count_blocking_bugs
+
+    body = (
+        "## Blocking Bugs\nNone\n\n"
+        "## Verdict\nFAIL — missing profiler integration\n"
+    )
+    assert count_blocking_bugs(body) >= 1
+
+
 def test_review_artifacts_complete_rejects_short_template() -> None:
     template = "## Blocking Bugs\nNone\n\n## Verdict\nPASS\n"
     assert not review_artifacts_complete(template)

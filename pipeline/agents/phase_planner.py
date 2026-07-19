@@ -280,6 +280,33 @@ class PhasePlannerAgent(AgentProcess):
                 tokens_used=result.tokens_used if hasattr(result, 'tokens_used') else 0,
                 steps_used=result.steps_used if hasattr(result, 'steps_used') else 0,
             )
+        # Dual-engine: grok_build projects skip classic executor enqueue.
+        # Hook (pipeline.engines.hook) drives implement/review/fix instead.
+        try:
+            from pipeline.engines.selection import ENGINE_GROK_BUILD, get_project_engine
+
+            _st = self.read_json_state("state/current_idea.json") or {}
+            if get_project_engine(_st) == ENGINE_GROK_BUILD:
+                self._update_idea_status(
+                    f"phase_{phase_num}_executing", phase_num=phase_num
+                )
+                import logging as _log
+
+                _log.getLogger(__name__).info(
+                    "[phase_planner] engine=grok_build — wrote phase %d tasks, "
+                    "skipping classic executor (driver hook will run)",
+                    phase_num,
+                )
+                return AgentOutput(
+                    success=result.completed,
+                    answer=result.answer,
+                    outgoing=[],
+                    tokens_used=result.tokens_used,
+                    steps_used=result.steps_used,
+                )
+        except Exception:
+            pass
+
         out_msg = Message.create(
             from_agent=self.role,
             to_agent="executor",

@@ -150,6 +150,24 @@ def _advance_phase(
         workspace = project_dir / "workspace"
         state["status"] = f"phase_{completed_phase}_executing"
         state.pop("review_result", None)
+
+        # Dual-engine: grok_build owns implement/review/fix — do NOT enqueue classic
+        # executor (would dual-schedule with tick_grok_build_engines on same phase).
+        try:
+            from pipeline.engines.selection import ENGINE_GROK_BUILD, get_project_engine
+
+            if get_project_engine(state) == ENGINE_GROK_BUILD:
+                state["grok_overflow_pending"] = True
+                _write_state_dict(project_dir, state)
+                title = state.get("title", slug)
+                print(
+                    f"  📦 '{title}' phase {completed_phase} overflow: "
+                    f"engine=grok_build — re-enter driver (no classic executor)"
+                )
+                return True
+        except Exception:
+            pass
+
         _write_state_dict(project_dir, state)
 
         # Mark that we're in overflow mode so we don't loop
@@ -254,8 +272,66 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     total = int(state.get("total_phases", 1) or 1)
     full = phases_fully_built(state)
 
+    # Checkbox honesty: never mark full complete with open - [ ] tasks
+    if full:
+        try:
+            from pipeline.task_checkboxes import (
+                format_open_tasks_message,
+                project_all_tasks_closed,
+                stats_all_phases,
+                sync_task_counts_to_state,
+            )
+
+            sync_task_counts_to_state(state, project_dir, phase)
+            if not project_all_tasks_closed(project_dir):
+                stats = stats_all_phases(project_dir)
+                msg = format_open_tasks_message(stats)
+                state["status"] = f"phase_{phase}_executing"
+                state["complete_blocked_reason"] = msg
+                state.pop("completed_at", None)
+                _write_state_dict(project_dir, state)
+                print(
+                    f"  ☑️  '{title}' NOT marked complete — {msg} "
+                    f"(rework open tasks / mark [x] only when done)"
+                )
+                try:
+                    from pipeline.message_bus import Message, MessageBus
+                    from pipeline.paths import queues_dir
+
+                    bus = MessageBus(queues_dir())
+                    bus.send(
+                        Message.create(
+                            from_agent="runner",
+                            to_agent="executor",
+                            type="task",
+                            payload={
+                                "phase": phase,
+                                "tasks_path": f"phases/phase_{phase}/tasks.md",
+                                "workspace_path": str(project_dir / "workspace"),
+                                "fix_required": True,
+                                "open_tasks": True,
+                                "fix_instructions": (
+                                    f"COMPLETE BLOCKED: {msg}. "
+                                    "Finish remaining tasks and mark each `- [x]` in the "
+                                    "relevant phases/phase_*/tasks.md when Done-when is met."
+                                ),
+                                "idea_slug": slug,
+                            },
+                        )
+                    )
+                except Exception:
+                    pass
+                return
+        except Exception as _cb_err:
+            import logging as _log
+
+            _log.getLogger(__name__).debug(
+                "task checkbox complete-gate skipped: %s", _cb_err
+            )
+
     if full:
         state["status"] = "complete"
+        state.pop("complete_blocked_reason", None)
         _write_state_dict(project_dir, state)
         print(f"  ✅ '{title}' completed all phases!")
     else:

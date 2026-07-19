@@ -129,10 +129,29 @@ def rescue_dir_filtered(
     skip_shadow_files: bool = True,
 ) -> int:
     """Copy files from src_dir into dest_base, skipping infra/shadow filenames."""
-    if not src_dir.is_dir():
-        return 0
+    return len(
+        rescue_dir_filtered_moves(
+            src_dir, dest_base, skip_shadow_files=skip_shadow_files
+        )
+    )
 
-    moved = 0
+
+def rescue_dir_filtered_moves(
+    src_dir: pathlib.Path,
+    dest_base: pathlib.Path,
+    *,
+    skip_shadow_files: bool = True,
+    label: str = "",
+) -> list[dict[str, str]]:
+    """
+    Copy files from src_dir into dest_base.
+
+    Returns list of {src, dest, label} for each file copied (for executor hints).
+    """
+    if not src_dir.is_dir():
+        return []
+
+    moves: list[dict[str, str]] = []
     for f in list(src_dir.rglob("*")):
         if not f.is_file():
             continue
@@ -146,20 +165,30 @@ def rescue_dir_filtered(
             continue
         dst = dest_base / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
+        copied = False
         if not dst.exists():
             shutil.copy2(str(f), str(dst))
-            moved += 1
+            copied = True
         elif f.stat().st_mtime > dst.stat().st_mtime:
             shutil.copy2(str(f), str(dst))
-            moved += 1
+            copied = True
+        if copied:
+            moves.append(
+                {
+                    "src": str(f),
+                    "dest": str(dst),
+                    "rel": rel.as_posix(),
+                    "label": label or "rescue",
+                }
+            )
 
-    if moved:
+    if moves:
         try:
             shutil.rmtree(str(src_dir))
         except OSError:
             pass
 
-    return moved
+    return moves
 
 
 def prune_workspace_shadows(workspace: pathlib.Path) -> list[str]:

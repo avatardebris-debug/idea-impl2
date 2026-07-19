@@ -131,17 +131,29 @@ class IdeaPlannerAgent(AgentProcess):
         phase_1_spec = self._extract_phase(master_plan, 1)
 
 
-        # Save current idea state
-        self.write_json_state("state/current_idea.json", {
+        # Save current idea state (preserve dual-engine field + seed tags)
+        existing_idea = self.read_json_state("state/current_idea.json") or {}
+        idea_state = {
             "title": idea_title,
             "description": idea_description[:500],
             "status": "planning",
             "phase": 1,
             "total_phases": self._count_phases(master_plan),
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": existing_idea.get("started_at")
+            or datetime.now(timezone.utc).isoformat(),
             "depends_on": depends_on,
             "priority_tier": priority_tier,
-        })
+            "slug": idea_slug or existing_idea.get("slug", ""),
+        }
+        # engine set at seed time; never force grok_build here (planners stay classic)
+        if existing_idea.get("engine"):
+            idea_state["engine"] = existing_idea["engine"]
+        else:
+            idea_state["engine"] = "classic"
+        for _k in ("goal_id", "system_id", "budget_lock", "engine_fallback"):
+            if _k in existing_idea:
+                idea_state[_k] = existing_idea[_k]
+        self.write_json_state("state/current_idea.json", idea_state)
 
 
         # Send Phase 1 to Phase Planner

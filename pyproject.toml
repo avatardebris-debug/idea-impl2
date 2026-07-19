@@ -1,0 +1,4 @@
+[project]
+name = "dropify"
+version = "0.1.0"
+description = "Dropshipping-focused Shopify clone"

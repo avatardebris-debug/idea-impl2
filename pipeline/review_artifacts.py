@@ -39,16 +39,40 @@ def review_artifacts_complete(review_content: str) -> bool:
     return True
 
 
+def review_verdict_is_fail(review_content: str) -> bool:
+    """True when ## Verdict is explicitly FAIL (even if Blocking Bugs says None)."""
+    if not review_content:
+        return False
+    # Prefer last Verdict section
+    m = re.search(
+        r"##\s+Verdict\s*\n+([^\n#]+)",
+        review_content,
+        re.IGNORECASE,
+    )
+    if m:
+        line = m.group(1).strip().upper()
+        if line.startswith("FAIL") or re.match(r"^FAIL\b", line):
+            return True
+        if line.startswith("PASS"):
+            return False
+    if re.search(r"Verdict:\s*FAIL\b", review_content, re.IGNORECASE):
+        return True
+    return False
+
+
 def count_blocking_bugs(review_content: str) -> int:
     bugs_section = re.search(
         r"## Blocking Bugs.*?(?=## |$)", review_content, re.DOTALL | re.IGNORECASE
     )
-    if not bugs_section:
-        return 0
-    section_text = bugs_section.group()
-    if re.search(r"\bnone\b", section_text, re.IGNORECASE):
-        return 0
-    return len(re.findall(r"^[-*]\s+", section_text, re.MULTILINE))
+    n = 0
+    if bugs_section:
+        section_text = bugs_section.group()
+        if not re.search(r"\bnone\b", section_text, re.IGNORECASE):
+            n = len(re.findall(r"^[-*]\s+", section_text, re.MULTILINE))
+    # Explicit FAIL verdict must not advance even when Blocking Bugs is "None"
+    if n == 0 and review_verdict_is_fail(review_content):
+        return 1
+    return n
 
 
 def extract_non_blocking_notes(review_content: str) -> str:
@@ -71,8 +95,10 @@ def build_review_result(
     workspace_path: str,
     files_written: list | None = None,
 ) -> dict:
+    blocking = count_blocking_bugs(review_content)
     return {
-        "blocking_bugs": count_blocking_bugs(review_content),
+        "blocking_bugs": blocking,
+        "review_fail": review_verdict_is_fail(review_content),
         "review_path": review_path,
         "tasks_path": tasks_path,
         "workspace_path": workspace_path,

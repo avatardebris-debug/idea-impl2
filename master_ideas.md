@@ -83,8 +83,6 @@ for human approval — not silent agent rewrites. (Elon-style “delete until it
 
 ## Goal Decompositions
 <!-- goal:bootstrap_robot_training decomposed 2026-07-11 -->
-- [ ] **[Primitive parameter space sampler]** — [[goal:bootstrap_robot_training:b001] Sampler generating valid parameter sets for primitives from schema bounds. Class ParameterSampler with sample(vocab.yaml, n=100) writing params.json and coverage_report.md.. requires: Primitive definition schema validator. suggested_reuse: json_schema_profiler, shared_json_formatter]
-- [ ] **[Trajectory embedding model trainer]** — [[goal:bootstrap_robot_training:b002] Trainer fitting autoencoder or VAE on primitive trajectories for embedding distances. Module embed_trainer.py with train(traces.h5) writing encoder.pt and embedding_space.pkl.. requires: Trajectory similarity metric library. suggested_reuse: ai_movie_generation_suite, book_researcher]
 - [ ] **[Primitive acquisition benchmark protocol]** — [[goal:bootstrap_robot_training:b003] Design reproducible benchmark for comparing primitive learning methods.. suggested_reuse: shared_ascii_table_formatter, shared_currency_formatter] --hermes
 - [ ] **[Sim-to-real calibration dataset builder]** — [[goal:bootstrap_robot_training:b004] Builder creating paired sim/real trajectory datasets for gap measurement. Class CalibrationDatasetBuilder with build(sim_config, real_logs) writing paired_dataset.h5 and metadata.json.. requires: Real robot data collector. suggested_reuse: shared_json_formatter, ai_movie_generation_suite]
 

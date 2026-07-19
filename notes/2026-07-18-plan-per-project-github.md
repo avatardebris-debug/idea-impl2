@@ -4,7 +4,27 @@
 **Date:** 2026-07-18  
 **Code:** `pipeline/github_publish.py`, `scripts/publish_project_github.py`, hooks in `project_phase._mark_complete` + `ship_evaluator`  
 **Depends on:** none of Orca; Orca becomes easier later if this exists
+==
+gh auth login
+# or: $env:GITHUB_TOKEN = "ghp_..."
 
+$env:PIPELINE_GITHUB_ORG = "avatardebris-debug"
+$env:PIPELINE_GITHUB_REPO_PREFIX = "pipe-"
+$env:PIPELINE_GITHUB_VISIBILITY = "private"
+
+cd C:\Users\avata\.grok\worktrees\aicompete-idea-impl\idea-impl2
+python scripts/publish_project_github.py --slug ship_canary --push
+--- 
+session
+$env:GITHUB_TOKEN = "ghp_...."   # paste token
+$env:PIPELINE_GITHUB_ORG = "avatardebris-debug"
+$env:PIPELINE_GITHUB_REPO_PREFIX = "pipe-"
+$env:PIPELINE_GITHUB_VISIBILITY = "private"
+$env:GIT_COMMIT_AUTHOR = "Your Name <you@email.com>"
+
+cd C:\Users\avata\.grok\worktrees\aicompete-idea-impl\idea-impl2
+python scripts/publish_project_github.py --slug ship_canary --push
+==
 ## Goals
 
 1. Each pipeline project can become a **real git repo** (at least local).  

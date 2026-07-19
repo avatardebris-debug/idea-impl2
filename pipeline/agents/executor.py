@@ -398,6 +398,16 @@ class ExecutorAgent(AgentProcess):
         if discrepancy_warning:
             task_prompt = discrepancy_warning + "\n\n" + task_prompt
 
+        # Prior run may have rescued files into the real workspace — show the model
+        try:
+            from pipeline.file_rescue import load_rescue_prompt_for_executor
+
+            rescue_hint = load_rescue_prompt_for_executor(self._project_dir)
+            if rescue_hint:
+                task_prompt = rescue_hint + "\n" + task_prompt
+        except Exception:
+            pass
+
         try:
             result = self.call_agent(task=task_prompt, verbose=False)
         except InterruptedError:
@@ -464,58 +474,68 @@ class ExecutorAgent(AgentProcess):
 
         # --- Post-run stray file rescue ---
         # The LLM frequently writes files to wrong locations. We rescue them
-        # into the correct workspace BEFORE reporting results to the validator.
+        # into the correct workspace BEFORE reporting results to the validator,
+        # and persist a hint so the next executor turn knows what moved.
         import shutil as _shutil
-        _rescued_total = 0
+        from pipeline.path_health import is_root_infra_file, rescue_dir_filtered_moves
+
+        _rescue_moves: list[dict] = []
+        _pruned: list[str] = []
 
         def _rescue_dir(src_dir: pathlib.Path, dest_base: pathlib.Path, label: str) -> int:
-            """Move files from src_dir into dest_base; skip repo infra/shadow names."""
-            from pipeline.path_health import rescue_dir_filtered
-
             if not src_dir.exists() or not src_dir.is_dir():
                 return 0
-            moved = rescue_dir_filtered(src_dir, dest_base)
-            if moved:
+            moves = rescue_dir_filtered_moves(
+                src_dir, dest_base, label=label
+            )
+            _rescue_moves.extend(moves)
+            if moves:
                 import logging as _log
                 _log.getLogger(__name__).warning(
-                    "[executor] Rescued %d file(s) from %s", moved, label
+                    "[executor] Rescued %d file(s) from %s", len(moves), label
                 )
-            return moved
+            return len(moves)
 
         # Pattern 1: workspace/workspace/ double-nesting
-        _rescued_total += _rescue_dir(workspace / "workspace", workspace, "workspace/workspace/")
+        _rescue_dir(workspace / "workspace", workspace, "workspace/workspace/")
 
         # Pattern 2: src/ and tests/ at idea project root (very common LLM mistake)
         _project_root = _idea_root
         for _stray_name in ("src", "tests", "test"):
             _stray_dir = _project_root / _stray_name
             if _stray_dir.exists() and _stray_dir.is_dir():
-                # Only rescue if files appeared DURING this run (check mtime)
                 _recent = any(
-                    f.stat().st_mtime > (result.started_at if hasattr(result, 'started_at') else 0)
+                    f.stat().st_mtime > (result.started_at if hasattr(result, "started_at") else 0)
                     for f in _stray_dir.rglob("*") if f.is_file()
-                ) if hasattr(result, 'started_at') else True
+                ) if hasattr(result, "started_at") else True
                 if _recent:
-                    _rescued_total += _rescue_dir(_stray_dir, workspace / _stray_name, f"root {_stray_name}/")
+                    _rescue_dir(
+                        _stray_dir, workspace / _stray_name, f"root {_stray_name}/"
+                    )
 
         # Pattern 3: slug-named directory at project root
         _slug_at_root = _project_root / idea_slug
         if _slug_at_root.exists() and _slug_at_root.is_dir():
-            _rescued_total += _rescue_dir(_slug_at_root, workspace, f"root {idea_slug}/")
+            _rescue_dir(_slug_at_root, workspace, f"root {idea_slug}/")
 
         # Pattern 4: loose .py files at project root (not part of pipeline infra)
-        from pipeline.path_health import is_root_infra_file
-
         for _f in _project_root.glob("*.py"):
             if is_root_infra_file(_f.name) or _f.name in before_root_py:
                 continue
             if hasattr(result, "started_at") and _f.stat().st_mtime <= result.started_at:
                 continue
             _dst = workspace / _f.name
-            if not _dst.exists():
+            if not _dst.exists() or _f.stat().st_mtime > _dst.stat().st_mtime:
                 _dst.parent.mkdir(parents=True, exist_ok=True)
                 _shutil.copy2(str(_f), str(_dst))
-                _rescued_total += 1
+                _rescue_moves.append(
+                    {
+                        "src": str(_f),
+                        "dest": str(_dst),
+                        "rel": _f.name,
+                        "label": "root loose .py",
+                    }
+                )
                 import logging as _log
                 _log.getLogger(__name__).warning(
                     "[executor] Rescued loose file %s from project root", _f.name
@@ -524,7 +544,9 @@ class ExecutorAgent(AgentProcess):
         # Pattern 5: /workspace/workspace/<slug>/ (cloud double-nesting)
         _cloud_stray = pathlib.Path("/workspace/workspace") / idea_slug
         if _cloud_stray.exists() and _cloud_stray.is_dir():
-            _rescued_total += _rescue_dir(_cloud_stray, workspace, f"/workspace/workspace/{idea_slug}/")
+            _rescue_dir(
+                _cloud_stray, workspace, f"/workspace/workspace/{idea_slug}/"
+            )
 
         # Pattern 6: prune infra leaks that slipped into workspace during this run
         try:
@@ -536,7 +558,34 @@ class ExecutorAgent(AgentProcess):
                     "[executor] Pruned %d workspace path leak(s)", len(_pruned)
                 )
         except Exception:
-            pass
+            _pruned = []
+
+        # Persist rescue so next executor turn + validators know the layout
+        if _rescue_moves or _pruned:
+            try:
+                from pipeline.file_rescue import save_rescue_record
+                from pipeline.pipeline_activity import log_activity
+
+                save_rescue_record(
+                    self._project_dir,
+                    moves=_rescue_moves,
+                    pruned=_pruned,
+                    workspace=str(workspace),
+                    phase=phase_num,
+                    idea_slug=idea_slug,
+                )
+                try:
+                    log_activity(
+                        "file_rescue",
+                        slug=idea_slug,
+                        phase=phase_num,
+                        move_count=len(_rescue_moves),
+                        pruned_count=len(_pruned),
+                    )
+                except Exception:
+                    pass
+            except Exception:
+                pass
 
         # Only report files created/changed during THIS call
         after_files = (
@@ -550,53 +599,24 @@ class ExecutorAgent(AgentProcess):
             for p in files_to_report
             if not p.name.startswith(".")
         ]
+        # Include rescued destinations so validator sees them as project files
+        for _m in _rescue_moves:
+            rel = _m.get("rel") or ""
+            if rel and rel not in files_written:
+                files_written.append(rel)
 
-        # --- Auto-mark tasks done based on files written ---
-        # The executor often forgets to update checkboxes after a long run.
-        # Deterministically mark any unchecked task as [x] if the workspace
-        # has files that suggest it was completed (any .py files exist at all).
-        # This is conservative: only marks if workspace has substantive output.
-        try:
-            if tasks_full_path.exists() and len(after_files) >= 3:
-                raw = tasks_full_path.read_text(encoding="utf-8")
-                # Find unchecked tasks in the current phase section only
-                scoped = self._extract_phase_tasks(raw, phase_num)
-                unchecked = re.findall(r'^\s*- \[ \].*', scoped, re.MULTILINE)
-                # Trigger if: new files written (fresh run) OR workspace has >= 3 files
-                # (fix run: modifies existing files, new_files may be empty)
-                has_output = bool(new_files) or len(after_files) >= 3
-                if unchecked and has_output:
-                    # Mark all unchecked phase tasks as done
-                    # Replace only within the phase section to avoid touching other phases
-                    import re as _re
-                    phase_pattern = rf'^(#{1,4})\s+(?:.*?)?Phase\s+{phase_num}\b.*$'
-                    m = _re.search(phase_pattern, raw, _re.MULTILINE | _re.IGNORECASE)
-                    if m:
-                        next_phase = _re.search(
-                            rf'^#{1,4}\s+(?:.*?)?Phase\s+{phase_num + 1}\b',
-                            raw[m.end():], _re.MULTILINE | _re.IGNORECASE
-                        )
-                        sec_end = m.end() + next_phase.start() if next_phase else len(raw)
-                        section = raw[m.start():sec_end]
-                        fixed = _re.sub(r'^- \[ \]', '- [x]', section, flags=_re.MULTILINE)
-                        new_raw = raw[:m.start()] + fixed + raw[sec_end:]
-                        tasks_full_path.write_text(new_raw, encoding="utf-8")
-                        marked = len(_re.findall(r'^- \[ \]', section, _re.MULTILINE))
-                        if marked:
-                            import logging as _log
-                            _log.getLogger(__name__).info(
-                                "[executor] Auto-marked %d task(s) as done (files written: %d)",
-                                marked, len(new_files)
-                            )
-        except Exception:
-            pass  # Non-critical — validator will catch real failures
-
-        # --- Sync task counts back to current_idea.json immediately ---
-        # The auto-mark above wrote [x] to disk but current_idea.json still has
-        # tasks_done=0 from the start-of-execution snapshot.  Update it now so
-        # the runner's next status tick shows the real count (e.g. 6/6 not 0/6)
-        # and the stall-kill guard sees fresh data.
+        # Do NOT auto-mark all [ ] → [x] just because files exist (false completes).
+        # Executor must mark tasks; runner blocks phase advance / complete while open.
+        # Sync real checkbox counts into current_idea.json for status display.
         if not ship_fix and not thermo_refactor:
+            try:
+                from pipeline.task_checkboxes import sync_task_counts_to_state
+
+                idea_state = self.read_json_state("state/current_idea.json")
+                sync_task_counts_to_state(idea_state, self._project_dir, phase_num)
+                self.write_json_state("state/current_idea.json", idea_state)
+            except Exception:
+                pass
             self._update_idea_status(f"phase_{phase_num}_executing", phase_num=phase_num)
 
         # Route: ship track vs normal phase loop
@@ -634,19 +654,23 @@ class ExecutorAgent(AgentProcess):
         else:
             use_reviewer = not fix_required or (retry_count % 2 == 0)
             next_agent = "reviewer" if use_reviewer else "validator"
+            _payload = {
+                "phase": phase_num,
+                "tasks_path": tasks_path,
+                "workspace_path": str(workspace),
+                "files_written": files_written,
+                "validation_report_path": f"phases/phase_{phase_num}/validation_report.md",
+                "idea_slug": idea_slug,
+                "retry_count": retry_count,
+            }
+            if _rescue_moves:
+                _payload["files_rescued"] = len(_rescue_moves)
+                _payload["file_rescue_path"] = "state/file_rescue.json"
             out_msg = Message.create(
                 from_agent=self.role,
                 to_agent=next_agent,
                 type="task",
-                payload={
-                    "phase": phase_num,
-                    "tasks_path": tasks_path,
-                    "workspace_path": str(workspace),
-                    "files_written": files_written,
-                    "validation_report_path": f"phases/phase_{phase_num}/validation_report.md",
-                    "idea_slug": idea_slug,
-                    "retry_count": retry_count,
-                },
+                payload=_payload,
             )
 
         return AgentOutput(

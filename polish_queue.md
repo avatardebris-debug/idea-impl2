@@ -25,3 +25,4 @@ Format: `- [ ] **[project-slug]** — notes about what to add`
 - [ ] **[transcript_extractor]** — p1/5 complete. Continue phases 2-5. Original title: [transcript extractor]
 - [ ] **[udemy_training_tool]** — p2/3 complete. Continue phases 3-3. Original title: [udemy training tool]
 - [ ] **[video_management]** — p1/5 complete. Continue phases 2-5. Original title: [video management]
+- [ ] **[widget]** — p1/4 mvp_complete. Continue phases 2-4. Original title: Widget

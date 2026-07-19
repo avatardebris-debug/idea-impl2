@@ -241,3 +241,8 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
   desc: [youtube workflow tool.]
 - zillow — [Zillow] — 
   desc: [tool using redfin/zillow to trigger criteria alert to phone/email.]
+- primitive_parameter_space_sampler — [Primitive parameter space sampler] — 2026-07-19T19:41:43.620357+00:00
+  desc: [goal:bootstrap_robot_training:b001] Sampler generating valid parameter sets for primitives from schema bounds. Class ParameterSampler with sample(vocab.yaml, n=100) writing params.json and coverage_report.md.. requires: Primitive definition schema validator. suggested_reuse: json_schema_profiler, shared_json_formatter
+- trajectory_embedding_model_trainer — [Trajectory embedding model trainer] — 2026-07-19T20:05:21.510740+00:00
+  desc: [goal:bootstrap_robot_training:b002] Trainer fitting autoencoder or VAE on primitive trajectories for embedding distances. Module embed_trainer.py with train(traces.h5) writing encoder.pt and embedding_space.pkl.. requires: Trajectory similarity metric library. suggested_reuse: ai_movie_generation_suite, book_researcher
+- fake_proj — Fake Proj — 2026-07-19T21:17:23.115103+00:00

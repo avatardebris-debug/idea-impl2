@@ -30,6 +30,30 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+
+def _load_dotenv(path: Path) -> None:
+    """Load KEY=VALUE from factory .env into os.environ (no overwrite of set vars)."""
+    if not path.is_file():
+        return
+    import os
+
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, val = line.partition("=")
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = val
+
+
+_load_dotenv(ROOT / ".env")
+
 from pipeline.github_publish import (  # noqa: E402
     list_eligible_slugs,
     publish_enabled,

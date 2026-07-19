@@ -146,12 +146,31 @@ def seed_idea(bus: MessageBus, title: str, description: str,
             "priority_tier": priority_tier,
             "started_at": datetime.now(timezone.utc).isoformat(),
         }
+        # Dual-engine: set engine on new seeds only (classic default; grok_build via env/canary)
+        try:
+            from pipeline.engines.selection import resolve_seed_engine
+
+            seed_engine = resolve_seed_engine()
+            stub_payload["engine"] = seed_engine
+        except Exception:
+            stub_payload["engine"] = "classic"
         if idea_tags:
             if idea_tags.get("goal_id"):
                 stub_payload["goal_id"] = idea_tags["goal_id"]
             if idea_tags.get("system_id"):
                 stub_payload["system_id"] = idea_tags["system_id"]
         stub_state_file.write_text(json.dumps(stub_payload, indent=2), encoding="utf-8")
+        try:
+            from pipeline.pipeline_activity import log_activity
+
+            log_activity(
+                "seed_engine",
+                engine=stub_payload.get("engine", "classic"),
+                slug=idea_slug,
+                title=title,
+            )
+        except Exception:
+            pass
         if idea_tags:
             try:
                 from pipeline.ship_provenance import merge_idea_tags
@@ -500,9 +519,29 @@ def seed_from_master_list(
             # Parse optional hermes_goal_check from description: [goal_check: ...]
             _hgc_match = re.search(r'goal_check:\s*([^\.\]]+)', hermes_description, re.IGNORECASE)
             hermes_goal_check = _hgc_match.group(1).strip() if _hgc_match else f"Has the task '{title}' been completed?"
+
+            from pipeline.hermes_runner import (
+                clear_hermes_retry,
+                hermes_on_cooldown,
+                schedule_hermes_retry,
+            )
+
+            # After install/network failure: wait X minutes before trying this title again
+            cool = hermes_on_cooldown(title)
+            if cool > 0:
+                mins = max(1, int(cool // 60) + (1 if cool % 60 else 0))
+                print(
+                    f"  ⏳ Hermes '{title}' on cooldown "
+                    f"({mins} min left) — trying next idea"
+                )
+                continue
+
             print(f"\n  🤖 Routing to Hermes: {title}")
             try:
-                from pipeline.hermes_runner import HermesGoalRunner
+                from pipeline.hermes_runner import HermesGoalRunner, ensure_hermes_available
+
+                # Bootstrap clone/pip before long worker run (retries inside)
+                ensure_hermes_available()
                 _hr = HermesGoalRunner()
                 _hr_result = _hr.run(
                     prompt=hermes_description,
@@ -511,6 +550,7 @@ def seed_from_master_list(
                     branch_id=_slugify(title),
                 )
                 print(f"  🤖 Hermes '{title}': {_hr_result['status']} ({_hr_result['attempts']} attempts)")
+                clear_hermes_retry(title)
                 try:
                     from pipeline.pipeline_mode import legacy_mode
                     if not legacy_mode():
@@ -544,14 +584,20 @@ def seed_from_master_list(
                         pass
                     _seeded_this_session.add(title)
                     return _SEED_SEEDED
-                # Not achieved — leave unchecked; skip for this session only
+                # Not achieved — leave unchecked; skip rest of this seed pass only
                 print(f"  ⚠ Hermes '{title}' not achieved — leaving unchecked for later retry")
                 _seeded_this_session.add(title)
                 continue
             except Exception as _he:
+                # Install/bootstrap failure: cooldown then retry (do NOT permanent-skip session)
+                mins = schedule_hermes_retry(title)
+                print(
+                    f"  ✗ Hermes runner failed for '{title}': {_he}\n"
+                    f"  ⏳ Will retry Hermes install/run after {mins:.0f} min "
+                    f"(HERMES_INSTALL_RETRY_MINUTES; set HERMES_AUTO_INSTALL=1 to auto-clone)"
+                )
                 # Must NOT return SEED_SEEDED — that starves every later idea in the list
-                print(f"  ✗ Hermes runner failed for '{title}': {_he}")
-                _seeded_this_session.add(title)
+                # Do NOT add to _seeded_this_session so after cooldown this title is eligible again
                 continue
 
         # --- kind:connector → run workflow YAML, not a 7-phase project ---
