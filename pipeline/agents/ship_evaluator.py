@@ -123,6 +123,16 @@ class ShipEvaluatorAgent(AgentProcess):
                     self._project_dir,
                     {**load_provenance(self._project_dir), "ship_evaluated": True},
                 )
+                try:
+                    from pipeline.github_publish import maybe_publish_project
+
+                    maybe_publish_project(idea_slug, trigger="field_proven")
+                except Exception:
+                    import logging
+
+                    logging.getLogger(__name__).debug(
+                        "github_publish after field_proven skipped", exc_info=True
+                    )
 
         return AgentOutput(
             success=verdict == "FIELD_PROVEN",

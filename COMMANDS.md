@@ -69,6 +69,35 @@ SHIP_PROVE_BACKGROUND=1 ./scripts/run_ship_prove.sh --serial --provider grok --m
 `ship_insufficient` without clearing the ship bus — use the script. Eligibility is
 `status=complete` only (terminals are skipped).
 
+### Per-project GitHub publish
+
+On **`complete`** and **`field_proven`**, the pipeline **local-commits** the whole
+`projects/<slug>/` tree (workspace + state + phases). **Push to GitHub is opt-in** and
+best-effort (never fails the project).
+
+```bash
+# Enable remote publish (private repos under your org)
+export PIPELINE_GITHUB_PUBLISH=1
+export PIPELINE_GITHUB_ORG=your-github-org
+export PIPELINE_GITHUB_REPO_PREFIX=pipe-          # repo = pipe-<slug>
+export PIPELINE_GITHUB_VISIBILITY=private
+export PIPELINE_GITHUB_ON=complete,field_proven   # default
+export GIT_COMMIT_AUTHOR="You <you@example.com>"
+# Auth: gh auth login   OR   GITHUB_TOKEN=...
+
+# Manual / backfill (local only)
+python scripts/publish_project_github.py --slug ship_canary --local-only
+
+# Manual push one project
+python scripts/publish_project_github.py --slug ship_canary --push
+
+# All complete + field_proven
+python scripts/publish_project_github.py --all-eligible --push
+```
+
+Status written to `projects/<slug>/state/github_status.json`.  
+Whole-`PIPELINE_DIR` backup remains `scripts/sync_output_repo.py` (separate job).
+
 Statuses: `complete` = all planned phases done; `mvp_complete` = plan exhausted early
 (phase &lt; total_phases) — does **not** unlock `requires:` deps; use `--polish` or polish-first.
 

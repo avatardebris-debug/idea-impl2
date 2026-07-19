@@ -335,3 +335,13 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     except Exception as _reg_err:
         import logging as _log
         _log.getLogger(__name__).debug("capability refresh skipped: %s", _reg_err)
+
+    # Per-project git (+ optional GitHub push). Best-effort; never blocks complete.
+    if full:
+        try:
+            from pipeline.github_publish import maybe_publish_project
+
+            maybe_publish_project(slug, trigger="complete")
+        except Exception as _gh_err:
+            import logging as _log
+            _log.getLogger(__name__).debug("github_publish skipped (non-critical): %s", _gh_err)
