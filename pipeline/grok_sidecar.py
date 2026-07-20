@@ -6,6 +6,12 @@ Grok handles planning, implement, debrief, and non-GPU work; the runner keeps ex
 on Ollama. Artifacts (tasks.md, workspace/, validation_report.md) stay the contract
 for harvest.py and bug_memory.
 
+Optional classic-path rescue (NOT the default cloud path):
+  PIPELINE_GROK_SIDECAR=1
+  maybe_run_sidecar_fix(slug, phase, reason) — one serial implement/fix step via
+  GROK_BUILD_CMD (or dry-run) when classic is stuck after N retries / manager chooses.
+  Does NOT switch the project engine permanently. Grok sessions remain serial.
+
 Usage (from repo root):
     python -m pipeline.grok_sidecar status --slug my_project --phase 1
     python -m pipeline.grok_sidecar context --slug my_project --phase 1
@@ -19,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import pathlib
 import re
 import sys
@@ -26,9 +33,15 @@ from datetime import datetime, timezone
 from typing import Any
 
 _PROJECT_ROOT = pathlib.Path(__file__).parent.parent.resolve()
-from pipeline.paths import get_pipeline_dir, projects_dir  # noqa: E402
+from pipeline.env_flags import env_bool, env_int  # noqa: E402
+from pipeline.paths import get_pipeline_dir, project_dir, projects_dir  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 VERDICT_PASS = re.compile(r"Verdict:\s*PASS", re.IGNORECASE)
+
+# Default: off for classic cloud. Enable only when operators want a one-shot rescue.
+DEFAULT_SIDECAR_MIN_RETRIES = 3
 
 
 def _read(path: pathlib.Path, limit: int = 0) -> str:
@@ -228,6 +241,159 @@ def cmd_provenance(
     )
     print(f"Wrote {paths['grok_provenance']}")
     return 0
+
+
+def sidecar_enabled() -> bool:
+    """PIPELINE_GROK_SIDECAR=1 enables optional one-shot Grok fix for classic projects."""
+    return env_bool("PIPELINE_GROK_SIDECAR", default=False)
+
+
+def sidecar_min_retries() -> int:
+    return max(1, env_int("PIPELINE_GROK_SIDECAR_MIN_RETRIES", default=DEFAULT_SIDECAR_MIN_RETRIES))
+
+
+def _sidecar_flag_key(phase: int) -> str:
+    return f"grok_sidecar_attempted_phase_{int(phase)}"
+
+
+def already_ran_sidecar(proj: pathlib.Path, phase: int) -> bool:
+    state_file = proj / "state" / "current_idea.json"
+    if not state_file.is_file():
+        return False
+    try:
+        st = json.loads(state_file.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    return bool(st.get(_sidecar_flag_key(phase)))
+
+
+def mark_sidecar_attempted(proj: pathlib.Path, phase: int, meta: dict[str, Any] | None = None) -> None:
+    state_file = proj / "state" / "current_idea.json"
+    if not state_file.is_file():
+        return
+    try:
+        st = json.loads(state_file.read_text(encoding="utf-8"))
+        st[_sidecar_flag_key(phase)] = True
+        if meta:
+            st[f"grok_sidecar_meta_phase_{int(phase)}"] = meta
+        state_file.write_text(json.dumps(st, indent=2), encoding="utf-8")
+    except Exception as exc:
+        logger.debug("mark sidecar attempted failed: %s", exc)
+
+
+def maybe_run_sidecar_fix(
+    slug: str,
+    phase: int,
+    reason: str = "",
+    *,
+    retry_count: int = 0,
+    step: str = "fix",
+    force: bool = False,
+) -> dict[str, Any] | None:
+    """
+    Optionally run one serial Grok Build implement/fix step for a classic project.
+
+    Returns result dict if invoked, else None (disabled / already ran / below threshold).
+
+    Env:
+      PIPELINE_GROK_SIDECAR=0|1   (default 0)
+      PIPELINE_GROK_SIDECAR_MIN_RETRIES  (default 3) — unless force=True
+      GROK_BUILD_CMD / GROK_BUILD_DRY_RUN — same as engines.grok_build
+
+    Does not flip engine permanently; marks state flag so it runs at most once per phase.
+    """
+    if not force and not sidecar_enabled():
+        return None
+    if not slug:
+        return None
+    phase = int(phase or 0)
+    if phase < 1:
+        return None
+
+    if not force and int(retry_count or 0) < sidecar_min_retries():
+        return None
+
+    proj = project_dir(slug)
+    if not proj.is_dir():
+        logger.warning("[grok_sidecar] project missing: %s", proj)
+        return None
+
+    # Never hijack a project that already selected grok_build as full engine
+    try:
+        st = json.loads((proj / "state" / "current_idea.json").read_text(encoding="utf-8"))
+        if (st.get("engine") or "classic") == "grok_build":
+            return None
+    except Exception:
+        st = {}
+
+    if already_ran_sidecar(proj, phase):
+        logger.info("[grok_sidecar] already attempted for %s phase %d", slug, phase)
+        return None
+
+    from pipeline.engines.grok_build import run_phase_step
+
+    # grok_build STEP_PROMPT_MAP keys: implement | fix | debug | review | ...
+    use_step = step if step in ("fix", "implement", "debug") else "fix"
+    phase_dir = proj / "phases" / f"phase_{phase}"
+    if use_step == "fix" and not (phase_dir / "review.md").is_file() and not (
+        phase_dir / "fix_report.md"
+    ).is_file():
+        use_step = "implement"
+
+    logger.info(
+        "[grok_sidecar] running one-shot %s for %s phase %d — %s",
+        use_step,
+        slug,
+        phase,
+        (reason or "")[:120],
+    )
+    try:
+        result = run_phase_step(slug, phase, use_step, project_dir=proj)
+    except Exception as exc:
+        logger.warning("[grok_sidecar] run_phase_step failed: %s", exc)
+        mark_sidecar_attempted(
+            proj,
+            phase,
+            {"ok": False, "error": str(exc)[:300], "reason": reason[:200]},
+        )
+        return {"ok": False, "error": str(exc), "slug": slug, "phase": phase}
+
+    ok = bool(getattr(result, "success", False))
+    meta = {
+        "ok": ok,
+        "step": use_step,
+        "reason": (reason or "")[:300],
+        "at": datetime.now(timezone.utc).isoformat(),
+        "retry_count": int(retry_count or 0),
+        "engine_result": {
+            "success": ok,
+            "error": getattr(result, "error", None) or "",
+            "log_path": str(getattr(result, "log_path", "") or ""),
+            "dry_run": bool(getattr(result, "dry_run", False)),
+        },
+    }
+    mark_sidecar_attempted(proj, phase, meta)
+    try:
+        from pipeline.pipeline_activity import log_activity
+
+        log_activity(
+            "grok_sidecar",
+            slug=slug,
+            phase=phase,
+            step=use_step,
+            ok=ok,
+            reason=(reason or "")[:200],
+        )
+    except Exception:
+        pass
+    return {
+        "ok": ok,
+        "slug": slug,
+        "phase": phase,
+        "step": use_step,
+        "meta": meta,
+        "result": result,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

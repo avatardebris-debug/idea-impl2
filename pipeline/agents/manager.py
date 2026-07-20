@@ -183,6 +183,10 @@ class ManagerAgent(AgentProcess):
             idea_slug = msg.payload.get("idea_slug", "")
             reason = msg.payload.get("reason", "unknown")
             validation_excerpt = msg.payload.get("validation_report", "") or ""
+            try:
+                stuck_retries = int(msg.payload.get("retry_count") or 0)
+            except (TypeError, ValueError):
+                stuck_retries = 0
 
             # One systematic-debugging pass before force-advance (classic bridge)
             if idea_slug:
@@ -193,7 +197,7 @@ class ManagerAgent(AgentProcess):
                         idea_slug=idea_slug,
                         phase=int(phase or 0),
                         validation_excerpt=validation_excerpt[:4000],
-                        retry_count=3,
+                        retry_count=stuck_retries,
                     )
                     if payload:
                         self._log_decision(
@@ -220,6 +224,48 @@ class ManagerAgent(AgentProcess):
                 except Exception as exc:
                     logger.warning("[manager] pre_force_debug skipped: %s", exc)
 
+            # Optional serial Grok sidecar (PIPELINE_GROK_SIDECAR=1) before force-advance
+            if idea_slug:
+                try:
+                    from pipeline.grok_sidecar import maybe_run_sidecar_fix
+
+                    side = maybe_run_sidecar_fix(
+                        idea_slug,
+                        int(phase or 0),
+                        reason=f"PHASE_STUCK: {reason}",
+                        retry_count=stuck_retries,
+                        step="fix",
+                    )
+                    if side is not None:
+                        self._log_decision(
+                            msg,
+                            [],
+                            note=(
+                                f"PHASE_STUCK phase={phase}: GROK_SIDECAR "
+                                f"ok={side.get('ok')} — requeue executor"
+                            ),
+                        )
+                        return [
+                            Message.create(
+                                from_agent=self.role,
+                                to_agent="executor",
+                                type="task",
+                                payload={
+                                    "phase": phase,
+                                    "fix_required": True,
+                                    "fix_instructions": (
+                                        "Grok sidecar one-shot ran after PHASE_STUCK. "
+                                        "Integrate/verify workspace; re-validate."
+                                    ),
+                                    "idea_slug": idea_slug,
+                                    "retry_count": stuck_retries,
+                                    "grok_sidecar": True,
+                                },
+                            )
+                        ]
+                except Exception as exc:
+                    logger.warning("[manager] grok_sidecar skipped: %s", exc)
+
             self._log_decision(
                 msg, [], note=f"PHASE_STUCK phase={phase}: {reason} — force-advancing now"
             )
@@ -231,7 +277,7 @@ class ManagerAgent(AgentProcess):
                     idea_slug,
                     int(phase or 0),
                     f"Force-advanced by manager (PHASE_STUCK): {reason}",
-                    retry_count=3,
+                    retry_count=max(stuck_retries, 1),
                 )
                 if ok:
                     logger.info("[manager] Force-advanced '%s' past phase %d (PHASE_STUCK)", idea_slug, phase)
@@ -382,6 +428,57 @@ class ManagerAgent(AgentProcess):
                         ]
                 except Exception as exc:
                     logger.warning("[manager] pre_force_debug skipped: %s", exc)
+
+            # Optional Grok sidecar (serial, PIPELINE_GROK_SIDECAR=1) — one fix shot
+            if idea_slug:
+                try:
+                    from pipeline.grok_sidecar import maybe_run_sidecar_fix
+
+                    side = maybe_run_sidecar_fix(
+                        idea_slug,
+                        int(phase_num or 0),
+                        reason=(
+                            f"manager FIX_ANALYSIS after {retry_count} retries; "
+                            f"{current_failures} failures"
+                        ),
+                        # Pass real retry count so PIPELINE_GROK_SIDECAR_MIN_RETRIES applies
+                        retry_count=int(retry_count or 0),
+                        step="fix",
+                    )
+                    if side is not None:
+                        self._log_decision(
+                            msg,
+                            [],
+                            note=(
+                                f"FIX_ANALYSIS phase={phase_num}: GROK_SIDECAR "
+                                f"ok={side.get('ok')} step={side.get('step')}"
+                            ),
+                        )
+                        # Re-queue executor so classic path re-validates sidecar work
+                        return [
+                            Message.create(
+                                from_agent=self.role,
+                                to_agent="executor",
+                                type="task",
+                                payload={
+                                    "phase": phase_num,
+                                    "tasks_path": tasks_path,
+                                    "workspace_path": workspace_path,
+                                    "fix_required": True,
+                                    "fix_report_path": fix_report_path,
+                                    "fix_instructions": (
+                                        "A one-shot Grok sidecar implement/fix ran. "
+                                        "Review workspace changes, ensure tests pass, "
+                                        "mark tasks [x]. Do not force-advance yet."
+                                    ),
+                                    "idea_slug": idea_slug,
+                                    "retry_count": retry_count,
+                                    "grok_sidecar": True,
+                                },
+                            )
+                        ]
+                except Exception as exc:
+                    logger.warning("[manager] grok_sidecar skipped: %s", exc)
 
             # Force-advance past this phase
             self._log_decision(msg, [], note=(

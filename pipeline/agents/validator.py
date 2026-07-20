@@ -664,6 +664,14 @@ class ValidatorAgent(AgentProcess):
             except Exception:
                 pass
 
+            # Phase passed — drop per-phase fix memory (stale bans no longer apply)
+            try:
+                from pipeline.phase_fix_memory import clear_fix_memory
+
+                clear_fix_memory(pathlib.Path(self._project_dir), int(phase_num))
+            except Exception:
+                pass
+
             try:
                 from pipeline.bug_memory import record_validator_pass
                 fix_report_path_str = f"phases/phase_{phase_num}/fix_report.md"
@@ -753,6 +761,24 @@ class ValidatorAgent(AgentProcess):
             except Exception:
                 pass
 
+            # Structured phase fix memory — ban repeated failure signatures
+            try:
+                from pipeline.phase_fix_memory import record_failed_attempt
+
+                record_failed_attempt(
+                    pathlib.Path(self._project_dir),
+                    int(phase_num),
+                    summary=(
+                        f"Validation FAIL attempt {retry_count}: "
+                        f"{current_failures} failures "
+                        f"({'improving' if made_progress else 'no progress'})"
+                    ),
+                    source_text=report_content,
+                    ban=True,
+                )
+            except Exception:
+                pass
+
             if retry_count >= MAX_VALIDATOR_ATTEMPTS:
                 # Absolute cap hit — escalate regardless of progress
                 logger.warning(
@@ -779,6 +805,7 @@ class ValidatorAgent(AgentProcess):
                         ),
                         "validation_report": report_content[:2000],
                         "idea_slug": idea_slug,
+                        "retry_count": int(retry_count),
                     },
                 )
             else:

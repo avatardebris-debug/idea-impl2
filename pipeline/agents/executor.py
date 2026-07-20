@@ -275,6 +275,9 @@ class ExecutorAgent(AgentProcess):
                 )
             except Exception:
                 pass
+            # Phase fix memory is for classic validation/review fix only
+            # (not ship_fix / thermo_refactor).
+            fix_memory_block = ""
             pending_section = ""
             if pending_fixes:
                 pending_section = f"## ⚠️ Health Check Findings (fix these FIRST)\n{pending_fixes[:1500]}\n\n"
@@ -341,6 +344,14 @@ class ExecutorAgent(AgentProcess):
                     strategy_block = (
                         f"## {title}\n{extra_instructions[:10000]}\n\n"
                     )
+                try:
+                    from pipeline.phase_fix_memory import format_for_prompt as format_fix_memory
+
+                    fix_memory_block = format_fix_memory(
+                        self._project_dir, int(phase_num), last_n=3, max_banned=8
+                    )
+                except Exception:
+                    fix_memory_block = ""
                 task_prompt = (
                 f"You are fixing Phase {phase_num} code that failed validation/review.\n\n"
                 f"## Workspace\n{workspace}\n\n"
@@ -349,6 +360,7 @@ class ExecutorAgent(AgentProcess):
                 + f"## Fix Report (read ALL previous attempts before making changes)\n"
                 f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
+                + (f"{fix_memory_block}\n\n" if fix_memory_block else "")
                 + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
                 + "## Instructions\n"
                   + (

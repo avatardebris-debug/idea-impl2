@@ -148,18 +148,27 @@ def run_pipeline(
     ship_slug: str = "",
     ship_serial: bool = False,
     ship_skip_thermo: bool = False,
-    parallel_seeds: int = 1,
+    parallel_seeds: int | None = None,
     auto_tune: bool = False,
     max_seeds: int = 4,
-    num_executors: int = 1,
+    num_executors: int | None = None,
     legacy: bool = False,
+    *,
+    seeds_explicit: bool = False,
+    executors_explicit: bool = False,
 ) -> None:
-    """Main pipeline orchestrator."""
+    """Main pipeline orchestrator.
+
+    *parallel_seeds* / *num_executors*: None → resolve via cloud_defaults
+    (PIPELINE_CLOUD → 2/2 unless env overrides). Pass seeds_explicit=True when
+    the operator set --parallel-seeds on the CLI (even if value is 1).
+    """
     from pipeline.context_aggregator import (
         refresh_all_projects,
         start_background_refresh,
         stop_background_refresh,
     )
+    from pipeline.cloud_defaults import resolve_parallelism
     from pipeline.metrics import RunMetrics
     from pipeline.pipeline_mode import set_legacy_mode
     from pipeline.run_context import RunContext
@@ -169,6 +178,22 @@ def run_pipeline(
     global PROJECT_ROOT, _run_ctx, PIPELINE_DIR
 
     PIPELINE_DIR = ensure_pipeline_ready(hermes=not ship_prove)
+
+    parallel_seeds, num_executors = resolve_parallelism(
+        parallel_seeds=parallel_seeds,
+        num_executors=num_executors,
+        seeds_explicit=seeds_explicit,
+        executors_explicit=executors_explicit,
+    )
+
+    try:
+        from pipeline.project_lock import sweep_dead_project_locks
+
+        _swept = sweep_dead_project_locks()
+        if _swept:
+            print(f"  🔓 Swept {_swept} dead project lock(s)")
+    except Exception:
+        pass
 
     from pipeline.message_bus import MessageBus
 
@@ -253,6 +278,18 @@ def run_pipeline(
         print(f"  Seeds:    {parallel_seeds} parallel project slots (Strategy 6)")
     if num_executors > 1:
         print(f"  Executors:{num_executors} parallel executor instances")
+    try:
+        from pipeline.output_bootstrap import is_cloud_environment
+        from pipeline.cloud_defaults import describe_cloud_parallel_config
+
+        if is_cloud_environment():
+            _cfg = describe_cloud_parallel_config(parallel_seeds, num_executors)
+            print(
+                f"  Cloud:    PIPELINE_CLOUD=1 seeds={_cfg['parallel_seeds']} "
+                f"executors={_cfg['executors']} bus_wake={_cfg['bus_wake']}"
+            )
+    except Exception:
+        pass
     _light_model_env = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip()
     if _light_model_env:
         print(f"  Light:    {_light_model_env} (light-tier agents: planner/manager/validator)")
@@ -601,9 +638,10 @@ def main():
                              "when each reaches field_proven or ship_insufficient.")
     parser.add_argument("--ship-skip-thermo", action="store_true",
                         help="With --ship-prove, skip thermo_reviewer and go straight to ship_evaluator.")
-    parser.add_argument("--parallel-seeds", type=int, default=1, metavar="N",
+    parser.add_argument("--parallel-seeds", type=int, default=None, metavar="N",
                         help="Seed up to N independent projects simultaneously. "
-                             "With --auto-tune this becomes the starting value (default: 1). "
+                             "With --auto-tune this becomes the starting value (default: 1; "
+                             "PIPELINE_CLOUD=1 → PIPELINE_CLOUD_PARALLEL_SEEDS or 2). "
                              "Example: --parallel-seeds 2")
     parser.add_argument("--auto-tune", action="store_true",
                         help="Enable the DynamicParallelizer: automatically detects diminishing "
@@ -613,8 +651,9 @@ def main():
     parser.add_argument("--max-seeds", type=int, default=4, metavar="M",
                         help="Upper ceiling for --auto-tune (default: 4). Ignored when "
                              "--auto-tune is not set.")
-    parser.add_argument("--executors", type=int, default=1, metavar="N",
-                        help="Number of parallel executor agent instances (default: 1). "
+    parser.add_argument("--executors", type=int, default=None, metavar="N",
+                        help="Number of parallel executor agent instances (default: 1; "
+                             "PIPELINE_CLOUD=1 → PIPELINE_CLOUD_EXECUTORS or 2). "
                              "Each executor independently processes tasks from the shared "
                              "SQLite queue — no extra config needed. "
                              "Recommended: 2 when using --parallel-seeds 3+. "
@@ -710,6 +749,17 @@ def main():
         sys.exit(1)
 
     idea = args.idea or args.seed_idea
+    # Cloud classic defaults applied inside run_pipeline via resolve_parallelism
+    # when --parallel-seeds / --executors are omitted (args.* is None).
+    import sys as _sys
+
+    _seeds_explicit = any(
+        a == "--parallel-seeds" or a.startswith("--parallel-seeds=")
+        for a in _sys.argv[1:]
+    )
+    _exec_explicit = any(
+        a == "--executors" or a.startswith("--executors=") for a in _sys.argv[1:]
+    )
     run_pipeline(
         idea=idea,
         from_list=args.from_list,
@@ -732,6 +782,8 @@ def main():
         max_seeds=args.max_seeds,
         num_executors=args.executors,
         legacy=args.legacy,
+        seeds_explicit=_seeds_explicit,
+        executors_explicit=_exec_explicit,
     )
 
 

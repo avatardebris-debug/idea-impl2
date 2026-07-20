@@ -91,6 +91,13 @@ def force_advance_phase(
         except Exception:
             pass
 
+        try:
+            from pipeline.phase_fix_memory import clear_fix_memory
+
+            clear_fix_memory(proj, phase)
+        except Exception:
+            pass
+
         from pipeline.pipeline_activity import log_activity
 
         log_activity(

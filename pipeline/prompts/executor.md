@@ -36,6 +36,7 @@ Failure to update checkboxes means the pipeline cannot track progress.
 - Prefer standard library over external dependencies
 
 ## What NOT to do
+- **CRITICAL GUARDRAIL [AVOID]** (pattern seen in 7 projects, avg 1.9 retries): *Problem*: e.g. Used relative imports outside package root. *Fix*: Avoid this pattern in future phases.
 - Do NOT modify files outside `.pipeline/workspace/`
 - Do NOT run destructive shell commands
 - Do NOT fabricate file contents — always read first

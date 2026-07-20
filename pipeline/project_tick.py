@@ -177,84 +177,160 @@ def _tick_project(
         blocking_bugs = max(int(blocking_bugs or 0), 1)
 
     if blocking_bugs > 0:
-        # Increment retry counter
-        retries = _increment_retries(project_dir, phase_num)
+        # Repair common LLM corruption: glued "- [x] Task N" blob at EOF
+        # without flipping the real checklist lines (causes infinite open-task retries).
+        if not tasks_closed:
+            try:
+                from pipeline.task_checkboxes import repair_tasks_file
 
-        if retries >= MAX_PHASE_RETRIES and tasks_closed:
-            # Too many retries — force-advance only if checkboxes are closed
-            print(
-                f"  ⚠️  Force-advancing '{title}' phase {phase_num} after {retries} "
-                f"retries ({blocking_bugs} bugs remain)"
-            )
-            _reset_retries(project_dir, phase_num)
-            state["quality_risk"] = True
-            state["force_advanced"] = True
-            advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
-            if not advanced:
-                _mark_complete(project_dir, state, title)
-                print(f"  ✅ '{title}' completed all phases (force-advanced past last phase)!")
+                tpath = project_dir / (
+                    tasks_path if tasks_path else f"phases/phase_{phase_num}/tasks.md"
+                )
+                if not tpath.is_absolute():
+                    tpath = project_dir / tasks_path
+                if repair_tasks_file(tpath):
+                    print(
+                        f"  🔧 '{title}' phase {phase_num}: repaired glued tasks.md checkboxes"
+                    )
+                    if phase_tasks_closed is not None:
+                        tasks_closed = phase_tasks_closed(project_dir, phase_num)
+                        task_stats = stats_for_phase(project_dir, phase_num)
+                    if tasks_closed:
+                        blocking_bugs = int(
+                            (state.get("review_result") or {}).get("blocking_bugs") or 0
+                        )
+                        if blocking_bugs == 0 and not (
+                            state.get("review_result") or {}
+                        ).get("review_fail"):
+                            # Only open tasks were blocking — fall through to clean pass
+                            pass
+            except Exception:
+                pass
+
+        # Re-evaluate open-task block after repair
+        if not tasks_closed:
+            blocking_bugs = max(int(blocking_bugs or 0), 1)
+
+        if not (blocking_bugs == 0 and tasks_closed):
+            # Increment retry counter
+            retries = _increment_retries(project_dir, phase_num)
+
+            if retries >= MAX_PHASE_RETRIES and tasks_closed:
+                # Too many retries — force-advance only if checkboxes are closed
+                print(
+                    f"  ⚠️  Force-advancing '{title}' phase {phase_num} after {retries} "
+                    f"retries ({blocking_bugs} bugs remain)"
+                )
+                _reset_retries(project_dir, phase_num)
+                state["quality_risk"] = True
+                state["force_advanced"] = True
+                advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
+                if not advanced:
+                    _mark_complete(project_dir, state, title)
+                    print(
+                        f"  ✅ '{title}' completed all phases "
+                        f"(force-advanced past last phase)!"
+                    )
+                return True
+
+            # HARD CAP: open tasks used to loop forever (retry 6/5, 7/5, …)
+            # because force-advance refuses open checkboxes. Stop re-queuing.
+            if retries > MAX_PHASE_RETRIES and not tasks_closed:
+                open_msg = ""
+                if task_stats is not None and format_open_tasks_message:
+                    open_msg = format_open_tasks_message(task_stats, phase=phase_num)
+                print(
+                    f"  🛑 '{title}' phase {phase_num}: retry {retries}/{MAX_PHASE_RETRIES} "
+                    f"but open tasks remain — stopping executor storm. {open_msg}"
+                )
+                bus.send(
+                    Message.create(
+                        from_agent="runner",
+                        to_agent="manager",
+                        type="signal",
+                        payload={
+                            "signal": "PHASE_STUCK",
+                            "phase": phase_num,
+                            "reason": (
+                                f"Open task checkboxes after {retries} retries "
+                                f"(>{MAX_PHASE_RETRIES}). Likely tasks.md corruption "
+                                f"or unfinished work. {open_msg}"
+                            ),
+                            "idea_slug": slug,
+                            "tasks_path": tasks_path,
+                            "workspace_path": workspace_path,
+                            "retry_count": int(retries),
+                        },
+                    )
+                )
+                _write_state(project_dir, state, f"phase_{phase_num}_executing")
+                return True
+
+            # Open tasks or review bugs → executor (no advance while [ ] remain)
+            review_full = str(project_dir / review_path) if review_path else ""
+            if not tasks_closed and task_stats is not None and format_open_tasks_message:
+                open_msg = format_open_tasks_message(task_stats, phase=phase_num)
+                fix_instructions = (
+                    f"TASK CHECKBOX GATE: {open_msg}\n"
+                    f"Edit the EXISTING lines in `{tasks_path}` — change `- [ ]` to `- [x]` "
+                    f"on each finished task. Do NOT append a new copy of the task list at "
+                    f"the bottom of the file (that leaves the real checkboxes open forever).\n"
+                    f"Finish remaining work, then mark each finished task `- [x]` only when "
+                    f"Done-when is met. "
+                    f"Also address any blocking review bugs (attempt {retries}/{MAX_PHASE_RETRIES}). "
+                    f"Read `{review_full}` for review details."
+                )
+                print(
+                    f"  ☑️  '{title}' phase {phase_num}: open tasks → executor "
+                    f"(retry {retries}/{MAX_PHASE_RETRIES})"
+                )
+            else:
+                fix_instructions = (
+                    f"Fix {blocking_bugs} blocking bugs from review "
+                    f"(attempt {retries}/{MAX_PHASE_RETRIES}). "
+                    f"Read `{review_full}` for details. "
+                    f"Mark completed tasks [x] in `{tasks_path}` by editing existing lines "
+                    f"(do not append duplicate task lists)."
+                )
+                print(
+                    f"  🔧 '{title}' phase {phase_num}: {blocking_bugs} bugs → executor "
+                    f"(retry {retries}/{MAX_PHASE_RETRIES})"
+                )
+
+            bus.send(Message.create(
+                from_agent="runner",
+                to_agent="executor",
+                type="task",
+                payload={
+                    "phase": phase_num,
+                    "tasks_path": tasks_path,
+                    "workspace_path": workspace_path,
+                    "fix_required": True,
+                    "review_path": review_path,
+                    "blocking_bugs": blocking_bugs,
+                    "open_tasks": not tasks_closed,
+                    "fix_instructions": fix_instructions,
+                    "idea_slug": slug,
+                },
+            ))
+            _write_state(project_dir, state, f"phase_{phase_num}_executing")
             return True
+        # else: repaired glued tasks → fall through to clean advance below
 
-        # Open tasks or review bugs → executor (no advance while [ ] remain)
-        review_full = str(project_dir / review_path) if review_path else ""
-        if not tasks_closed and task_stats is not None and format_open_tasks_message:
-            open_msg = format_open_tasks_message(task_stats, phase=phase_num)
-            fix_instructions = (
-                f"TASK CHECKBOX GATE: {open_msg}\n"
-                f"Finish remaining work, then mark each finished task `- [x]` in `{tasks_path}`. "
-                f"Do NOT mark [x] unless the Done-when criteria are met. "
-                f"Also address any blocking review bugs (attempt {retries}/{MAX_PHASE_RETRIES}). "
-                f"Read `{review_full}` for review details."
-            )
-            print(
-                f"  ☑️  '{title}' phase {phase_num}: open tasks → executor "
-                f"(retry {retries}/{MAX_PHASE_RETRIES})"
-            )
-        else:
-            fix_instructions = (
-                f"Fix {blocking_bugs} blocking bugs from review "
-                f"(attempt {retries}/{MAX_PHASE_RETRIES}). "
-                f"Read `{review_full}` for details. "
-                f"Mark completed tasks [x] in `{tasks_path}`."
-            )
-            print(
-                f"  🔧 '{title}' phase {phase_num}: {blocking_bugs} bugs → executor "
-                f"(retry {retries}/{MAX_PHASE_RETRIES})"
-            )
+    # Clean pass + all tasks closed — save non-blocking notes, advance or complete
+    if non_blocking_notes:
+        _append_polish(project_dir, phase_num, non_blocking_notes)
 
-        bus.send(Message.create(
-            from_agent="runner",
-            to_agent="executor",
-            type="task",
-            payload={
-                "phase": phase_num,
-                "tasks_path": tasks_path,
-                "workspace_path": workspace_path,
-                "fix_required": True,
-                "review_path": review_path,
-                "blocking_bugs": blocking_bugs,
-                "open_tasks": not tasks_closed,
-                "fix_instructions": fix_instructions,
-                "idea_slug": slug,
-            },
-        ))
-        _write_state(project_dir, state, f"phase_{phase_num}_executing")
-        return True
+    # --- Extract reusable components from review (no LLM needed) ---
+    _extract_shared_libs(project_dir, review_path, workspace_path, title)
+
+    _reset_retries(project_dir, phase_num)
+
+    advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
+    if not advanced:
+        _mark_complete(project_dir, state, title)
+        print(f"  ✅ '{title}' completed all phases!")
     else:
-        # Clean pass + all tasks closed — save non-blocking notes, advance or complete
-        if non_blocking_notes:
-            _append_polish(project_dir, phase_num, non_blocking_notes)
+        print(f"  ➡️  '{title}' phase {phase_num} passed → advancing to phase {phase_num + 1}")
 
-        # --- Extract reusable components from review (no LLM needed) ---
-        _extract_shared_libs(project_dir, review_path, workspace_path, title)
-
-        _reset_retries(project_dir, phase_num)
-
-        advanced = _advance_phase(bus, project_dir, state, phase_num, slug)
-        if not advanced:
-            _mark_complete(project_dir, state, title)
-            print(f"  ✅ '{title}' completed all phases!")
-        else:
-            print(f"  ➡️  '{title}' phase {phase_num} passed → advancing to phase {phase_num + 1}")
-
-        return True
+    return True

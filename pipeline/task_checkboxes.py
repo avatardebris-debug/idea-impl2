@@ -187,3 +187,79 @@ def format_open_tasks_message(stats: TaskCheckboxStats, *, phase: int | None = N
         f"{stats.open_count} open task checkbox(es) on {where} "
         f"({stats.done_count}/{stats.total} done).{titles}"
     )
+
+
+# Glued corruption: "...results.txt- [x] Task 1: foo- [x] Task 2: bar"
+_GLUED_TASK = re.compile(
+    r"-\s*\[([ xX])\]\s*Task\s+(\d+)\s*:\s*([^\n]*?)(?=-\s*\[|$)",
+    re.IGNORECASE,
+)
+_PROPER_TASK_LINE = re.compile(
+    r"^(\s*-\s*\[)[ xX](\]\s*Task\s+)(\d+)(\s*:.*)$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
+def repair_glued_tasks_content(content: str) -> tuple[str, bool]:
+    """
+    Fix LLM corruption where completed tasks are appended as a single glued line
+    instead of flipping the real ``- [ ] Task N:`` lines.
+
+    Returns (new_content, changed).
+    """
+    if not content or "- [" not in content:
+        return content, False
+
+    # Detect glued segment: checkbox not at line start (char before is not newline)
+    glued_start = None
+    for m in re.finditer(r"-\s*\[[ xX]\]\s*Task\s+\d+", content, re.I):
+        if m.start() > 0 and content[m.start() - 1] not in "\n\r":
+            glued_start = m.start()
+            break
+    if glued_start is None:
+        return content, False
+
+    head = content[:glued_start].rstrip()
+    glued = content[glued_start:]
+    done_ids: set[int] = set()
+    for m in _GLUED_TASK.finditer(glued):
+        mark, num_s, _title = m.group(1), m.group(2), m.group(3)
+        try:
+            num = int(num_s)
+        except ValueError:
+            continue
+        if mark.strip().lower() == "x":
+            done_ids.add(num)
+
+    if not done_ids:
+        # Still strip garbage glued trail
+        new = head + "\n"
+        return new, new != content
+
+    def _flip(m: re.Match[str]) -> str:
+        num = int(m.group(3))
+        if num in done_ids:
+            return f"{m.group(1)}x{m.group(2)}{m.group(3)}{m.group(4)}"
+        return m.group(0)
+
+    new_head = _PROPER_TASK_LINE.sub(_flip, head)
+    new = new_head.rstrip() + "\n"
+    return new, new != content
+
+
+def repair_tasks_file(path: Path) -> bool:
+    """Repair glued checkbox corruption in-place. Returns True if file changed."""
+    if not path.is_file():
+        return False
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    new, changed = repair_glued_tasks_content(text)
+    if not changed:
+        return False
+    try:
+        path.write_text(new, encoding="utf-8")
+    except OSError:
+        return False
+    return True

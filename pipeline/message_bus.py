@@ -167,6 +167,13 @@ class MessageBus:
              msg.created_at, msg.in_reply_to, "pending"),
         )
         conn.commit()
+        # Optional short-poll wake for agents (PIPELINE_BUS_WAKE / cloud default)
+        try:
+            from pipeline.bus_wake import touch_bus_wake
+
+            touch_bus_wake()
+        except Exception:
+            pass
 
     def read_next(self, agent_name: str) -> Message | None:
         """Atomically claim the next pending message (FIFO, priority-aware).

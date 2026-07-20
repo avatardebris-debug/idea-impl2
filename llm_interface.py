@@ -277,6 +277,8 @@ class OllamaAdapter(LLMBase):
         # Per-adapter context store: {cache_key -> context list}
         # Populated by kv_cache module; lives for the lifetime of this adapter instance.
         self._kv_slug_active: bool = bool(slug)
+        # Last Ollama singleflight lock wait (ms); set inside chat()
+        self._last_lock_wait_ms: float = 0.0
 
     def _normalize_messages(self, messages: list[dict]) -> list[dict]:
         """
@@ -407,7 +409,8 @@ class OllamaAdapter(LLMBase):
                 }
                 if self.think is not None:
                     _kv_opts["think"] = self.think  # type: ignore[assignment]
-                with ollama_singleflight():
+                with ollama_singleflight() as _wait_ms:
+                    self._last_lock_wait_ms = float(_wait_ms or 0)
                     _kv_resp = _cache.generate(
                         model=self.model,
                         system=_system,
@@ -440,7 +443,8 @@ class OllamaAdapter(LLMBase):
                     method="POST",
                 )
                 try:
-                    with ollama_singleflight():
+                    with ollama_singleflight() as _wait_ms:
+                        self._last_lock_wait_ms = float(_wait_ms or 0)
                         with urllib.request.urlopen(req, timeout=timeout_s) as resp:
                             raw = _json.loads(resp.read().decode("utf-8"))
                     break  # success — exit retry loop

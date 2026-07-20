@@ -30,3 +30,13 @@ def env_float(name: str, *, default: float) -> float:
         return float(raw)
     except ValueError:
         return default
+
+
+def env_int(name: str, *, default: int) -> int:
+    raw = os.environ.get(name)
+    if raw is None or not str(raw).strip():
+        return default
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        return default

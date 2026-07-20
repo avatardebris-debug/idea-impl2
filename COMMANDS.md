@@ -65,6 +65,60 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `PRE_FORCE_SYSTEMATIC_DEBUG` | on | Classic: one systematic-debugging executor pass before force-advance |
 | `PIPELINE_COMPLETE_PYTEST` | on | At complete: re-run pytest; red (or force_advanced) → `complete_with_bugs` |
 | `PIPELINE_COMPLETE_PYTEST_TIMEOUT` | (pytest internal) | Per-test timeout hint for complete gate |
+| `PIPELINE_CLOUD` | off | Cloud layout (`.pipeline/`); also enables cloud parallel + bus-wake defaults |
+| `PIPELINE_CLOUD_PARALLEL_SEEDS` | `2` when cloud | Default `--parallel-seeds` when `PIPELINE_CLOUD=1` and CLI not passed |
+| `PIPELINE_CLOUD_EXECUTORS` | `2` when cloud | Default `--executors` when `PIPELINE_CLOUD=1` and CLI not passed |
+| `PIPELINE_PROJECT_LOCK` | on when cloud | Per-slug lock file so multi-executors do not work the same project |
+| `PIPELINE_PROJECT_LOCK_STALE_S` | `1800` | Mtime fallback when lock PID unknown; live PID never reclaimed by age alone |
+| `PIPELINE_TIMEOUT_LOCK_JOIN_S` | `30` | After phase timeout, grace-join handle thread; if dead, release lock; if alive, start reaper |
+| `PIPELINE_ZOMBIE_LOCK_HARD_S` | `3600` | Max hold for zombie project lock before force-release |
+| `PIPELINE_BUS_WAKE` | on when cloud | Touch `state/bus_wake` on send; agents short-poll mtime/token (0.2–1s) |
+| `PIPELINE_BUS_WAKE_TIMEOUT` | `0.5` | Seconds between wake checks when `PIPELINE_BUS_WAKE=1` |
+| `PIPELINE_GROK_SIDECAR` | `0` | Optional **serial** one-shot Grok implement/fix for stuck classic phases (not default cloud path) |
+| `PIPELINE_GROK_SIDECAR_MIN_RETRIES` | `3` | Min fix retries before sidecar may run (manager / PHASE_STUCK; uses real payload retry_count) |
+
+### Cloud classic parallel (not Grok-Build parallel)
+
+With `PIPELINE_CLOUD=1`, if you do **not** pass `--parallel-seeds` / `--executors`, the runner
+applies `PIPELINE_CLOUD_PARALLEL_SEEDS` (default **2**) and `PIPELINE_CLOUD_EXECUTORS`
+(default **2**). Explicit CLI always wins. Grok-Build engine sessions stay **serial (1)**.
+
+```bash
+export PIPELINE_CLOUD=1
+# Uses seeds=2 executors=2 unless overridden:
+python pipeline/runner.py --from-list --provider ollama --model "$PIPELINE_MODEL" --time-limit 600
+# Explicit override:
+python pipeline/runner.py --from-list --parallel-seeds 1 --executors 1 ...
+```
+
+**Project lock:** the SQLite bus serializes *message* claim only. With multiple executors,
+`PIPELINE_PROJECT_LOCK` (default on under cloud) uses `projects/<slug>/state/project.lock`
+so two agents do not process the same slug at once.
+
+**Bus wake:** `MessageBus.send` touches `state/bus_wake`. Agents short-poll instead of only
+long idle sleeps. Disable: `PIPELINE_BUS_WAKE=0`.
+
+**Phase fix memory:** on validation FAIL, classic writes
+`projects/<slug>/state/phase_N_fix_memory.json` (`attempts` + `banned_signatures`) and
+injects banned signatures + last 3 attempts into executor fix prompts.
+
+**LLM wait metrics (instrumentation only — no vLLM deploy):**
+
+```bash
+python -m pipeline.llm_metrics
+python -m pipeline.llm_metrics --last 100 --json
+# Writes: PIPELINE_DIR/metrics/llm_calls.jsonl  + activity event llm_call
+```
+
+**Optional Grok sidecar** (classic stuck rescue; serial; default off):
+
+```bash
+export PIPELINE_GROK_SIDECAR=1
+export GROK_BUILD_CMD='your-grok-cli --workspace {workspace} --prompt {prompt_file} --skill {skill}'
+# or dry-run: GROK_BUILD_DRY_RUN=1
+# Invoked at most once per phase from manager FIX_ANALYSIS / PHASE_STUCK after min retries.
+# Does not set engine=grok_build permanently. See pipeline/grok_sidecar.maybe_run_sidecar_fix.
+```
 
 **Statuses:** `complete` = phases done + final pytest clean. `complete_with_bugs` = phases done
 but pytest failed at complete and/or force_advanced/quality_risk — still ship/field eligible

@@ -134,16 +134,46 @@ class AgentProcess:
                     self.role, self.provider, self.model)
 
         # Adaptive poll back-off: immediately re-poll after work, ramp to max on idle.
+        # With PIPELINE_BUS_WAKE=1 (default under PIPELINE_CLOUD=1), idle waits use
+        # a short wake-file poll instead of only fixed long sleeps.
         _POLL_MIN  = 0.1   # seconds — retry immediately after a hit
         _POLL_MAX  = 2.0   # seconds — cap on idle sleep
         _POLL_STEP = 0.25  # seconds — additive back-off increment per miss
         _poll_wait = _POLL_MIN
+        _wake_mtime: float = 0.0
+        _wake_token: int = 0
+        try:
+            from pipeline.bus_wake import bus_wake_enabled, read_wake_token, wake_poll_timeout_s
+
+            _use_bus_wake = bus_wake_enabled()
+            if _use_bus_wake:
+                # Prefer shorter max idle under cloud wake mode
+                _POLL_MAX = min(_POLL_MAX, max(0.5, wake_poll_timeout_s() * 2))
+                _wake_token = read_wake_token()
+        except Exception:
+            _use_bus_wake = False
 
         while not self._stop_requested:
             msg = self.bus.read_next(self.role)
 
             if msg is None:
-                if _poll_wait > 0:
+                if _use_bus_wake:
+                    try:
+                        from pipeline.bus_wake import read_wake_token, wait_for_bus_wake
+
+                        _wake_mtime = wait_for_bus_wake(
+                            last_mtime=_wake_mtime,
+                            last_token=_wake_token,
+                            timeout_s=min(_poll_wait, wake_poll_timeout_s())
+                            if _poll_wait > 0
+                            else wake_poll_timeout_s(),
+                            stop_check=lambda: self._stop_requested,
+                        )
+                        _wake_token = read_wake_token()
+                    except Exception:
+                        if _poll_wait > 0:
+                            time.sleep(_poll_wait)
+                elif _poll_wait > 0:
                     time.sleep(_poll_wait)
                 # Ramp up sleep on consecutive misses, cap at max
                 _poll_wait = min(_poll_wait + _POLL_STEP, _POLL_MAX)
@@ -187,6 +217,44 @@ class AgentProcess:
                     _queue_wait_s = 0.0
                 _handle_start = time.time()
 
+                # Optional per-project lock (cloud multi-executor): bus serializes
+                # messages, not slugs — avoid two agents mutating the same project.
+                # Includes validator so test runs do not race late executor writes.
+                _proj_lock_held = False
+                _lock_slug = getattr(self, "_current_slug", "") or ""
+                _LOCK_ROLES = (
+                    "executor",
+                    "phase_planner",
+                    "reviewer",
+                    "validator",
+                )
+                if _lock_slug and self.role in _LOCK_ROLES:
+                    try:
+                        from pipeline.project_lock import (
+                            project_lock_enabled,
+                            try_acquire_project_lock,
+                            release_project_lock,
+                        )
+
+                        if project_lock_enabled():
+                            _holder = f"{self.role}:{os.getpid()}"
+                            if not try_acquire_project_lock(
+                                _lock_slug, holder=_holder, timeout_s=0.0
+                            ):
+                                logger.info(
+                                    "[%s] Project %s locked by another agent — requeue",
+                                    self.role,
+                                    _lock_slug,
+                                )
+                                self.bus.nack(msg, increment_retry=False)
+                                time.sleep(0.5)
+                                continue
+                            _proj_lock_held = True
+                    except Exception:
+                        logger.debug(
+                            "[%s] project lock check failed", self.role, exc_info=True
+                        )
+
                 # Run handle() in a thread so we can enforce a wall-clock timeout
                 _result: list[Any] = [None]
                 _exc: list[Optional[Exception]] = [None]
@@ -197,108 +265,164 @@ class AgentProcess:
                     except Exception as e:
                         _exc[0] = e
 
-                t = threading.Thread(target=_run_handle, daemon=True)
-                t.start()
-                t.join(timeout=self.phase_timeout)
+                # On timeout we must NOT release the project lock while the daemon
+                # handle thread may still be writing the workspace. Hold the lock
+                # until the thread ends (capped) or skip release so dead-PID sweep
+                # reclaims after process exit.
+                _release_lock = True
+                try:
+                    t = threading.Thread(target=_run_handle, daemon=True)
+                    t.start()
+                    t.join(timeout=self.phase_timeout)
 
-                if t.is_alive():
-                    # Agent timed out — escalate to manager (main pipeline) or ship recovery
-                    timeout_min = self.phase_timeout // 60
-                    logger.warning(
-                        "[%s] Timed out after %d min on message %s",
-                        self.role, timeout_min, msg.msg_id
-                    )
-                    from pipeline.pipeline_config import SHIP_AGENT_ROLES
-
-                    if self.role in SHIP_AGENT_ROLES:
-                        from pipeline.ship_recovery import handle_ship_agent_failure
-
-                        handle_ship_agent_failure(
-                            self.bus,
-                            self._current_slug,
-                            self.role,
-                            f"timed out after {timeout_min} minutes",
+                    if t.is_alive():
+                        # Agent timed out — escalate to manager (main pipeline) or ship recovery
+                        timeout_min = self.phase_timeout // 60
+                        logger.warning(
+                            "[%s] Timed out after %d min on message %s",
+                            self.role, timeout_min, msg.msg_id
                         )
-                    else:
-                        timeout_msg = Message.create(
-                            from_agent=self.role,
-                            to_agent="manager",
-                            type="signal",
-                            payload={
-                                "signal": "PHASE_STUCK",
-                                "reason": f"{self.role} timed out after {timeout_min} minutes",
-                                "phase": msg.payload.get("phase", "?"),
-                                "idea_slug": self._current_slug,
-                            },
+                        from pipeline.pipeline_config import SHIP_AGENT_ROLES
+
+                        if self.role in SHIP_AGENT_ROLES:
+                            from pipeline.ship_recovery import handle_ship_agent_failure
+
+                            handle_ship_agent_failure(
+                                self.bus,
+                                self._current_slug,
+                                self.role,
+                                f"timed out after {timeout_min} minutes",
+                            )
+                        else:
+                            timeout_msg = Message.create(
+                                from_agent=self.role,
+                                to_agent="manager",
+                                type="signal",
+                                payload={
+                                    "signal": "PHASE_STUCK",
+                                    "reason": f"{self.role} timed out after {timeout_min} minutes",
+                                    "phase": msg.payload.get("phase", "?"),
+                                    "idea_slug": self._current_slug,
+                                    "retry_count": int(
+                                        (msg.payload or {}).get("retry_count") or 0
+                                    ),
+                                },
+                            )
+                            self.bus.send(timeout_msg)
+                        self.bus.fail(msg)   # Don't retry a timed-out message
+
+                        # Keep exclusivity while timed-out work may still run.
+                        # Grace join: if thread dies, release lock normally.
+                        # If still alive: hold lock + background reaper releases
+                        # when the handle thread finishes (or hard timeout).
+                        _grace = float(
+                            os.environ.get("PIPELINE_TIMEOUT_LOCK_JOIN_S", "30") or 30
                         )
-                        self.bus.send(timeout_msg)
-                    self.bus.fail(msg)   # Don't retry a timed-out message
-                    continue
+                        t.join(timeout=max(0.0, _grace))
+                        if t.is_alive() and _proj_lock_held and _lock_slug:
+                            try:
+                                from pipeline.project_lock import register_zombie_lock
 
-                if _exc[0] is not None:
-                    raise _exc[0]
+                                register_zombie_lock(
+                                    _lock_slug,
+                                    t,
+                                    holder=f"{self.role}:{os.getpid()}",
+                                )
+                                _release_lock = False
+                                logger.warning(
+                                    "[%s] Timeout thread still alive for %s — "
+                                    "holding project lock until handle ends (reaper)",
+                                    self.role,
+                                    _lock_slug or "(no-slug)",
+                                )
+                            except Exception:
+                                # Fail open: release rather than freeze the slug forever
+                                _release_lock = True
+                                logger.debug(
+                                    "[%s] zombie lock register failed — releasing",
+                                    self.role,
+                                    exc_info=True,
+                                )
+                        else:
+                            # Thread finished during grace — release in finally
+                            _release_lock = True
+                        continue
 
-                output = _result[0]
+                    if _exc[0] is not None:
+                        raise _exc[0]
 
-                # Send outgoing messages
-                for out_msg in output.outgoing:
-                    self.bus.send(out_msg)
-                    logger.info("[%s] Sent %s to %s",
-                                self.role, out_msg.type, out_msg.to_agent)
+                    output = _result[0]
 
-                self.bus.ack(msg)
+                    # Send outgoing messages
+                    for out_msg in output.outgoing:
+                        self.bus.send(out_msg)
+                        logger.info("[%s] Sent %s to %s",
+                                    self.role, out_msg.type, out_msg.to_agent)
 
-                # Record timing metrics
-                try:
-                    _handle_s = time.time() - _handle_start
-                    from pipeline.agent_metrics import record as _record_metric
-                    _record_metric(
-                        role=self.role,
-                        slug=self._current_slug,
-                        queue_wait_s=_queue_wait_s,
-                        handle_s=_handle_s,
-                        tokens=output.tokens_used,
-                        files_written=len(output.files_written),
-                    )
-                except Exception:
-                    pass  # Never crash over metrics
+                    self.bus.ack(msg)
 
-                logger.info("[%s] Completed message %s (success=%s, tokens=%d, steps=%d)",
-                            self.role, msg.msg_id, output.success,
-                            output.tokens_used, output.steps_used)
+                    # Record timing metrics
+                    try:
+                        _handle_s = time.time() - _handle_start
+                        from pipeline.agent_metrics import record as _record_metric
+                        _record_metric(
+                            role=self.role,
+                            slug=self._current_slug,
+                            queue_wait_s=_queue_wait_s,
+                            handle_s=_handle_s,
+                            tokens=output.tokens_used,
+                            files_written=len(output.files_written),
+                        )
+                    except Exception:
+                        pass  # Never crash over metrics
 
-                try:
-                    from pipeline.pipeline_config import SHIP_AGENT_ROLES
+                    logger.info("[%s] Completed message %s (success=%s, tokens=%d, steps=%d)",
+                                self.role, msg.msg_id, output.success,
+                                output.tokens_used, output.steps_used)
 
-                    if self.role in SHIP_AGENT_ROLES and output.success:
-                        from pipeline.ship_recovery import reset_ship_failure_counters
+                    try:
+                        from pipeline.pipeline_config import SHIP_AGENT_ROLES
 
-                        reset_ship_failure_counters(self._project_dir)
-                except Exception:
-                    pass
+                        if self.role in SHIP_AGENT_ROLES and output.success:
+                            from pipeline.ship_recovery import reset_ship_failure_counters
 
-                try:
-                    from pipeline.step_collector import collect_agent_step
+                            reset_ship_failure_counters(self._project_dir)
+                    except Exception:
+                        pass
 
-                    collect_agent_step(
-                        slug=self._current_slug,
-                        agent_role=self.role,
-                        msg_type=msg.type,
-                        payload=msg.payload if msg.type != "signal" else {},
-                        answer=output.answer or "",
-                        tokens_used=output.tokens_used,
-                        steps_used=output.steps_used,
-                        success=output.success,
-                        project_dir=self._project_dir,
-                    )
-                except Exception:
-                    pass
+                    try:
+                        from pipeline.step_collector import collect_agent_step
 
-                # Executor continuity: immediately try next message without any poll delay.
-                # This eliminates idle time between back-to-back tasks for busy agents.
-                # The back-off will reset to _POLL_MIN at the top of the loop anyway,
-                # but this skips even that minimal delay when there's more work queued.
-                _poll_wait = 0.0
+                        collect_agent_step(
+                            slug=self._current_slug,
+                            agent_role=self.role,
+                            msg_type=msg.type,
+                            payload=msg.payload if msg.type != "signal" else {},
+                            answer=output.answer or "",
+                            tokens_used=output.tokens_used,
+                            steps_used=output.steps_used,
+                            success=output.success,
+                            project_dir=self._project_dir,
+                        )
+                    except Exception:
+                        pass
+
+                    # Executor continuity: immediately try next message without any poll delay.
+                    # This eliminates idle time between back-to-back tasks for busy agents.
+                    # The back-off will reset to _POLL_MIN at the top of the loop anyway,
+                    # but this skips even that minimal delay when there's more work queued.
+                    _poll_wait = 0.0
+                finally:
+                    if _release_lock and _proj_lock_held and _lock_slug:
+                        try:
+                            from pipeline.project_lock import release_project_lock
+
+                            release_project_lock(
+                                _lock_slug,
+                                holder=f"{self.role}:{os.getpid()}",
+                            )
+                        except Exception:
+                            pass
 
             except InterruptedError as e:
                 logger.info("[%s] Preemption interrupt triggered: %s. Cleanly NACKing message.", self.role, e)
@@ -341,6 +465,7 @@ class AgentProcess:
                                 ),
                                 "phase": msg.payload.get("phase", "?"),
                                 "idea_slug": self._current_slug,
+                                "retry_count": int(retries),
                             },
                         )
                         try:
@@ -638,6 +763,17 @@ class AgentProcess:
         except Exception:
             pass
 
+        def _react_wait_ms() -> float:
+            """Best-effort Ollama singleflight wait (last call in this process)."""
+            try:
+                from pipeline.ollama_lock import last_lock_wait_ms
+
+                return float(last_lock_wait_ms() or 0.0)
+            except Exception:
+                return 0.0
+
+        _llm_t0 = time.time()
+        _llm_ok = True
         try:
             result = run_agent(
                 task=task,
@@ -653,6 +789,22 @@ class AgentProcess:
                 slug=self._current_slug,  # enables Ollama KV-cache reuse per project
             )
         except InterruptedError:
+            _llm_ok = False
+            try:
+                from pipeline.llm_metrics import record_llm_call
+
+                record_llm_call(
+                    duration_ms=(time.time() - _llm_t0) * 1000,
+                    wait_ms=_react_wait_ms(),
+                    provider=self.provider,
+                    model=self.model,
+                    role=self.role,
+                    slug=self._current_slug or "",
+                    kind="react",
+                    ok=False,
+                )
+            except Exception:
+                pass
             raise
         except Exception as e:
             if getattr(self, "model_tier", "heavy") == "light" and self.model != self.heavy_model:
@@ -682,13 +834,60 @@ class AgentProcess:
                 except Exception as fallback_e:
                     self.model = original_model
                     self.num_ctx = original_num_ctx
+                    _llm_ok = False
+                    try:
+                        from pipeline.llm_metrics import record_llm_call
+
+                        record_llm_call(
+                            duration_ms=(time.time() - _llm_t0) * 1000,
+                            wait_ms=_react_wait_ms(),
+                            provider=self.provider,
+                            model=self.model,
+                            role=self.role,
+                            slug=self._current_slug or "",
+                            kind="react",
+                            ok=False,
+                        )
+                    except Exception:
+                        pass
                     raise fallback_e
                 
                 self.model = original_model
                 self.num_ctx = original_num_ctx
             else:
+                _llm_ok = False
+                try:
+                    from pipeline.llm_metrics import record_llm_call
+
+                    record_llm_call(
+                        duration_ms=(time.time() - _llm_t0) * 1000,
+                        wait_ms=_react_wait_ms(),
+                        provider=self.provider,
+                        model=self.model,
+                        role=self.role,
+                        slug=self._current_slug or "",
+                        kind="react",
+                        ok=False,
+                    )
+                except Exception:
+                    pass
                 raise e
 
+        try:
+            from pipeline.llm_metrics import record_llm_call
+
+            record_llm_call(
+                duration_ms=(time.time() - _llm_t0) * 1000,
+                wait_ms=_react_wait_ms(),
+                provider=self.provider,
+                model=self.model,
+                role=self.role,
+                slug=self._current_slug or "",
+                kind="react",
+                ok=_llm_ok,
+            )
+        except Exception:
+            pass
 
         # Preload thread is daemon — no need to join; it will finish naturally.
         # If it's still running when we return, the context build completes in
@@ -752,7 +951,43 @@ class AgentProcess:
             "[%s] Direct LLM call starting (model=%s, ctx=%d, timeout=%ds)",
             self.role, self.model, self.num_ctx, request_timeout_s,
         )
-        resp = llm.chat(messages, tools=None, request_timeout=request_timeout_s)
+        _llm_t0 = time.time()
+        _llm_ok = True
+        try:
+            resp = llm.chat(messages, tools=None, request_timeout=request_timeout_s)
+        except Exception:
+            _llm_ok = False
+            try:
+                from pipeline.llm_metrics import record_llm_call
+
+                record_llm_call(
+                    duration_ms=(time.time() - _llm_t0) * 1000,
+                    wait_ms=float(getattr(llm, "_last_lock_wait_ms", 0) or 0),
+                    provider=self.provider,
+                    model=self.model,
+                    role=self.role,
+                    slug=self._current_slug or "",
+                    kind="direct",
+                    ok=False,
+                )
+            except Exception:
+                pass
+            raise
+        try:
+            from pipeline.llm_metrics import record_llm_call
+
+            record_llm_call(
+                duration_ms=(time.time() - _llm_t0) * 1000,
+                wait_ms=float(getattr(llm, "_last_lock_wait_ms", 0) or 0),
+                provider=self.provider,
+                model=self.model,
+                role=self.role,
+                slug=self._current_slug or "",
+                kind="direct",
+                ok=_llm_ok,
+            )
+        except Exception:
+            pass
         content = resp.content or ""
         tokens = resp.usage.total_tokens if resp.usage else 0
         logger.info("[%s] Direct LLM call done (tokens=%d, chars=%d)", self.role, tokens, len(content))
