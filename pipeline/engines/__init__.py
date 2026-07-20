@@ -3,7 +3,7 @@ Dual-engine package: classic multi-agent path + optional Grok Build skill chain.
 
 Default engine is always classic. Grok Build is opt-in via PIPELINE_ENGINE /
 per-project state["engine"]. Planners (idea_planner, phase_planner) stay classic
-in v1; grok_build owns implement → validate → review → fix only.
+in v1; grok_build owns implement → validate → review → fix, then thin field ship.
 """
 
 from __future__ import annotations

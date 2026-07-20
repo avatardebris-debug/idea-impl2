@@ -673,6 +673,24 @@ def run_grok_phase(
             outcome.completed = True
             outcome.reason = "complete"
             print(f"  ✅ grok_build '{title}' completed all phases!")
+            # Thin ship: field plan + run in-process (no classic thermo stack)
+            try:
+                from pipeline.engines.field_ship import run_thin_field_ship, thin_ship_enabled
+
+                state_after = _load_state(project_dir)
+                if thin_ship_enabled(state_after) and (
+                    state_after.get("status") or ""
+                ) == "complete":
+                    ship = run_thin_field_ship(
+                        project_dir, state_after, slug=slug
+                    )
+                    outcome.reason = f"complete+thin_ship:{ship.status}"
+                    outcome.review_result = {
+                        **(outcome.review_result or {}),
+                        "thin_field_ship": ship.to_dict(),
+                    }
+            except Exception as _ship_exc:
+                print(f"  [thin-ship] skipped after complete: {_ship_exc}")
         else:
             outcome.advanced = True
             # Overflow re-queue sets phase_N_executing without next phase

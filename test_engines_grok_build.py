@@ -88,6 +88,8 @@ def test_missing_cmd_is_hard_failure(tmp_path: Path, monkeypatch):
     monkeypatch.delenv("GROK_BUILD_DRY_RUN", raising=False)
     proj = tmp_path / "proj"
     (proj / "workspace").mkdir(parents=True)
+    monkeypatch.setenv("GROK_BUILD_BACKEND", "cli")
+    monkeypatch.delenv("GROK_BUILD_CMD", raising=False)
     result = run_phase_step(
         "proj",
         2,
@@ -96,7 +98,7 @@ def test_missing_cmd_is_hard_failure(tmp_path: Path, monkeypatch):
         dry_run=False,
         cmd_template=None,
     )
-    # When env unset and no template override, fail
+    # When backend=cli and CMD unset, hard fail (no pipeline_llm fallback)
     assert result.success is False
     assert result.exit_code == 127
     assert "GROK_BUILD_CMD" in (result.error or "")

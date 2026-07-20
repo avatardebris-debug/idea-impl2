@@ -170,10 +170,21 @@ def test_fake_engine_completes_phase(tmp_path: Path):
     assert rr["blocking_bugs"] == 0
 
     final = json.loads((proj / "state" / "current_idea.json").read_text(encoding="utf-8"))
-    # complete or mvp_complete depending on phases_fully_built
-    assert final.get("status") in ("complete", "mvp_complete", "phase_1_reviewed")
+    # complete / mvp_complete, or thin-ship terminal field_proven / ship_insufficient
+    assert final.get("status") in (
+        "complete",
+        "mvp_complete",
+        "phase_1_reviewed",
+        "field_proven",
+        "ship_insufficient",
+    )
     if outcome.completed:
-        assert final.get("status") in ("complete", "mvp_complete")
+        assert final.get("status") in (
+            "complete",
+            "mvp_complete",
+            "field_proven",
+            "ship_insufficient",
+        )
 
 
 def test_hard_failure_falls_back_to_classic(tmp_path: Path):

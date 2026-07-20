@@ -49,6 +49,13 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `GROK_BUILD_TIMEOUT_S` | `1800` | Per-step subprocess timeout |
 | `GROK_BUILD_DEEP_REVIEW=1` | off | Run optional deep review skill every grok phase |
 | `GROK_BUILD_DEEP_REVIEW_LAST=1` | off | Deep review only on last planned phase |
+| `GROK_BUILD_BACKEND` | `auto` | `auto` = CLI if `GROK_BUILD_CMD` set else `pipeline_llm`; `cli` = require grok.exe template; `pipeline_llm` = ollama/qwen/openai via `llm_interface` |
+| `GROK_BUILD_ALLOW_PIPELINE_LLM` | on | When `auto` and no CLI, use pipeline LLM for skill steps |
+| `GROK_BUILD_PROVIDER` / `GROK_BUILD_MODEL` | fall back to `PIPELINE_*` | Provider/model for `pipeline_llm` build steps |
+| `GROK_BUILD_THIN_SHIP` | on | After grok_build complete, run in-process field plan+run → `field_proven` / `ship_insufficient` (skip classic thermo) |
+| `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
+| `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
+| `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
 
 ```bash
 # Dry-run adapter smoke (no real Grok CLI required)
@@ -86,7 +93,24 @@ from the main health cycle (at most **one** grok project per health tick).
 Overflow batches (`phase_N_overflow/tasks.md`) under `engine=grok_build` re-enter the
 Grok driver — classic executor is **not** dual-scheduled.
 
-**Ship handoff unchanged:** complete → GitHub publish + ship-prove use the same scripts.
+**Thin ship (grok_build closed loop):** on full complete, `run_thin_field_ship` plans
+`phases/ship/field_tests.md` (Grok CLI → pipeline LLM e.g. qwen → heuristic), runs
+`field_test_runner`, writes results + usefulness report, sets `field_proven` or
+`ship_insufficient`. Classic `--ship-prove` uses the same thin path for
+`engine=grok_build` projects; other engines still queue `field_test_planner`.
+
+```bash
+# Local/qwen build steps without grok.exe (optional)
+export PIPELINE_ENGINE=grok_build
+export GROK_BUILD_BACKEND=pipeline_llm
+export PIPELINE_PROVIDER=ollama
+export PIPELINE_MODEL=qwen3.6:35b-a3b-q4_K_M
+export FIELD_PLAN_ENGINE=pipeline_llm   # or heuristic / auto
+
+# Grok CLI for implement; local LLM only for field plan
+export GROK_BUILD_CMD='C:\Users\avata\.grok\bin\grok.exe --cwd "{workspace}" --prompt-file "{prompt_file}" --always-approve --max-turns 40 --output-format plain'
+export FIELD_PLAN_ENGINE=auto
+```
 
 Plan + scorecard: `notes/2026-07-19-grok-build-factory-dual-engine-plan.md`,
 `notes/experiments/grok-build-engine-README.md`.

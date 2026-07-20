@@ -246,6 +246,29 @@ def queue_ship_prove_projects(
         if prov.get("maturity_stage") in ("M2", "M3", "M4"):
             continue
 
+        # Grok Build thin ship: in-process field plan+run (skip classic planner/thermo)
+        try:
+            from pipeline.engines.field_ship import run_thin_field_ship, thin_ship_enabled
+            from pipeline.engines.selection import get_project_engine
+
+            if thin_ship_enabled(state) and get_project_engine(state) == "grok_build":
+                state.pop("pre_budget_status", None)
+                state.pop("budget_note", None)
+                _stamp_ship_session(state)
+                state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                ship = run_thin_field_ship(project_dir, state, slug=slug)
+                print(
+                    f"  [ship-prove] thin-ship '{state.get('title', slug)}' → {ship.status}"
+                )
+                if ship.status in ("field_proven", "ship_insufficient", "field_testing"):
+                    queued += 1
+                    fresh_slugs.add(slug)
+                if limit and queued >= limit:
+                    break
+                continue
+        except Exception as _thin_exc:
+            print(f"  [ship-prove] thin-ship fallback to classic for {slug}: {_thin_exc}")
+
         state["status"] = "field_test_planning"
         state.pop("pre_budget_status", None)
         state.pop("budget_note", None)
