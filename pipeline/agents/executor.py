@@ -327,18 +327,39 @@ class ExecutorAgent(AgentProcess):
                     "3. Say DONE and list every file you changed.\n"
                 )
             else:
+                # Manager strategy / systematic-debug: always surface fix_instructions
+                # even when fix_report.md already exists (was previously only a fallback).
+                extra_instructions = (msg.payload.get("fix_instructions") or "").strip()
+                sys_debug = bool(msg.payload.get("systematic_debug"))
+                strategy_block = ""
+                if extra_instructions:
+                    title = (
+                        "SYSTEMATIC DEBUG (required)"
+                        if sys_debug
+                        else "Manager / directed fix strategy"
+                    )
+                    strategy_block = (
+                        f"## {title}\n{extra_instructions[:10000]}\n\n"
+                    )
                 task_prompt = (
                 f"You are fixing Phase {phase_num} code that failed validation/review.\n\n"
                 f"## Workspace\n{workspace}\n\n"
                 + pending_section
+                + strategy_block
                 + f"## Fix Report (read ALL previous attempts before making changes)\n"
                 f"{fix_report_content[:8000]}\n\n"
                 + (f"## Review Details\n{review_content[:2000]}\n\n" if review_content else "")
                 + (f"{bug_memory_block}\n\n" if bug_memory_block else "")
                 + "## Instructions\n"
-                  "**FOCUS RULE: Fix ONLY what the Fix Report says is broken. "
-                  "Do NOT refactor, explore alternatives, or add features.**\n"
-                  "1. Read the Fix Report above carefully — especially Previous Attempts.\n"
+                  + (
+                    "**SYSTEMATIC DEBUG:** Follow the strategy section first "
+                    "(root cause before fix).\n"
+                    if sys_debug
+                    else
+                    "**FOCUS RULE: Fix ONLY what the Fix Report says is broken. "
+                    "Do NOT refactor, explore alternatives, or add features.**\n"
+                  )
+                  + "1. Read the Fix Report above carefully — especially Previous Attempts.\n"
                   "2. Do NOT repeat a fix that was already tried and failed.\n"
                   f"3. Use `list_tree` then `read_file` on each relevant source file.\n"
                   "4. Fix ONLY the blocking issues described. Don't rewrite working code.\n"

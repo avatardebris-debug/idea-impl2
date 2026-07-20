@@ -34,6 +34,7 @@ from pipeline.engines.selection import ENGINE_GROK_BUILD, get_project_engine
 FIELD_TESTS_REL = Path("phases/ship/field_tests.md")
 FIELD_RESULTS_REL = Path("phases/ship/field_test_results.md")
 USEFULNESS_REL = Path("phases/ship/usefulness_report.md")
+CAPABILITY_CLAIMS_REL = Path("state/capability_claims.md")
 
 
 @dataclass
@@ -66,13 +67,35 @@ class FieldShipResult:
         }
 
 
-def thin_ship_enabled(state: dict[str, Any] | None = None) -> bool:
-    """Whether to run thin field ship for this project."""
-    if not env_bool("GROK_BUILD_THIN_SHIP", default=True):
-        return False
-    if state is not None and get_project_engine(state) != ENGINE_GROK_BUILD:
-        return False
-    return True
+def thin_ship_enabled(
+    state: dict[str, Any] | None = None,
+    *,
+    force: bool = False,
+) -> bool:
+    """Whether thin field ship may run for this project.
+
+    - grok_build: on by default (GROK_BUILD_THIN_SHIP, default true)
+    - classic: only if FIELD_SHIP_ALLOW_CLASSIC=1 or FIELD_SHIP_BULK=1
+    - force=True: always (bulk CLI / ops)
+    """
+    if force:
+        return True
+    if env_bool("FIELD_SHIP_BULK", default=False):
+        return True
+    eng = get_project_engine(state) if state is not None else ENGINE_GROK_BUILD
+    if eng == ENGINE_GROK_BUILD:
+        return env_bool("GROK_BUILD_THIN_SHIP", default=True)
+    # classic / other
+    return env_bool("FIELD_SHIP_ALLOW_CLASSIC", default=False)
+
+
+def field_ship_status_eligible(status: str) -> bool:
+    """Statuses that bulk / ship-prove may pick for thin field ship."""
+    raw = os.environ.get("FIELD_SHIP_STATUSES", "complete").strip()
+    allowed = {s.strip() for s in raw.split(",") if s.strip()}
+    if not allowed:
+        allowed = {"complete"}
+    return (status or "").strip() in allowed
 
 
 def resolve_plan_engine(explicit: str | None = None) -> str:
@@ -396,6 +419,87 @@ def ensure_field_plan(
     return False, engine, last_detail or "no plan backend succeeded"
 
 
+def ensure_capability_claims(
+    project_dir: Path,
+    *,
+    force_stub: bool = False,
+) -> Path:
+    """Ensure state/capability_claims.md exists (honesty contract for usefulness)."""
+    project_dir = Path(project_dir)
+    path = project_dir / CAPABILITY_CLAIMS_REL
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_file() and path.stat().st_size > 80 and not force_stub:
+        return path
+
+    master = project_dir / "state" / "master_plan.md"
+    idea = project_dir / "state" / "current_idea.json"
+    title = project_dir.name
+    goal_bit = ""
+    if master.is_file():
+        try:
+            text = master.read_text(encoding="utf-8", errors="replace")
+            m = re.search(r"##\s*Goal\s*\n(.+?)(?:\n##|\Z)", text, re.DOTALL | re.I)
+            if m:
+                goal_bit = m.group(1).strip()[:400]
+        except OSError:
+            pass
+    if idea.is_file():
+        try:
+            import json
+
+            st = json.loads(idea.read_text(encoding="utf-8"))
+            title = st.get("title") or title
+        except Exception:
+            pass
+
+    # Heuristic outcome class from workspace signals
+    ws = project_dir / "workspace"
+    signals: list[str] = []
+    outcome = "software_tool"
+    if ws.is_dir():
+        names = " ".join(p.name.lower() for p in ws.rglob("*") if p.is_file())
+        if "prompt" in names or "sections.yaml" in names:
+            outcome = "prompt_artifact"
+            signals.append("prompt/yaml templates present")
+        if any(p.suffix == ".py" for p in ws.rglob("*.py")):
+            signals.append("python modules present")
+        if (ws / "tests").is_dir():
+            signals.append("tests/ present")
+
+    body = f"""# Capability claims
+
+- Project: {title}
+- Updated: {datetime.now(timezone.utc).isoformat()}
+- Source: {"stub_auto" if force_stub or not path.is_file() else "existing"}
+
+## Delivers
+- Software under `workspace/` matching the written idea / master plan.
+- Goal excerpt: {goal_bit or "(see master_plan.md)"}
+
+## Does NOT deliver (be explicit)
+- Outcomes not implemented in code (e.g. calling external LLMs, full documents
+  if the product only generates prompts/templates).
+- Goal-level success without a separate goal-fitness pass.
+
+## External dependencies required outside this tool
+- None known from static scan (update if APIs, keys, or human steps are required).
+
+## Primary I/O
+- Inputs: see CLI `--help` / idea files in workspace
+- Outputs: files produced under workspace (and any documented out dirs)
+
+## Outcome class
+- `{outcome}`  (prompt_artifact | final_document | software_tool | data_pipeline | other)
+- Signals: {", ".join(signals) or "n/a"}
+
+## Composition hints
+- If outcome class is `prompt_artifact`, consider a follow-on project
+  `requires: {project_dir.name}` that executes prompts and writes final artifacts.
+"""
+    path.write_text(body, encoding="utf-8")
+    return path
+
+
 def write_usefulness_report(
     project_dir: Path,
     *,
@@ -406,6 +510,13 @@ def write_usefulness_report(
 ) -> Path:
     """Deterministic honesty report (no LLM) — gap for goals later."""
     project_dir = Path(project_dir)
+    claims_path = ensure_capability_claims(project_dir)
+    claims_excerpt = ""
+    try:
+        claims_excerpt = claims_path.read_text(encoding="utf-8", errors="replace")[:2000]
+    except OSError:
+        pass
+
     path = project_dir / USEFULNESS_REL
     path.parent.mkdir(parents=True, exist_ok=True)
     master = project_dir / "state" / "master_plan.md"
@@ -419,31 +530,44 @@ def write_usefulness_report(
         except OSError:
             pass
 
+    outcome_m = re.search(
+        r"Outcome class\s*\n-\s*`([^`]+)`",
+        claims_excerpt,
+        re.I,
+    )
+    outcome = outcome_m.group(1) if outcome_m else "unknown"
+
     body = f"""# Usefulness report (thin ship)
 
 - Generated: {datetime.now(timezone.utc).isoformat()}
 - Plan engine: {plan_engine}
 - Field result: {"PASS" if run_passed else "FAIL"} ({passed} passed / {failed} failed)
+- Outcome class (from capability claims): `{outcome}`
 
 ## Goal / plan excerpt
 {aim or "(see state/master_plan.md)"}
 
+## Capability claims (excerpt)
+See `{CAPABILITY_CLAIMS_REL.as_posix()}`.
+
+```markdown
+{claims_excerpt[:1500]}
+```
+
 ## What field proved
 - Runnable product/integration commands against the workspace (see field_test_results.md).
-- Build-track quality was already assumed (implement/review/pytest for grok_build).
+- Build-track quality may already have run (grok_build review/pytest) or only classic complete.
 
 ## What field did NOT prove
-- That every human *intent* beyond the written idea is satisfied.
+- That every human *intent* beyond the written idea / claims is satisfied.
 - End-to-end outcomes that require external systems (LLM APIs, paid services)
   unless those were explicitly implemented and tested.
 - Goal-level success (field-proven ≠ goal-proven).
 
 ## Alone vs composition
-- If the product is a *scaffold* (e.g. prompt packs, templates), it may be
-  field-proven while still needing another tool (`requires: this_slug`) to
-  achieve outcome goals (e.g. "write N finished plans").
-- Suggested next (manual / goal layer): feature expand, new project with
-  `requires:`, or connector — based on usefulness of this artifact class.
+- If outcome class is `prompt_artifact` (or similar scaffold), field-proven still
+  does **not** mean "final human outcome" without another step.
+- Suggested next: feature expand, new project with `requires:`, or connector.
 
 ## Status
 - field_fitness: {"sufficient_for_claims" if run_passed else "insufficient"}
@@ -483,13 +607,14 @@ def run_thin_field_ship(
         return result
 
     if not thin_ship_enabled(state if state.get("engine") else {"engine": ENGINE_GROK_BUILD}):
-        # allow force if state says grok_build even when global off? thin_ship_enabled handles env
-        if get_project_engine(state) != ENGINE_GROK_BUILD:
-            result.reason = "not grok_build engine"
-            return result
-        if not env_bool("GROK_BUILD_THIN_SHIP", default=True):
-            result.reason = "GROK_BUILD_THIN_SHIP disabled"
-            return result
+        result.reason = (
+            "thin ship disabled for this engine "
+            f"(engine={get_project_engine(state)}; "
+            "set FIELD_SHIP_ALLOW_CLASSIC=1 or FIELD_SHIP_BULK=1 for classic)"
+        )
+        return result
+
+    ensure_capability_claims(project_dir)
 
     workspace = project_dir / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
@@ -530,7 +655,7 @@ def run_thin_field_ship(
     header = (
         f"# Field Test Results\n\n"
         f"- Plan engine: {eng}\n"
-        f"- Thin ship: grok_build\n"
+        f"- Thin ship: field plan+run (+ optional repair bridge)\n"
         f"- Product aim: see master_plan / usefulness_report\n\n"
     )
     if results_md.startswith("# Field Test Results"):
@@ -543,23 +668,62 @@ def run_thin_field_ship(
     result.passed = run.passed
     result.failed = run.failed
 
+    # Bridge: on FAIL, field-test skill style repair → debug → code-review → report
+    # (not full grok_build implement chain)
+    if not run.all_passed:
+        try:
+            from pipeline.engines.field_repair import repair_enabled, run_field_repair_chain
+
+            if repair_enabled():
+                state["status"] = "field_testing"  # repair in progress
+                _write_state_dict(project_dir, state)
+                repair = run_field_repair_chain(
+                    project_dir,
+                    workspace,
+                    slug=slug,
+                    phase=phase,
+                    initial_results_md=results_md,
+                )
+                result.extra["repair"] = repair.to_dict()
+                # Refresh counts from latest results
+                if (project_dir / FIELD_RESULTS_REL).is_file():
+                    results_md = (project_dir / FIELD_RESULTS_REL).read_text(
+                        encoding="utf-8", errors="replace"
+                    )
+                if repair.steps_run:
+                    result.passed = int(repair.final_passed)
+                    result.failed = int(repair.final_failed)
+                if repair.passed:
+                    run_all_passed = True
+                else:
+                    run_all_passed = False
+                    result.extra["repair_reason"] = repair.reason
+            else:
+                run_all_passed = False
+        except Exception as _rep_exc:
+            run_all_passed = False
+            result.extra["repair_error"] = str(_rep_exc)
+    else:
+        run_all_passed = True
+
     if env_bool("FIELD_SHIP_USEFULNESS", default=True):
         up = write_usefulness_report(
             project_dir,
-            run_passed=run.all_passed,
-            passed=run.passed,
-            failed=run.failed,
+            run_passed=run_all_passed,
+            passed=result.passed,
+            failed=result.failed,
             plan_engine=eng,
         )
         result.usefulness_path = str(up)
 
-    if run.all_passed:
+    if run_all_passed:
         state["status"] = "field_proven"
         state["field_proven_at"] = datetime.now(timezone.utc).isoformat()
         state.pop("field_ship_reason", None)
         result.ok = True
         result.status = "field_proven"
-        result.reason = f"field PASS {run.passed}/{run.passed + run.failed}"
+        total = result.passed + result.failed
+        result.reason = f"field PASS {result.passed}/{total or result.passed}"
         try:
             from pipeline.ship_provenance import set_maturity
 
@@ -574,7 +738,9 @@ def run_thin_field_ship(
             pass
     else:
         state["status"] = "ship_insufficient"
-        state["field_ship_reason"] = f"field FAIL passed={run.passed} failed={run.failed}"
+        state["field_ship_reason"] = (
+            f"field FAIL passed={result.passed} failed={result.failed}"
+        )
         result.status = "ship_insufficient"
         result.reason = state["field_ship_reason"]
 
@@ -587,8 +753,8 @@ def run_thin_field_ship(
             "thin_field_ship",
             slug=slug,
             plan_engine=eng,
-            passed=run.passed,
-            failed=run.failed,
+            passed=result.passed,
+            failed=result.failed,
             status=result.status,
         )
     except Exception:
@@ -596,6 +762,6 @@ def run_thin_field_ship(
 
     print(
         f"  [thin-ship] {slug}: {result.status} "
-        f"(plan={eng}, pass={run.passed}, fail={run.failed})"
+        f"(plan={eng}, pass={result.passed}, fail={result.failed})"
     )
     return result

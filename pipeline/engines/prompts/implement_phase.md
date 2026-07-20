@@ -42,11 +42,36 @@ Pipeline projects look like this — **do not invent a different layout**:
 7. Do **not** invent new phases. Stay within this phase’s tasks.
 8. Prefer reusing existing modules in the workspace over reimplementation.
 
+## Capability claims (honesty — last phase especially)
+
+Create or update **`{project_dir}/state/capability_claims.md`** so ship/field
+usefulness knows what this software actually is:
+
+```markdown
+# Capability claims
+## Delivers
+- ...
+## Does NOT deliver
+- ...
+## External dependencies required outside this tool
+- None | list (API keys, human paste into LLM, etc.)
+## Primary I/O
+- Inputs: ...
+- Outputs: ...
+## Outcome class
+- `prompt_artifact` | `final_document` | `software_tool` | `data_pipeline` | `other`
+## Composition hints
+- requires: follow-on ideas if this is a scaffold only
+```
+
+Be honest: a prompt factory does **not** deliver finished documents.
+
 ## Done
 
 - Finished tasks are `[x]` in `{tasks_path}`
 - Workspace imports cleanly (package layout under workspace is fine)
 - Tests exist if the phase called for them
+- `state/capability_claims.md` updated when you can
 - Leave a short note if something is blocked
 
 Say DONE when implement work for this phase is finished.

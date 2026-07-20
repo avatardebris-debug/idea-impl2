@@ -182,8 +182,47 @@ class ManagerAgent(AgentProcess):
             phase = msg.payload.get("phase", 0)
             idea_slug = msg.payload.get("idea_slug", "")
             reason = msg.payload.get("reason", "unknown")
+            validation_excerpt = msg.payload.get("validation_report", "") or ""
 
-            self._log_decision(msg, [], note=f"PHASE_STUCK phase={phase}: {reason} — force-advancing now")
+            # One systematic-debugging pass before force-advance (classic bridge)
+            if idea_slug:
+                try:
+                    from pipeline.pre_force_debug import try_enqueue_pre_force_debug
+
+                    payload = try_enqueue_pre_force_debug(
+                        idea_slug=idea_slug,
+                        phase=int(phase or 0),
+                        validation_excerpt=validation_excerpt[:4000],
+                        retry_count=3,
+                    )
+                    if payload:
+                        self._log_decision(
+                            msg,
+                            [],
+                            note=(
+                                f"PHASE_STUCK phase={phase}: systematic-debug "
+                                f"before force-advance — {reason[:120]}"
+                            ),
+                        )
+                        logger.info(
+                            "[manager] Pre-force systematic-debug for '%s' phase %d",
+                            idea_slug,
+                            phase,
+                        )
+                        return [
+                            Message.create(
+                                from_agent=self.role,
+                                to_agent="executor",
+                                type="task",
+                                payload=payload,
+                            )
+                        ]
+                except Exception as exc:
+                    logger.warning("[manager] pre_force_debug skipped: %s", exc)
+
+            self._log_decision(
+                msg, [], note=f"PHASE_STUCK phase={phase}: {reason} — force-advancing now"
+            )
 
             if idea_slug:
                 from pipeline.force_advance import force_advance_phase
@@ -302,6 +341,48 @@ class ManagerAgent(AgentProcess):
                 },
             )]
         else:
+            # Prefer one systematic-debugging pass before force-advance
+            if idea_slug:
+                try:
+                    from pipeline.pre_force_debug import try_enqueue_pre_force_debug
+
+                    payload = try_enqueue_pre_force_debug(
+                        idea_slug=idea_slug,
+                        phase=int(phase_num or 0),
+                        tasks_path=tasks_path or "",
+                        workspace_path=workspace_path or "",
+                        fix_report_path=fix_report_path or "",
+                        fix_report_content=fix_report_content,
+                        validation_excerpt=fix_report_content[:2000],
+                        retry_count=max(int(retry_count or 0), 3),
+                    )
+                    if payload:
+                        self._log_decision(
+                            msg,
+                            [],
+                            note=(
+                                f"FIX_ANALYSIS phase={phase_num} retry={retry_count}: "
+                                f"SYSTEMATIC DEBUG before force-advance"
+                            ),
+                        )
+                        logger.info(
+                            "[manager] Pre-force systematic-debug for '%s' phase %d "
+                            "(after %d retries)",
+                            idea_slug,
+                            phase_num,
+                            retry_count,
+                        )
+                        return [
+                            Message.create(
+                                from_agent=self.role,
+                                to_agent="executor",
+                                type="task",
+                                payload=payload,
+                            )
+                        ]
+                except Exception as exc:
+                    logger.warning("[manager] pre_force_debug skipped: %s", exc)
+
             # Force-advance past this phase
             self._log_decision(msg, [], note=(
                 f"FIX_ANALYSIS phase={phase_num} retry={retry_count}: "

@@ -40,6 +40,10 @@ STEP_PROMPT_MAP: dict[str, str] = {
     "debug": "debug_validate_fail.md",
     "deep_review": "deep_review_phase.md",
     "field_test_plan": "field_test_plan.md",
+    "field_fail_repair": "field_fail_repair.md",
+    "field_systematic_debug": "field_systematic_debug.md",
+    "field_code_review": "field_code_review.md",
+    "field_comprehensive_report": "field_comprehensive_report.md",
 }
 
 DEFAULT_TIMEOUT_S = 1800
@@ -109,18 +113,33 @@ def _apply_pipeline_llm_output(
         written.append(str(path))
 
     # Structured file fences for implement/fix/debug
+    proj_root = project_dir.resolve()
+    ws_root = workspace.resolve()
     for rx in (_FILE_FENCE, _FILE_FENCE_ALT):
         for m in rx.finditer(text):
             rel = m.group(1).strip().strip("`\"'")
             body = m.group(2)
             if not rel or ".." in rel.replace("\\", "/"):
                 continue
-            # Normalize to workspace-relative unless absolute under project
+            # Reject absolute paths (escape hatch to arbitrary FS)
+            try:
+                if pathlib.Path(rel).is_absolute():
+                    continue
+            except Exception:
+                continue
+            # Normalize to workspace-relative unless phases/ or state/
             if rel.startswith("phases/") or rel.startswith("state/"):
                 dest = project_dir / rel
             else:
                 dest = workspace / rel
             try:
+                dest_res = dest.resolve()
+                # Must stay under project root (phases/state) or workspace
+                if not (
+                    str(dest_res).startswith(str(proj_root))
+                    or str(dest_res).startswith(str(ws_root))
+                ):
+                    continue
                 _write(dest, body)
             except OSError:
                 continue
@@ -155,6 +174,26 @@ def _apply_pipeline_llm_output(
         if m:
             body = m.group(1)
         _write(ship / "field_tests.md", body)
+
+    if step == "field_fail_repair":
+        ship = project_dir / "phases" / "ship"
+        # Prefer explicit fences; else dump fix report
+        if "field_fix_report" not in " ".join(written).lower():
+            _write(ship / "field_fix_report.md", text[:8000])
+
+    if step == "field_systematic_debug":
+        ship = project_dir / "phases" / "ship"
+        if not any("field_debug" in w for w in written):
+            _write(ship / "field_debug_report.md", text[:8000])
+
+    if step == "field_code_review":
+        ship = project_dir / "phases" / "ship"
+        if not any("field_code_review" in w for w in written):
+            _write(ship / "field_code_review.md", text[:8000])
+
+    if step == "field_comprehensive_report":
+        ship = project_dir / "phases" / "ship"
+        _write(ship / "field_comprehensive_report.md", text[:12000])
 
     return written
 
@@ -325,7 +364,13 @@ def render_prompt_for_phase(
     validation_path = phase_dir / "validation_report.md"
     review_path = phase_dir / "review.md"
     deep_review_path = phase_dir / "deep_review.md"
-    field_tests_path = project_dir / "phases" / "ship" / "field_tests.md"
+    ship_dir = project_dir / "phases" / "ship"
+    field_tests_path = ship_dir / "field_tests.md"
+    field_results_path = ship_dir / "field_test_results.md"
+    field_fix_report_path = ship_dir / "field_fix_report.md"
+    field_debug_report_path = ship_dir / "field_debug_report.md"
+    field_review_path = ship_dir / "field_code_review.md"
+    field_comprehensive_path = ship_dir / "field_comprehensive_report.md"
     master_plan = project_dir / "state" / "master_plan.md"
 
     # Support both {workspace} style and literal phase_N placeholders in packs
@@ -341,9 +386,29 @@ def render_prompt_for_phase(
         "review_path": str(review_path.resolve()),
         "deep_review_path": str(deep_review_path.resolve()),
         "field_tests_path": str(field_tests_path.resolve()),
+        "field_results_path": str(field_results_path.resolve()),
+        "field_fix_report_path": str(field_fix_report_path.resolve()),
+        "field_debug_report_path": str(field_debug_report_path.resolve()),
+        "field_review_path": str(field_review_path.resolve()),
+        "field_comprehensive_path": str(field_comprehensive_path.resolve()),
         "master_plan_path": str(master_plan.resolve()),
         "skill": step,
     }
+    # Inject real systematic-debugging skill for field step 2
+    if step == "field_systematic_debug" or "{systematic_debugging_skill}" in rendered:
+        try:
+            from pipeline.skill_load import load_skill_body
+
+            skill_txt = load_skill_body("systematic-debugging", max_chars=10000)
+        except Exception:
+            skill_txt = ""
+        if not skill_txt:
+            skill_txt = (
+                "(systematic-debugging skill not found on disk — use: reproduce, "
+                "one hypothesis, minimal fix, write debug report.)"
+            )
+        subs["systematic_debugging_skill"] = skill_txt
+
     for key, val in subs.items():
         rendered = rendered.replace("{" + key + "}", val)
     # Common doc placeholders like phase_N

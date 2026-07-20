@@ -56,6 +56,39 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
+| `FIELD_SHIP_ALLOW_CLASSIC` | off | Allow thin field ship for classic-engine projects (bulk port of `complete`) |
+| `FIELD_SHIP_BULK` | off | Force thin-ship eligibility for bulk CLI |
+| `FIELD_SHIP_STATUSES` | `complete` | Comma statuses bulk/ship-prove thin path may pick |
+| `FIELD_SHIP_REPAIR` | on | On field FAIL: bridge repair chain (not full grok_build) |
+| `FIELD_SHIP_REPAIR_MAX` | `3` | Max steps: 1=field_fail_repair, 2=+debug, 3=+code_review, 4=+comprehensive report |
+| `FIELD_SHIP_REPAIR_BACKEND` | `auto` | `auto`/`cli`/`pipeline_llm` for repair skill steps |
+| `PRE_FORCE_SYSTEMATIC_DEBUG` | on | Classic: one systematic-debugging executor pass before force-advance |
+
+**Systematic debugging:** installed for TUI under `~/.grok/skills/systematic-debugging`
+(and Superpowers plugin). Pipeline does **not** auto-load skills unless injected —
+field step 2 and pre-force-advance load the skill body via `pipeline.skill_load`.
+
+**Field repair bridge** (on FAIL, no full engine re-run; **max 3 fix retries** by default):
+
+1. `field_fail_repair` — field-test skill style (fix plan and/or minimal product code)  
+2. `field_systematic_debug` — systematic debug + minimal fix  
+3. `field_code_review` — focused structure review (+ tiny fix if obvious)  
+
+Re-runs field after each step. If still FAIL → write **`phases/ship/field_evaluation.md`**
+(evaluation + recommended next steps; closes the loop — no infinite retry).  
+Optional 4th (`FIELD_SHIP_REPAIR_MAX=4`): LLM comprehensive report.  
+Also: `field_repair_log.md`.
+
+```bash
+# Bulk field-test classic completes (no re-review / no thermo) — start small
+export PIPELINE_DIR=C:/Users/avata/aicompete/thepipeline
+export FIELD_SHIP_ALLOW_CLASSIC=1
+export FIELD_PLAN_ENGINE=heuristic   # or pipeline_llm / auto
+python scripts/bulk_thin_field_ship.py --include-classic --limit 5 --dry-run
+python scripts/bulk_thin_field_ship.py --include-classic --limit 5
+# Re-try prior ship_insufficient with better plans:
+python scripts/bulk_thin_field_ship.py --include-classic --retry-insufficient --plan-engine pipeline_llm --limit 10
+```
 
 ```bash
 # Dry-run adapter smoke (no real Grok CLI required)
