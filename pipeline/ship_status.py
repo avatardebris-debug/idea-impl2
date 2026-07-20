@@ -45,4 +45,4 @@ def is_ship_status(status: str) -> bool:
 
 def is_ship_prove_eligible(status: str) -> bool:
     """Projects the ship-prove loop may pick up."""
-    return status == "complete"
+    return status in ("complete", "complete_with_bugs")

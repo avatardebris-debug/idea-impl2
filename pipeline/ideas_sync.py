@@ -98,7 +98,7 @@ def collect_completion_records(projects_dir: pathlib.Path | None = None) -> dict
                 data = json.loads(stf.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            if data.get("status") != "complete":
+            if data.get("status") not in ("complete", "complete_with_bugs"):
                 continue
             slug = data.get("_slug") or proj.name
             records[slug] = {

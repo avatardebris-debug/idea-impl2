@@ -91,10 +91,12 @@ def thin_ship_enabled(
 
 def field_ship_status_eligible(status: str) -> bool:
     """Statuses that bulk / ship-prove may pick for thin field ship."""
-    raw = os.environ.get("FIELD_SHIP_STATUSES", "complete").strip()
+    raw = os.environ.get(
+        "FIELD_SHIP_STATUSES", "complete,complete_with_bugs"
+    ).strip()
     allowed = {s.strip() for s in raw.split(",") if s.strip()}
     if not allowed:
-        allowed = {"complete"}
+        allowed = {"complete", "complete_with_bugs"}
     return (status or "").strip() in allowed
 
 

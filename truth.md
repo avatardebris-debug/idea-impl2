@@ -248,3 +248,4 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
 - fake_proj — Fake Proj — 2026-07-19T21:17:23.115103+00:00
 - business_plan_writer_create_a_series_of_structur — [business plan writer] Create a series of structur — 2026-07-19T22:59:53.050930+00:00
   desc: [business plan writer] Create a series of structured prompts for writing a complete business proposal. Deconstruct business plan into all of its parts, all the phases and all of the prompts necessary. The prompts can compound like creating a plan that develops all the necessary sections and then each section can go through a series of prompts to deconstruct into phases of questions that the next prompt will answer and inject the placeholder for sections and build everything necessary. Make it so
+- proj — proj — 2026-07-20T03:45:13.672120+00:00

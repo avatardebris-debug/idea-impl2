@@ -23,7 +23,7 @@ from pipeline.env_flags import env_bool
 from pipeline.paths import project_dir as default_project_dir
 
 # Default triggers (complete + field_proven)
-_DEFAULT_ON = frozenset({"complete", "field_proven"})
+_DEFAULT_ON = frozenset({"complete", "complete_with_bugs", "field_proven"})
 
 _GITIGNORE = """\
 # Pipeline project publish — keep secrets and junk out of remotes
@@ -71,7 +71,9 @@ def publish_enabled() -> bool:
 
 
 def publish_triggers() -> frozenset[str]:
-    raw = os.environ.get("PIPELINE_GITHUB_ON", "complete,field_proven").strip()
+    raw = os.environ.get(
+        "PIPELINE_GITHUB_ON", "complete,complete_with_bugs,field_proven"
+    ).strip()
     if not raw:
         return _DEFAULT_ON
     return frozenset(p.strip().lower() for p in raw.split(",") if p.strip())

@@ -63,6 +63,12 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `FIELD_SHIP_REPAIR_MAX` | `3` | Max steps: 1=field_fail_repair, 2=+debug, 3=+code_review, 4=+comprehensive report |
 | `FIELD_SHIP_REPAIR_BACKEND` | `auto` | `auto`/`cli`/`pipeline_llm` for repair skill steps |
 | `PRE_FORCE_SYSTEMATIC_DEBUG` | on | Classic: one systematic-debugging executor pass before force-advance |
+| `PIPELINE_COMPLETE_PYTEST` | on | At complete: re-run pytest; red (or force_advanced) → `complete_with_bugs` |
+| `PIPELINE_COMPLETE_PYTEST_TIMEOUT` | (pytest internal) | Per-test timeout hint for complete gate |
+
+**Statuses:** `complete` = phases done + final pytest clean. `complete_with_bugs` = phases done
+but pytest failed at complete and/or force_advanced/quality_risk — still ship/field eligible
+and unlocks deps; marks quality for corpus/ops.
 
 **Systematic debugging:** installed for TUI under `~/.grok/skills/systematic-debugging`
 (and Superpowers plugin). Pipeline does **not** auto-load skills unless injected —

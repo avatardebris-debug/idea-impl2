@@ -16,11 +16,13 @@ _REQUIRES_TRAILING_RE = re.compile(
 DepContext = Literal["seeding", "rebuild", "purge"]
 
 # Full completion unlocks dependents. mvp_complete does NOT.
-FULL_COMPLETE_STATUSES = frozenset({"complete", "field_proven"})
+# complete_with_bugs = phases done but final pytest/force-advance risk — still unlocks deps.
+FULL_COMPLETE_STATUSES = frozenset({"complete", "complete_with_bugs", "field_proven"})
 
 # Terminal / non-coding statuses for runner & agents
 BUILD_TERMINAL_STATUSES = frozenset({
     "complete",
+    "complete_with_bugs",
     "mvp_complete",
     "budget_exceeded",
     "dep_waiting",
@@ -30,11 +32,17 @@ BUILD_TERMINAL_STATUSES = frozenset({
 })
 
 # Eligible for --polish / polish-first resume
-POLISHABLE_STATUSES = frozenset({"complete", "mvp_complete", "budget_exceeded"})
+POLISHABLE_STATUSES = frozenset({
+    "complete",
+    "complete_with_bugs",
+    "mvp_complete",
+    "budget_exceeded",
+})
 
 # Sacred: in-flight agents must not overwrite these
 AGENT_SACRED_STATUSES = frozenset({
     "complete",
+    "complete_with_bugs",
     "mvp_complete",
     "stalled",
     "budget_exceeded",
@@ -80,7 +88,7 @@ def is_full_complete(state: Mapping[str, Any]) -> bool:
     status = str(state.get("status", ""))
     if status == "field_proven":
         return True
-    if status != "complete":
+    if status not in ("complete", "complete_with_bugs"):
         return False
     return phases_fully_built(state)
 

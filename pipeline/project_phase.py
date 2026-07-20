@@ -330,10 +330,41 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
             )
 
     if full:
-        state["status"] = "complete"
-        state.pop("complete_blocked_reason", None)
-        _write_state_dict(project_dir, state)
-        print(f"  ✅ '{title}' completed all phases!")
+        # Final pytest (+ force-advance risk) → complete or complete_with_bugs
+        try:
+            from pipeline.complete_gate import assess_complete_quality
+
+            assessment = assess_complete_quality(project_dir, state)
+            status = assessment["status"]
+            state["status"] = status
+            state.pop("complete_blocked_reason", None)
+            if assessment.get("reasons"):
+                state["complete_bug_reasons"] = assessment["reasons"][:20]
+                state["quality_risk"] = True
+            else:
+                state.pop("complete_bug_reasons", None)
+            if assessment.get("pytest") is not None:
+                state["complete_pytest"] = assessment["pytest"]
+            _write_state_dict(project_dir, state)
+            if status == "complete_with_bugs":
+                print(
+                    f"  ⚠️  '{title}' complete_with_bugs — "
+                    f"{'; '.join(assessment.get('reasons') or ['quality risk'])}"
+                )
+            else:
+                print(f"  ✅ '{title}' completed all phases!")
+        except Exception as _cg_err:
+            import logging as _log
+
+            _log.getLogger(__name__).warning(
+                "complete quality gate failed for %s: %s — defaulting to complete",
+                slug,
+                _cg_err,
+            )
+            state["status"] = "complete"
+            state.pop("complete_blocked_reason", None)
+            _write_state_dict(project_dir, state)
+            print(f"  ✅ '{title}' completed all phases!")
     else:
         state["status"] = "mvp_complete"
         _write_state_dict(project_dir, state)
@@ -417,7 +448,9 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
         try:
             from pipeline.github_publish import maybe_publish_project
 
-            maybe_publish_project(slug, trigger="complete")
+            maybe_publish_project(
+                slug, trigger=str(state.get("status") or "complete")
+            )
         except Exception as _gh_err:
             import logging as _log
             _log.getLogger(__name__).debug("github_publish skipped (non-critical): %s", _gh_err)
