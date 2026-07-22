@@ -53,6 +53,12 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `GROK_BUILD_ALLOW_PIPELINE_LLM` | on | When `auto` and no CLI, use pipeline LLM for skill steps |
 | `GROK_BUILD_PROVIDER` / `GROK_BUILD_MODEL` | fall back to `PIPELINE_*` | Provider/model for `pipeline_llm` build steps |
 | `GROK_BUILD_THIN_SHIP` | on | After grok_build complete, run in-process field plan+run → `field_proven` / `ship_insufficient` (skip classic thermo) |
+| `GROK_BUILD_PLAN_SKILLS` | on | Before implement: run `idea_plan` if no `master_plan.md`, `phase_plan` if no `tasks.md` (Grok skills `idea-plan` / `phase-plan`) |
+| `GROK_BUILD_ALLOW_PARALLEL` | off | Allow `--parallel-seeds`/`--executors` >1 with `PIPELINE_ENGINE=grok_build` (default refuse — serial v1) |
+| `GROK_BUILD_STALE_S` | `3600` | Clear stuck `grok_driver_running` if state older than this many seconds |
+| `FIELD_REWORK_MAX_ATTEMPTS` | `3` | Thin-ship / field rework entries before `deeper_work_needed` |
+| `FIELD_REWORK_MAX_MINUTES` | `45` | Accumulative field rework wall minutes before `deeper_work_needed` |
+| `FIELD_REWORK_MAX_TOKENS` | `2500000` | Accumulative measured tokens (agent_timing / llm_calls; Grok CLI ~log char÷4 fallback) |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
@@ -204,6 +210,30 @@ export FIELD_PLAN_ENGINE=pipeline_llm   # or heuristic / auto
 export GROK_BUILD_CMD='C:\Users\avata\.grok\bin\grok.exe --cwd "{workspace}" --prompt-file "{prompt_file}" --always-approve --max-turns 40 --output-format plain'
 export FIELD_PLAN_ENGINE=auto
 ```
+
+### Overnight Grok from-list (P0 hardened)
+
+```powershell
+# Preflight + env freeze only
+.\scripts\overnight_grok_from_list.ps1 -DryRunEnvOnly
+
+# 30 min dry night (host must stay awake)
+.\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30
+
+# Full 8h night (default --fresh-list-only: new seeds, not whole classic backlog)
+.\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
+
+# Also orphan-requeue old in-flight projects (not recommended for clean Grok nights)
+.\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -NoFreshListOnly
+
+# Morning report only
+python scripts/overnight_report.py --log-dir $env:PIPELINE_DIR\logs\overnight_YYYYMMDD_HHMMSS
+```
+
+Runbook: `notes/2026-07-22-overnight-grok-from-list-runbook.md`  
+Guards: `pipeline/engines/overnight_guard.py` (CLI assert, serial refuse, stale driver clear).  
+Thin ship also runs for **`complete_with_bugs`**.  
+Stuck field loops: limited rework then status **`deeper_work_needed`** (`FIELD_REWORK_MAX_*`).
 
 Plan + scorecard: `notes/2026-07-19-grok-build-factory-dual-engine-plan.md`,
 `notes/experiments/grok-build-engine-README.md`.

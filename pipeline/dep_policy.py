@@ -28,6 +28,7 @@ BUILD_TERMINAL_STATUSES = frozenset({
     "dep_waiting",
     "field_proven",
     "ship_insufficient",
+    "deeper_work_needed",  # rework budget exhausted; human / later pass
     "stalled",
 })
 
@@ -37,6 +38,7 @@ POLISHABLE_STATUSES = frozenset({
     "complete_with_bugs",
     "mvp_complete",
     "budget_exceeded",
+    "deeper_work_needed",  # optional later polish after human/deeper pass
 })
 
 # Sacred: in-flight agents must not overwrite these
@@ -48,6 +50,7 @@ AGENT_SACRED_STATUSES = frozenset({
     "budget_exceeded",
     "field_proven",
     "ship_insufficient",
+    "deeper_work_needed",
 })
 
 # Skip when counting active slots / eviction / rebuild (aligned with build terminals)

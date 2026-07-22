@@ -56,6 +56,41 @@ class FakeEngine:
         phase_dir.mkdir(parents=True, exist_ok=True)
         workspace.mkdir(parents=True, exist_ok=True)
 
+        if step == "idea_plan":
+            state_dir = project_dir / "state"
+            state_dir.mkdir(parents=True, exist_ok=True)
+            (state_dir / "master_plan.md").write_text(
+                "# Master Plan: Fake\n\n## Goal\nFake MVP\n\n"
+                "## Phase 1: Foundation\n"
+                "- **Description**: scaffold\n"
+                "- **Deliverable**: main.py\n"
+                "- **Dependencies**: none\n"
+                "- **Success criteria**:\n"
+                "  - main.py exists\n\n"
+                "## Architecture Notes\n- test\n\n## Risks\n- none\n\n"
+                "## Phase count\n- total_phases: 1\n",
+                encoding="utf-8",
+            )
+            idea = state_dir / "current_idea.json"
+            if idea.is_file():
+                try:
+                    data = json.loads(idea.read_text(encoding="utf-8"))
+                    data["total_phases"] = 1
+                    idea.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                except Exception:
+                    pass
+
+        if step == "phase_plan":
+            phase_dir.mkdir(parents=True, exist_ok=True)
+            (phase_dir / "tasks.md").write_text(
+                f"# Phase {phase} Tasks: Fake\n\n"
+                "- [ ] Task 1: Create main\n"
+                "  - What: write main.py\n"
+                "  - Files: main.py\n"
+                "  - Done when: file exists\n",
+                encoding="utf-8",
+            )
+
         if step == "implement":
             (workspace / "main.py").write_text(
                 'def hello():\n    return "ok"\n',
@@ -116,7 +151,17 @@ def _make_project(tmp_path: Path, *, engine: str = ENGINE_GROK_BUILD) -> Path:
         encoding="utf-8",
     )
     (proj / "state" / "master_plan.md").write_text(
-        "# Master Plan\n\n## Phase 1: MVP\nBuild hello.\n",
+        "# Master Plan: Fake Proj\n\n"
+        "## Goal\nShip a hello module for dual-engine tests.\n\n"
+        "## Phase 1: MVP — Foundation\n"
+        "- **Description**: Create main.py with hello()\n"
+        "- **Deliverable**: workspace/main.py\n"
+        "- **Dependencies**: none\n"
+        "- **Success criteria**:\n"
+        "  - main.py exists and is importable\n\n"
+        "## Architecture Notes\n- Minimal Python module\n\n"
+        "## Risks\n- None for tests\n\n"
+        "## Phase count\n- total_phases: 1\n",
         encoding="utf-8",
     )
     state = {
@@ -131,6 +176,86 @@ def _make_project(tmp_path: Path, *, engine: str = ENGINE_GROK_BUILD) -> Path:
         json.dumps(state, indent=2), encoding="utf-8"
     )
     return proj
+
+
+def test_plan_skills_run_when_artifacts_missing(tmp_path: Path):
+    """Driver runs idea_plan + phase_plan before implement when plan files absent."""
+    proj = tmp_path / "plan_first"
+    (proj / "state").mkdir(parents=True)
+    (proj / "workspace").mkdir(parents=True)
+    (proj / "phases" / "phase_1").mkdir(parents=True)
+    # No master_plan.md, no tasks.md
+    (proj / "state" / "current_idea.json").write_text(
+        json.dumps(
+            {
+                "title": "Plan First",
+                "description": "A tool that prints hello",
+                "slug": "plan_first",
+                "status": "phase_1_executing",
+                "phase": 1,
+                "total_phases": 1,
+                "engine": ENGINE_GROK_BUILD,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    state = json.loads((proj / "state" / "current_idea.json").read_text(encoding="utf-8"))
+    bus = FakeBus()
+    fake = FakeEngine()
+    outcome = run_grok_phase(
+        bus,
+        proj,
+        state,
+        1,
+        "plan_first",
+        invoke=fake,
+        skip_validate=True,
+    )
+    assert "idea_plan" in fake.calls
+    assert "phase_plan" in fake.calls
+    assert fake.calls.index("idea_plan") < fake.calls.index("phase_plan")
+    assert fake.calls.index("phase_plan") < fake.calls.index("implement")
+    assert (proj / "state" / "master_plan.md").is_file()
+    assert (proj / "phases" / "phase_1" / "tasks.md").is_file()
+    assert outcome.completed or outcome.advanced or not outcome.fell_back
+
+
+def test_plan_skills_skipped_when_present(tmp_path: Path):
+    proj = _make_project(tmp_path)
+    state = json.loads((proj / "state" / "current_idea.json").read_text(encoding="utf-8"))
+    bus = FakeBus()
+    fake = FakeEngine()
+    run_grok_phase(
+        bus, proj, state, 1, "fake_proj", invoke=fake, skip_validate=True
+    )
+    assert "idea_plan" not in fake.calls
+    assert "phase_plan" not in fake.calls
+    assert "implement" in fake.calls
+
+
+def test_hook_finds_candidate_without_tasks(tmp_path: Path):
+    root = tmp_path / "projects"
+    root.mkdir()
+    p = root / "needs_plan"
+    p.mkdir()
+    (p / "state").mkdir()
+    (p / "workspace").mkdir()
+    (p / "phases" / "phase_1").mkdir(parents=True)
+    (p / "state" / "current_idea.json").write_text(
+        json.dumps(
+            {
+                "title": "Needs Plan",
+                "slug": "needs_plan",
+                "status": "phase_1_executing",
+                "phase": 1,
+                "engine": ENGINE_GROK_BUILD,
+            }
+        ),
+        encoding="utf-8",
+    )
+    found = find_grok_build_candidates(root)
+    assert any(slug == "needs_plan" for *_, slug in found)
 
 
 def test_fake_engine_completes_phase(tmp_path: Path):

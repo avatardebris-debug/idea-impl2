@@ -186,6 +186,25 @@ def run_pipeline(
         executors_explicit=executors_explicit,
     )
 
+    # Grok overnight: force serial after resolve so PIPELINE_CLOUD defaults (2/2)
+    # cannot silently run parallel when CLI flags were omitted.
+    try:
+        from pipeline.engines.overnight_guard import grok_overnight_mode
+        from pipeline.env_flags import env_bool as _env_bool
+
+        if grok_overnight_mode() and not _env_bool(
+            "GROK_BUILD_ALLOW_PARALLEL", default=False
+        ):
+            if parallel_seeds > 1 or num_executors > 1:
+                print(
+                    "  [grok] forcing serial: parallel_seeds=1 num_executors=1 "
+                    "(set GROK_BUILD_ALLOW_PARALLEL=1 to allow parallel)"
+                )
+            parallel_seeds = 1
+            num_executors = 1
+    except Exception:
+        pass
+
     try:
         from pipeline.project_lock import sweep_dead_project_locks
 
@@ -760,6 +779,27 @@ def main():
     _exec_explicit = any(
         a == "--executors" or a.startswith("--executors=") for a in _sys.argv[1:]
     )
+
+    # P0 overnight guards: CLI env + serial Grok from-list
+    try:
+        from pipeline.engines.overnight_guard import (
+            assert_grok_cli_ready,
+            assert_serial_for_grok,
+            preflight_disk_and_paths,
+        )
+
+        assert_grok_cli_ready()
+        # Serial only when PIPELINE_ENGINE=grok_build (classic may parallel)
+        _ps = args.parallel_seeds if args.parallel_seeds is not None else 1
+        _ex = args.executors if args.executors is not None else 1
+        assert_serial_for_grok(parallel_seeds=_ps, num_executors=_ex)
+        for w in preflight_disk_and_paths():
+            print(f"  [preflight] WARNING: {w}")
+    except SystemExit:
+        raise
+    except Exception as _pf_exc:
+        print(f"  [preflight] skipped: {_pf_exc}")
+
     run_pipeline(
         idea=idea,
         from_list=args.from_list,

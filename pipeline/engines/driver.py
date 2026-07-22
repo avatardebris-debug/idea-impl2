@@ -1,7 +1,9 @@
 """
 Grok Build phase driver — deterministic skill chain for one phase.
 
-Sequence (v1: planners stay classic; this owns implement/review/fix only):
+Sequence:
+  0. idea_plan if master_plan missing (Grok /idea-plan skill pack; skip if present)
+  0b. phase_plan if tasks.md missing (Grok /phase-plan skill pack; skip if present)
   1. implement (CLI or injected engine) — skipped if tasks already closed mid-retry
   2. validate via run_pytest
   3. debug once on validate fail
@@ -9,6 +11,9 @@ Sequence (v1: planners stay classic; this owns implement/review/fix only):
   5. fix once on review FAIL
   6. gates: validate ok + checkboxes + non-FAIL review (never auto-PASS stubs)
   7. _advance_phase / _mark_complete when gates pass
+
+Plan skills default on (GROK_BUILD_PLAN_SKILLS=1). Classic idea/phase planners
+may still have written plans first — then steps 0/0b are no-ops.
 
 Hard invoke failure → fallback to classic (engine field + enqueue executor).
 
@@ -65,6 +70,35 @@ def _log_activity(event: str, **fields: Any) -> None:
         log_activity(event, engine=ENGINE_GROK_BUILD, **fields)
     except Exception:
         pass
+
+
+def plan_skills_enabled() -> bool:
+    """When true, driver runs idea_plan / phase_plan before implement if artifacts missing."""
+    return env_bool("GROK_BUILD_PLAN_SKILLS", default=True)
+
+
+def master_plan_ready(project_dir: pathlib.Path) -> bool:
+    p = project_dir / "state" / "master_plan.md"
+    if not p.is_file():
+        return False
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return len(text.strip()) > 80 and (
+        "Phase" in text or "phase" in text or "Goal" in text
+    )
+
+
+def tasks_ready(project_dir: pathlib.Path, phase_num: int) -> bool:
+    p = project_dir / "phases" / f"phase_{phase_num}" / "tasks.md"
+    if not p.is_file():
+        return False
+    try:
+        text = p.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return len(text.strip()) > 40 and ("- [ ]" in text or "- [x]" in text)
 
 
 def _load_state(project_dir: pathlib.Path) -> dict:
@@ -398,6 +432,9 @@ def run_grok_phase(
     try:
         _grok_active_slug = slug
         state["grok_driver_running"] = True
+        from datetime import datetime, timezone
+
+        state["grok_driver_started_at"] = datetime.now(timezone.utc).isoformat()
         state["status"] = f"phase_{phase_num}_grok_running"
         _write_state(project_dir, state)
         _log_activity("grok_driver_start", slug=slug, phase=phase_num)
@@ -415,12 +452,80 @@ def run_grok_phase(
             outcome.steps.append(step)
             return result
 
+        # 0. Ensure master plan + phase tasks (Grok plan skills; no-op if already present)
+        if plan_skills_enabled():
+            if not master_plan_ready(project_dir):
+                ip = _step("idea_plan")
+                if not ip.success and not ip.dry_run:
+                    fallback_to_classic(
+                        bus,
+                        project_dir,
+                        state,
+                        phase_num,
+                        slug,
+                        reason=ip.error or f"idea_plan failed exit={ip.exit_code}",
+                    )
+                    outcome.fell_back = True
+                    outcome.reason = ip.error or "idea_plan hard failure"
+                    return outcome
+                if not master_plan_ready(project_dir) and not (ip.dry_run):
+                    return _block_outcome(
+                        outcome,
+                        project_dir,
+                        state,
+                        phase_num,
+                        slug,
+                        reason="idea_plan finished but state/master_plan.md still missing/empty",
+                        bus=bus,
+                    )
+            if not tasks_ready(project_dir, phase_num):
+                pp = _step("phase_plan")
+                if not pp.success and not pp.dry_run:
+                    fallback_to_classic(
+                        bus,
+                        project_dir,
+                        state,
+                        phase_num,
+                        slug,
+                        reason=pp.error or f"phase_plan failed exit={pp.exit_code}",
+                    )
+                    outcome.fell_back = True
+                    outcome.reason = pp.error or "phase_plan hard failure"
+                    return outcome
+                if not tasks_ready(project_dir, phase_num) and not (pp.dry_run):
+                    return _block_outcome(
+                        outcome,
+                        project_dir,
+                        state,
+                        phase_num,
+                        slug,
+                        reason=(
+                            f"phase_plan finished but phases/phase_{phase_num}/tasks.md "
+                            "still missing or has no checkboxes"
+                        ),
+                        bus=bus,
+                    )
+                # Refresh task path after planning
+                tasks_path, tasks_rel, is_overflow = _active_tasks_context(
+                    project_dir, phase_num
+                )
+
         # 1. Implement (skip re-implement when retrying after gates block with closed tasks)
         tasks_already_closed = _tasks_closed_for(tasks_path)
         skip_implement = bool(
             state.get("grok_gates_blocked") and tasks_already_closed
         )
         if not skip_implement:
+            if plan_skills_enabled() and not tasks_ready(project_dir, phase_num):
+                return _block_outcome(
+                    outcome,
+                    project_dir,
+                    state,
+                    phase_num,
+                    slug,
+                    reason="cannot implement without tasks.md (plan skills enabled but tasks still missing/empty)",
+                    bus=bus,
+                )
             impl = _step("implement")
             if not impl.success and not impl.dry_run:
                 fallback_to_classic(
@@ -678,13 +783,16 @@ def run_grok_phase(
                 from pipeline.engines.field_ship import run_thin_field_ship, thin_ship_enabled
 
                 state_after = _load_state(project_dir)
-                if thin_ship_enabled(state_after) and (
-                    state_after.get("status") or ""
-                ) == "complete":
+                st = (state_after.get("status") or "").strip()
+                # complete_with_bugs is still phase-complete — eligible for field prove
+                if thin_ship_enabled(state_after) and st in (
+                    "complete",
+                    "complete_with_bugs",
+                ):
                     ship = run_thin_field_ship(
                         project_dir, state_after, slug=slug
                     )
-                    outcome.reason = f"complete+thin_ship:{ship.status}"
+                    outcome.reason = f"{st}+thin_ship:{ship.status}"
                     outcome.review_result = {
                         **(outcome.review_result or {}),
                         "thin_field_ship": ship.to_dict(),

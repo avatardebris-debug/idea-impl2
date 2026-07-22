@@ -5,6 +5,9 @@ Called from the main health cycle (run_loop). When status is phase_N_executing
 (or phase_N_grok_running left mid-flight) and engine is grok_build, runs the
 skill chain instead of waiting on classic executor messages.
 
+Eligible with or without tasks.md when GROK_BUILD_PLAN_SKILLS is on (default):
+driver will idea_plan / phase_plan then implement.
+
 Classic projects are untouched.
 """
 
@@ -60,6 +63,13 @@ def find_grok_build_candidates(
             continue
         if get_project_engine(state) != ENGINE_GROK_BUILD:
             continue
+        # P0: clear stuck grok_driver_running after crash/sleep
+        try:
+            from pipeline.engines.overnight_guard import clear_stale_grok_driver_flags
+
+            state = clear_stale_grok_driver_flags(proj, state)
+        except Exception:
+            pass
         if state.get("grok_driver_running"):
             # Another tick already owns it (or crashed mid-flight)
             # Allow re-entry only if status is still grok_running and lock free
@@ -69,10 +79,28 @@ def find_grok_build_candidates(
         phase = _parse_executing_phase(state.get("status") or "")
         if phase is None:
             continue
-        # Need tasks.md before driving
-        tasks = proj / "phases" / f"phase_{phase}" / "tasks.md"
-        if not tasks.is_file():
-            continue
+        # tasks.md optional: driver runs idea_plan/phase_plan when missing
+        # (GROK_BUILD_PLAN_SKILLS). Still require phase dir or ability to create it.
+        phase_dir = proj / "phases" / f"phase_{phase}"
+        tasks = phase_dir / "tasks.md"
+        master = proj / "state" / "master_plan.md"
+        has_tasks = tasks.is_file() and tasks.stat().st_size > 40
+        has_master = master.is_file() and master.stat().st_size > 80
+        # Classic path already wrote tasks — always eligible.
+        # Plan-first path: eligible if plan skills on (default) even without tasks.
+        if not has_tasks:
+            try:
+                from pipeline.engines.driver import plan_skills_enabled
+
+                if not plan_skills_enabled():
+                    continue
+            except Exception:
+                # Fail open toward planning if import fails
+                pass
+            # Need at least idea text or empty workspace project
+            idea = proj / "state" / "current_idea.json"
+            if not idea.is_file() and not has_master:
+                continue
         slug = state.get("slug") or proj.name
         out.append((proj, state, phase, slug))
     return out

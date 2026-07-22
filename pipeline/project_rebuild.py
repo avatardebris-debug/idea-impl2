@@ -159,6 +159,29 @@ def dispatch_phase_requeue(
         "thermo_refactoring",
         "ship_evaluating",
     ):
+        # Park chronic field loops: limited attempts/minutes, then deeper_work_needed
+        try:
+            from pipeline.field_rework_budget import (
+                maybe_park_if_over_budget,
+                write_state,
+            )
+
+            state, parked = maybe_park_if_over_budget(
+                state,
+                reason_prefix=f"ship re-queue blocked ({status})",
+                slug=slug,
+                project_dir=project_dir,
+            )
+            if parked:
+                write_state(project_dir, state)
+                if log_requeue:
+                    print(
+                        f"  [re-queue] Parked '{title}' -> deeper_work_needed "
+                        f"({state.get('deeper_work_reason', '')[:80]})"
+                    )
+                return False
+        except Exception:
+            pass
         from pipeline.ship_mode import dispatch_ship_requeue
 
         if dispatch_ship_requeue(bus, slug, title, state, project_dir, status):

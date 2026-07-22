@@ -603,7 +603,11 @@ def run_thin_field_ship(
     result = FieldShipResult()
 
     status = (state.get("status") or "").strip()
-    if skip_if_terminal and status in ("field_proven", "ship_insufficient"):
+    if skip_if_terminal and status in (
+        "field_proven",
+        "ship_insufficient",
+        "deeper_work_needed",
+    ):
         result.reason = f"already terminal ship status={status}"
         result.status = status
         return result
@@ -615,6 +619,33 @@ def run_thin_field_ship(
             "set FIELD_SHIP_ALLOW_CLASSIC=1 or FIELD_SHIP_BULK=1 for classic)"
         )
         return result
+
+    # Accumulative rework budget (attempts + minutes) — not infinite ship loops
+    try:
+        from pipeline.field_rework_budget import (
+            begin_field_rework_attempt,
+            end_field_rework_attempt,
+            maybe_park_if_over_budget,
+            mark_deeper_work_needed,
+            rework_over_budget,
+        )
+
+        state, parked = maybe_park_if_over_budget(
+            state,
+            reason_prefix="pre-field thin ship",
+            slug=slug,
+            project_dir=project_dir,
+        )
+        if parked:
+            _write_state_dict(project_dir, state)
+            result.status = "deeper_work_needed"
+            result.reason = state.get("deeper_work_reason") or "rework budget exhausted"
+            return result
+        state = begin_field_rework_attempt(state)
+    except Exception:
+        rework_over_budget = None  # type: ignore
+        end_field_rework_attempt = None  # type: ignore
+        mark_deeper_work_needed = None  # type: ignore
 
     ensure_capability_claims(project_dir)
 
@@ -642,6 +673,28 @@ def run_thin_field_ship(
     result.field_tests_path = str(field_path)
 
     if not ok_plan:
+        try:
+            from pipeline.field_rework_budget import (
+                end_field_rework_attempt,
+                maybe_park_if_over_budget,
+            )
+
+            state = end_field_rework_attempt(
+                state, slug=slug, project_dir=project_dir
+            )
+            state, parked = maybe_park_if_over_budget(
+                state,
+                reason_prefix=f"plan failed: {detail}; rework budget",
+                slug=slug,
+                project_dir=project_dir,
+            )
+            if parked:
+                _write_state_dict(project_dir, state)
+                result.status = "deeper_work_needed"
+                result.reason = state.get("deeper_work_reason") or detail
+                return result
+        except Exception:
+            pass
         state["status"] = "ship_insufficient"
         state["field_ship_reason"] = f"plan failed: {detail}"
         _write_state_dict(project_dir, state)
@@ -727,6 +780,14 @@ def run_thin_field_ship(
         total = result.passed + result.failed
         result.reason = f"field PASS {result.passed}/{total or result.passed}"
         try:
+            from pipeline.field_rework_budget import end_field_rework_attempt
+
+            state = end_field_rework_attempt(
+                state, slug=slug, project_dir=project_dir
+            )
+        except Exception:
+            pass
+        try:
             from pipeline.ship_provenance import set_maturity
 
             set_maturity(project_dir, "M4")
@@ -739,12 +800,40 @@ def run_thin_field_ship(
         except Exception:
             pass
     else:
-        state["status"] = "ship_insufficient"
-        state["field_ship_reason"] = (
-            f"field FAIL passed={result.passed} failed={result.failed}"
-        )
-        result.status = "ship_insufficient"
-        result.reason = state["field_ship_reason"]
+        try:
+            from pipeline.field_rework_budget import (
+                end_field_rework_attempt,
+                maybe_park_if_over_budget,
+            )
+
+            state = end_field_rework_attempt(
+                state, slug=slug, project_dir=project_dir
+            )
+            state, parked = maybe_park_if_over_budget(
+                state,
+                reason_prefix=(
+                    f"field FAIL pass={result.passed} fail={result.failed}; rework budget"
+                ),
+                slug=slug,
+                project_dir=project_dir,
+            )
+            if parked:
+                result.status = "deeper_work_needed"
+                result.reason = state.get("deeper_work_reason") or result.reason
+            else:
+                state["status"] = "ship_insufficient"
+                state["field_ship_reason"] = (
+                    f"field FAIL passed={result.passed} failed={result.failed}"
+                )
+                result.status = "ship_insufficient"
+                result.reason = state["field_ship_reason"]
+        except Exception:
+            state["status"] = "ship_insufficient"
+            state["field_ship_reason"] = (
+                f"field FAIL passed={result.passed} failed={result.failed}"
+            )
+            result.status = "ship_insufficient"
+            result.reason = state["field_ship_reason"]
 
     _write_state_dict(project_dir, state)
 

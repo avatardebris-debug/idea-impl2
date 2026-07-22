@@ -34,6 +34,8 @@ from pipeline.env_flags import env_bool
 PROMPTS_DIR = pathlib.Path(__file__).resolve().parent / "prompts"
 
 STEP_PROMPT_MAP: dict[str, str] = {
+    "idea_plan": "idea_plan.md",
+    "phase_plan": "phase_plan.md",
     "implement": "implement_phase.md",
     "review": "review_phase.md",
     "fix": "fix_from_review.md",
@@ -44,6 +46,13 @@ STEP_PROMPT_MAP: dict[str, str] = {
     "field_systematic_debug": "field_systematic_debug.md",
     "field_code_review": "field_code_review.md",
     "field_comprehensive_report": "field_comprehensive_report.md",
+}
+
+# CLI / skill-dir names (hyphen) for steps that map to ~/.grok/skills/*
+STEP_SKILL_NAME: dict[str, str] = {
+    "idea_plan": "idea-plan",
+    "phase_plan": "phase-plan",
+    "field_systematic_debug": "systematic-debugging",
 }
 
 DEFAULT_TIMEOUT_S = 1800
@@ -195,7 +204,60 @@ def _apply_pipeline_llm_output(
         ship = project_dir / "phases" / "ship"
         _write(ship / "field_comprehensive_report.md", text[:12000])
 
+    if step == "idea_plan":
+        master = project_dir / "state" / "master_plan.md"
+        body = text
+        m = re.search(r"(#\s*Master Plan\b.*)", text, re.DOTALL | re.I)
+        if m:
+            body = m.group(1)
+        if "Master Plan" in body or "## Phase" in body or body.strip():
+            _write(master, body[:20000])
+        _maybe_sync_total_phases(project_dir, body)
+
+    if step == "phase_plan":
+        tasks_out = phase_dir / "tasks.md"
+        body = text
+        m = re.search(r"(#\s*Phase\s+\d+\s+Tasks\b.*)", text, re.DOTALL | re.I)
+        if m:
+            body = m.group(1)
+        if "- [" in body or "- [ ]" in body or "- [x]" in body:
+            _write(tasks_out, body[:20000])
+        elif body.strip() and not tasks_out.is_file():
+            # Last resort: wrap raw bullets if model omitted heading
+            _write(
+                tasks_out,
+                f"# Phase {phase} Tasks\n\n{body[:15000]}\n",
+            )
+
     return written
+
+
+def _maybe_sync_total_phases(project_dir: pathlib.Path, plan_text: str) -> None:
+    """Best-effort total_phases from master plan text into current_idea.json."""
+    n = None
+    m = re.search(r"total_phases\s*[:=]\s*(\d+)", plan_text, re.I)
+    if m:
+        n = int(m.group(1))
+    else:
+        phases = re.findall(r"^##\s*Phase\s+(\d+)\b", plan_text, re.I | re.M)
+        if phases:
+            n = max(int(x) for x in phases)
+    if not n or n < 1:
+        return
+    sf = project_dir / "state" / "current_idea.json"
+    if not sf.is_file():
+        return
+    try:
+        import json
+
+        state = json.loads(sf.read_text(encoding="utf-8-sig"))
+        state["total_phases"] = int(n)
+        sf.write_text(
+            json.dumps(state, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
 
 
 def _run_via_pipeline_llm(
@@ -394,20 +456,27 @@ def render_prompt_for_phase(
         "master_plan_path": str(master_plan.resolve()),
         "skill": step,
     }
-    # Inject real systematic-debugging skill for field step 2
-    if step == "field_systematic_debug" or "{systematic_debugging_skill}" in rendered:
-        try:
-            from pipeline.skill_load import load_skill_body
+    # Inject on-disk skills into pack templates
+    skill_placeholders = (
+        ("field_systematic_debug", "systematic_debugging_skill", "systematic-debugging"),
+        ("idea_plan", "idea_plan_skill", "idea-plan"),
+        ("phase_plan", "phase_plan_skill", "phase-plan"),
+    )
+    for step_name, placeholder, skill_name in skill_placeholders:
+        token = "{" + placeholder + "}"
+        if step == step_name or token in rendered:
+            try:
+                from pipeline.skill_load import load_skill_body
 
-            skill_txt = load_skill_body("systematic-debugging", max_chars=10000)
-        except Exception:
-            skill_txt = ""
-        if not skill_txt:
-            skill_txt = (
-                "(systematic-debugging skill not found on disk — use: reproduce, "
-                "one hypothesis, minimal fix, write debug report.)"
-            )
-        subs["systematic_debugging_skill"] = skill_txt
+                skill_txt = load_skill_body(skill_name, max_chars=12000)
+            except Exception:
+                skill_txt = ""
+            if not skill_txt:
+                skill_txt = (
+                    f"({skill_name} skill not found under ~/.grok/skills — "
+                    f"follow the Hard requirements in this prompt.)"
+                )
+            subs[placeholder] = skill_txt
 
     for key, val in subs.items():
         rendered = rendered.replace("{" + key + "}", val)
@@ -501,10 +570,11 @@ def run_phase_step(
         # Missing pack is a warning in result, not always hard-fail (dry-run still ok)
 
     log_path = phase_log_path(proj, phase, step)
+    skill_label = STEP_SKILL_NAME.get(step, step)
     command, cmd_err = build_command(
         workspace=ws,
         prompt_file=pfile,
-        skill=step,
+        skill=skill_label,
         log_file=log_path,
         cmd_template=cmd_template,
     )
