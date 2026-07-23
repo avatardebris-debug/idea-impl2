@@ -386,16 +386,25 @@ def seed_from_master_list(
             try:
                 state = json.loads(project_state.read_text(encoding="utf-8"))
                 status = state.get("status", "?")
-                # Locked budget_exceeded: auto-reset then fall through to re-queue
-                if status == "budget_exceeded" and state.get("budget_lock"):
-                    resume_status = state.get("pre_budget_status", "phase_1_executing")
-                    state["status"] = resume_status
-                    state["budget_note"] = ""
-                    state["session_started_at"] = ""  # reset timer
-                    project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                    print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
-                    status = resume_status
-                elif is_seed_list_skip(status):
+                # budget_exceeded: ladder (lock / BE1-3) may auto-resume
+                if status == "budget_exceeded":
+                    try:
+                        from pipeline.budget_ladder import process_budget_exceeded_project
+
+                        state = process_budget_exceeded_project(slug, state, project_state)
+                        status = state.get("status", status)
+                    except Exception as _be_exc:
+                        print(f"  [budget_ladder] seed process error for '{title}': {_be_exc}")
+                    # Legacy lock path if ladder left it exceeded but locked
+                    if status == "budget_exceeded" and state.get("budget_lock"):
+                        resume_status = state.get("pre_budget_status", "phase_1_executing")
+                        state["status"] = resume_status
+                        state["budget_note"] = ""
+                        state["session_started_at"] = ""
+                        project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
+                        print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
+                        status = resume_status
+                if is_seed_list_skip(status):
                     # Terminal / mvp / ship done — skip line, keep scanning list
                     # (returning SEED_SEEDED here starves every later idea)
                     _seeded_this_session.add(title)
@@ -659,6 +668,49 @@ def seed_from_master_list(
                         blocking.append(reason)
                 except Exception:
                     blocking.append(f"{dep_slug} (unreadable)")
+            if blocking:
+                # If blocked only by budget_exceeded prereqs, try one ladder/prereq reset
+                try:
+                    from pipeline.budget_ladder import try_reset_be_prereq
+
+                    reset_any = False
+                    for dep_slug in deps:
+                        dep_sf = project_state_file(dep_slug)
+                        if not dep_sf.exists():
+                            continue
+                        try:
+                            _ds = json.loads(dep_sf.read_text(encoding="utf-8"))
+                        except Exception:
+                            continue
+                        if _ds.get("status") == "budget_exceeded":
+                            if try_reset_be_prereq(dep_slug, waiter=slug):
+                                reset_any = True
+                    if reset_any:
+                        # Re-check deps after prereq reset
+                        blocking = []
+                        for dep_slug in deps:
+                            dep_state_file = project_state_file(dep_slug)
+                            if not dep_state_file.exists():
+                                blocking.append(
+                                    dep_blocking_reason(dep_slug, None, context="seeding")
+                                )
+                                continue
+                            try:
+                                dep_state = json.loads(
+                                    dep_state_file.read_text(encoding="utf-8")
+                                )
+                                reason = dep_blocking_reason(
+                                    dep_slug,
+                                    dep_state.get("status"),
+                                    context="seeding",
+                                    state=dep_state,
+                                )
+                                if reason:
+                                    blocking.append(reason)
+                            except Exception:
+                                blocking.append(f"{dep_slug} (unreadable)")
+                except Exception as _pr_exc:
+                    print(f"  [budget_ladder] prereq reset error: {_pr_exc}")
             if blocking:
                 blocked_count += 1
                 print(f"  [blocked]  '{title}' blocked - waiting for: {', '.join(blocking)}")

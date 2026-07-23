@@ -86,6 +86,16 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
 
     if not cfg.ship_prove:
         idea_state = tick_budget_enforcement(cfg, idea_state)
+        # BE1/BE2/BE3 ladder: process yielded projects (auto-retry, debug path, blocker report)
+        try:
+            from pipeline.budget_ladder import tick_process_budget_yields
+
+            n_ladder = tick_process_budget_yields(cfg.pipeline_dir)
+            if n_ladder:
+                # Active state may have been resumed — reload preferred focus
+                idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=focus)
+        except Exception as _be_exc:
+            print(f"  [budget_ladder] error: {_be_exc}", flush=True)
         idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)
         tick_seed_after_project_advance(cfg, idea_state)
         # Dual-engine: drive grok_build skill chain when status is phase_N_executing

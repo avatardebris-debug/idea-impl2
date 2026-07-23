@@ -60,6 +60,12 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `FIELD_REWORK_MAX_MINUTES` | `45` | Accumulative field rework wall minutes before `deeper_work_needed` |
 | `FIELD_REWORK_MAX_TOKENS` | `2500000` | Accumulative measured tokens (agent_timing / llm_calls; Grok CLI ~log char÷4 fallback) |
 | `FIELD_IDLE_PARK_MINUTES` | `20` | Empty-queue + no LLM for this long on field_testing → `deeper_work_needed` so seed continues |
+| `BUDGET_ACTIVE_CLOCK` | on | Budget uses active work, not calendar sleep gaps |
+| `BUDGET_IDLE_GAP_MINUTES` | `45` | Idle longer than this pauses the budget clock |
+| `BUDGET_BE1_AUTO_RETRY` | on | Strike-1 `budget_exceeded` → clean resume |
+| `BUDGET_BE2` | on | Strike-2 → debug or thin_field path flag |
+| `BUDGET_BE3_BLOCKER` | on | Strike-3 → `blocker_report.v1` + manager menu |
+| `BUDGET_PREREQ_RESET` | on | Reset unlocked BE prereq once when seed blocked by requires |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
@@ -462,6 +468,17 @@ python scripts/connector_canary.py
 python scripts/connector_canary.py --cli-smoke --api-smoke --require-api
 # Report: $PIPELINE_DIR/metrics/connector_canary_latest.md
 # Plan: notes/2026-07-22-p1-held-out-and-goal-traces.md
+
+# P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
+python scripts/run_held_out.py
+python scripts/run_held_out.py --json
+# Report: $PIPELINE_DIR/metrics/held_out_latest.{json,md}
+
+# Goal traces (goal_trace.v1 under $PIPELINE_DIR/goal_traces/):
+# python -c "from pipeline.goal_trace import sandbox_file_exists_goal; from pathlib import Path; print(sandbox_file_exists_goal(Path('README.md'))['status'])"
+
+# Budget yield ladder: budget_exceeded is a yield (strikes 1→2→3), not permanent death.
+# Skill /blocker-identifier produces the same blocker_report.v1 schema for manual BE3.
 
 # User steering dropbox (runner polls every 10 min; manager replies in-file):
 # Edit dropbox.md at repo root — see template inside the file.
