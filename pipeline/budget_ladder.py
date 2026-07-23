@@ -18,6 +18,7 @@ Env (defaults favor safety / overnight):
   BUDGET_PREREQ_RESET=1          reset unlocked BE prereq once when deps block seed
   BUDGET_LADDER_SERIAL=1         one BE recovery at a time (no mass revive)
   BUDGET_LADDER_FOCUS_TTL_HOURS=4 clear stale serial focus so queue unsticks
+  BUDGET_THIN_FIELD_TICK=1       consume prefer_thin_field → run_thin_field_ship
 
 Note: "1000 retries" in budget_note is lifetime phase_retries sum corruption /
 cap path — not wall-clock minutes of a short overnight.
@@ -93,6 +94,32 @@ def prereq_reset_enabled() -> bool:
 def ladder_serial_enabled() -> bool:
     """Only one BE recovery in flight; never mass-revive the graveyard."""
     return env_bool("BUDGET_LADDER_SERIAL", default=True)
+
+
+def thin_field_tick_enabled() -> bool:
+    """Consume prefer_thin_field via thin field ship on the health tick."""
+    return env_bool("BUDGET_THIN_FIELD_TICK", default=True)
+
+
+def prefer_thin_field_ready(state: dict[str, Any]) -> bool:
+    """True when BE2 thin_field flag is set and project is ready to field-prove.
+
+    Ready if complete/complete_with_bugs, or near-done (phases finished) and not
+    still budget_exceeded / dep_waiting.
+    """
+    if not state.get("prefer_thin_field"):
+        return False
+    if state.get("prefer_thin_field_shipped"):
+        return False
+    status = str(state.get("status") or "")
+    if status in ("field_proven", "ship_insufficient", "deeper_work_needed"):
+        return False
+    if status in ("complete", "complete_with_bugs"):
+        return True
+    if status in ("budget_exceeded", "dep_waiting", "evicted", ""):
+        return False
+    # Near-done after BE2 resume (e.g. phase_3_validating with phase>=total)
+    return is_near_done(state)
 
 
 def focus_ttl_hours() -> float:
@@ -1090,3 +1117,82 @@ def try_reset_be_prereq(
         f"(for waiter={waiter or '?'}) → {st.get('status')}"
     )
     return True
+
+
+def tick_prefer_thin_field_ship(
+    pipeline_dir: Path | None = None,
+    *,
+    limit: int = 1,
+) -> int:
+    """Run thin field ship for BE2 prefer_thin_field projects that are ready.
+
+    At most *limit* projects per tick (default 1 — serial-friendly).
+    Clears prefer_thin_field after a ship attempt (success or fail terminal).
+    """
+    if not thin_field_tick_enabled():
+        return 0
+    root = Path(pipeline_dir) if pipeline_dir else get_pipeline_dir()
+    projects = root / "projects"
+    if not projects.is_dir():
+        return 0
+
+    try:
+        from pipeline.engines.field_ship import run_thin_field_ship
+    except Exception as exc:
+        print(f"  [budget_ladder] thin_field import failed: {exc}")
+        return 0
+
+    n = 0
+    for d in sorted(projects.iterdir()):
+        if n >= max(1, limit):
+            break
+        if not d.is_dir():
+            continue
+        sf = d / "state" / "current_idea.json"
+        if not sf.is_file():
+            continue
+        try:
+            st = json.loads(sf.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not prefer_thin_field_ready(st):
+            continue
+
+        slug = d.name
+        print(
+            f"  [budget_ladder] BE2 thin_field ship '{slug}' "
+            f"(status={st.get('status')} phase={st.get('phase')}/{st.get('total_phases')})"
+        )
+        try:
+            # Ensure classic/unknown engines still allowed (prefer_thin_field in thin_ship_enabled)
+            ship = run_thin_field_ship(d, st, slug=slug)
+            # Reload state after ship mutates disk
+            try:
+                st2 = json.loads(sf.read_text(encoding="utf-8"))
+            except Exception:
+                st2 = dict(st)
+            st2["prefer_thin_field_shipped"] = True
+            st2["prefer_thin_field"] = False
+            st2["be2_pending"] = False
+            st2["last_decision"] = st2.get("last_decision") or "THIN_FIELD"
+            st2["thin_field_ship_status"] = getattr(ship, "status", "") or ""
+            st2["thin_field_ship_reason"] = (getattr(ship, "reason", "") or "")[:300]
+            if getattr(ship, "ok", False) or st2.get("status") == "field_proven":
+                clear_ladder_focus(root, slug=slug)
+            sf.write_text(json.dumps(st2, indent=2), encoding="utf-8")
+            print(
+                f"  [budget_ladder] thin_field ship '{slug}' → "
+                f"status={st2.get('status')} ship={getattr(ship, 'status', '?')} "
+                f"ok={getattr(ship, 'ok', False)}"
+            )
+            n += 1
+        except Exception as exc:
+            print(f"  [budget_ladder] thin_field ship '{slug}' failed: {exc}")
+            try:
+                st["prefer_thin_field_shipped"] = True
+                st["prefer_thin_field_error"] = str(exc)[:300]
+                sf.write_text(json.dumps(st, indent=2), encoding="utf-8")
+            except Exception:
+                pass
+            n += 1
+    return n

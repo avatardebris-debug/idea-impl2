@@ -542,3 +542,126 @@ def test_focus_ttl_clears_stale_lock(tmp_path, monkeypatch):
     assert n == 1
     st_b = json.loads((d_b / "current_idea.json").read_text(encoding="utf-8"))
     assert st_b.get("be1_consumed") is True
+
+
+def test_prefer_thin_field_ready_complete_and_near_done():
+    from pipeline.budget_ladder import prefer_thin_field_ready
+
+    assert prefer_thin_field_ready({"prefer_thin_field": True, "status": "complete"})
+    assert prefer_thin_field_ready({
+        "prefer_thin_field": True,
+        "status": "phase_3_validating",
+        "phase": 3,
+        "total_phases": 3,
+    })
+    assert not prefer_thin_field_ready({
+        "prefer_thin_field": True,
+        "status": "budget_exceeded",
+        "phase": 3,
+        "total_phases": 3,
+    })
+    assert not prefer_thin_field_ready({
+        "prefer_thin_field": True,
+        "prefer_thin_field_shipped": True,
+        "status": "complete",
+    })
+    assert not prefer_thin_field_ready({"status": "complete"})
+
+
+def test_be2_strike2_thin_field_when_near_done(tmp_path, monkeypatch):
+    """Fixture: strike 2 + near-done → thin_field path (not debug)."""
+    monkeypatch.setenv("BUDGET_BE2", "1")
+    st = {
+        "status": "budget_exceeded",
+        "budget_strikes": 2,
+        "be1_consumed": True,
+        "pre_budget_status": "phase_3_validating",
+        "phase": 3,
+        "total_phases": 3,
+    }
+    sf = tmp_path / "current_idea.json"
+    sf.write_text(json.dumps(st), encoding="utf-8")
+    out = process_budget_exceeded_project("near", st, sf)
+    assert out.get("be2_path") == "thin_field"
+    assert out.get("prefer_thin_field") is True
+    assert out.get("be2_consumed") is True
+    assert out["status"] == "phase_3_validating"
+
+
+def test_be2_strike2_debug_when_not_near_done(tmp_path, monkeypatch):
+    """Fixture: strike 2 mid-phase → debug path (needs bus; no-bus defers)."""
+    monkeypatch.setenv("BUDGET_BE2", "1")
+    st = {
+        "status": "budget_exceeded",
+        "budget_strikes": 2,
+        "be1_consumed": True,
+        "pre_budget_status": "phase_1_executing",
+        "phase": 1,
+        "total_phases": 3,
+    }
+    sf = tmp_path / "current_idea.json"
+    sf.write_text(json.dumps(st), encoding="utf-8")
+    # Without bus: defer (not thin_field)
+    deferred = process_budget_exceeded_project("mid", dict(st), sf)
+    assert deferred.get("status") == "budget_exceeded"
+    assert not deferred.get("prefer_thin_field")
+    assert not deferred.get("be2_consumed")
+    # With bus: debug path
+    bus = MagicMock()
+    out = process_budget_exceeded_project("mid", dict(st), sf, bus=bus)
+    assert out.get("be2_path") == "debug"
+    assert not out.get("prefer_thin_field")
+    assert out.get("be2_consumed") is True
+
+
+def test_tick_prefer_thin_field_ship_calls_run(tmp_path, monkeypatch):
+    from pipeline.budget_ladder import tick_prefer_thin_field_ship
+
+    monkeypatch.setenv("BUDGET_THIN_FIELD_TICK", "1")
+    projects = tmp_path / "projects"
+    d = projects / "ship_me" / "state"
+    d.mkdir(parents=True)
+    st = {
+        "status": "complete",
+        "prefer_thin_field": True,
+        "phase": 3,
+        "total_phases": 3,
+        "engine": "classic",
+    }
+    sf = d / "current_idea.json"
+    sf.write_text(json.dumps(st), encoding="utf-8")
+
+    class FakeShip:
+        ok = True
+        status = "field_proven"
+        reason = "mock"
+
+    called = {}
+
+    def fake_run(project_dir, state=None, slug="", **kw):
+        called["slug"] = slug
+        called["prefer"] = (state or {}).get("prefer_thin_field")
+        # Simulate ship writing field_proven
+        p = Path(project_dir) / "state" / "current_idea.json"
+        cur = json.loads(p.read_text(encoding="utf-8"))
+        cur["status"] = "field_proven"
+        p.write_text(json.dumps(cur), encoding="utf-8")
+        return FakeShip()
+
+    monkeypatch.setattr(
+        "pipeline.engines.field_ship.run_thin_field_ship",
+        fake_run,
+    )
+    n = tick_prefer_thin_field_ship(tmp_path, limit=1)
+    assert n == 1
+    assert called.get("slug") == "ship_me"
+    disk = json.loads(sf.read_text(encoding="utf-8"))
+    assert disk.get("prefer_thin_field") is False
+    assert disk.get("prefer_thin_field_shipped") is True
+    assert disk.get("status") == "field_proven"
+
+
+def test_thin_ship_enabled_for_prefer_thin_field():
+    from pipeline.engines.field_ship import thin_ship_enabled
+
+    assert thin_ship_enabled({"prefer_thin_field": True, "engine": "classic"}) is True

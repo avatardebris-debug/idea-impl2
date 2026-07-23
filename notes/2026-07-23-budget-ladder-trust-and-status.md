@@ -93,8 +93,9 @@ still does **not** treat BE as full complete for `requires:`.
 
 ### Remaining gap
 
-BE2 thin_field still needs field_ship consumer when near-done. BE3 ASK_OPERATOR dropbox
-loop not productized. Operator loop still design-only.
+BE2 **thin_field consumer shipped** (`tick_prefer_thin_field_ship` + `prefer_thin_field`
+enables classic thin ship; `BUDGET_THIN_FIELD_TICK=1`). BE3 ASK_OPERATOR dropbox loop
+not productized. Operator loop still design-only.
 
 ### After the 60m run: design then implement
 

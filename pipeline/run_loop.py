@@ -94,6 +94,17 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
             if n_ladder:
                 # Active state may have been resumed — reload preferred focus
                 idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=focus)
+            # BE2 prefer_thin_field → thin field ship (near-done / complete)
+            try:
+                from pipeline.budget_ladder import tick_prefer_thin_field_ship
+
+                n_tf = tick_prefer_thin_field_ship(cfg.pipeline_dir, limit=1)
+                if n_tf:
+                    idea_state = _get_active_idea_state(
+                        cfg.pipeline_dir, preferred_slug=focus
+                    )
+            except Exception as _tf_exc:
+                print(f"  [budget_ladder] thin_field tick error: {_tf_exc}", flush=True)
         except Exception as _be_exc:
             print(f"  [budget_ladder] error: {_be_exc}", flush=True)
         idea_state = tick_reviewed_advance(cfg, idea_state, all_empty)

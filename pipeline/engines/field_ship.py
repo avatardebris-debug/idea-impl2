@@ -76,9 +76,13 @@ def thin_ship_enabled(
 
     - grok_build: on by default (GROK_BUILD_THIN_SHIP, default true)
     - classic: only if FIELD_SHIP_ALLOW_CLASSIC=1 or FIELD_SHIP_BULK=1
+    - prefer_thin_field (BE2 ladder): always on (budget recovery path)
     - force=True: always (bulk CLI / ops)
     """
     if force:
+        return True
+    if state and state.get("prefer_thin_field"):
+        # BE2 near-done recovery: allow classic + grok without bulk flags
         return True
     if env_bool("FIELD_SHIP_BULK", default=False):
         return True

@@ -67,7 +67,8 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `BUDGET_BE3_BLOCKER` | on | Strike-3 → `blocker_report.v1` + manager menu |
 | `BUDGET_PREREQ_RESET` | on | One ladder step on BE prereq when seed blocked by requires |
 | `BUDGET_LADDER_SERIAL` | on | One BE recovery at a time; no mass revive of graveyard |
-| `BUDGET_LADDER_FOCUS_TTL_HOURS` | `4` | Clear stale serial focus after N hours so other BE can proceed |
+| `BUDGET_LADDER_FOCUS_TTL_HOURS` | `4` | Clear stale serial focus so another BE can run |
+| `BUDGET_THIN_FIELD_TICK` | on | BE2 `prefer_thin_field` → `run_thin_field_ship` on health tick |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
