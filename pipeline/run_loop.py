@@ -90,7 +90,7 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
         try:
             from pipeline.budget_ladder import tick_process_budget_yields
 
-            n_ladder = tick_process_budget_yields(cfg.pipeline_dir)
+            n_ladder = tick_process_budget_yields(cfg.pipeline_dir, bus=cfg.bus)
             if n_ladder:
                 # Active state may have been resumed — reload preferred focus
                 idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=focus)

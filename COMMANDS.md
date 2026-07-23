@@ -62,10 +62,12 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `FIELD_IDLE_PARK_MINUTES` | `20` | Empty-queue + no LLM for this long on field_testing → `deeper_work_needed` so seed continues |
 | `BUDGET_ACTIVE_CLOCK` | on | Budget uses active work, not calendar sleep gaps |
 | `BUDGET_IDLE_GAP_MINUTES` | `45` | Idle longer than this pauses the budget clock |
-| `BUDGET_BE1_AUTO_RETRY` | on | Strike-1 `budget_exceeded` → clean resume |
-| `BUDGET_BE2` | on | Strike-2 → debug or thin_field path flag |
+| `BUDGET_BE1_AUTO_RETRY` | on | Strike-1 only (not strike-0 fossils) → clean resume |
+| `BUDGET_BE2` | on | Strike-2 → systematic-debug enqueue or thin_field |
 | `BUDGET_BE3_BLOCKER` | on | Strike-3 → `blocker_report.v1` + manager menu |
-| `BUDGET_PREREQ_RESET` | on | Reset unlocked BE prereq once when seed blocked by requires |
+| `BUDGET_PREREQ_RESET` | on | One ladder step on BE prereq when seed blocked by requires |
+| `BUDGET_LADDER_SERIAL` | on | One BE recovery at a time; no mass revive of graveyard |
+| `BUDGET_LADDER_FOCUS_TTL_HOURS` | `4` | Clear stale serial focus after N hours so other BE can proceed |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |

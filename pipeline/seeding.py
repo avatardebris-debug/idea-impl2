@@ -386,24 +386,20 @@ def seed_from_master_list(
             try:
                 state = json.loads(project_state.read_text(encoding="utf-8"))
                 status = state.get("status", "?")
-                # budget_exceeded: ladder (lock / BE1-3) may auto-resume
+                # budget_exceeded: only ladder-eligible (strikes>=1 / lock) may resume.
+                # Fossils (strike 0) stay skipped — no mass revive from the list scan.
                 if status == "budget_exceeded":
                     try:
-                        from pipeline.budget_ladder import process_budget_exceeded_project
+                        from pipeline.budget_ladder import (
+                            try_seed_process_budget_exceeded,
+                        )
 
-                        state = process_budget_exceeded_project(slug, state, project_state)
+                        state = try_seed_process_budget_exceeded(
+                            slug, state, project_state, bus=bus
+                        )
                         status = state.get("status", status)
                     except Exception as _be_exc:
                         print(f"  [budget_ladder] seed process error for '{title}': {_be_exc}")
-                    # Legacy lock path if ladder left it exceeded but locked
-                    if status == "budget_exceeded" and state.get("budget_lock"):
-                        resume_status = state.get("pre_budget_status", "phase_1_executing")
-                        state["status"] = resume_status
-                        state["budget_note"] = ""
-                        state["session_started_at"] = ""
-                        project_state.write_text(json.dumps(state, indent=2), encoding="utf-8")
-                        print(f"  🔒 [LOCKED] '{title}' was budget_exceeded — auto-reset to {resume_status}")
-                        status = resume_status
                 if is_seed_list_skip(status):
                     # Terminal / mvp / ship done — skip line, keep scanning list
                     # (returning SEED_SEEDED here starves every later idea)
@@ -683,7 +679,7 @@ def seed_from_master_list(
                         except Exception:
                             continue
                         if _ds.get("status") == "budget_exceeded":
-                            if try_reset_be_prereq(dep_slug, waiter=slug):
+                            if try_reset_be_prereq(dep_slug, waiter=slug, bus=bus):
                                 reset_any = True
                     if reset_any:
                         # Re-check deps after prereq reset

@@ -583,17 +583,39 @@ def tick_project_metrics(
                         and st not in ("complete", "budget_exceeded", "", "dep_waiting")
                         and not cfg.ship_prove
                         and not is_ship_status(st)
+                        # Once lifetime-capped, never auto re-yield from this health check
+                        # (static phase_retries sum would otherwise cascade BE1→BE2→BE3)
+                        and not ci.get("lifetime_retry_capped")
                     ):
-                        ci["status"] = "budget_exceeded"
-                        ci["budget_note"] = (
-                            f"Force-completed: exceeded {MAX_PROJECT_LIFETIME_RETRIES} "
-                            f"total retries across all phases (actual: {retries})"
-                        )
+                        # Use ladder yield so strikes advance BE1→BE2 (not a silent fossil)
+                        try:
+                            from pipeline.budget_ladder import apply_budget_yield
+
+                            ci = apply_budget_yield(
+                                ci,
+                                elapsed_min=float(retries),
+                                phase_budget=float(MAX_PROJECT_LIFETIME_RETRIES),
+                                total_phases=int(ci.get("total_phases") or 3),
+                            )
+                            ci["budget_note"] = (
+                                f"Force-completed: exceeded {MAX_PROJECT_LIFETIME_RETRIES} "
+                                f"total retries across all phases (actual: {retries}); "
+                                f"strike={ci.get('budget_strikes')}"
+                            )
+                            # Durable: skip re-application after BE1 resume while flag set
+                            ci["lifetime_retry_capped"] = True
+                        except Exception:
+                            ci["status"] = "budget_exceeded"
+                            ci["budget_note"] = (
+                                f"Force-completed: exceeded {MAX_PROJECT_LIFETIME_RETRIES} "
+                                f"total retries across all phases (actual: {retries})"
+                            )
+                            ci["lifetime_retry_capped"] = True
                         ci_path.write_text(json.dumps(ci, indent=2), encoding="utf-8")
                         print(
                             f"  \U0001f6d1 Lifetime retry cap hit: '{ci.get('title', slug)}' "
                             f"({retries} retries \u2265 {MAX_PROJECT_LIFETIME_RETRIES}) "
-                            f"\u2192 budget_exceeded"
+                            f"\u2192 budget_exceeded strike={ci.get('budget_strikes')}"
                         )
                         for _role in AGENT_ROLES:
                             cfg.bus.clear_queue(_role)

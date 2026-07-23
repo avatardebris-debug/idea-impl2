@@ -12,10 +12,15 @@ Semantics:
 Env (defaults favor safety / overnight):
   BUDGET_ACTIVE_CLOCK=1          wall idle gaps do not count toward budget
   BUDGET_IDLE_GAP_MINUTES=45     pause clock after this idle gap
-  BUDGET_BE1_AUTO_RETRY=1        strike-1 auto resume
-  BUDGET_BE2=1                   mark BE2 path on strike 2
-  BUDGET_BE3_BLOCKER=1           write blocker_report + manager decision
+  BUDGET_BE1_AUTO_RETRY=1        strike-1 auto resume (only strikes==1, not fossils)
+  BUDGET_BE2=1                   strike-2 → systematic-debug or thin_field
+  BUDGET_BE3_BLOCKER=1           strike-3 → blocker_report + manager decision
   BUDGET_PREREQ_RESET=1          reset unlocked BE prereq once when deps block seed
+  BUDGET_LADDER_SERIAL=1         one BE recovery at a time (no mass revive)
+  BUDGET_LADDER_FOCUS_TTL_HOURS=4 clear stale serial focus so queue unsticks
+
+Note: "1000 retries" in budget_note is lifetime phase_retries sum corruption /
+cap path — not wall-clock minutes of a short overnight.
 """
 
 from __future__ import annotations
@@ -83,6 +88,26 @@ def be3_enabled() -> bool:
 
 def prereq_reset_enabled() -> bool:
     return env_bool("BUDGET_PREREQ_RESET", default=True)
+
+
+def ladder_serial_enabled() -> bool:
+    """Only one BE recovery in flight; never mass-revive the graveyard."""
+    return env_bool("BUDGET_LADDER_SERIAL", default=True)
+
+
+def focus_ttl_hours() -> float:
+    """Hours after which serial ladder focus is cleared (default 4)."""
+    return max(0.25, env_float("BUDGET_LADDER_FOCUS_TTL_HOURS", default=4.0))
+
+
+def focus_is_expired(focus: dict[str, Any] | None) -> bool:
+    if not focus:
+        return False
+    since = _parse_iso(focus.get("since") if isinstance(focus.get("since"), str) else None)
+    if since is None:
+        return False
+    age_h = (_now() - since).total_seconds() / 3600.0
+    return age_h >= focus_ttl_hours()
 
 
 def touch_active_work(state: dict[str, Any]) -> dict[str, Any]:
@@ -370,6 +395,9 @@ def apply_manager_decision(
         state = auto_retry_clean(state, reason="DEBUG_AGAIN")
         state["be2_path"] = "debug"
         state["be2_pending"] = True
+        # Re-arm a new systematic-debug pass (prior BE2 may have left these True)
+        state["be2_debug_enqueued"] = False
+        state["be2_debug_attempted"] = False
         return state
     if decision == "THIN_FIELD":
         # Prefer thin ship path if near done — leave status that field_ship can pick up
@@ -456,18 +484,294 @@ def _open_dependents(slug: str) -> list[dict[str, Any]]:
     return found
 
 
+_LADDER_DONE = frozenset({
+    "complete",
+    "complete_with_bugs",
+    "field_proven",
+    "mvp_complete",
+    "deeper_work_needed",
+    "ship_insufficient",
+    "evicted",
+})
+
+
+def is_lifetime_retry_fossil(state: dict[str, Any]) -> bool:
+    """True if note is the lifetime-retry cap (often inflated counters, not real work)."""
+    note = str(state.get("budget_note") or "")
+    return "total retries across all phases" in note.lower() or "lifetime" in note.lower()
+
+
+def is_ladder_eligible(state: dict[str, Any]) -> bool:
+    """Whether this BE may be advanced by the serial ladder.
+
+    Fossils (strikes==0, never yielded by active-clock ladder) stay parked.
+    Real yields set budget_strikes via apply_budget_yield.
+    """
+    if state.get("status") != "budget_exceeded":
+        return False
+    if state.get("awaiting_operator") or state.get("budget_archived"):
+        return False
+    # BE3 parked (BYPASS/ARCHIVE/IGNORE) — no further auto ladder step
+    if state.get("be3_consumed"):
+        return False
+    strikes = get_strikes(state)
+    if strikes >= 1:
+        return True
+    if state.get("budget_lock"):
+        return True
+    if state.get("budget_yielded") and state.get("budget_yielded_at"):
+        return True
+    # Explicit prereq path may set this
+    if state.get("prereq_reset_for") or state.get("force_ladder"):
+        return True
+    return False
+
+
+def ladder_focus_path(pipeline_dir: Path | None = None) -> Path:
+    root = pipeline_dir or get_pipeline_dir()
+    return root / "state" / "budget_ladder_focus.json"
+
+
+def read_ladder_focus(pipeline_dir: Path | None = None) -> dict[str, Any] | None:
+    p = ladder_focus_path(pipeline_dir)
+    if not p.is_file():
+        return None
+    try:
+        return json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def write_ladder_focus(
+    slug: str,
+    *,
+    stage: str,
+    pipeline_dir: Path | None = None,
+) -> None:
+    p = ladder_focus_path(pipeline_dir)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        json.dumps({"slug": slug, "stage": stage, "since": _iso()}, indent=2),
+        encoding="utf-8",
+    )
+
+
+def clear_ladder_focus(pipeline_dir: Path | None = None, *, slug: str | None = None) -> None:
+    p = ladder_focus_path(pipeline_dir)
+    if not p.is_file():
+        return
+    if slug:
+        cur = read_ladder_focus(pipeline_dir)
+        if cur and cur.get("slug") != slug:
+            return
+    try:
+        p.unlink()
+    except OSError:
+        pass
+
+
+def seed_serial_blocked(
+    slug: str,
+    focus: dict[str, Any] | None = None,
+    *,
+    pipeline_dir: Path | None = None,
+    clear_expired: bool = True,
+) -> bool:
+    """True if seed must not advance *slug* because another serial focus is in-flight.
+
+    Expired focus (TTL) does not block; when *clear_expired* it is cleared on disk.
+    If *focus* is omitted, reads current ladder focus from *pipeline_dir*.
+    """
+    if not ladder_serial_enabled():
+        return False
+    if focus is None:
+        focus = read_ladder_focus(pipeline_dir)
+    if not focus or not focus.get("slug"):
+        return False
+    if focus_is_expired(focus):
+        if clear_expired:
+            clear_ladder_focus(pipeline_dir, slug=str(focus.get("slug")))
+        return False
+    return str(focus.get("slug")) != slug
+
+
+def try_seed_process_budget_exceeded(
+    slug: str,
+    state: dict[str, Any],
+    state_file: Path,
+    *,
+    pipeline_dir: Path | None = None,
+    bus: Any | None = None,
+) -> dict[str, Any]:
+    """Seed-path BE advance used by list seeding.
+
+    - Honors serial focus + TTL (never parallel with another in-flight recovery).
+    - Advances only BE1 (strikes==1); BE2/BE3 need bus via tick.
+    - Locked resume (budget_lock, be1 not consumed) also honors serial_block.
+    """
+    if state.get("status") != "budget_exceeded":
+        return state
+    serial_block = seed_serial_blocked(slug, pipeline_dir=pipeline_dir)
+    # Seed only advances BE1 (strikes==1). BE2 needs bus via tick;
+    # BE3 is manager path — both must not race seed without bus.
+    if (
+        is_ladder_eligible(state)
+        and not serial_block
+        and get_strikes(state) == 1
+    ):
+        return process_budget_exceeded_project(
+            slug, state, state_file, bus=bus, pipeline_dir=pipeline_dir
+        )
+    if (
+        state.get("budget_lock")
+        and not state.get("be1_consumed")
+        and not serial_block
+    ):
+        # Locked: one resume even if strike metadata missing
+        # (still honor serial — never parallel with another focus)
+        state["force_ladder"] = True
+        return process_budget_exceeded_project(
+            slug,
+            state,
+            state_file,
+            bus=bus,
+            allow_ineligible=True,
+            pipeline_dir=pipeline_dir,
+        )
+    return state
+
+
+def _ladder_fully_consumed_parked(st: dict[str, Any]) -> bool:
+    """True when no further ladder step can run (BE3 done / parked decisions)."""
+    if st.get("awaiting_operator") or st.get("budget_archived"):
+        return True
+    if st.get("be3_consumed") and st.get("status") == "budget_exceeded":
+        # BYPASS_RETURN / ARCHIVE / IGNORE leave BE parked — not mid-flight
+        return True
+    if (
+        st.get("be1_consumed")
+        and st.get("be2_consumed")
+        and st.get("be3_consumed")
+        and st.get("status") == "budget_exceeded"
+    ):
+        return True
+    return False
+
+
+def _project_still_ladder_inflight(st: dict[str, Any]) -> bool:
+    """True if we already started BE1/BE2 on this project and it is not done/BE again."""
+    if st.get("status") in _LADDER_DONE:
+        return False
+    if _ladder_fully_consumed_parked(st):
+        return False
+    if st.get("status") == "budget_exceeded":
+        # Waiting for next strike step — still the focus (BE1/BE2 done, more strikes later)
+        return bool(st.get("be1_consumed") or st.get("be2_consumed"))
+    # Mid-flight after clean retry
+    return bool(
+        st.get("be1_consumed")
+        or st.get("be2_pending")
+        or st.get("be2_consumed")
+        or st.get("ladder_focus")
+    )
+
+
+def try_enqueue_be2_debug(slug: str, state: dict[str, Any], bus: Any | None) -> bool:
+    """Enqueue one systematic-debug executor pass for BE2 debug path. Returns True if sent.
+
+    Does **not** call try_enqueue_pre_force_debug (avoids mid-step disk write /
+    mark_attempted race on current_idea.json). Builds payload in-memory only;
+    caller sets be2_debug_attempted / be2_debug_enqueued and does a single write.
+    """
+    if bus is None:
+        return False
+    if state.get("be2_path") != "debug" or not state.get("be2_pending"):
+        return False
+    if state.get("be2_debug_enqueued") or state.get("be2_debug_attempted"):
+        return False
+    phase = int(state.get("phase") or 1)
+    try:
+        from pipeline.pre_force_debug import build_systematic_debug_instructions
+        from pipeline.message_bus import Message
+
+        instructions = build_systematic_debug_instructions(
+            idea_slug=slug,
+            phase=phase,
+            validation_excerpt=(state.get("budget_note") or "")[:2000],
+        )
+        proj = project_dir(slug)
+        payload = {
+            "phase": phase,
+            "tasks_path": f"phases/phase_{phase}/tasks.md",
+            "workspace_path": str(proj / "workspace"),
+            "fix_required": True,
+            "fix_report_path": f"phases/phase_{phase}/fix_report.md",
+            "fix_instructions": (
+                "# BE2 SYSTEMATIC DEBUG (budget ladder strike 2)\n\n" + instructions
+            ),
+            "idea_slug": slug,
+            "retry_count": get_strikes(state),
+            "systematic_debug": True,
+            "be2_debug": True,
+        }
+        bus.send(
+            Message.create(
+                from_agent="manager",
+                to_agent="executor",
+                type="task",
+                payload=payload,
+            )
+        )
+        return True
+    except Exception as exc:
+        print(f"  [budget_ladder] BE2 debug enqueue failed for '{slug}': {exc}")
+        return False
+
+
+def _try_complete_pending_be2_enqueue(
+    slug: str,
+    state: dict[str, Any],
+    state_file: Path,
+    bus: Any | None,
+) -> bool:
+    """If BE2 already resumed with pending debug and bus is available, enqueue once."""
+    if bus is None:
+        return False
+    if state.get("status") == "budget_exceeded":
+        return False
+    if state.get("be2_path") != "debug":
+        return False
+    if not state.get("be2_pending") or state.get("be2_debug_enqueued"):
+        return False
+    enq = try_enqueue_be2_debug(slug, state, bus)
+    if not enq:
+        return False
+    state["be2_debug_enqueued"] = True
+    state["be2_debug_attempted"] = True
+    state["be2_pending"] = False
+    state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    print(f"  [budget_ladder] BE2 systematic-debug enqueued (late) for '{slug}'")
+    return True
+
+
 def process_budget_exceeded_project(
     slug: str,
     state: dict[str, Any],
     state_file: Path,
+    *,
+    bus: Any | None = None,
+    pipeline_dir: Path | None = None,
+    allow_ineligible: bool = False,
 ) -> dict[str, Any]:
-    """Advance one yielded project through BE1/BE2/BE3. Returns new state."""
+    """Advance one yielded project one ladder step (BE1 or BE2 or BE3).
+
+    Does **not** revive strike-0 fossils unless allow_ineligible / lock / prereq.
+    """
     if state.get("status") != "budget_exceeded":
         return state
     if state.get("awaiting_operator") or state.get("budget_archived"):
         return state
     if state.get("next_policy") == "ignore_next" and int(state.get("seed_skip_cycles") or 0) > 0:
-        # consume one skip
         state["seed_skip_cycles"] = max(0, int(state.get("seed_skip_cycles") or 0) - 1)
         if state["seed_skip_cycles"] == 0:
             state["next_policy"] = "remain_queue"
@@ -476,28 +780,66 @@ def process_budget_exceeded_project(
 
     strikes = get_strikes(state)
 
-    # BE1: auto clean retry
-    if strikes <= 1 and be1_auto_retry_enabled() and not state.get("be1_consumed"):
+    # --- Eligibility: never mass-revive strike-0 classic graveyard ---
+    if not allow_ineligible and not is_ladder_eligible(state):
+        # Stay budget_exceeded; overnight ignores
+        return state
+
+    # Normalize: first real entry into ladder without strikes (lock / prereq)
+    if strikes < 1 and (state.get("budget_lock") or allow_ineligible or state.get("force_ladder")):
+        state["budget_strikes"] = 1
+        strikes = 1
+
+    # BE1: exactly strike 1, clean retry only (not strikes==0 fossils)
+    if (
+        strikes == 1
+        and be1_auto_retry_enabled()
+        and not state.get("be1_consumed")
+    ):
         state["be1_consumed"] = True
+        state["ladder_focus"] = True
         state = auto_retry_clean(state, reason="AUTO_RETRY_CLEAN")
+        write_ladder_focus(slug, stage="be1", pipeline_dir=pipeline_dir)
         print(f"  [budget_ladder] BE1 AUTO_RETRY_CLEAN '{slug}' → {state.get('status')}")
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
 
-    # BE2: mark tactical path once, then resume
+    # BE2: strike 2 → systematic-debug or thin_field (real work, not just a flag)
     if strikes == 2 and be2_enabled() and not state.get("be2_consumed"):
-        state["be2_consumed"] = True
         path = "thin_field" if is_near_done(state) else "debug"
+        # Debug path needs a bus to enqueue real work. Without bus, do not
+        # consume BE2 so a later tick (with bus) can retry. thin_field is
+        # flag-only and may proceed without bus.
+        if path == "debug" and bus is None:
+            print(
+                f"  [budget_ladder] BE2 path=debug for '{slug}' deferred "
+                f"(no bus — leave budget_exceeded for tick)"
+            )
+            return state
+
+        state["be2_consumed"] = True
+        state["ladder_focus"] = True
         state = auto_retry_clean(state, reason="BE2_" + path.upper())
         state["be2_path"] = path
         state["be2_pending"] = True
         if path == "thin_field":
             state["prefer_thin_field"] = True
-        print(f"  [budget_ladder] BE2 path={path} for '{slug}' → {state.get('status')}")
+        write_ladder_focus(slug, stage="be2", pipeline_dir=pipeline_dir)
+        enq = False
+        if path == "debug":
+            enq = try_enqueue_be2_debug(slug, state, bus)
+            if enq:
+                state["be2_debug_enqueued"] = True
+                state["be2_debug_attempted"] = True
+                state["be2_pending"] = False  # hand off to executor
+        print(
+            f"  [budget_ladder] BE2 path={path} for '{slug}' → {state.get('status')}"
+            + (" (systematic-debug enqueued)" if enq else "")
+        )
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
 
-    # BE3: blocker report + manager
+    # BE3: strike ≥3 → report + manager
     if strikes >= 3 and be3_enabled() and not state.get("be3_consumed"):
         state["be3_consumed"] = True
         deps = _deps_status_for(state)
@@ -511,16 +853,43 @@ def process_budget_exceeded_project(
         write_blocker_report(slug, report)
         append_manager_decision(slug, decision, report)
         state = apply_manager_decision(state, decision, report)
+        # BE3 DEBUG_AGAIN re-arms debug; enqueue immediately when bus available
+        enq = False
+        if (
+            decision == "DEBUG_AGAIN"
+            and state.get("be2_path") == "debug"
+            and state.get("be2_pending")
+            and bus is not None
+        ):
+            enq = try_enqueue_be2_debug(slug, state, bus)
+            if enq:
+                state["be2_debug_enqueued"] = True
+                state["be2_debug_attempted"] = True
+                state["be2_pending"] = False
+        write_ladder_focus(slug, stage="be3", pipeline_dir=pipeline_dir)
+        # Clear focus when parked / no further ladder step (not mid-resume work)
+        if (
+            state.get("status") in _LADDER_DONE
+            or state.get("awaiting_operator")
+            or state.get("budget_archived")
+            or state.get("status") == "budget_exceeded"
+        ):
+            clear_ladder_focus(pipeline_dir, slug=slug)
+            state["ladder_focus"] = False
         print(
             f"  [budget_ladder] BE3 '{slug}' class={report.get('blocker_class')} "
             f"decision={decision} → {state.get('status')}"
+            + (" (systematic-debug enqueued)" if enq else "")
         )
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
 
-    # Locked projects: always allow clean retry
-    if state.get("budget_lock") and be1_auto_retry_enabled():
+    # Locked, strike still 0 after normalize failed: one locked wake only
+    if state.get("budget_lock") and be1_auto_retry_enabled() and not state.get("be1_consumed"):
+        state["budget_strikes"] = max(1, strikes)
+        state["be1_consumed"] = True
         state = auto_retry_clean(state, reason="LOCKED_AUTO_RETRY")
+        write_ladder_focus(slug, stage="be1_lock", pipeline_dir=pipeline_dir)
         print(f"  [budget_ladder] locked auto-retry '{slug}' → {state.get('status')}")
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
@@ -528,13 +897,85 @@ def process_budget_exceeded_project(
     return state
 
 
-def tick_process_budget_yields(pipeline_dir: Path | None = None) -> int:
-    """Scan projects; process budget_exceeded via ladder. Returns count processed."""
-    root = (pipeline_dir or get_pipeline_dir()) / "projects"
-    if not root.is_dir():
+def _priority_key(slug: str, st: dict[str, Any]) -> tuple:
+    """Higher priority first: open dependents, non-fossil, recent yield."""
+    deps = _open_dependents(slug)
+    has_deps = 1 if deps else 0
+    fossil = 0 if is_lifetime_retry_fossil(st) else 1
+    strikes = get_strikes(st)
+    # Prefer higher strikes already mid-ladder (BE2 before new BE1 of others)
+    return (-has_deps, -strikes, -fossil, slug)
+
+
+def tick_process_budget_yields(
+    pipeline_dir: Path | None = None,
+    bus: Any | None = None,
+) -> int:
+    """Process **at most one** eligible budget_exceeded project per tick.
+
+    Serial by default: if a ladder focus is already in-flight, do not revive others.
+    """
+    root = Path(pipeline_dir) if pipeline_dir else get_pipeline_dir()
+    projects = root / "projects"
+    if not projects.is_dir():
         return 0
-    n = 0
-    for d in sorted(root.iterdir()):
+
+    # Clear focus if target finished, parked, TTL expired, or cannot advance
+    focus = read_ladder_focus(root)
+    if focus and focus.get("slug"):
+        fslug = str(focus["slug"])
+        if focus_is_expired(focus):
+            clear_ladder_focus(root, slug=fslug)
+            print(f"  [budget_ladder] focus TTL expired for '{fslug}' — cleared")
+            focus = None
+        else:
+            fsf = projects / fslug / "state" / "current_idea.json"
+            if fsf.is_file():
+                try:
+                    fst = json.loads(fsf.read_text(encoding="utf-8"))
+                    if (
+                        fst.get("status") in _LADDER_DONE
+                        or _ladder_fully_consumed_parked(fst)
+                        or not _project_still_ladder_inflight(fst)
+                    ):
+                        clear_ladder_focus(root, slug=fslug)
+                        focus = None
+                    elif ladder_serial_enabled() and _project_still_ladder_inflight(fst):
+                        # Late BE2 enqueue if already resumed without bus
+                        if _try_complete_pending_be2_enqueue(fslug, fst, fsf, bus):
+                            return 1
+                        # Only advance this slug if it is BE again (strike 2/3)
+                        if fst.get("status") == "budget_exceeded":
+                            before = json.dumps(fst, sort_keys=True)
+                            fst2 = process_budget_exceeded_project(
+                                fslug, fst, fsf, bus=bus, pipeline_dir=root
+                            )
+                            if json.dumps(fst2, sort_keys=True) != before:
+                                return 1
+                            # Unchanged — release focus so other eligible BE can proceed
+                            clear_ladder_focus(root, slug=fslug)
+                            focus = None
+                        else:
+                            # Still working mid-phase — do not start other BE recoveries
+                            return 0
+                except Exception as _focus_exc:
+                    # Fail closed under serial: do not advance another BE while
+                    # the focus target is unreadable / process blew up.
+                    print(
+                        f"  [budget_ladder] focus error for '{fslug}': {_focus_exc}"
+                        + (" — hold serial" if ladder_serial_enabled() else " — clear focus")
+                    )
+                    if ladder_serial_enabled():
+                        return 0
+                    clear_ladder_focus(root, slug=fslug)
+                    focus = None
+            else:
+                # Focus target missing — clear stale lock
+                clear_ladder_focus(root, slug=fslug)
+                focus = None
+
+    candidates: list[tuple[tuple, str, Path, dict[str, Any]]] = []
+    for d in projects.iterdir():
         if not d.is_dir():
             continue
         sf = d / "state" / "current_idea.json"
@@ -546,16 +987,33 @@ def tick_process_budget_yields(pipeline_dir: Path | None = None) -> int:
             continue
         if st.get("status") != "budget_exceeded":
             continue
-        before = json.dumps(st, sort_keys=True)
-        st2 = process_budget_exceeded_project(d.name, st, sf)
-        after = json.dumps(st2, sort_keys=True)
-        if before != after:
-            n += 1
-    return n
+        if not is_ladder_eligible(st):
+            continue
+        candidates.append((_priority_key(d.name, st), d.name, sf, st))
+
+    if not candidates:
+        return 0
+
+    candidates.sort(key=lambda x: x[0])
+    _prio, slug, sf, st = candidates[0]
+    before = json.dumps(st, sort_keys=True)
+    st2 = process_budget_exceeded_project(
+        slug, st, sf, bus=bus, pipeline_dir=root
+    )
+    return 1 if json.dumps(st2, sort_keys=True) != before else 0
 
 
-def try_reset_be_prereq(dep_slug: str, *, waiter: str = "") -> bool:
-    """If dep is unlocked budget_exceeded, reset once for dependents (BE prereq)."""
+def try_reset_be_prereq(
+    dep_slug: str,
+    *,
+    waiter: str = "",
+    bus: Any | None = None,
+) -> bool:
+    """If dep is budget_exceeded, one serial ladder step for chain unblock.
+
+    Honors BUDGET_LADDER_SERIAL: if another slug owns an in-flight focus, leave
+    the waiter blocked (return False). Optional bus enables BE2 debug enqueue.
+    """
     if not prereq_reset_enabled():
         return False
     sf = projects_dir() / dep_slug / "state" / "current_idea.json"
@@ -567,21 +1025,68 @@ def try_reset_be_prereq(dep_slug: str, *, waiter: str = "") -> bool:
         return False
     if st.get("status") != "budget_exceeded":
         return False
-    if st.get("prereq_reset_once"):
+    if st.get("prereq_reset_once") and st.get("be1_consumed"):
+        return False
+
+    # Serial: do not start a parallel recovery while another focus is in-flight
+    if ladder_serial_enabled():
+        focus = read_ladder_focus()
+        if focus and focus.get("slug") and focus.get("slug") != dep_slug:
+            if not focus_is_expired(focus):
+                # Confirm the other focus is still meaningfully in-flight
+                other = str(focus["slug"])
+                other_sf = projects_dir() / other / "state" / "current_idea.json"
+                still = True
+                if other_sf.is_file():
+                    try:
+                        ost = json.loads(other_sf.read_text(encoding="utf-8"))
+                        still = _project_still_ladder_inflight(ost)
+                    except Exception:
+                        still = True
+                if still:
+                    return False
+                clear_ladder_focus(slug=other)
+            else:
+                clear_ladder_focus(slug=str(focus["slug"]))
+
+    st["prereq_reset_for"] = waiter
+    st["force_ladder"] = True
+    if get_strikes(st) < 1:
+        st["budget_strikes"] = 1
+    before_status = st.get("status")
+    before_consumed = (
+        bool(st.get("be1_consumed")),
+        bool(st.get("be2_consumed")),
+        bool(st.get("be3_consumed")),
+    )
+    st = process_budget_exceeded_project(
+        dep_slug,
+        st,
+        sf,
+        bus=bus,
+        allow_ineligible=True,
+        pipeline_dir=get_pipeline_dir(),
+    )
+    advanced = (
+        st.get("status") != before_status
+        or (
+            bool(st.get("be1_consumed")),
+            bool(st.get("be2_consumed")),
+            bool(st.get("be3_consumed")),
+        )
+        != before_consumed
+    )
+    if not advanced:
+        # e.g. BE2 debug deferred without bus — do not burn prereq_reset_once
+        print(
+            f"  [budget_ladder] prereq ladder step '{dep_slug}' deferred "
+            f"(for waiter={waiter or '?'}; no advance — leave for tick/bus)"
+        )
         return False
     st["prereq_reset_once"] = True
-    st["prereq_reset_for"] = waiter
-    # Prefer ladder process so strikes still count
-    if get_strikes(st) == 0:
-        st["budget_strikes"] = 1
-    st = process_budget_exceeded_project(dep_slug, st, sf)
-    # If still exceeded (parked), force one clean retry for prereq unblock
-    if st.get("status") == "budget_exceeded" and not st.get("awaiting_operator"):
-        st = auto_retry_clean(st, reason="PREREQ_RESET")
-        st["prereq_reset_once"] = True
-        sf.write_text(json.dumps(st, indent=2), encoding="utf-8")
+    sf.write_text(json.dumps(st, indent=2), encoding="utf-8")
     print(
-        f"  [budget_ladder] prereq reset '{dep_slug}' "
+        f"  [budget_ladder] prereq ladder step '{dep_slug}' "
         f"(for waiter={waiter or '?'}) → {st.get('status')}"
     )
     return True
