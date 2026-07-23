@@ -248,3 +248,26 @@ Use `python reset_budget_exceeded.py` to retry them (does not touch this file).
 - fake_proj â€” Fake Proj â€” 2026-07-19T21:17:23.115103+00:00
 - business_plan_writer_create_a_series_of_structur â€” [business plan writer] Create a series of structur â€” 2026-07-19T22:59:53.050930+00:00
   desc: [business plan writer] Create a series of structured prompts for writing a complete business proposal. Deconstruct business plan into all of its parts, all the phases and all of the prompts necessary. The prompts can compound like creating a plan that develops all the necessary sections and then each section can go through a series of prompts to deconstruct into phases of questions that the next prompt will answer and inject the placeholder for sections and build everything necessary. Make it so
+- proj — proj — 2026-07-20T04:12:44.164722+00:00
+- plan_first — Plan First — 2026-07-22T06:26:27.307198+00:00
+  desc: A tool that prints hello
+- dialog_generator — dialog generator — 2026-07-22T07:22:27.709929+00:00
+  desc: generate dialogue between characters
+- directoreditor — director/editor — 2026-07-22T14:09:13.428306+00:00
+  desc: direct and cut using RL
+- robo_primitive_mapper — [robo primitive mapper] — 2026-07-22T14:27:16.215708+00:00
+  desc: Maps video_recipe action descriptions to the canonical robot primitive vocabulary. Handles unit conversion, reference frame normalization (world/object/gripper), validates each action maps to a known primitive. Output: robot_program.json ready for mujoco_codegen
+- sim_to_real_calibration_dataset_builder — [Sim-to-real calibration dataset builder] — 2026-07-22T14:44:04.262220+00:00
+  desc: [goal:bootstrap_robot_training:b004] Builder creating paired sim/real trajectory datasets for gap measurement. Class CalibrationDatasetBuilder with build(sim_config, real_logs) writing paired_dataset.h5 and metadata.json.. requires: Real robot data collector. suggested_reuse: shared_json_formatter, ai_movie_generation_suite
+- mujoco_codegen — [mujoco codegen] — 2026-07-23T06:29:25.859853+00:00
+  desc: Generates runnable MuJoCo XML scene files and Python control scripts from robo_primitive_mapper output. Handles object placement, trajectory planning, contact and grasp primitives. Executes simulation and records render video. Output: scene.xml, control.py, render.mp4
+- pufferlib_rl_harness — [pufferlib rl harness] — 2026-07-23T07:04:24.854189+00:00
+  desc: Wraps MuJoCo robot skill environments with PufferLib (github.com/PufferAI/PufferLib) for vectorized high-throughput RL training. Achieves 10-100x sample efficiency vs naive implementations. Enables training primitive skills on a consumer RTX 4090 instead of A100 cluster. Exposes: train_skill(skill_name, reward_fn, n_envs=512, max_steps=1M). Plugs sim_real_discriminator score in as reward
+- robot_skill_library — [robot skill library] — 2026-07-23T07:33:45.195405+00:00
+  desc: SQLite + FAISS vector database of verified robot skill programs. Schema: {skill_id, name, description_embedding, video_example_path, robo_program_path, sim_score, real_score, primitive_tags}. Query by semantic similarity. Reviewer promotes successful skills here after validation. Shared library acts as reviewer: all new skills checked for redundancy and interface consistency before promotion
+- goal_decomposer — [goal decomposer] — 2026-07-23T19:46:41.366960+00:00
+  desc: LLM agent that takes any high-level goal and recursively decomposes it into a dependency tree of skills using subgoal_generator. Checks robot_skill_library for each node — found skills reused, gap skills queued as video_recipe jobs. Robot can invoke any software pipeline tool (web scraping, SEO, legal, payments, Airbnb) as subgoals alongside physical skills — unified goal graph across physical and digital domains
+- domain_randomization_controller — [Domain randomization controller] — 2026-07-23T20:12:49.370426+00:00
+  desc: [goal:bootstrap_robot_training:b001] Module applying domain randomization to MuJoCo primitives for sim-to-real robustness. Class DomainRandomizer with randomize(primitive_params, config) writing randomized_traces.h5 and randomization_log.json.. requires: MuJoCo primitive rollout engine. suggested_reuse: shared_json_formatter, real_estate_listing_analyzer
+- primitive_success_detector — [Primitive success detector] — 2026-07-23T20:44:29.218600+00:00
+  desc: [goal:bootstrap_robot_training:b002] Detector classifying primitive execution success from trajectory features. Class PrimitiveSuccessDetector with detect(trace.h5) returning success_score.json.. requires: Trajectory similarity metric library. suggested_reuse: shared_youtube_url_detector, shared_text_classifier

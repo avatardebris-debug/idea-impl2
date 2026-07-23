@@ -59,6 +59,7 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `FIELD_REWORK_MAX_ATTEMPTS` | `3` | Thin-ship / field rework entries before `deeper_work_needed` |
 | `FIELD_REWORK_MAX_MINUTES` | `45` | Accumulative field rework wall minutes before `deeper_work_needed` |
 | `FIELD_REWORK_MAX_TOKENS` | `2500000` | Accumulative measured tokens (agent_timing / llm_calls; Grok CLI ~log char÷4 fallback) |
+| `FIELD_IDLE_PARK_MINUTES` | `20` | Empty-queue + no LLM for this long on field_testing → `deeper_work_needed` so seed continues |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
@@ -220,10 +221,13 @@ export FIELD_PLAN_ENGINE=auto
 # 30 min dry night (host must stay awake)
 .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30
 
-# Full 8h night (default --fresh-list-only: new seeds, not whole classic backlog)
+# Full 8h night (default --fresh-list-only; no extract zip)
 .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
 
-# Also orphan-requeue old in-flight projects (not recommended for clean Grok nights)
+# Cloud zip after run
+.\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -DoExtract
+
+# Also orphan-requeue old in-flight (can waste hours on classic field_testing zombies)
 .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -NoFreshListOnly
 
 # Morning report only
@@ -233,7 +237,7 @@ python scripts/overnight_report.py --log-dir $env:PIPELINE_DIR\logs\overnight_YY
 Runbook: `notes/2026-07-22-overnight-grok-from-list-runbook.md`  
 Guards: `pipeline/engines/overnight_guard.py` (CLI assert, serial refuse, stale driver clear).  
 Thin ship also runs for **`complete_with_bugs`**.  
-Stuck field loops: limited rework then status **`deeper_work_needed`** (`FIELD_REWORK_MAX_*`).
+Stuck field loops: rework caps (`FIELD_REWORK_MAX_*`) + **idle park** after `FIELD_IDLE_PARK_MINUTES` (default 20) empty-queue stall → **`deeper_work_needed`**, then seed continues.
 
 Plan + scorecard: `notes/2026-07-19-grok-build-factory-dual-engine-plan.md`,
 `notes/experiments/grok-build-engine-README.md`.
@@ -451,7 +455,13 @@ python scripts/run_workflow.py registry_refresh
 python scripts/run_workflow.py registry_refresh --export-n8n .pipeline/workflows/exports/registry_refresh.n8n.json
 python scripts/run_workflow.py --n8n-health   # N8N_BASE_URL, N8N_API_KEY
 # invoke_capability('registry_refresh') when status: verified in YAML
-# See .pipeline/docs/workflows.md
+# See .pipeline/docs/workflows.md (under PIPELINE_DIR)
+
+# P1 harness canary (CLI/API/workflow load — NOT product field_proven of bridges):
+python scripts/connector_canary.py
+python scripts/connector_canary.py --cli-smoke --api-smoke --require-api
+# Report: $PIPELINE_DIR/metrics/connector_canary_latest.md
+# Plan: notes/2026-07-22-p1-held-out-and-goal-traces.md
 
 # User steering dropbox (runner polls every 10 min; manager replies in-file):
 # Edit dropbox.md at repo root — see template inside the file.

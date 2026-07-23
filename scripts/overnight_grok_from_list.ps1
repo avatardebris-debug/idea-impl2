@@ -4,15 +4,15 @@
 # Usage (from factory repo root):
 #   .\scripts\overnight_grok_from_list.ps1
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30
-#   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -SkipExtract
-#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly   # also resume old in-flight
+#   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
+#   .\scripts\overnight_grok_from_list.ps1 -DoExtract          # cloud zip
+#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # also resume old in-flight
 #
 # REQUIREMENTS:
 #   - Host must stay awake (disable sleep on AC)
 #   - Do not run concurrent bulk_thin_field_ship
-#   - LOCAL default: --provider grok + GROK_BUILD_CMD (CLI for implement/plan skills;
-#     Grok API for any classic planner/manager agents). No Ollama required.
-#   - CLOUD/Vast: use -Provider ollama -Model <pulled tag> (Qwen etc.)
+#   - LOCAL default: --provider grok + GROK_BUILD_CMD; no extract zip
+#   - CLOUD/Vast: -Provider ollama -Model <tag> -DoExtract
 
 param(
     [string]$PipelineDir = "C:\Users\avata\aicompete\thepipeline",
@@ -21,12 +21,10 @@ param(
     [string]$Provider = "grok",
     [string]$Model = "",
     [string]$IdeasFile = "",
-    [switch]$SkipExtract,
+    # Local default: no zip. Cloud sync: pass -DoExtract.
+    [switch]$DoExtract,
     [switch]$DryRunEnvOnly,
-    # Default ON: only work master_ideas list / new seeds — do not orphan-requeue
-    # the whole classic backlog (video_babbel_enhanced, mid-phase projects, …).
-    # Those can still get limited ship rework when already in-flight; over budget
-    # they become deeper_work_needed (FIELD_REWORK_MAX_*).
+    # Default ON (--fresh-list-only): new seeds only, not classic backlog zombies.
     [switch]$NoFreshListOnly
 )
 
@@ -251,8 +249,17 @@ if ($pre.errors.Count -gt 0) {
     exit 2
 }
 
+# P1 harness canary (HARD checks only; does not block soft n8n)
+Write-Host "Running connector canary (HARD)..."
+$canaryArgs = @("-u", "scripts/connector_canary.py", "--require-api", "--no-n8n")
+& python @canaryArgs 2>&1 | Tee-Object -FilePath (Join-Path $logDir "connector_canary.log")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "CONNECTOR CANARY HARD FAIL - abort overnight." -ForegroundColor Red
+    exit 2
+}
+
 if ($DryRunEnvOnly) {
-    Write-Host "DryRunEnvOnly: env frozen, not starting runner."
+    Write-Host "DryRunEnvOnly: env frozen, canary ran, not starting runner."
     exit 0
 }
 
@@ -296,7 +303,7 @@ Write-Host "Runner exit: $exit"
 # Morning report
 python -u scripts/overnight_report.py --since $startIso --log-dir $logDir 2>&1 | Tee-Object -FilePath (Join-Path $logDir "report_stdout.log")
 
-if (-not $SkipExtract) {
+if ($DoExtract) {
     Write-Host "Running extract.py (may take a while) ..."
     # Do not let $ErrorActionPreference=Stop kill the script on native stderr
     $prevEap = $ErrorActionPreference
@@ -312,6 +319,8 @@ if (-not $SkipExtract) {
     } finally {
         $ErrorActionPreference = $prevEap
     }
+} else {
+    Write-Host "Skip extract (local default). Use -DoExtract for cloud zip under aicompete\."
 }
 
 Write-Host ""

@@ -51,10 +51,15 @@ def _try_polish_first(cfg: MainLoopConfig) -> int:
 
 
 def tick_seed_after_project_advance(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> None:
-    """When active project is complete/mvp/budget_exceeded, advance queues and seed/polish."""
-    from pipeline.dep_policy import is_polishable
+    """When active project is terminal/polishable (incl. budget_exceeded), advance and seed."""
+    from pipeline.dep_policy import is_polishable, is_build_terminal
 
-    if not is_polishable(idea_state.get("status", "")):
+    status = idea_state.get("status", "")
+    # budget_exceeded / deeper_work_needed / field_proven / etc. → free the slot
+    if not (is_polishable(status) or is_build_terminal(status)):
+        return
+    # dep_waiting is terminal for build but not "done advancing" for seed focus
+    if status == "dep_waiting":
         return
     slug = idea_state.get("_slug", "")
     orphaned = _rebuild_queues_from_state(cfg.bus)
@@ -122,8 +127,12 @@ def tick_seed_after_project_advance(cfg: MainLoopConfig, idea_state: dict[str, A
 
 
 def _any_project_recently_working(pipeline_dir: pathlib.Path) -> bool:
-    """True if any project has a working-state status modified in the last 15 min."""
-    _working_states = ("_executing", "_validating", "_reviewing", "_planning")
+    """True if any project has a working-state status modified in the last 15 min.
+
+    Ship-only statuses (field_testing, etc.) do NOT count — an idle field_testing
+    project with empty queues must not block seeding forever (overnight stall).
+    """
+    _working_states = ("_executing", "_validating", "_reviewing", "_planning", "_grok_running")
     _recency_cutoff = time.time() - 900
     _projects_dir = pipeline_dir / "projects"
     if not _projects_dir.exists():
@@ -137,11 +146,111 @@ def _any_project_recently_working(pipeline_dir: pathlib.Path) -> bool:
                 continue
             _st = json.loads(_sf.read_text(encoding="utf-8"))
             _ss = _st.get("status", "")
+            # field_testing / ship track alone is not "working" for seed-block
+            if _ss.startswith("field_") or _ss in (
+                "thermo_reviewing",
+                "thermo_refactoring",
+                "ship_evaluating",
+                "ship_insufficient",
+            ):
+                continue
             if any(_ss.endswith(ws) for ws in _working_states):
                 return True
         except Exception:
             pass
     return False
+
+
+def tick_park_idle_ship_inflight(cfg: MainLoopConfig) -> int:
+    """Park field_testing (etc.) stuck with empty queues into deeper_work_needed.
+
+    Overnight failure mode: orphan re-queue keeps a ship status project "active"
+    while no LLM work runs for hours. After FIELD_IDLE_PARK_MINUTES (default 20)
+    of no LLM call + empty bus, park so seed/advance can continue.
+    """
+    from pipeline.env_flags import env_bool
+    from pipeline.field_rework_budget import (
+        FIELD_REWORK_STATUSES,
+        mark_deeper_work_needed,
+        maybe_park_if_over_budget,
+        write_state,
+    )
+
+    if cfg.ship_prove or not cfg.from_list:
+        return 0
+    if cfg.bus.has_active_work():
+        return 0
+
+    raw = (os.environ.get("FIELD_IDLE_PARK_MINUTES") or "20").strip()
+    try:
+        idle_min = max(5.0, float(raw))
+    except ValueError:
+        idle_min = 20.0
+
+    # Prefer throughput last-LLM age; fall back to wall time since start
+    age_s = None
+    try:
+        tp = cfg.pipeline_dir / "state" / "throughput.json"
+        if tp.is_file():
+            data = json.loads(tp.read_text(encoding="utf-8"))
+            updated = data.get("updated_at")
+            if updated is not None:
+                age_s = time.time() - float(updated)
+    except Exception:
+        age_s = None
+    if age_s is None:
+        age_s = time.time() - cfg.start_time
+    if age_s < idle_min * 60:
+        return 0
+
+    parked = 0
+    projects = cfg.pipeline_dir / "projects"
+    if not projects.is_dir():
+        return 0
+    for pd in sorted(projects.iterdir()):
+        if not pd.is_dir():
+            continue
+        sf = pd / "state" / "current_idea.json"
+        if not sf.is_file():
+            continue
+        try:
+            state = json.loads(sf.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        status = (state.get("status") or "").strip()
+        if status not in FIELD_REWORK_STATUSES and status != "field_testing":
+            continue
+        # Over rework budget OR idle long enough with empty queues
+        state2, over = maybe_park_if_over_budget(
+            state,
+            reason_prefix=f"idle ship status={status}",
+            slug=pd.name,
+            project_dir=pd,
+        )
+        if over:
+            write_state(pd, state2)
+            print(
+                f"  [idle-park] '{pd.name}' → deeper_work_needed "
+                f"(rework budget; was {status})",
+                flush=True,
+            )
+            parked += 1
+            continue
+        # Idle park: long no-LLM + empty bus
+        reason = (
+            f"idle ship status={status}: no LLM ~{int(age_s // 60)}m "
+            f"with empty queues (FIELD_IDLE_PARK_MINUTES={idle_min:.0f})"
+        )
+        state3 = mark_deeper_work_needed(
+            state, reason=reason, slug=pd.name, project_dir=pd
+        )
+        write_state(pd, state3)
+        print(
+            f"  [idle-park] '{pd.name}' → deeper_work_needed ({reason[:100]})",
+            flush=True,
+        )
+        parked += 1
+    return parked
 
 
 def tick_seed_idle_when_empty(cfg: MainLoopConfig, all_empty: bool, *, orphaned: int) -> None:

@@ -22,6 +22,19 @@ MATURITY_MULTIPLIER: dict[str, float] = {
     "M4": 2.0,
 }
 
+# Pipeline terminal status multipliers (P1 stage weights — field > complete > …)
+STATUS_MULTIPLIER: dict[str, float] = {
+    "field_proven": 2.5,
+    "complete": 1.0,
+    "complete_with_bugs": 0.5,
+    "ship_insufficient": 0.15,  # rare include if policy allows; usually filtered
+    "deeper_work_needed": 0.0,
+    "budget_exceeded": 0.0,
+    "mvp_complete": 0.0,
+    "goal_proven": 4.0,  # future
+    "goal_proven_human": 5.0,  # future
+}
+
 
 def train_tier_from_record(rec: dict[str, Any]) -> str:
     """Map a corpus record to train tier A–D from quality_label and verdicts."""
@@ -29,8 +42,16 @@ def train_tier_from_record(rec: dict[str, Any]) -> str:
     if rec.get("force_advanced") or rec.get("quality_risk"):
         return "D"
     status = str(rec.get("final_status") or rec.get("status") or "").lower()
-    if status in ("mvp_complete", "budget_exceeded"):
+    if status in ("mvp_complete", "budget_exceeded", "deeper_work_needed"):
         return "D"
+    # field_proven is always high-value even if review markers are soft
+    if status == "field_proven":
+        ql = str(rec.get("quality_label", "clean")).lower()
+        if ql == "patched":
+            return "B"
+        if ql == "struggled":
+            return "C"
+        return "A"
 
     test_v = str(rec.get("test_verdict", "PASS")).upper()
     review_v = str(rec.get("review_verdict", "PASS")).upper()
@@ -59,7 +80,10 @@ def enrich_record_weights(rec: dict[str, Any]) -> dict[str, Any]:
     base = train_weight_for_record(rec, tier=tier)
     # Use recorded maturity only — do not invent stages from final_status
     maturity = str(rec.get("maturity_stage") or "M1")
-    rec["train_weight"] = base * MATURITY_MULTIPLIER.get(maturity, 1.0)
+    status = str(rec.get("final_status") or rec.get("status") or "").lower()
+    status_mult = STATUS_MULTIPLIER.get(status, 1.0)
+    rec["train_weight"] = base * MATURITY_MULTIPLIER.get(maturity, 1.0) * status_mult
+    rec["status_weight_mult"] = status_mult
     return rec
 
 

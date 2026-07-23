@@ -126,6 +126,13 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
         return True
 
     if not cfg.ship_prove and all_empty and cfg.from_list and not cfg.bus.has_active_work():
+        # Park zombie field_testing / ship-inflight before orphan requeue blocks seed
+        try:
+            from pipeline.run_loop_seed_idle import tick_park_idle_ship_inflight
+
+            tick_park_idle_ship_inflight(cfg)
+        except Exception as _park_exc:
+            print(f"  [idle-park] error: {_park_exc}", flush=True)
         orphaned = tick_orphan_requeue(cfg)
         tick_seed_idle_when_empty(cfg, all_empty, orphaned=orphaned)
 

@@ -51,8 +51,6 @@ for human approval — not silent agent rewrites. (Elon-style “delete until it
 
 ## Ideas
 [ ] [movie player] — [[lock] front end player to play the AI movies. requires: ai_movie_generation_suite]
-[ ] [dialog generator] — [[lock] generate dialogue between characters. requires: ai_movie_generation_suite]
-[ ] [director/editor] — [[lock] direct and cut using RL. requires: ai_movie_generation_suite]
 
 ## Robotics & Physical Agency
 
@@ -65,19 +63,14 @@ for human approval — not silent agent rewrites. (Elon-style “delete until it
 
 
 
-- [ ] **[robo primitive mapper]** — [[lock] Maps video_recipe action descriptions to the canonical robot primitive vocabulary. Handles unit conversion, reference frame normalization (world/object/gripper), validates each action maps to a known primitive. Output: robot_program.json ready for mujoco_codegen. requires: video_recipe, robot_primitive_vocabulary]
 
-- [ ] **[mujoco codegen]** — [[lock] Generates runnable MuJoCo XML scene files and Python control scripts from robo_primitive_mapper output. Handles object placement, trajectory planning, contact and grasp primitives. Executes simulation and records render video. Output: scene.xml, control.py, render.mp4. requires: robo_primitive_mapper]
 
 - [ ] **[sim real comparator]** — [[lock] Given a real video clip and a MuJoCo simulation render of the same task, computes multi-metric similarity: SSIM, perceptual hash, CLIP embedding cosine similarity. Outputs per-frame heatmap + global score in [0,1]. Core evaluation tool for sim-to-real gap measurement. requires: video_ingestor_summary]
 
 - [ ] **[sim real discriminator]** — [[lock] GAN-style critic trained to distinguish real robot/human footage from MuJoCo renders. Discriminator score is the RL reward signal driving adversarial sim improvement. Extends video_GAN architecture. Once gap closes past threshold, additional criteria push performance beyond the original demonstration. requires: sim_real_comparator, video_gan]
 
-- [ ] **[pufferlib rl harness]** — [[lock] Wraps MuJoCo robot skill environments with PufferLib (github.com/PufferAI/PufferLib) for vectorized high-throughput RL training. Achieves 10-100x sample efficiency vs naive implementations. Enables training primitive skills on a consumer RTX 4090 instead of A100 cluster. Exposes: train_skill(skill_name, reward_fn, n_envs=512, max_steps=1M). Plugs sim_real_discriminator score in as reward. requires: mujoco_codegen]
 
-- [ ] **[robot skill library]** — [[lock] SQLite + FAISS vector database of verified robot skill programs. Schema: {skill_id, name, description_embedding, video_example_path, robo_program_path, sim_score, real_score, primitive_tags}. Query by semantic similarity. Reviewer promotes successful skills here after validation. Shared library acts as reviewer: all new skills checked for redundancy and interface consistency before promotion. requires: robo_primitive_mapper]
 
-- [ ] **[goal decomposer]** — [[lock] LLM agent that takes any high-level goal and recursively decomposes it into a dependency tree of skills using subgoal_generator. Checks robot_skill_library for each node — found skills reused, gap skills queued as video_recipe jobs. Robot can invoke any software pipeline tool (web scraping, SEO, legal, payments, Airbnb) as subgoals alongside physical skills — unified goal graph across physical and digital domains. requires: robot_skill_library, subgoal_generator]
 
 - [ ] **[robot pipeline fork]** — [[lock] Fork of the autonomous pipeline with agents retuned for robot skill development: skill_planner, robo_codegen, sim_runner, sim_critic, skill_reviewer. Same runner/message bus/budget management — ~30% new code, ~70% reused. Robot has full LLM access and the current agent harness to develop its own software in addition to robot skill programs. Can spawn any software pipeline tool: websites, SEO, legal, finance, delegate to other robots. shared_libs/RobotPrimitives is the canonical reviewer for all generated robot code. requires: goal_decomposer, pufferlib_rl_harness, sim_real_discriminator, robot_skill_library]
 
@@ -87,8 +80,6 @@ for human approval — not silent agent rewrites. (Elon-style “delete until it
 - [ ] **[Sim-to-real calibration dataset builder]** — [[goal:bootstrap_robot_training:b004] Builder creating paired sim/real trajectory datasets for gap measurement. Class CalibrationDatasetBuilder with build(sim_config, real_logs) writing paired_dataset.h5 and metadata.json.. requires: Real robot data collector. suggested_reuse: shared_json_formatter, ai_movie_generation_suite]
 
 <!-- goal:bootstrap_robot_training decomposed 2026-07-11 -->
-- [ ] **[Domain randomization controller]** — [[goal:bootstrap_robot_training:b001] Module applying domain randomization to MuJoCo primitives for sim-to-real robustness. Class DomainRandomizer with randomize(primitive_params, config) writing randomized_traces.h5 and randomization_log.json.. requires: MuJoCo primitive rollout engine. suggested_reuse: shared_json_formatter, real_estate_listing_analyzer]
-- [ ] **[Primitive success detector]** — [[goal:bootstrap_robot_training:b002] Detector classifying primitive execution success from trajectory features. Class PrimitiveSuccessDetector with detect(trace.h5) returning success_score.json.. requires: Trajectory similarity metric library. suggested_reuse: shared_youtube_url_detector, shared_text_classifier]
 - [ ] **[Skill transfer evaluator]** — [[goal:bootstrap_robot_training:b003] Evaluator measuring policy transfer performance from sim primitives to real. Class SkillTransferEvaluator with evaluate(sim_traces, real_traces) writing transfer_report.json.. requires: Sim-to-real gap visualizer. suggested_reuse: pipeline_extract, ai_movie_generation_suite]
 - [ ] **[Robot URDF compatibility survey]** — [[goal:bootstrap_robot_training:b004] Survey URDF models suitable for primitive learning pipelines.. suggested_reuse: shared_ascii_table_formatter, shared_currency_formatter] --hermes
 
@@ -132,7 +123,6 @@ for human approval — not silent agent rewrites. (Elon-style “delete until it
 <!-- goal:bootstrap_robot_training decomposed 2026-07-04 -->
 - [ ] **[Observation preprocessor module]** — [[goal:bootstrap_robot_training:b001] Module to normalize robot states and observations for primitive policies. Class ObservationPreprocessor with fit(raw_states.npy) and transform() writing preprocessor.pkl and norm_stats.json.. suggested_reuse: shared_MessageHandler, ai_movie_generation_suite]
 - [ ] **[Action space discretizer]** — [[goal:bootstrap_robot_training:b002] Discretizer converting continuous joint actions into primitive action tokens. Class ActionDiscretizer with discretize(joint_cmds) writing action_vocab.json and tokenized_actions.h5.. suggested_reuse: audiobook_script_pipeline, ai_movie_generation_suite]
-- [ ] **[Primitive success detector]** — [[goal:bootstrap_robot_training:b003] Detector evaluating whether a primitive execution meets success thresholds. Class PrimitiveSuccessDetector with evaluate(execution_log.json) writing success_flags.json and criteria.yaml.. requires: Primitive execution harness. suggested_reuse: json_diff_tool, json_schema_profiler]
 - [ ] **[Vocabulary coverage analyzer]** — [[goal:bootstrap_robot_training:b004] Analyzer computing coverage, overlap, and gaps in the current primitive vocabulary. Class VocabularyCoverageAnalyzer with analyze(vocab.yaml, progress.csv) writing coverage_report.json.. requires: Primitive YAML schema validator. suggested_reuse: csv_analyzer, manuscriptdata_analyzer_system]
 
 <!-- goal:bootstrap_robot_training decomposed 2026-07-04 -->
