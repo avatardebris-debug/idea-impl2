@@ -42,6 +42,97 @@ do **not** load new factory code until restart.
 - Always-on goal OS with live money/identity
 - Infinite idea spawn on stuck chains
 - Wiring the skill *file* into the runner (Python classifier already emits same schema)
+- **Grok Workflows (Rhai) inside idea-impl** — see §7 vocabulary (enhancement later, not earned yet)
+
+---
+
+## 7. Vocabulary: “workflow” vs “Grok Workflows” (2026-07-24)
+
+**Convention going forward:**
+
+| Phrase | Means |
+|--------|--------|
+| **workflow** (unqualified) | **Our** plan: org/SOP/CEO architecture, connectors, Lego products, factory assemblies, graph nodes for goal execution |
+| **Grok Workflow** / **Rhai** | Grok Build TUI multi-agent scripts (`.rhai`, `/workflow`, `/workflows` dashboard) |
+
+**Relationship (same pattern as Grok Build skills):**
+
+- Factory / graph / overnight **worked first** without Grok-specific enhancements.
+- **Grok Skills** were added as enhancements inside the software-building architecture once the base loop worked.
+- **Grok Workflows (Rhai)** will be the same class of enhancement: optional callable Lego later, **not** a replacement for our workflow/org/SOP plan.
+- They do **not** replace CEO/org modeling; a graph node may one day *bind* a Grok Workflow the way it binds a skill or field_proven slug.
+
+**Earn order:**
+
+1. Build out **graph engineering** (and goal/architecture selection) in idea-impl / thepipeline first.  
+2. We have **not** earned embedding Grok Workflows into idea-impl until that foundation exists.  
+3. Authoring/using Rhai is a **side story** only when there is a clear use case — not a current factory dependency.
+
+**Nested “workflow in workflow” in our language** = org/SOP subgraphs and Lego composition on the knowledge graph — **not** Rhai-in-Rhai (host also does not support nested Grok Workflows today).
+
+---
+
+## 8. Ambitious / AGI experimental: recursive improvement via successors (not yet)
+
+**Status:** Discussion only. **Not earned.** Do not implement. Needs more safety procedures before any prototype.
+
+### The idea (user framing)
+
+Recursive self-improvement (RSI) does imply the system can improve “itself.” That need **not** mean mutating the live original in place.
+
+Safer mental model: **successor copies**, not hot self-surgery:
+
+```text
+v1 (frozen original, never edited by the improver)
+  └── works on / proposes v2 (isolated copy or worktree / branch / PIPELINE_DIR variant)
+        └── once v2 is proven under QC, humans (or later policy) may promote v2 → next outer
+              └── optionally v2 hosts a nested improver that only authors v3 …
+```
+
+- **At most two live depths** for a long time (outer supervisor + one inner improver), not infinite nesting.
+- **Original stays untouched** until an explicit promote step.
+- Improver does not have to “push and overwrite production”; it can leave a candidate successor for review.
+
+That *is* a form of RSI (each generation improves the next), with **ordering and rigidity** as the current safety rails.
+
+### Why not ready (reasons, not dismissal)
+
+| Gap | Why it blocks RSI-now |
+|-----|------------------------|
+| Graph engineering not built | No durable map of process + outcomes to choose architectures |
+| Held-out / proof gates still thin | No automatic “v2 is better than v1” oracle |
+| Budget ladder / factory only recently rigidified | Nested improver would thrash without serial focus lessons |
+| No promote protocol | Without dual control, “successor” becomes silent takeover |
+| Grok Workflows = enhancement later | Reflection/eval SOPs not yet encoded; manual path first |
+| Trust/mandate deferred | Self-mod of spend/identity must never free-run |
+
+**Possible ≠ ready.** Full RSI remains experimental direction after quality controls, ordering, and rigidity prove out; then carefully add **slack** (knowledge-graph change tracking, process graph engineering, measured experiment).
+
+### Intended path (manual → automated under oversight)
+
+1. **Prove rigid factory** (overnight serial ladder, field_prove, held-out, no mass thrash).  
+2. **Manual meta path:** discuss → decide next factory/process change → implement with review (human oversees).  
+3. **Encode** that discussion/eval/self-reflection path as a **Grok Workflow** (and/or skills) once the manual path is stable.  
+4. **Replace only the manual *routine*** under oversight — not free rewrite of the root.  
+5. **Successor model:** improver authors **v_next** in isolation; promote only after QC; outer original stays frozen until promote.  
+6. **Later slack:** KG tracks process changes; graph engineering of process; less rigid only where evidence supports it.
+
+### Safety procedures to design before any prototype (checklist for later)
+
+- [ ] Max nesting depth = 2 (outer + one improver) unless explicitly raised  
+- [ ] Improver **cannot write** the live original tree / production `PIPELINE_DIR`  
+- [ ] Candidate successor path/worktree only  
+- [ ] Held-out + factory smoke must not regress before promote  
+- [ ] Human (or dual control) **promote** step  
+- [ ] Substrate vs product goals labeled; substrate changes never silent overnight  
+- [ ] Full audit log (who proposed, what diff, what proof)  
+- [ ] Kill switch / freeze improver without killing product factory  
+
+### One-line stance
+
+**Yes:** recursive improvement via **isolated successors** and proven promote is a coherent AGI-experimental direction.  
+**No (now):** nesting self as a free tool or mutating the original in place.  
+**Next earn:** graph + selection + held-out; then optional Grok Workflow encoding of the *manual* improve loop; RSI promote chain last.
 
 ---
 
@@ -221,3 +312,109 @@ Park until software field_prove + goal_trace + connectors are boring.
 - P1 held-out + goal traces plan: `notes/2026-07-22-p1-held-out-and-goal-traces.md`  
 - Env + canary + held_out: `COMMANDS.md`  
 - Manual triage: `/blocker-identifier <slug>`  
+
+---
+
+## 7. Classic → Grok canary (2026-07-24)
+
+**supportagent_workflow_builder (BE1 active_yield, p3 near-done):**
+- Converted with `classic_be_to_grok.py` → `engine=grok_build`, `prefer_thin_field`.
+- Serial resume **without** `--fresh-list-only` (that flag cleared canary work earlier).
+- Thin-field ship: first field pass 1/14 (import/syntax), repair → **14/14 field_proven** ~11m.
+- Post-success idle seeded Hermes/list (Ollama 404 noise) — stop runner after focus batch.
+
+**BE0 lifetime fossils converted next (force-lifetime + phase_retries reset):**
+- `ai_author_suite` p6/6
+- `dropshipserviceecommerce_autoseo_autometa` p3/3
+- `email_tool` p6/6
+- `pocketknife_of_the_internet` p9 (total clamped 6→9)
+
+Grok Build runs have been healthy; no mass BE1 revive.
+
+### If fossils still fail after Grok
+
+Consider a **plan-sufficiency / re-plan evaluation** step (not built yet):
+- After N gate blocks or field fail-repair exhaustion: ask whether master_plan /
+  phase tasks were sufficient vs product aim.
+- Options: re-run idea-plan/phase-plan, thin-field ship, archive, ASK_OPERATOR.
+- Distinct from blocker-identifier (cost/benefit on stuck work) — this questions
+  the *plan artifact*, not only budget/deps.
+
+
+### BE0 lifetime batch result (2026-07-24, ~55m serial)
+
+| slug | result | field | notes |
+|------|--------|-------|-------|
+| ai_author_suite | field_proven | 10/10 | bad_plan + product_bug repair |
+| dropshipservice… | field_proven | 10/10 | full grok phase3 + thin ship |
+| email_tool | field_proven | 11/11 | grok_driver blocked on pytest; thin field still proved product |
+| pocketknife_of_the_internet | budget_exceeded | 2/10 fail | "Phase 9 stuck: 0/3 tasks after 15m"; never got dedicated driver window |
+
+**Lesson:** Grok thrives on near-done fossils with real code; thin-field can ship product proof even when unit-test suite is broken. Hard fails are plan/phase mismatch fossils (pocketknife p9/9 zero tasks) — re-plan evaluation candidate.
+
+
+---
+
+## 8. Recovery classes, re-plan, feature expander (2026-07-24)
+
+Grok Build has been healthy on classic BE canaries. Remaining stalls are often
+**not** "code is wrong" — we need better **analytics / reporting / routing** so
+the manager (or a recovery skill) picks the right next move.
+
+### Recovery classes (route, don't thrash)
+
+| Class | Signal | Better route |
+|-------|--------|--------------|
+| **Env / runtime** | e.g. ONsquared loading hang, local service down, path/env | diagnose infra; don't rewrite product |
+| **Connectivity / credentials** | field tests need IMAP/SMTP/API keys; human 2FA | `needs_human_attestation` / dry-run / mock rails — not infinite implement |
+| **Plan insufficient** | field plan invents wrong package/CLI; tasks don't match workspace layout | **re-plan evaluation** (master + phase tasks vs product aim) |
+| **Artifact vandalism** | agent deleted/truncated master_plan; auto-trim removed critical code | restore from bak/git; re-plan if incomplete; ban destructive trim of gates |
+| **Spin no progress** | same status long wall, 0 checkbox movement | blocker-identifier + re-plan or thin-field, not more same-agent retries |
+| **Product incomplete but shippable** | unit suite broken, product API works | thin-field / field_proven path (seen on email_tool) |
+
+**email_tool lesson:** field-proving and "spin in place" may be **connectivity /
+credential** more often than pure logic bugs. Route to mock/dry-run fixtures and
+human credential grant instead of endless executor loops.
+
+### Re-plan evaluation (design — not built)
+
+After N gate blocks, field fail-repair exhaustion, or "phase stuck 0/N tasks":
+
+1. Ask: was master_plan / phase tasks **sufficient vs product aim**?
+2. Options: re-run idea-plan + phase-plan · thin-field only · archive · ASK_OPERATOR
+3. Distinct from blocker-identifier (cost/benefit) — this questions the **plan artifact**
+
+Historical failure modes to encode:
+- AI **deleted master_plan** then partial recovery → incomplete plan
+- **Auto-trim** of content that was crucial for functionality
+- Need bak/git restore + plan quality gate before re-implement
+
+### Feature expander (design — later goal-prove)
+
+After **field_proven**, optional process (human-driven or automated later):
+
+1. **Inventory** what the product already does (from field tests / CAPABILITIES / code)
+2. **Reason** about ways to make it better (gaps, UX, connectors, reliability)
+3. **Plan** additive features (not greenfield restart)
+4. **Implement** incrementally → re-field-prove
+
+Intent: factory starts **minimal on purpose** to reach field_proven. Feature expander
+is how products grow without "add another product / connector / start over."
+
+Likely sits in **goal-prove** pipeline later; for now notes-only.
+
+### Active BE1 batch (this session)
+
+Serial classic→grok: `extraction`, `udemy_training_tool`, `video_management`.
+
+
+### BE1 trio result (2026-07-24, ~45m)
+
+| slug | result | field | notes |
+|------|--------|-------|-------|
+| extraction | field_proven | 11/11 | thin ship; status clobber race after ship (fixed) |
+| udemy_training_tool | field_proven | 12/12 | thin ship from planning |
+| video_management | ship_insufficient | 3/5 | p5 review PASS 71/71 but complete blocked by **stale phase-1 checkboxes** (20/25); no prefer_thin until manual; heuristic plan 3 pass/2 fail |
+
+**Factory bug pattern:** complete gate counts *all* open checkboxes across old phases → grok can finish last phase + review PASS and still never `complete` / never auto thin-field. Recovery should: (a) only gate current phase, or (b) auto prefer_thin when phase>=total + review PASS, or (c) re-plan evaluation on stuck checkboxes.
+

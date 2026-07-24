@@ -105,3 +105,126 @@ def test_full_complete_includes_with_bugs():
     assert is_full_complete(
         {"status": "complete_with_bugs", "phase": 2, "total_phases": 2}
     )
+
+
+def test_mark_complete_ignores_older_phase_open_checkboxes(tmp_path: Path, monkeypatch):
+    """Current phase all [x] → complete even if phase 1 still has open boxes."""
+    monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    monkeypatch.setenv("PIPELINE_COMPLETE_PYTEST", "0")
+    monkeypatch.setenv("PIPELINE_REQUIRE_TESTS", "0")
+
+    projects = tmp_path / "projects"
+    p = projects / "multi"
+    (p / "workspace").mkdir(parents=True)
+    (p / "state").mkdir(parents=True)
+    (p / "phases" / "phase_1").mkdir(parents=True)
+    (p / "phases" / "phase_2").mkdir(parents=True)
+    # Stale opens on phase 1 (historical) — must NOT block complete
+    phase1_tasks = (
+        "- [x] Task 1: done early\n"
+        "- [ ] Task 2: abandoned leftover\n"
+        "- [ ] Task 3: never closed\n"
+    )
+    phase1_path = p / "phases" / "phase_1" / "tasks.md"
+    phase1_path.write_text(phase1_tasks, encoding="utf-8")
+    # Current / last phase fully closed
+    (p / "phases" / "phase_2" / "tasks.md").write_text(
+        "- [x] Task 1: final work\n"
+        "- [x] Task 2: review fixes\n",
+        encoding="utf-8",
+    )
+    (p / "workspace" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+
+    state = {
+        "title": "multi",
+        "status": "phase_2_reviewed",
+        "phase": 2,
+        "total_phases": 2,
+        "_slug": "multi",
+    }
+    (p / "state" / "current_idea.json").write_text(json.dumps(state), encoding="utf-8")
+    _mark_complete(p, state, "multi")
+    st = json.loads((p / "state" / "current_idea.json").read_text(encoding="utf-8"))
+    assert st["status"] in ("complete", "complete_with_bugs")
+    assert "complete_blocked_reason" not in st
+    # Historical phase-1 tasks must not be rewritten/closed silently
+    assert phase1_path.read_text(encoding="utf-8") == phase1_tasks
+    assert "- [ ] Task 2:" in phase1_path.read_text(encoding="utf-8")
+
+
+def test_mark_complete_blocks_on_current_phase_open(tmp_path: Path, monkeypatch):
+    """Open boxes on the current phase still block complete."""
+    monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    monkeypatch.setenv("PIPELINE_COMPLETE_PYTEST", "0")
+
+    projects = tmp_path / "projects"
+    p = projects / "blocked"
+    (p / "workspace").mkdir(parents=True)
+    (p / "state").mkdir(parents=True)
+    (p / "phases" / "phase_1").mkdir(parents=True)
+    (p / "phases" / "phase_2").mkdir(parents=True)
+    (p / "phases" / "phase_1" / "tasks.md").write_text(
+        "- [x] Task 1: old done\n",
+        encoding="utf-8",
+    )
+    (p / "phases" / "phase_2" / "tasks.md").write_text(
+        "- [x] Task 1: ok\n"
+        "- [ ] Task 2: still open on current phase\n",
+        encoding="utf-8",
+    )
+    state = {
+        "title": "blocked",
+        "status": "phase_2_reviewed",
+        "phase": 2,
+        "total_phases": 2,
+        "_slug": "blocked",
+    }
+    (p / "state" / "current_idea.json").write_text(json.dumps(state), encoding="utf-8")
+    _mark_complete(p, state, "blocked")
+    st = json.loads((p / "state" / "current_idea.json").read_text(encoding="utf-8"))
+    assert st["status"] == "phase_2_executing"
+    assert "complete_blocked_reason" in st
+    assert "phase 2" in st["complete_blocked_reason"]
+
+
+def test_mark_complete_waived_allows_open_current_phase(tmp_path: Path, monkeypatch):
+    """complete_blocked_waived → terminal complete; current-phase open boxes left as-is."""
+    monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    monkeypatch.setenv("PIPELINE_COMPLETE_PYTEST", "0")
+    monkeypatch.setenv("PIPELINE_REQUIRE_TESTS", "0")
+
+    projects = tmp_path / "projects"
+    p = projects / "waived"
+    (p / "workspace").mkdir(parents=True)
+    (p / "state").mkdir(parents=True)
+    (p / "phases" / "phase_1").mkdir(parents=True)
+    (p / "phases" / "phase_2").mkdir(parents=True)
+    (p / "phases" / "phase_1" / "tasks.md").write_text(
+        "- [x] Task 1: old done\n",
+        encoding="utf-8",
+    )
+    phase2_tasks = (
+        "- [x] Task 1: ok\n"
+        "- [ ] Task 2: still open on current phase\n"
+    )
+    phase2_path = p / "phases" / "phase_2" / "tasks.md"
+    phase2_path.write_text(phase2_tasks, encoding="utf-8")
+    (p / "workspace" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+
+    state = {
+        "title": "waived",
+        "status": "phase_2_reviewed",
+        "phase": 2,
+        "total_phases": 2,
+        "_slug": "waived",
+        "complete_blocked_waived": True,
+        "complete_blocked_waived_reason": "FIX_GATE_ONLY consumer",
+    }
+    (p / "state" / "current_idea.json").write_text(json.dumps(state), encoding="utf-8")
+    _mark_complete(p, state, "waived")
+    st = json.loads((p / "state" / "current_idea.json").read_text(encoding="utf-8"))
+    assert st["status"] in ("complete", "complete_with_bugs")
+    assert "complete_blocked_reason" not in st
+    # Must not rewrite open checkboxes when waived
+    assert phase2_path.read_text(encoding="utf-8") == phase2_tasks
+    assert "- [ ] Task 2:" in phase2_path.read_text(encoding="utf-8")

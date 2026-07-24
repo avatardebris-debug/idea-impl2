@@ -63,6 +63,12 @@ def find_grok_build_candidates(
             continue
         if get_project_engine(state) != ENGINE_GROK_BUILD:
             continue
+        # Parked classic→grok: sticky engine only; not runnable until unpark/run_now
+        if state.get("classic_to_grok_parked"):
+            continue
+        status = state.get("status") or ""
+        if status == "budget_exceeded":
+            continue
         # P0: clear stuck grok_driver_running after crash/sleep
         try:
             from pipeline.engines.overnight_guard import clear_stale_grok_driver_flags

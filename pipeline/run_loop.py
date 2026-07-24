@@ -94,11 +94,38 @@ def _tick_health_cycle(cfg: MainLoopConfig) -> bool:
             if n_ladder:
                 # Active state may have been resumed — reload preferred focus
                 idea_state = _get_active_idea_state(cfg.pipeline_dir, preferred_slug=focus)
-            # BE2 prefer_thin_field → thin field ship (near-done / complete)
+            # ship_insufficient recovery: cheap act (prefer_thin re-arm) or budget_exceeded.
+            # Consumer yields wait until the *next* health cycle for BE ladder pickup
+            # (ladder already ran above; thin re-arm same-cycle is the priority).
+            _consumer_acted: list[str] = []
+            try:
+                from pipeline.troubleshoot_consumer import tick_troubleshoot_recovery
+
+                n_tr = tick_troubleshoot_recovery(
+                    cfg.pipeline_dir,
+                    bus=cfg.bus,
+                    limit=1,
+                    acted_out=_consumer_acted,
+                )
+                if n_tr:
+                    idea_state = _get_active_idea_state(
+                        cfg.pipeline_dir, preferred_slug=focus
+                    )
+            except Exception as _tr_exc:
+                print(
+                    f"  [troubleshoot-consumer] tick error: {_tr_exc}",
+                    flush=True,
+                )
+            # BE2 prefer_thin_field → thin field ship (near-done / complete).
+            # Prefer slugs just re-armed by consumer so same-cycle ship is not stolen.
             try:
                 from pipeline.budget_ladder import tick_prefer_thin_field_ship
 
-                n_tf = tick_prefer_thin_field_ship(cfg.pipeline_dir, limit=1)
+                n_tf = tick_prefer_thin_field_ship(
+                    cfg.pipeline_dir,
+                    limit=1,
+                    preferred_slugs=_consumer_acted or None,
+                )
                 if n_tf:
                     idea_state = _get_active_idea_state(
                         cfg.pipeline_dir, preferred_slug=focus

@@ -14,7 +14,7 @@ open questions that should not clutter `master_ideas.md`, `mission.yaml`, or `CO
 | [experiments/grok-build-engine-README.md](./experiments/grok-build-engine-README.md) | Scorecard template for classic vs grok_build comparison runs |
 | [2026-07-22-overnight-grok-from-list-runbook.md](./2026-07-22-overnight-grok-from-list-runbook.md) | P0 overnight Grok from-list runbook |
 | [2026-07-22-p1-held-out-and-goal-traces.md](./2026-07-22-p1-held-out-and-goal-traces.md) | P1 held-out suite + goal_trace plan |
-| [2026-07-23-budget-ladder-trust-and-status.md](./2026-07-23-budget-ladder-trust-and-status.md) | **Status + ladder BE1–3 + open-world trust/funds vision; BE2 test plan** |
+| [2026-07-23-budget-ladder-trust-and-status.md](./2026-07-23-budget-ladder-trust-and-status.md) | Ladder, trust vision, **§7: workflow vs Grok Workflows (Rhai) earn order** |
 
 Add new notes as `YYYY-MM-DD-short-slug.md`. Do not treat this folder as something the
 overnight pipeline must read unless we explicitly wire it later.

@@ -90,6 +90,11 @@ def clear_hermes_retry(title: str) -> None:
 # Provider resolution (mirrors what runner.py uses for pipeline agents)
 # ---------------------------------------------------------------------------
 
+# Default xAI model when PIPELINE_MODEL is Ollama-only (e.g. qwen3.6:35b).
+_DEFAULT_XAI_MODEL = "grok-3"
+_XAI_BASE_URL = "https://api.x.ai/v1"
+
+
 def _pipeline_model() -> str:
     """Return the model the pipeline is currently configured to use."""
     return os.environ.get("PIPELINE_MODEL", "qwen3:6b")
@@ -99,10 +104,113 @@ def _pipeline_provider() -> str:
     return os.environ.get("PIPELINE_PROVIDER", "ollama")
 
 
-def _hermes_base_url(provider: str, model: str) -> str:
+def _xai_api_key() -> str:
+    """Return xAI / Grok API key (same env names overnight / GrokAdapter use)."""
+    return (
+        os.environ.get("XAI_API_KEY", "").strip()
+        or os.environ.get("GROK_API_KEY", "").strip()
+    )
+
+
+def _ollama_base_host() -> str:
+    """Ollama HTTP host for /api/tags (not the /v1 OpenAI-compat path)."""
+    base = (
+        os.environ.get("OLLAMA_HOST")
+        or os.environ.get("OLLAMA_BASE_URL")
+        or "http://localhost:11434"
+    ).strip()
+    if not base.startswith("http"):
+        base = f"http://{base}"
+    base = base.replace("://0.0.0.0", "://localhost")
+    # Strip trailing /v1 if someone set OLLAMA_BASE_URL to the OpenAI-compat root
+    if base.rstrip("/").endswith("/v1"):
+        base = base.rstrip("/")[:-3]
+    return base.rstrip("/")
+
+
+def _ollama_name_matches(want: str, available_name: str) -> bool:
+    """
+    Case-insensitive Ollama model match with common tag aliases.
+
+    Matches when:
+      - exact equality (qwen3:6b == qwen3:6b)
+      - tags list is a tag extension of want (want=qwen3:6b, name=qwen3:6b:latest)
+      - want is a tag extension of tags name (want=qwen3:6b:latest, name=qwen3:6b)
+
+    Does NOT do bare-prefix partials (qwen3 must not match qwen3.5:...).
+    """
+    w = (want or "").strip().lower()
+    n = (available_name or "").strip().lower()
+    if not w or not n:
+        return False
+    if w == n:
+        return True
+    # listed name is want + extra tag segment(s)
+    if n.startswith(w + ":"):
+        return True
+    # configured want is listed name + extra tag segment(s)
+    if w.startswith(n + ":"):
+        return True
+    return False
+
+
+def ollama_model_available(model: str, *, timeout: float = 3.0) -> bool:
+    """
+    True if Ollama is reachable and *model* matches an entry in /api/tags.
+
+    Matching is case-insensitive exact, plus tag-alias (name:tag vs name:tag:latest).
+    Does not pull models. Network errors → False (do not thrash 404s later).
+    """
+    if not (model or "").strip():
+        return False
+    import urllib.error
+    import urllib.request
+
+    base = _ollama_base_host()
+    try:
+        with urllib.request.urlopen(f"{base}/api/tags", timeout=timeout) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        return False
+    available = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
+    want = model.strip()
+    return any(_ollama_name_matches(want, name) for name in available)
+
+def _looks_like_xai_model(name: str) -> bool:
+    """Heuristic: real xAI API model names are grok-* without Ollama tags (no ':')."""
+    n = (name or "").strip().lower()
+    if not n.startswith("grok-"):
+        return False
+    # Ollama-style tags e.g. grok:latest
+    if ":" in n:
+        return False
+    return True
+
+
+def _resolve_xai_model(configured: str) -> str:
+    """
+    Pick a model name for the xAI OpenAI-compatible API.
+
+    Order: HERMES_GROK_MODEL → configured if it looks like xAI → default grok-3.
+    """
+    env = os.environ.get("HERMES_GROK_MODEL", "").strip()
+    if env:
+        return env
+    if _looks_like_xai_model(configured):
+        return configured.strip()
+    return _DEFAULT_XAI_MODEL
+
+
+def _hermes_base_url(provider: str, model: str = "") -> str:
     """Map pipeline provider → Hermes-compatible base_url."""
     if provider == "ollama":
-        return os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+        # Prefer explicit OpenAI-compat URL; else derive from host
+        explicit = os.environ.get("OLLAMA_BASE_URL", "").strip()
+        if explicit:
+            return explicit if explicit.rstrip("/").endswith("/v1") else explicit.rstrip("/") + "/v1"
+        return f"{_ollama_base_host()}/v1"
+    if provider in ("grok", "xai"):
+        return os.environ.get("XAI_BASE_URL", _XAI_BASE_URL).rstrip("/")
     if provider == "openrouter":
         return "https://openrouter.ai/api/v1"
     if provider == "openai":
@@ -115,11 +223,112 @@ def _hermes_api_key(provider: str) -> str:
     """Return the API key for the given provider."""
     if provider == "ollama":
         return "ollama"   # Ollama ignores the key but AIAgent requires it non-empty
+    if provider in ("grok", "xai"):
+        return _xai_api_key() or "sk-dummy"
     if provider == "openrouter":
         return os.environ.get("OPENROUTER_API_KEY", "")
     if provider == "openai":
         return os.environ.get("OPENAI_API_KEY", "")
     return os.environ.get("OPENROUTER_API_KEY", os.environ.get("OPENAI_API_KEY", "sk-dummy"))
+
+
+class HermesRoute:
+    """Resolved backend for a Hermes run (or skip)."""
+
+    __slots__ = ("action", "provider", "model", "base_url", "api_key", "reason", "log_label")
+
+    def __init__(
+        self,
+        *,
+        action: str,
+        provider: str = "",
+        model: str = "",
+        base_url: str = "",
+        api_key: str = "",
+        reason: str = "",
+        log_label: str = "",
+    ):
+        self.action = action  # "run" | "skip"
+        self.provider = provider
+        self.model = model
+        self.base_url = base_url
+        self.api_key = api_key
+        self.reason = reason
+        self.log_label = log_label or reason
+
+    def __repr__(self) -> str:
+        # Never dump raw API keys via %r / traceback of this object
+        key = "***" if self.api_key else ""
+        return (
+            f"HermesRoute(action={self.action!r}, provider={self.provider!r}, "
+            f"model={self.model!r}, base_url={self.base_url!r}, "
+            f"api_key={key!r}, reason={self.reason!r}, log_label={self.log_label!r})"
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+
+def resolve_hermes_route(
+    model: str | None = None,
+    provider: str | None = None,
+    *,
+    ollama_check: Any = None,
+) -> HermesRoute:
+    """
+    Choose where Hermes talks when seeding/running goals.
+
+    Policy:
+      1. Prefer Ollama if the configured model is actually available.
+      2. Else if XAI_API_KEY / GROK_API_KEY present → provider=grok (xAI API).
+      3. Else skip (do not thrash 404 on localhost:11434).
+
+    *ollama_check* is an optional callable(model) -> bool for tests.
+    """
+    configured_model = (model or _pipeline_model()).strip()
+    # provider arg is informational only for routing; policy always prefers live Ollama
+    _ = provider or _pipeline_provider()
+
+    check = ollama_check if ollama_check is not None else ollama_model_available
+    try:
+        ollama_ok = bool(check(configured_model))
+    except Exception:
+        ollama_ok = False
+
+    if ollama_ok:
+        base = _hermes_base_url("ollama", configured_model)
+        key = _hermes_api_key("ollama")
+        return HermesRoute(
+            action="run",
+            provider="ollama",
+            model=configured_model,
+            base_url=base,
+            api_key=key,
+            reason="using ollama",
+            log_label="using ollama",
+        )
+
+    xai_key = _xai_api_key()
+    if xai_key:
+        grok_model = _resolve_xai_model(configured_model)
+        base = _hermes_base_url("grok", grok_model)
+        return HermesRoute(
+            action="run",
+            provider="grok",
+            model=grok_model,
+            base_url=base,
+            api_key=xai_key,
+            reason="using xai/grok",
+            log_label="using xai/grok",
+        )
+
+    return HermesRoute(
+        action="skip",
+        provider="",
+        model=configured_model,
+        reason="skip hermes: no ollama model and no xai key",
+        log_label="skip hermes: no ollama model and no xai key",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -382,6 +591,9 @@ class HermesGoalRunner:
 
     The Critic's reason is fed back to the Worker as a follow-up message
     so it can iterate on its own shortcomings without restarting from scratch.
+
+    Backend routing (see resolve_hermes_route): prefer Ollama when the model is
+    available; else xAI/Grok if an API key is set; else skip without 404 thrash.
     """
 
     def __init__(
@@ -391,14 +603,26 @@ class HermesGoalRunner:
         max_worker_iterations: int = 25,
         max_attempts: int = 4,
         critic_confidence_threshold: float = 0.72,
+        *,
+        route: HermesRoute | None = None,
+        ollama_check: Any = None,
     ):
-        self.model = model or _pipeline_model()
-        self.provider = provider or _pipeline_provider()
-        self.base_url = _hermes_base_url(self.provider, self.model)
-        self.api_key = _hermes_api_key(self.provider)
+        self.requested_model = model or _pipeline_model()
+        self.requested_provider = provider or _pipeline_provider()
         self.max_worker_iterations = max_worker_iterations
         self.max_attempts = max_attempts
         self.critic_threshold = critic_confidence_threshold
+        self._ollama_check = ollama_check
+        # Resolve once at construct time so callers can inspect route before run()
+        self.route = route or resolve_hermes_route(
+            self.requested_model,
+            self.requested_provider,
+            ollama_check=ollama_check,
+        )
+        self.model = self.route.model or self.requested_model
+        self.provider = self.route.provider or self.requested_provider
+        self.base_url = self.route.base_url or _hermes_base_url(self.provider, self.model)
+        self.api_key = self.route.api_key or _hermes_api_key(self.provider)
 
     def run(
         self,
@@ -419,13 +643,31 @@ class HermesGoalRunner:
 
         Returns:
             {
-              "status":   "achieved" | "budget_exceeded" | "error",
+              "status":   "achieved" | "budget_exceeded" | "error" | "skipped",
               "output":   str (Worker's last final_response),
               "attempts": int,
               "messages": list (full Hermes conversation history),
             }
         """
         label = f"[hermes:{branch_id}]" if branch_id else "[hermes]"
+        route = self.route
+        print(f"  {label} {route.log_label}")
+        if route.action == "skip":
+            logger.info("%s %s", label, route.reason)
+            return {
+                "status": "skipped",
+                "output": "",
+                "attempts": 0,
+                "messages": [],
+                "reason": route.reason,
+            }
+
+        # Apply resolved backend (in case route was injected after __init__)
+        self.provider = route.provider
+        self.model = route.model
+        self.base_url = route.base_url or _hermes_base_url(self.provider, self.model)
+        self.api_key = route.api_key or _hermes_api_key(self.provider)
+
         deadline = time.time() + time_budget_min * 60
 
         worker = _build_worker(self.base_url, self.model, self.api_key, self.max_worker_iterations)
@@ -528,9 +770,19 @@ def run_hermes_branch(branch: dict, time_budget_min: int = 30) -> dict[str, Any]
         time_budget_min: Wall-clock budget in minutes
 
     Returns:
-        Result dict from HermesGoalRunner.run()
+        Result dict from HermesGoalRunner.run() (status may be "skipped")
     """
-    runner = HermesGoalRunner()
+    route = resolve_hermes_route()
+    if route.action == "skip":
+        print(f"  [hermes] {route.log_label}")
+        return {
+            "status": "skipped",
+            "output": "",
+            "attempts": 0,
+            "messages": [],
+            "reason": route.reason,
+        }
+    runner = HermesGoalRunner(route=route)
     return runner.run(
         prompt=branch.get("hermes_prompt", branch.get("description", "")),
         goal_check=branch.get("hermes_goal_check", "Has the task been completed?"),

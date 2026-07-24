@@ -528,6 +528,7 @@ def seed_from_master_list(
             from pipeline.hermes_runner import (
                 clear_hermes_retry,
                 hermes_on_cooldown,
+                resolve_hermes_route,
                 schedule_hermes_retry,
             )
 
@@ -541,13 +542,21 @@ def seed_from_master_list(
                 )
                 continue
 
-            print(f"\n  🤖 Routing to Hermes: {title}")
+            # Route before bootstrap: skip without clone/404 thrash when no backend
+            _h_route = resolve_hermes_route()
+            if _h_route.action == "skip":
+                print(f"  {_h_route.log_label} — skipping '{title}' this session")
+                # Session-skip so seed loop does not retry-storm every tick
+                _seeded_this_session.add(title)
+                continue
+
+            print(f"\n  🤖 Routing to Hermes: {title} ({_h_route.log_label})")
             try:
                 from pipeline.hermes_runner import HermesGoalRunner, ensure_hermes_available
 
                 # Bootstrap clone/pip before long worker run (retries inside)
                 ensure_hermes_available()
-                _hr = HermesGoalRunner()
+                _hr = HermesGoalRunner(route=_h_route)
                 _hr_result = _hr.run(
                     prompt=hermes_description,
                     goal_check=hermes_goal_check,
@@ -570,6 +579,13 @@ def seed_from_master_list(
                         )
                 except Exception:
                     pass
+                if _hr_result.get("status") == "skipped":
+                    print(
+                        f"  ⏭ Hermes '{title}' skipped — "
+                        f"{_hr_result.get('reason') or _h_route.reason}"
+                    )
+                    _seeded_this_session.add(title)
+                    continue
                 if _hr_result.get("status") == "achieved":
                     # Mark the line as done in master_ideas.md
                     try:

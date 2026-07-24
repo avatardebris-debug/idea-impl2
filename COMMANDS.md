@@ -69,6 +69,12 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `BUDGET_LADDER_SERIAL` | on | One BE recovery at a time; no mass revive of graveyard |
 | `BUDGET_LADDER_FOCUS_TTL_HOURS` | `4` | Clear stale serial focus so another BE can run |
 | `BUDGET_THIN_FIELD_TICK` | on | BE2 `prefer_thin_field` → `run_thin_field_ship` on health tick |
+| `CLASSIC_TO_GROK_ON_YIELD` | **on** | After classic/missing-engine budget yield, auto-convert eligible projects to sticky `engine=grok_build` (strict eligibility: no junk/lifetime; near-done when `NEAR_DONE_ONLY`) |
+| `CLASSIC_TO_GROK_AUTO_RUN` | **off** | When on + serial ladder focus free: `run_now` (resume + ladder focus). Default **park** = sticky engine, **status stays `budget_exceeded`**, not runnable |
+| `CLASSIC_TO_GROK_NEAR_DONE_ONLY` | **on** | Auto path only converts near-done (`phase>=total` or late review/validate on last/penultimate phase) |
+| `CLASSIC_TO_GROK_DRAIN` | **off** | Ladder may unpark parked classic→grok (serial). Overnight `-NoFreshListOnly` sets this to `1` |
+| `TROUBLESHOOT_CONSUMER` | on | `ship_insufficient` recovery consumer: cheap act or `budget_exceeded` yield |
+| `TROUBLESHOOT_MAX_ACTS` | `2` | Max auto-acts per ship_outcome fingerprint episode before yield |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
@@ -239,9 +245,26 @@ export FIELD_PLAN_ENGINE=auto
 # Also orphan-requeue old in-flight (can waste hours on classic field_testing zombies)
 .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -NoFreshListOnly
 
+# Drain parked classic→grok conversions (sticky engine=grok_build, not fresh seeds only)
+# Same flag: -NoFreshListOnly resumes in-flight / converted work without mass-converting BE fossils.
+.\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480 -NoFreshListOnly
+
 # Morning report only
 python scripts/overnight_report.py --log-dir $env:PIPELINE_DIR\logs\overnight_YYYYMMDD_HHMMSS
 ```
+
+**Classic BE → Grok (park vs drain):** On yield, eligible classic projects get sticky
+`engine=grok_build` + `classic_to_grok_*` fields in `current_idea.json` (survives zip).
+
+| Mode | State | Runnable? |
+|------|--------|-----------|
+| **park** (default) | `engine=grok_build`, `status=budget_exceeded`, `classic_to_grok_parked=True`; prefer_thin deferred | **No** — grok hook + thin-field tick skip |
+| **run_now** | resume `pre_budget_status`, arm prefer_thin if near-done, ladder focus if free | **Yes** |
+
+Unpark / drain:
+- `python scripts/classic_be_to_grok.py --slug … --run-now`
+- Overnight **`-NoFreshListOnly`** sets `CLASSIC_TO_GROK_DRAIN=1` so ladder unparks serially
+- Or `CLASSIC_TO_GROK_AUTO_RUN=1` at convert time (if focus free)
 
 Runbook: `notes/2026-07-22-overnight-grok-from-list-runbook.md`  
 Guards: `pipeline/engines/overnight_guard.py` (CLI assert, serial refuse, stale driver clear).  
@@ -480,10 +503,14 @@ python scripts/run_held_out.py --json
 # Morning report shows BE0–BE3 ladder labels on budget_exceeded:
 python scripts/overnight_report.py --pipeline-dir $env:PIPELINE_DIR
 
-# Classic BE → grok_build canary (state only; then run serial Grok yourself):
+# Classic BE → grok_build (library: pipeline/classic_to_grok.py; sticky engine in current_idea.json):
+# Auto on yield when CLASSIC_TO_GROK_ON_YIELD=1 (default): near-done classic only; park unless AUTO_RUN=1.
 python scripts/classic_be_to_grok.py --list
 python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder --dry-run
-python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder
+python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder              # park
+python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder --run-now    # ladder focus if free
+# Drain parked conversions overnight:
+#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly
 
 
 # Goal traces (goal_trace.v1 under $PIPELINE_DIR/goal_traces/):
@@ -514,6 +541,18 @@ python health_check.py --fix        # delete import_zip/health_check/pipeline/ n
 # export HERMES_INSTALL_RETRY_MINUTES=15  # after bootstrap fail, skip that idea this long
 # export HERMES_INSTALL_ATTEMPTS=3       # clone/pip retries within one ensure call
 # export HERMES_SKIP_PIP=1       # clone only, you install deps yourself
+#
+# Hermes LLM routing (seeding / goal attempt) — avoids 404 thrash on missing Ollama models:
+#   1. Prefer Ollama when PIPELINE_MODEL matches /api/tags (case-insensitive exact, or
+#      tag-alias: qwen3:6b ↔ qwen3:6b:latest; does NOT partial-match qwen3 → qwen3.5)
+#   2. Else if XAI_API_KEY or GROK_API_KEY is set → provider=grok (https://api.x.ai/v1)
+#   3. Else skip hermes for that idea this session (no retry storm)
+# export XAI_API_KEY=xai-...          # same key as pipeline --provider grok
+# export GROK_API_KEY=...             # alternate name (either works)
+# export HERMES_GROK_MODEL=grok-3     # xAI model when PIPELINE_MODEL is Ollama-only (default: grok-3)
+# export XAI_BASE_URL=https://api.x.ai/v1   # optional override
+# export OLLAMA_HOST=http://localhost:11434 # used for model-presence check
+# export PIPELINE_STRICT_COMPLETE_GATE=1    # re-raise if checkbox complete-gate throws (default: soft-disable + warn)
 
 # Single idea (quick test)
 python pipeline/runner.py "Build a Python word counter CLI" \

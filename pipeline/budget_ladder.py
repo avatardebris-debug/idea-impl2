@@ -19,9 +19,17 @@ Env (defaults favor safety / overnight):
   BUDGET_LADDER_SERIAL=1         one BE recovery at a time (no mass revive)
   BUDGET_LADDER_FOCUS_TTL_HOURS=4 clear stale serial focus so queue unsticks
   BUDGET_THIN_FIELD_TICK=1       consume prefer_thin_field → run_thin_field_ship
+  CLASSIC_TO_GROK_ON_YIELD=1     classic/missing-engine yield → sticky grok_build
+  CLASSIC_TO_GROK_AUTO_RUN=0      park (stay BE); 1 = resume + ladder focus if free
+  CLASSIC_TO_GROK_NEAR_DONE_ONLY=1 auto-convert only near-done projects
+  CLASSIC_TO_GROK_DRAIN=0         ladder may unpark parked classic→grok (serial)
 
 Note: "1000 retries" in budget_note is lifetime phase_retries sum corruption /
-cap path — not wall-clock minutes of a short overnight.
+cap path — not wall-clock minutes of a short overnight. Lifetime health yield
+passes classic_to_grok=False so fossils are not auto-converted.
+
+Park: engine=grok_build + status=budget_exceeded + classic_to_grok_parked (not
+runnable by grok hook / thin tick until unpark, --run-now, or DRAIN=1).
 """
 
 from __future__ import annotations
@@ -106,10 +114,15 @@ def prefer_thin_field_ready(state: dict[str, Any]) -> bool:
 
     Ready if complete/complete_with_bugs, or near-done (phases finished) and not
     still budget_exceeded / dep_waiting.
+
+    Parked classic→grok converts never arm thin ship until unpark/run_now.
     """
     if not state.get("prefer_thin_field"):
         return False
     if state.get("prefer_thin_field_shipped"):
+        return False
+    # Sticky classic→grok park must not thin-ship until explicit unpark/drain
+    if state.get("classic_to_grok_parked"):
         return False
     status = str(state.get("status") or "")
     if status in ("field_proven", "ship_insufficient", "deeper_work_needed"):
@@ -198,8 +211,20 @@ def apply_budget_yield(
     elapsed_min: float,
     phase_budget: float,
     total_phases: int,
+    slug: str | None = None,
+    pipeline_dir: Path | None = None,
+    classic_to_grok: bool | None = None,
 ) -> dict[str, Any]:
-    """Mark project budget_exceeded with strike increment (yield, not archive)."""
+    """Mark project budget_exceeded with strike increment (yield, not archive).
+
+    When *slug* is provided and CLASSIC_TO_GROK_ON_YIELD is on, eligible
+    classic/missing-engine projects are auto-converted to sticky grok_build
+    (park by default; see pipeline.classic_to_grok). Lifetime fossils and junk
+    are refused without force flags. Caller still writes state to disk.
+
+    Set classic_to_grok=False to skip auto-convert (e.g. lifetime-retry health
+    path, which rewrites budget_note after yield).
+    """
     strikes = get_strikes(state) + 1
     state["budget_strikes"] = strikes
     state["pre_budget_status"] = state.get("status", "phase_1_executing")
@@ -210,6 +235,37 @@ def apply_budget_yield(
         f"(budget: {phase_budget:.0f} min for {total_phases}-phase project; strike={strikes})"
     )
     state["budget_yielded_at"] = _iso()
+    # New classic yield episode: clear prior convert markers so re-convert is allowed
+    # if engine was forced back to classic after a previous classic→grok episode.
+    eng = str(state.get("engine") or "").strip().lower()
+    if eng in ("", "classic"):
+        state.pop("classic_to_grok_consumed", None)
+        state.pop("classic_to_grok_parked", None)
+        state.pop("classic_to_grok_prefer_thin", None)
+    # Hybrid: convert eligible classic BE → sticky grok_build (once per episode)
+    do_c2g = classic_to_grok if classic_to_grok is not None else bool(slug)
+    if do_c2g and slug:
+        try:
+            from pipeline.classic_to_grok import maybe_classic_to_grok_after_yield
+
+            state = maybe_classic_to_grok_after_yield(
+                state, slug=slug, pipeline_dir=pipeline_dir
+            )
+        except Exception as _c2g_exc:
+            try:
+                from pipeline.pipeline_activity import log_activity
+
+                log_activity(
+                    "classic_to_grok_error",
+                    slug=slug,
+                    error=str(_c2g_exc)[:300],
+                )
+            except Exception:
+                pass
+            print(
+                f"  [classic_to_grok] auto-convert error for '{slug}': {_c2g_exc}",
+                flush=True,
+            )
     return state
 
 
@@ -234,6 +290,7 @@ def auto_retry_clean(
 
 
 def is_near_done(state: dict[str, Any]) -> bool:
+    """Near complete: final phase, or penultimate/final late review/validate."""
     try:
         phase = int(state.get("phase") or 0)
         total = int(state.get("total_phases") or 1)
@@ -241,8 +298,9 @@ def is_near_done(state: dict[str, Any]) -> bool:
         return False
     if phase >= total:
         return True
-    pre = str(state.get("pre_budget_status") or "")
-    if phase >= max(1, total - 0) and any(
+    pre = str(state.get("pre_budget_status") or state.get("status") or "")
+    # late review/validate on last or penultimate phase (total-1, not total-0)
+    if phase >= max(1, total - 1) and any(
         x in pre for x in ("validating", "reviewing", "reviewed")
     ):
         return True
@@ -533,6 +591,11 @@ def is_ladder_eligible(state: dict[str, Any]) -> bool:
 
     Fossils (strikes==0, never yielded by active-clock ladder) stay parked.
     Real yields set budget_strikes via apply_budget_yield.
+
+    Parked classic→grok (sticky engine, still budget_exceeded) is **not** ladder
+    eligible unless CLASSIC_TO_GROK_DRAIN or CLASSIC_TO_GROK_AUTO_RUN is on — so
+    a parked no-op cannot occupy the single tick_process_budget_yields slot and
+    starve real BE1/BE2 recoveries.
     """
     if state.get("status") != "budget_exceeded":
         return False
@@ -541,6 +604,22 @@ def is_ladder_eligible(state: dict[str, Any]) -> bool:
     # BE3 parked (BYPASS/ARCHIVE/IGNORE) — no further auto ladder step
     if state.get("be3_consumed"):
         return False
+    # Sticky classic→grok park: only a drain/auto-run unpark path may select it
+    if state.get("classic_to_grok_parked") and (
+        str(state.get("engine") or "").strip().lower() == "grok_build"
+    ):
+        try:
+            from pipeline.classic_to_grok import (
+                classic_to_grok_auto_run_enabled,
+                classic_to_grok_drain_enabled,
+            )
+
+            if not (
+                classic_to_grok_drain_enabled() or classic_to_grok_auto_run_enabled()
+            ):
+                return False
+        except Exception:
+            return False
     strikes = get_strikes(state)
     if strikes >= 1:
         return True
@@ -805,6 +884,20 @@ def process_budget_exceeded_project(
         state_file.write_text(json.dumps(state, indent=2), encoding="utf-8")
         return state
 
+    # Parked classic→grok: stay BE until drain/run_now (do not BE1-resume as classic)
+    if state.get("classic_to_grok_parked") and (
+        str(state.get("engine") or "").lower() == "grok_build"
+    ):
+        try:
+            from pipeline.classic_to_grok import try_unpark_for_drain
+
+            unparked = try_unpark_for_drain(
+                slug, state, state_file, pipeline_dir=pipeline_dir
+            )
+            return unparked
+        except Exception:
+            return state
+
     strikes = get_strikes(state)
 
     # --- Eligibility: never mass-revive strike-0 classic graveyard ---
@@ -930,8 +1023,18 @@ def _priority_key(slug: str, st: dict[str, Any]) -> tuple:
     has_deps = 1 if deps else 0
     fossil = 0 if is_lifetime_retry_fossil(st) else 1
     strikes = get_strikes(st)
-    # Prefer higher strikes already mid-ladder (BE2 before new BE1 of others)
-    return (-has_deps, -strikes, -fossil, slug)
+    # Parked classic→grok (only eligible when DRAIN/AUTO_RUN) sorts after real ladder work
+    parked_c2g = (
+        1
+        if (
+            st.get("classic_to_grok_parked")
+            and str(st.get("engine") or "").strip().lower() == "grok_build"
+        )
+        else 0
+    )
+    # Prefer higher strikes already mid-ladder (BE2 before new BE1 of others);
+    # demote parked classic→grok so BE1/BE2 drain first even when DRAIN=1
+    return (-has_deps, parked_c2g, -strikes, -fossil, slug)
 
 
 def tick_process_budget_yields(
@@ -1123,11 +1226,15 @@ def tick_prefer_thin_field_ship(
     pipeline_dir: Path | None = None,
     *,
     limit: int = 1,
+    preferred_slugs: list[str] | None = None,
 ) -> int:
     """Run thin field ship for BE2 prefer_thin_field projects that are ready.
 
     At most *limit* projects per tick (default 1 — serial-friendly).
     Clears prefer_thin_field after a ship attempt (success or fail terminal).
+
+    *preferred_slugs* (e.g. just re-armed by troubleshoot consumer) are tried
+    first so same-cycle re-arm→ship is not stolen by another ready project.
     """
     if not thin_field_tick_enabled():
         return 0
@@ -1142,12 +1249,25 @@ def tick_prefer_thin_field_ship(
         print(f"  [budget_ladder] thin_field import failed: {exc}")
         return 0
 
-    n = 0
+    # Order: preferred first (preserve given order), then remaining sorted dirs
+    seen: set[str] = set()
+    ordered: list[Path] = []
+    for slug in preferred_slugs or []:
+        if not slug or slug in seen:
+            continue
+        d = projects / slug
+        if d.is_dir():
+            ordered.append(d)
+            seen.add(slug)
     for d in sorted(projects.iterdir()):
+        if not d.is_dir() or d.name in seen:
+            continue
+        ordered.append(d)
+
+    n = 0
+    for d in ordered:
         if n >= max(1, limit):
             break
-        if not d.is_dir():
-            continue
         sf = d / "state" / "current_idea.json"
         if not sf.is_file():
             continue

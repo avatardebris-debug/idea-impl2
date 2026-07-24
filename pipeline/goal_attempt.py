@@ -126,15 +126,29 @@ def _attempt_hermes(
     prompt = branch.hermes_prompt or branch.description or ""
     goal_check = branch.hermes_goal_check or f"Was '{branch.subgoal}' completed?"
     try:
-        from pipeline.hermes_runner import HermesGoalRunner
+        from pipeline.hermes_runner import HermesGoalRunner, resolve_hermes_route
 
-        runner = HermesGoalRunner(model=model, provider=provider)
+        route = resolve_hermes_route(model=model, provider=provider)
+        if route.action == "skip":
+            print(f"  [hermes:{bid}] {route.log_label}")
+            return {
+                "branch": bid,
+                "status": "skipped",
+                "reason": route.reason,
+            }
+        runner = HermesGoalRunner(model=model, provider=provider, route=route)
         result = runner.run(
             prompt=prompt,
             goal_check=goal_check,
             time_budget_min=30,
             branch_id=bid,
         )
+        if result.get("status") == "skipped":
+            return {
+                "branch": bid,
+                "status": "skipped",
+                "reason": result.get("reason") or route.reason,
+            }
         status = "achieved" if result.get("status") == "achieved" else "failed"
         return {
             "branch": bid,

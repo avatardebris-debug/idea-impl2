@@ -272,62 +272,84 @@ def _mark_complete(project_dir: pathlib.Path, state: dict, title: str, ideas_pat
     total = int(state.get("total_phases", 1) or 1)
     full = phases_fully_built(state)
 
-    # Checkbox honesty: never mark full complete with open - [ ] tasks
+    # Checkbox honesty: only require *current* phase tasks closed for complete.
+    # Historical open boxes on phases 1..N-1 must not block project complete
+    # (video_management-style: last phase PASS but phase-1 still had [ ]).
+    # complete_blocked_waived remains an extra escape for FIX_GATE_ONLY paths.
     if full:
         try:
             from pipeline.task_checkboxes import (
                 format_open_tasks_message,
-                project_all_tasks_closed,
-                stats_all_phases,
+                phase_tasks_closed,
+                stats_for_phase,
                 sync_task_counts_to_state,
             )
 
             sync_task_counts_to_state(state, project_dir, phase)
-            if not project_all_tasks_closed(project_dir):
-                stats = stats_all_phases(project_dir)
-                msg = format_open_tasks_message(stats)
-                state["status"] = f"phase_{phase}_executing"
-                state["complete_blocked_reason"] = msg
-                state.pop("completed_at", None)
-                _write_state_dict(project_dir, state)
-                print(
-                    f"  ☑️  '{title}' NOT marked complete — {msg} "
-                    f"(rework open tasks / mark [x] only when done)"
-                )
-                try:
-                    from pipeline.message_bus import Message, MessageBus
-                    from pipeline.paths import queues_dir
-
-                    bus = MessageBus(queues_dir())
-                    bus.send(
-                        Message.create(
-                            from_agent="runner",
-                            to_agent="executor",
-                            type="task",
-                            payload={
-                                "phase": phase,
-                                "tasks_path": f"phases/phase_{phase}/tasks.md",
-                                "workspace_path": str(project_dir / "workspace"),
-                                "fix_required": True,
-                                "open_tasks": True,
-                                "fix_instructions": (
-                                    f"COMPLETE BLOCKED: {msg}. "
-                                    "Finish remaining tasks and mark each `- [x]` in the "
-                                    "relevant phases/phase_*/tasks.md when Done-when is met."
-                                ),
-                                "idea_slug": slug,
-                            },
-                        )
+            if not phase_tasks_closed(project_dir, phase):
+                stats = stats_for_phase(project_dir, phase)
+                msg = format_open_tasks_message(stats, phase=phase)
+                # FIX_GATE_ONLY / troubleshoot consumer may waive current-phase
+                # checkboxes so thin field ship can proceed without rewriting tasks.md.
+                if state.get("complete_blocked_waived"):
+                    state.pop("complete_blocked_reason", None)
+                    print(
+                        f"  ☑️  '{title}' complete checkbox waived "
+                        f"({state.get('complete_blocked_waived_reason') or 'waived'}) "
+                        f"— open tasks remain: {msg}",
+                        flush=True,
                     )
-                except Exception:
-                    pass
-                return
-        except Exception as _cb_err:
-            import logging as _log
+                else:
+                    state["status"] = f"phase_{phase}_executing"
+                    state["complete_blocked_reason"] = msg
+                    state.pop("completed_at", None)
+                    _write_state_dict(project_dir, state)
+                    print(
+                        f"  ☑️  '{title}' NOT marked complete — {msg} "
+                        f"(rework open tasks / mark [x] only when done)"
+                    )
+                    try:
+                        from pipeline.message_bus import Message, MessageBus
+                        from pipeline.paths import queues_dir
 
-            _log.getLogger(__name__).debug(
-                "task checkbox complete-gate skipped: %s", _cb_err
+                        bus = MessageBus(queues_dir())
+                        bus.send(
+                            Message.create(
+                                from_agent="runner",
+                                to_agent="executor",
+                                type="task",
+                                payload={
+                                    "phase": phase,
+                                    "tasks_path": f"phases/phase_{phase}/tasks.md",
+                                    "workspace_path": str(project_dir / "workspace"),
+                                    "fix_required": True,
+                                    "open_tasks": True,
+                                    "fix_instructions": (
+                                        f"COMPLETE BLOCKED: {msg}. "
+                                        "Finish remaining tasks and mark each `- [x]` in "
+                                        f"phases/phase_{phase}/tasks.md when Done-when is met."
+                                    ),
+                                    "idea_slug": slug,
+                                },
+                            )
+                        )
+                    except Exception:
+                        pass
+                    return
+        except Exception as _cb_err:
+            # Expected soft failures: missing phases dir, unreadable tasks.md, etc.
+            # Unexpected failures still soft-disable (pre-existing honesty pattern)
+            # unless PIPELINE_STRICT_COMPLETE_GATE=1 (fail closed → re-raise).
+            import logging as _log
+            import os as _os
+
+            _log.getLogger(__name__).warning(
+                "task checkbox complete-gate soft-disabled: %s", _cb_err
             )
+            _strict = _os.environ.get("PIPELINE_STRICT_COMPLETE_GATE", "").strip().lower()
+            if _strict in ("1", "true", "yes"):
+                raise
+
 
     if full:
         # Final pytest (+ force-advance risk) → complete or complete_with_bugs

@@ -6,7 +6,7 @@
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
 #   .\scripts\overnight_grok_from_list.ps1 -DoExtract          # cloud zip
-#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # also resume old in-flight
+#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # drain: resume in-flight + parked classic→grok
 #
 # REQUIREMENTS:
 #   - Host must stay awake (disable sleep on AC)
@@ -25,6 +25,8 @@ param(
     [switch]$DoExtract,
     [switch]$DryRunEnvOnly,
     # Default ON (--fresh-list-only): new seeds only, not classic backlog zombies.
+    # Pass -NoFreshListOnly to drain parked classic→grok conversions / in-flight resume
+    # (sets CLASSIC_TO_GROK_DRAIN=1 so ladder may unpark sticky engine=grok_build BE).
     [switch]$NoFreshListOnly
 )
 
@@ -285,6 +287,11 @@ $pyArgs = @(
 )
 if (-not $NoFreshListOnly) {
     $pyArgs += "--fresh-list-only"
+    # Fresh-list: do not unpark parked classic→grok converts
+    if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "0" }
+} else {
+    # Drain path: allow ladder to unpark sticky classic→grok (serial, one at a time)
+    if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "1" }
 }
 $pyArgs = $pyArgs + $ideaArgs
 

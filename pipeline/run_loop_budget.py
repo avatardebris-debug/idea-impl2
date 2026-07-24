@@ -98,18 +98,47 @@ def tick_budget_enforcement(cfg: MainLoopConfig, idea_state: dict[str, Any]) -> 
             _phase_budget = int(_phase_budget * (1.0 + 0.5 * grants))
 
         if _elapsed > _phase_budget and not _is_locked:
+            # Bak before yield/convert mutates on-disk state (auto classic→grok path)
+            try:
+                if _proj_file.is_file() and _active_slug:
+                    from datetime import datetime as _dt
+
+                    _bak = _proj_file.with_suffix(
+                        _proj_file.suffix
+                        + f".bak_classic_{_dt.now().strftime('%Y%m%d_%H%M%S')}"
+                    )
+                    if not _bak.is_file():
+                        _bak.write_text(
+                            _proj_file.read_text(encoding="utf-8"), encoding="utf-8"
+                        )
+            except Exception:
+                pass
             idea_state = apply_budget_yield(
                 idea_state,
                 elapsed_min=_elapsed,
                 phase_budget=float(_phase_budget),
                 total_phases=int(_total_phases) if _total_phases else 3,
+                slug=_active_slug or None,
+                pipeline_dir=cfg.pipeline_dir,
             )
             _proj_file.write_text(json.dumps(idea_state, indent=2), encoding="utf-8")
-            print(
-                f"  Budget yielded for '{idea_state.get('title', _active_slug)}' "
-                f"({_elapsed:.0f}m active > {_phase_budget}m "
-                f"[{_total_phases} phases] strike={idea_state.get('budget_strikes')}) -- skipping"
-            )
+            if idea_state.get("engine") == "grok_build" and idea_state.get(
+                "classic_to_grok_at"
+            ):
+                print(
+                    f"  Budget yielded → classic_to_grok "
+                    f"'{idea_state.get('title', _active_slug)}' "
+                    f"mode={idea_state.get('classic_to_grok_mode', 'park')} "
+                    f"parked={bool(idea_state.get('classic_to_grok_parked'))} "
+                    f"status={idea_state.get('status')} "
+                    f"({_elapsed:.0f}m active > {_phase_budget}m)"
+                )
+            else:
+                print(
+                    f"  Budget yielded for '{idea_state.get('title', _active_slug)}' "
+                    f"({_elapsed:.0f}m active > {_phase_budget}m "
+                    f"[{_total_phases} phases] strike={idea_state.get('budget_strikes')}) -- skipping"
+                )
             cleared = 0
             for _role in AGENT_ROLES:
                 cleared += cfg.bus.clear_queue(_role)

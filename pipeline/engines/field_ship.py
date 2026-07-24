@@ -583,6 +583,72 @@ See `{CAPABILITY_CLAIMS_REL.as_posix()}`.
     return path
 
 
+def _apply_ship_outcome(
+    project_dir: Path,
+    state: dict[str, Any],
+    outcome: str,
+) -> None:
+    """Sticky ship_outcome + ship_outcome_at (in-memory; caller writes state)."""
+    try:
+        from pipeline.troubleshoot_gate import set_ship_outcome
+
+        set_ship_outcome(project_dir, outcome, state=state, write=False)
+    except Exception:
+        from datetime import datetime, timezone as _tz
+
+        state["ship_outcome"] = outcome
+        state["ship_outcome_at"] = datetime.now(_tz.utc).isoformat()
+
+
+def _run_troubleshoot_after_ship(
+    project_dir: Path,
+    state: dict[str, Any],
+    *,
+    status: str,
+    results_md: str = "",
+    persist_state: bool = True,
+) -> None:
+    """Emit recovery_decision after ship_insufficient / deeper_work_needed.
+
+    Sets last_recovery_* on *state*. When persist_state=True (default), writes
+    state once after the gate so ship_outcome + last_recovery_* land together.
+    """
+    try:
+        from pipeline.troubleshoot_gate import run_troubleshoot_gate
+
+        decision = run_troubleshoot_gate(
+            project_dir,
+            state=state,
+            status=status,
+            field_results_text=results_md or None,
+            write=True,
+            set_outcome=False,  # already sticky-set by caller
+        )
+        state["last_recovery_action"] = decision.get("recommended_action")
+        state["last_recovery_class"] = decision.get("primary_class")
+        if persist_state:
+            try:
+                from pipeline.project_state import _write_state_dict as _ws
+
+                _ws(project_dir, state)
+            except Exception as write_exc:
+                import logging as _log
+
+                _log.getLogger(__name__).warning(
+                    "troubleshoot-gate could not persist last_recovery_* for %s: %s",
+                    state.get("_slug") or project_dir.name,
+                    write_exc,
+                )
+        print(
+            f"  [troubleshoot-gate] {state.get('_slug') or project_dir.name}: "
+            f"{decision.get('recommended_action')} "
+            f"({decision.get('primary_class')}, conf={decision.get('confidence')})",
+            flush=True,
+        )
+    except Exception as exc:
+        print(f"  [troubleshoot-gate] skipped: {exc}", flush=True)
+
+
 def run_thin_field_ship(
     project_dir: Path,
     state: dict[str, Any] | None = None,
@@ -641,9 +707,15 @@ def run_thin_field_ship(
             project_dir=project_dir,
         )
         if parked:
-            _write_state_dict(project_dir, state)
+            _apply_ship_outcome(project_dir, state, "deeper_work_needed")
             result.status = "deeper_work_needed"
             result.reason = state.get("deeper_work_reason") or "rework budget exhausted"
+            _run_troubleshoot_after_ship(
+                project_dir,
+                state,
+                status="deeper_work_needed",
+                results_md="",
+            )
             return result
         state = begin_field_rework_attempt(state)
     except Exception:
@@ -693,17 +765,26 @@ def run_thin_field_ship(
                 project_dir=project_dir,
             )
             if parked:
-                _write_state_dict(project_dir, state)
+                _apply_ship_outcome(project_dir, state, "deeper_work_needed")
                 result.status = "deeper_work_needed"
                 result.reason = state.get("deeper_work_reason") or detail
+                _run_troubleshoot_after_ship(
+                    project_dir,
+                    state,
+                    status="deeper_work_needed",
+                    results_md="",
+                )
                 return result
         except Exception:
             pass
         state["status"] = "ship_insufficient"
         state["field_ship_reason"] = f"plan failed: {detail}"
-        _write_state_dict(project_dir, state)
+        _apply_ship_outcome(project_dir, state, "ship_insufficient")
         result.status = "ship_insufficient"
         result.reason = detail
+        _run_troubleshoot_after_ship(
+            project_dir, state, status="ship_insufficient", results_md=""
+        )
         return result
 
     state["status"] = "field_testing"
@@ -726,6 +807,14 @@ def run_thin_field_ship(
     result.results_path = str(results_path)
     result.passed = run.passed
     result.failed = run.failed
+    try:
+        from pipeline.troubleshoot_gate import write_field_test_results_json
+
+        write_field_test_results_json(
+            project_dir, run, plan_engine=eng
+        )
+    except Exception:
+        pass
 
     # Bridge: on FAIL, field-test skill style repair → debug → code-review → report
     # (not full grok_build implement chain)
@@ -757,6 +846,25 @@ def run_thin_field_ship(
                 else:
                     run_all_passed = False
                     result.extra["repair_reason"] = repair.reason
+                # Rewrite structured JSON with post-repair counts so gate does not
+                # prefer stale pre-repair failed numbers when reading from disk.
+                try:
+                    from pipeline.troubleshoot_gate import write_field_test_results_json
+
+                    class _FinalCounts:
+                        passed = result.passed
+                        failed = result.failed
+                        all_passed = bool(repair.passed)
+                        results = getattr(run, "results", []) or []
+
+                    write_field_test_results_json(
+                        project_dir,
+                        _FinalCounts(),
+                        plan_engine=eng,
+                        extra={"post_repair": True, "repair_steps": list(repair.steps_run)},
+                    )
+                except Exception:
+                    pass
             else:
                 run_all_passed = False
         except Exception as _rep_exc:
@@ -779,6 +887,7 @@ def run_thin_field_ship(
         state["status"] = "field_proven"
         state["field_proven_at"] = datetime.now(timezone.utc).isoformat()
         state.pop("field_ship_reason", None)
+        _apply_ship_outcome(project_dir, state, "field_proven")
         result.ok = True
         result.status = "field_proven"
         total = result.passed + result.failed
@@ -822,6 +931,7 @@ def run_thin_field_ship(
                 project_dir=project_dir,
             )
             if parked:
+                _apply_ship_outcome(project_dir, state, "deeper_work_needed")
                 result.status = "deeper_work_needed"
                 result.reason = state.get("deeper_work_reason") or result.reason
             else:
@@ -829,6 +939,7 @@ def run_thin_field_ship(
                 state["field_ship_reason"] = (
                     f"field FAIL passed={result.passed} failed={result.failed}"
                 )
+                _apply_ship_outcome(project_dir, state, "ship_insufficient")
                 result.status = "ship_insufficient"
                 result.reason = state["field_ship_reason"]
         except Exception:
@@ -836,9 +947,19 @@ def run_thin_field_ship(
             state["field_ship_reason"] = (
                 f"field FAIL passed={result.passed} failed={result.failed}"
             )
+            _apply_ship_outcome(project_dir, state, "ship_insufficient")
             result.status = "ship_insufficient"
             result.reason = state["field_ship_reason"]
 
+    # Gate first so last_recovery_* is on state before the single terminal write.
+    if result.status in ("ship_insufficient", "deeper_work_needed"):
+        _run_troubleshoot_after_ship(
+            project_dir,
+            state,
+            status=result.status,
+            results_md=results_md,
+            persist_state=False,
+        )
     _write_state_dict(project_dir, state)
 
     try:

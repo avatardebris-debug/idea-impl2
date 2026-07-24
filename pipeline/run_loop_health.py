@@ -596,6 +596,10 @@ def tick_project_metrics(
                                 elapsed_min=float(retries),
                                 phase_budget=float(MAX_PROJECT_LIFETIME_RETRIES),
                                 total_phases=int(ci.get("total_phases") or 3),
+                                slug=slug,
+                                pipeline_dir=cfg.pipeline_dir,
+                                # Lifetime fossils must not auto-convert (note rewritten below)
+                                classic_to_grok=False,
                             )
                             ci["budget_note"] = (
                                 f"Force-completed: exceeded {MAX_PROJECT_LIFETIME_RETRIES} "
