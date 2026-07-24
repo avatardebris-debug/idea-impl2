@@ -477,6 +477,15 @@ python scripts/run_held_out.py
 python scripts/run_held_out.py --json
 # Report: $PIPELINE_DIR/metrics/held_out_latest.{json,md}
 
+# Morning report shows BE0–BE3 ladder labels on budget_exceeded:
+python scripts/overnight_report.py --pipeline-dir $env:PIPELINE_DIR
+
+# Classic BE → grok_build canary (state only; then run serial Grok yourself):
+python scripts/classic_be_to_grok.py --list
+python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder --dry-run
+python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder
+
+
 # Goal traces (goal_trace.v1 under $PIPELINE_DIR/goal_traces/):
 # python -c "from pipeline.goal_trace import sandbox_file_exists_goal; from pathlib import Path; print(sandbox_file_exists_goal(Path('README.md'))['status'])"
 
