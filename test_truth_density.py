@@ -122,3 +122,28 @@ def test_format_report_includes_rates_and_missing_tokens():
     assert "2" in md
     assert "not instrumented" in md.lower() or "missing" in md.lower()
     assert "overran" in md.lower() or "overrun" in md.lower()
+
+
+def test_write_report_and_history(tmp_path):
+    from pipeline.truth_density import build_report, write_report_outputs
+
+    # minimal projects so count can be 0
+    (tmp_path / "projects").mkdir()
+    log_dir = tmp_path / "logs" / "overnight_test"
+    log_dir.mkdir(parents=True)
+    pre = {"ts": "2026-07-24T15:00:00+00:00", "time_limit_min": 60}
+    (log_dir / "preflight.json").write_text(json.dumps(pre), encoding="utf-8")
+    (log_dir / "runner.log").write_text("ok\n", encoding="utf-8")
+
+    report = build_report(tmp_path, since=str(log_dir))
+    paths = write_report_outputs(tmp_path, report, out_path=log_dir / "truth_density.md")
+    assert paths["markdown"].is_file()
+    md_text = paths["markdown"].read_text(encoding="utf-8")
+    assert "Field proven" in md_text or "field proven" in md_text.lower()
+    hist = tmp_path / "metrics" / "truth_density_history.jsonl"
+    assert hist.is_file()
+    line = hist.read_text(encoding="utf-8").strip().splitlines()[-1]
+    obj = json.loads(line)
+    assert "field_proven_count" in obj
+    assert "wall_clock_hours" in obj
+    assert obj["token_mode"] in ("full", "partial", "missing")

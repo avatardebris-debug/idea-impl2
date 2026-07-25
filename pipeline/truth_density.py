@@ -370,3 +370,44 @@ def build_report(
         pipeline_dir, window, metrics_summary_path=metrics_summary_path
     )
     return TruthDensityReport(window=window, field_proven=scan, tokens=tokens)
+
+
+def write_report_outputs(
+    pipeline_dir: Path,
+    report: TruthDensityReport,
+    *,
+    out_path: Path | None = None,
+) -> dict[str, Path]:
+    if out_path is None:
+        metrics = pipeline_dir / "metrics"
+        metrics.mkdir(parents=True, exist_ok=True)
+        out_path = metrics / "truth_density_latest.md"
+    else:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    md = format_report_markdown(report)
+    out_path.write_text(md, encoding="utf-8")
+
+    hist_dir = pipeline_dir / "metrics"
+    hist_dir.mkdir(parents=True, exist_ok=True)
+    hist_path = hist_dir / "truth_density_history.jsonl"
+    row = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "window_start": report.window.start.isoformat(),
+        "window_end": report.window.end.isoformat(),
+        "window_source": report.window.source,
+        "wall_clock_hours": report.window.hours,
+        "time_limit_min": report.window.time_limit_min,
+        "overrun": report.window.overrun(),
+        "partial_window": report.window.partial,
+        "field_proven_count": report.field_proven.count,
+        "field_proven_slugs": report.field_proven.slugs,
+        "per_wall_hour": report.per_wall_hour,
+        "token_mode": report.tokens.mode,
+        "total_tokens": report.tokens.total_tokens,
+        "per_million_tokens": report.per_million_tokens,
+    }
+    with hist_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(row) + "\n")
+
+    return {"markdown": out_path, "history": hist_path}
