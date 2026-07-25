@@ -67,3 +67,31 @@ def test_count_field_proven_in_window(tmp_path):
     assert result.count == 2
     assert set(result.slugs) == {"a", "d"}
     assert result.low_confidence_slugs == []
+
+
+def test_tokens_missing_mode():
+    from pipeline.truth_density import collect_tokens, RunWindow
+
+    report = collect_tokens(
+        Path("/nonexistent"),
+        RunWindow(
+            start=datetime(2026, 7, 24, 15, 0, tzinfo=timezone.utc),
+            end=datetime(2026, 7, 24, 16, 0, tzinfo=timezone.utc),
+        ),
+    )
+    assert report.mode == "missing"
+    assert report.total_tokens is None
+
+
+def test_tokens_from_explicit_summary(tmp_path):
+    from pipeline.truth_density import collect_tokens, RunWindow
+
+    p = tmp_path / "summary.json"
+    p.write_text(json.dumps({"total_tokens": 2_000_000}), encoding="utf-8")
+    window = RunWindow(
+        start=datetime(2026, 7, 24, 14, 0, tzinfo=timezone.utc),
+        end=datetime(2026, 7, 24, 20, 0, tzinfo=timezone.utc),
+    )
+    report = collect_tokens(tmp_path, window, metrics_summary_path=p)
+    assert report.mode == "full"
+    assert report.total_tokens == 2_000_000

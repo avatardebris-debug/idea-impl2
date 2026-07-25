@@ -188,3 +188,77 @@ def count_field_proven_in_window(
                 low.append(d.name)
 
     return FieldProvenScan(count=len(slugs), slugs=slugs, low_confidence_slugs=low)
+
+
+@dataclass
+class TokenReport:
+    mode: str  # "full" | "partial" | "missing"
+    total_tokens: int | None = None
+    stall_tokens: int | None = None
+    source: str = ""
+
+
+def collect_tokens(
+    pipeline_dir: Path,
+    window: RunWindow,
+    *,
+    metrics_summary_path: Path | None = None,
+) -> TokenReport:
+    """Collect token totals for the window. Never treat unknown as 0 tokens."""
+    path = metrics_summary_path
+    if path is None:
+        metrics_root = pipeline_dir / "metrics"
+        if metrics_root.is_dir():
+            # newest summary.json whose parent dir mtime intersects window (best effort)
+            candidates = sorted(
+                metrics_root.glob("*/summary.json"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            for cand in candidates[:5]:
+                mtime = datetime.fromtimestamp(cand.stat().st_mtime, tz=timezone.utc)
+                if window.start <= mtime <= window.end + timedelta(hours=1):
+                    path = cand
+                    break
+            if path is None and candidates:
+                # do not silently use out-of-window totals as "full" — leave missing
+                path = None
+
+    if path is None or not path.is_file():
+        return TokenReport(mode="missing", source="none")
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return TokenReport(mode="missing", source=str(path))
+
+    total = data.get("total_tokens")
+    if total is None:
+        return TokenReport(mode="missing", source=str(path))
+    try:
+        total_i = int(total)
+    except (TypeError, ValueError):
+        return TokenReport(mode="missing", source=str(path))
+
+    stall = data.get("stall_tokens")
+    stall_i: int | None
+    if stall is None:
+        stall_i = None
+    else:
+        try:
+            stall_i = int(stall)
+        except (TypeError, ValueError):
+            stall_i = None
+    # metrics summary is run-scoped; treat as full when present
+    return TokenReport(
+        mode="full",
+        total_tokens=total_i,
+        stall_tokens=stall_i,
+        source=str(path),
+    )
+
+
+def field_proven_per_million_tokens(count: int, tokens: int | None) -> float | None:
+    if tokens is None or tokens <= 0:
+        return None
+    return count / (tokens / 1_000_000.0)
