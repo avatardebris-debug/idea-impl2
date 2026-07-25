@@ -253,6 +253,19 @@ export FIELD_PLAN_ENGINE=auto
 python scripts/overnight_report.py --log-dir $env:PIPELINE_DIR\logs\overnight_YYYYMMDD_HHMMSS
 ```
 
+### Truth-density report (field proven per hour)
+
+After overnight or any factory run:
+
+```powershell
+set PIPELINE_DIR=C:\Users\avata\aicompete\thepipeline
+python scripts/report_truth_density.py --since $env:PIPELINE_DIR\logs\overnight_YYYYMMDD_HHMMSS
+```
+
+Writes `truth_density.md` in that log folder (or `metrics/truth_density_latest.md`) and appends `metrics/truth_density_history.jsonl`.
+
+Reports field proven per wall-clock hour; tokens per million only when a metrics summary exists. Does not change project status.
+
 **Classic BE → Grok (park vs drain):** On yield, eligible classic projects get sticky
 `engine=grok_build` + `classic_to_grok_*` fields in `current_idea.json` (survives zip).
 
