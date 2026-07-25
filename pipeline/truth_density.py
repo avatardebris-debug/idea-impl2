@@ -262,3 +262,111 @@ def field_proven_per_million_tokens(count: int, tokens: int | None) -> float | N
     if tokens is None or tokens <= 0:
         return None
     return count / (tokens / 1_000_000.0)
+
+
+@dataclass
+class TruthDensityReport:
+    window: RunWindow
+    field_proven: FieldProvenScan
+    tokens: TokenReport
+    active_work_hours: float | None = None
+
+    @property
+    def per_wall_hour(self) -> float | None:
+        h = self.window.hours
+        if h <= 0:
+            return None
+        return self.field_proven.count / h
+
+    @property
+    def per_million_tokens(self) -> float | None:
+        return field_proven_per_million_tokens(
+            self.field_proven.count, self.tokens.total_tokens
+        )
+
+
+def format_report_markdown(report: TruthDensityReport) -> str:
+    w = report.window
+    lines = [
+        "# Factory truth-density report",
+        "",
+        "## Run window",
+        f"- Start (UTC): {w.start.isoformat()}",
+        f"- End (UTC): {w.end.isoformat()}",
+        f"- Source: {w.source}",
+        f"- Wall-clock hours: {w.hours:.2f}",
+    ]
+    if w.time_limit_min is not None:
+        lines.append(f"- Configured time limit (minutes): {w.time_limit_min:.0f}")
+        if w.overrun():
+            lines.append(
+                "- **Note:** Wall-clock time overran the configured limit by more than 10%."
+            )
+    if w.partial:
+        lines.append("- **Note:** End time is approximate (run may still be open).")
+    lines += [
+        "",
+        "## Throughput",
+        f"- Field proven in window: **{report.field_proven.count}**",
+    ]
+    if report.per_wall_hour is not None:
+        lines.append(
+            f"- Field proven per wall-clock hour: **{report.per_wall_hour:.2f}**"
+        )
+    if report.active_work_hours is not None and report.active_work_hours > 0:
+        rate = report.field_proven.count / report.active_work_hours
+        lines.append(f"- Active work hours (if known): {report.active_work_hours:.2f}")
+        lines.append(f"- Field proven per active work hour: **{rate:.2f}**")
+    lines += ["", "## Model spend (tokens)"]
+    if report.tokens.mode == "missing":
+        lines.append(
+            "- Tokens: **not instrumented for this window** (no complete summary found)."
+        )
+        lines.append("- Field proven per million tokens: n/a")
+    elif report.tokens.mode == "partial":
+        lines.append(
+            f"- Tokens (partial): {report.tokens.total_tokens:,} (source: {report.tokens.source})"
+        )
+        lines.append(
+            "- Efficiency rates may understate spend; treat as incomplete."
+        )
+        if report.per_million_tokens is not None:
+            lines.append(
+                f"- Field proven per million tokens (partial): **{report.per_million_tokens:.2f}**"
+            )
+    else:
+        lines.append(
+            f"- Tokens: **{report.tokens.total_tokens:,}** (source: {report.tokens.source})"
+        )
+        if report.tokens.stall_tokens is not None:
+            lines.append(f"- Stall tokens (if recorded): {report.tokens.stall_tokens:,}")
+        if report.per_million_tokens is not None:
+            lines.append(
+                f"- Field proven per million tokens: **{report.per_million_tokens:.2f}**"
+            )
+    if report.field_proven.slugs:
+        lines += ["", "## Projects field-proven in window", ""]
+        for s in report.field_proven.slugs:
+            mark = (
+                " (low-confidence timestamp)"
+                if s in report.field_proven.low_confidence_slugs
+                else ""
+            )
+            lines.append(f"- `{s}`{mark}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def build_report(
+    pipeline_dir: Path,
+    *,
+    since: str | None = None,
+    until: str | None = None,
+    metrics_summary_path: Path | None = None,
+) -> TruthDensityReport:
+    window = resolve_run_window(pipeline_dir=pipeline_dir, since=since, until=until)
+    scan = count_field_proven_in_window(pipeline_dir, window)
+    tokens = collect_tokens(
+        pipeline_dir, window, metrics_summary_path=metrics_summary_path
+    )
+    return TruthDensityReport(window=window, field_proven=scan, tokens=tokens)

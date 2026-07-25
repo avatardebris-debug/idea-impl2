@@ -95,3 +95,30 @@ def test_tokens_from_explicit_summary(tmp_path):
     report = collect_tokens(tmp_path, window, metrics_summary_path=p)
     assert report.mode == "full"
     assert report.total_tokens == 2_000_000
+
+
+def test_format_report_includes_rates_and_missing_tokens():
+    from pipeline.truth_density import (
+        RunWindow,
+        FieldProvenScan,
+        TokenReport,
+        TruthDensityReport,
+        format_report_markdown,
+    )
+
+    window = RunWindow(
+        start=datetime(2026, 7, 24, 15, 0, tzinfo=timezone.utc),
+        end=datetime(2026, 7, 24, 17, 0, tzinfo=timezone.utc),
+        source="test",
+        time_limit_min=30,
+    )
+    # 2 hours wall; limit 0.5h → overrun
+    scan = FieldProvenScan(count=2, slugs=["a", "b"])
+    tokens = TokenReport(mode="missing")
+    report = TruthDensityReport(window=window, field_proven=scan, tokens=tokens)
+    md = format_report_markdown(report)
+    assert "Field proven" in md or "field proven" in md.lower()
+    assert "per wall-clock hour" in md.lower() or "per hour" in md.lower()
+    assert "2" in md
+    assert "not instrumented" in md.lower() or "missing" in md.lower()
+    assert "overran" in md.lower() or "overrun" in md.lower()
