@@ -41,3 +41,29 @@ def test_resolve_run_window_from_preflight(tmp_path, monkeypatch):
     assert window.end is not None
     assert window.time_limit_min == 30
     assert window.source.startswith("preflight") or "overnight" in window.source or "log" in window.source
+
+
+def _write_project(root: Path, slug: str, status: str, proven_at: str | None = None):
+    d = root / "projects" / slug / "state"
+    d.mkdir(parents=True)
+    st = {"status": status, "title": slug, "phase": 3, "total_phases": 3}
+    if proven_at:
+        st["field_proven_at"] = proven_at
+    (d / "current_idea.json").write_text(json.dumps(st, indent=2), encoding="utf-8")
+
+
+def test_count_field_proven_in_window(tmp_path):
+    start = datetime(2026, 7, 24, 15, 0, 0, tzinfo=timezone.utc)
+    end = datetime(2026, 7, 24, 18, 0, 0, tzinfo=timezone.utc)
+    _write_project(tmp_path, "a", "field_proven", "2026-07-24T16:00:00+00:00")  # in
+    _write_project(tmp_path, "b", "field_proven", "2026-07-24T12:00:00+00:00")  # before
+    _write_project(tmp_path, "c", "budget_exceeded", None)
+    _write_project(tmp_path, "d", "field_proven", "2026-07-24T17:00:00+00:00")  # in
+
+    from pipeline.truth_density import count_field_proven_in_window, RunWindow
+
+    window = RunWindow(start=start, end=end, source="test")
+    result = count_field_proven_in_window(tmp_path, window)
+    assert result.count == 2
+    assert set(result.slugs) == {"a", "d"}
+    assert result.low_confidence_slugs == []

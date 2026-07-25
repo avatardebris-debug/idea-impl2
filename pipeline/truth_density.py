@@ -140,3 +140,51 @@ def resolve_run_window(
         time_limit_min=time_limit_min,
         partial=partial,
     )
+
+
+@dataclass
+class FieldProvenScan:
+    count: int
+    slugs: list[str] = field(default_factory=list)
+    low_confidence_slugs: list[str] = field(default_factory=list)
+
+
+def count_field_proven_in_window(
+    pipeline_dir: Path,
+    window: RunWindow,
+) -> FieldProvenScan:
+    projects = pipeline_dir / "projects"
+    slugs: list[str] = []
+    low: list[str] = []
+    if not projects.is_dir():
+        return FieldProvenScan(count=0)
+
+    for d in sorted(projects.iterdir()):
+        if not d.is_dir():
+            continue
+        sf = d / "state" / "current_idea.json"
+        if not sf.is_file():
+            continue
+        try:
+            st = json.loads(sf.read_text(encoding="utf-8-sig"))
+        except Exception:
+            continue
+        if (st.get("status") or "") != "field_proven":
+            continue
+        proven_raw = st.get("field_proven_at") or st.get("last_active_work_at")
+        low_conf = False
+        if proven_raw:
+            try:
+                proven = parse_iso_to_utc(str(proven_raw))
+            except Exception:
+                proven = datetime.fromtimestamp(sf.stat().st_mtime, tz=timezone.utc)
+                low_conf = True
+        else:
+            proven = datetime.fromtimestamp(sf.stat().st_mtime, tz=timezone.utc)
+            low_conf = True
+        if window.start <= proven <= window.end:
+            slugs.append(d.name)
+            if low_conf:
+                low.append(d.name)
+
+    return FieldProvenScan(count=len(slugs), slugs=slugs, low_confidence_slugs=low)
