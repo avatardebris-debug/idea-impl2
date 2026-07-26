@@ -21,7 +21,10 @@ def main() -> int:
     ap.add_argument(
         "--since",
         default="",
-        help="ISO start time or path to overnight log directory (with preflight.json)",
+        help=(
+            "ISO start time, full path to overnight log dir, or bare folder name "
+            "under $PIPELINE_DIR/logs (e.g. overnight_20260724_233953)"
+        ),
     )
     ap.add_argument("--until", default="", help="Optional ISO end time")
     ap.add_argument("--out", default="", help="Markdown output path")
@@ -36,26 +39,47 @@ def main() -> int:
         os.environ["PIPELINE_DIR"] = args.pipeline_dir
 
     from pipeline.paths import get_pipeline_dir
-    from pipeline.truth_density import build_report, write_report_outputs
+    from pipeline.truth_density import (
+        build_report,
+        pipeline_dir_from_log_dir,
+        resolve_since_path,
+        write_report_outputs,
+    )
 
     pipeline_dir = get_pipeline_dir()
     if not pipeline_dir.is_dir():
         print(f"ERROR: pipeline dir missing: {pipeline_dir}", file=sys.stderr)
         return 2
 
-    report = build_report(
-        pipeline_dir,
-        since=args.since or None,
-        until=args.until or None,
-        metrics_summary_path=Path(args.metrics_summary) if args.metrics_summary else None,
-    )
+    # Bare overnight names / full log paths may live under a different factory
+    # root than get_pipeline_dir() (common when running from a worktree that has
+    # a local .pipeline while overnight logs are in ~/aicompete/thepipeline).
+    log_dir = None
+    if args.since:
+        log_dir = resolve_since_path(pipeline_dir, args.since)
+        if log_dir is not None and log_dir.is_dir():
+            inferred = pipeline_dir_from_log_dir(log_dir)
+            if inferred is not None and (inferred / "projects").is_dir():
+                if inferred.resolve() != pipeline_dir.resolve():
+                    print(f"Using pipeline dir from log location: {inferred}")
+                pipeline_dir = inferred
+                os.environ["PIPELINE_DIR"] = str(inferred)
 
     out = Path(args.out) if args.out else None
-    # If --since is overnight log dir, default out there
-    if out is None and args.since:
-        p = Path(args.since)
-        if p.is_dir():
-            out = p / "truth_density.md"
+    # If --since resolves to an overnight log dir, default report there
+    if out is None and log_dir is not None and log_dir.is_dir():
+        out = log_dir / "truth_density.md"
+
+    try:
+        report = build_report(
+            pipeline_dir,
+            since=args.since or None,
+            until=args.until or None,
+            metrics_summary_path=Path(args.metrics_summary) if args.metrics_summary else None,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
 
     paths = write_report_outputs(pipeline_dir, report, out_path=out)
     print(f"Report: {paths['markdown']}")

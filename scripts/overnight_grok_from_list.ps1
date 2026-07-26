@@ -7,6 +7,13 @@
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
 #   .\scripts\overnight_grok_from_list.ps1 -DoExtract          # cloud zip
 #   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # drain: resume in-flight + parked classic→grok
+#   .\scripts\overnight_grok_from_list.ps1 -FreshListOnly      # force new seeds only (even after crash)
+#
+# Traces / recovery:
+#   - goal_traces, recovery_history, consumer history are KEPT by default (never wiped here).
+#   - If the previous overnight has no clean "end ..." line (reboot/kill), this script
+#     auto-runs truth-density for that folder and defaults to resume (not fresh-list)
+#     so mid-flight projects can be recovered. Override with -FreshListOnly.
 #
 # REQUIREMENTS:
 #   - Host must stay awake (disable sleep on AC)
@@ -27,7 +34,9 @@ param(
     # Default ON (--fresh-list-only): new seeds only, not classic backlog zombies.
     # Pass -NoFreshListOnly to drain parked classic→grok conversions / in-flight resume
     # (sets CLASSIC_TO_GROK_DRAIN=1 so ladder may unpark sticky engine=grok_build BE).
-    [switch]$NoFreshListOnly
+    [switch]$NoFreshListOnly,
+    # Force fresh-list even when prior overnight was incomplete (crash/reboot).
+    [switch]$FreshListOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -92,6 +101,10 @@ $env:FIELD_SHIP_REPAIR = "1"
 $env:FIELD_SHIP_REPAIR_BACKEND = "cli"
 $env:PIPELINE_GROK_SIDECAR = "0"
 $env:PYTHONUNBUFFERED = "1"
+# Durable recovery / traces (default keep — do not wipe goal_traces or recovery history)
+if (-not $env:KEEP_GOAL_TRACES) { $env:KEEP_GOAL_TRACES = "1" }
+if (-not $env:TROUBLESHOOT_CONSUMER) { $env:TROUBLESHOOT_CONSUMER = "1" }
+if (-not $env:TROUBLESHOOT_MAX_ACTS) { $env:TROUBLESHOOT_MAX_ACTS = "2" }
 
 if (-not $env:GROK_BUILD_CMD) {
     $env:GROK_BUILD_CMD = 'C:\Users\avata\.grok\bin\grok.exe --cwd "{workspace}" --prompt-file "{prompt_file}" --always-approve --max-turns 40 --output-format plain'
@@ -118,6 +131,40 @@ $preferredOllamaModels = @(
     "llama3.2:latest"
 ) | Where-Object { $_ }
 
+# Detect incomplete prior overnight (no clean "end ..." line) → recover report + prefer resume.
+# Skip dirs already recovered: synthetic end line OR INCOMPLETE.md alone (truth_density optional).
+$incompletePrior = $null
+$logsRoot = Join-Path $PipelineDir "logs"
+if (Test-Path $logsRoot) {
+    $prior = Get-ChildItem -Path $logsRoot -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like "overnight_*" } |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 5
+    foreach ($dir in $prior) {
+        $rlog = Join-Path $dir.FullName "runner.log"
+        if (-not (Test-Path $rlog)) { continue }
+        $tail = Get-Content -Path $rlog -Tail 30 -ErrorAction SilentlyContinue
+        $hasEnd = $false
+        foreach ($line in $tail) {
+            if ($line -match '^\s*end\s+') { $hasEnd = $true; break }
+        }
+        if ($hasEnd) { continue }
+        # Already recovered once — do not stick forever on auto-resume
+        $incompleteMd = Join-Path $dir.FullName "INCOMPLETE.md"
+        if (Test-Path $incompleteMd) { continue }
+        $incompletePrior = $dir.Name
+        break
+    }
+}
+
+# Fresh-list vs resume: default fresh-list unless drain requested or crash recovery
+$useFreshList = $true
+if ($NoFreshListOnly) { $useFreshList = $false }
+if ($FreshListOnly) { $useFreshList = $true }
+if ($incompletePrior -and -not $FreshListOnly -and -not $NoFreshListOnly) {
+    $useFreshList = $false
+}
+
 $pre = [ordered]@{
     ts             = (Get-Date -Format o)
     pipeline_dir   = $PipelineDir
@@ -130,12 +177,18 @@ $pre = [ordered]@{
     backend        = $env:GROK_BUILD_BACKEND
     thin_ship      = $env:GROK_BUILD_THIN_SHIP
     plan_skills    = $env:GROK_BUILD_PLAN_SKILLS
-    fresh_list_only = (-not $NoFreshListOnly)
+    fresh_list_only = $useFreshList
+    keep_goal_traces = $env:KEEP_GOAL_TRACES
+    troubleshoot_consumer = $env:TROUBLESHOOT_CONSUMER
+    incomplete_prior_overnight = $incompletePrior
     dotenv_keys    = $envLoaded
     xai_key_set    = [bool]($env:XAI_API_KEY -or $env:GROK_API_KEY)
     ollama_models  = @()
     errors         = @()
     warnings       = @()
+}
+if ($incompletePrior) {
+    $pre.warnings += "Incomplete prior overnight '$incompletePrior' (no end line) — will recover truth-density; default resume in-flight unless -FreshListOnly"
 }
 
 # Field rework caps (accumulative; not infinite token/time on stuck ship projects)
@@ -251,6 +304,43 @@ if ($pre.errors.Count -gt 0) {
     exit 2
 }
 
+# Recover incomplete prior overnight reports before starting new run.
+# Mark recovered FIRST (synthetic end + INCOMPLETE.md) so a crash mid-report
+# does not stick auto-resume forever; then run truth-density for humans.
+if ($incompletePrior) {
+    Write-Host "Recovering reports for incomplete overnight: $incompletePrior" -ForegroundColor Yellow
+    $prevEapRec = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $priorDir = Join-Path $logsRoot $incompletePrior
+        # 1) Synthetic end line first — detection matches ^\s*end\s+
+        $priorRunnerLog = Join-Path $priorDir "runner.log"
+        if (Test-Path $priorRunnerLog) {
+            $endIso = Get-Date -Format o
+            Add-Content -Path $priorRunnerLog -Value "end $endIso exit=incomplete_recovered" -Encoding utf8
+        }
+        # 2) Human marker (alone also skips re-detection)
+        $mark = Join-Path $priorDir "INCOMPLETE.md"
+        @"
+# Incomplete overnight (recovered)
+
+- Detected at: $(Get-Date -Format o)
+- Cause: runner.log has no clean ``end ...`` line (reboot/kill/crash)
+- Truth-density: re-run via report_truth_density.py --since $incompletePrior
+- Project state under projects/ is preserved; recovery_history / goal_traces kept
+- Cleared for future overnight starts: synthetic end line + this file
+"@ | Set-Content -Path $mark -Encoding utf8
+        # 3) Best-effort report (may fail without re-sticking detection)
+        $recLog = Join-Path $logDir "recover_prior_truth_density.log"
+        & python -u scripts/report_truth_density.py --since $incompletePrior 2>&1 |
+            Tee-Object -FilePath $recLog
+    } catch {
+        Write-Host "Prior overnight recover failed: $_" -ForegroundColor Yellow
+    } finally {
+        $ErrorActionPreference = $prevEapRec
+    }
+}
+
 # P1 harness canary (HARD checks only; does not block soft n8n)
 Write-Host "Running connector canary (HARD)..."
 $canaryArgs = @("-u", "scripts/connector_canary.py", "--require-api", "--no-n8n")
@@ -260,8 +350,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 2
 }
 
+# Connector structural + process oracle smoke (HARD process oracle; durable goal_traces)
+Write-Host "Running connector smoke (structural + process oracle)..."
+$smokeArgs = @("-u", "scripts/connector_smoke.py")
+& python @smokeArgs 2>&1 | Tee-Object -FilePath (Join-Path $logDir "connector_smoke.log")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "CONNECTOR SMOKE HARD FAIL - abort overnight." -ForegroundColor Red
+    exit 2
+}
+
 if ($DryRunEnvOnly) {
-    Write-Host "DryRunEnvOnly: env frozen, canary ran, not starting runner."
+    Write-Host "DryRunEnvOnly: env frozen, canary+smoke ran, not starting runner."
     exit 0
 }
 
@@ -269,7 +368,9 @@ Write-Host ""
 Write-Host "=== Starting overnight Grok from-list (serial) ===" -ForegroundColor Cyan
 Write-Host "Log: $runnerLog"
 Write-Host "Time limit: $TimeLimitMinutes min"
+Write-Host "Fresh-list-only: $useFreshList (resume/drain when False)"
 Write-Host "Keep host AWAKE. Do not start bulk field ship."
+Write-Host "Traces kept: KEEP_GOAL_TRACES=$($env:KEEP_GOAL_TRACES) TROUBLESHOOT_CONSUMER=$($env:TROUBLESHOOT_CONSUMER)"
 Write-Host ""
 
 Set-Location $FactoryRoot
@@ -285,12 +386,12 @@ $pyArgs = @(
     "--executors", "1",
     "--time-limit", "$TimeLimitMinutes"
 )
-if (-not $NoFreshListOnly) {
+if ($useFreshList) {
     $pyArgs += "--fresh-list-only"
     # Fresh-list: do not unpark parked classic→grok converts
     if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "0" }
 } else {
-    # Drain path: allow ladder to unpark sticky classic→grok (serial, one at a time)
+    # Drain / resume path: in-flight + parked classic→grok (serial)
     if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "1" }
 }
 $pyArgs = $pyArgs + $ideaArgs
@@ -298,21 +399,42 @@ $pyArgs = $pyArgs + $ideaArgs
 $startIso = (Get-Date).ToUniversalTime().ToString("o")
 "start $startIso" | Tee-Object -FilePath $runnerLog | Out-Null
 
-$p = Start-Process -FilePath "python" -ArgumentList $pyArgs -WorkingDirectory $FactoryRoot `
-    -NoNewWindow -PassThru -RedirectStandardOutput $runnerLog -RedirectStandardError (Join-Path $logDir "runner.err.log")
-# Tee is hard with Start-Process; use Wait and then report
-Wait-Process -Id $p.Id
-$exit = $p.ExitCode
-"end $(Get-Date -Format o) exit=$exit" | Add-Content -Path $runnerLog
-
-Write-Host "Runner exit: $exit"
-
-# Morning report
-python -u scripts/overnight_report.py --since $startIso --log-dir $logDir 2>&1 | Tee-Object -FilePath (Join-Path $logDir "report_stdout.log")
+$exit = 1
+try {
+    $p = Start-Process -FilePath "python" -ArgumentList $pyArgs -WorkingDirectory $FactoryRoot `
+        -NoNewWindow -PassThru -RedirectStandardOutput $runnerLog -RedirectStandardError (Join-Path $logDir "runner.err.log")
+    Wait-Process -Id $p.Id
+    $exit = $p.ExitCode
+    if ($null -eq $exit) { $exit = 0 }
+    "end $(Get-Date -Format o) exit=$exit" | Add-Content -Path $runnerLog
+    Write-Host "Runner exit: $exit"
+} catch {
+    "end $(Get-Date -Format o) exit=error err=$_" | Add-Content -Path $runnerLog -ErrorAction SilentlyContinue
+    Write-Host "Runner wait failed: $_" -ForegroundColor Red
+    $exit = 1
+} finally {
+    # Morning hygiene always runs if we get here (not if host hard-reboots mid-Wait)
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        Write-Host "Morning report..."
+        python -u scripts/overnight_report.py --since $startIso --log-dir $logDir 2>&1 |
+            Tee-Object -FilePath (Join-Path $logDir "report_stdout.log")
+    } catch {
+        Write-Host "overnight_report failed: $_" -ForegroundColor Yellow
+    }
+    try {
+        Write-Host "Truth-density for this overnight..."
+        python -u scripts/report_truth_density.py --since (Split-Path -Leaf $logDir) 2>&1 |
+            Tee-Object -FilePath (Join-Path $logDir "truth_density_stdout.log")
+    } catch {
+        Write-Host "truth_density failed: $_" -ForegroundColor Yellow
+    }
+    $ErrorActionPreference = $prevEap
+}
 
 if ($DoExtract) {
     Write-Host "Running extract.py (may take a while) ..."
-    # Do not let $ErrorActionPreference=Stop kill the script on native stderr
     $prevEap = $ErrorActionPreference
     $ErrorActionPreference = "Continue"
     try {
@@ -333,4 +455,5 @@ if ($DoExtract) {
 Write-Host ""
 $morningPath = Join-Path $logDir "MORNING.md"
 Write-Host "Done. See $morningPath"
+Write-Host "Truth-density: $(Join-Path $logDir 'truth_density.md') (if report succeeded)"
 exit $exit

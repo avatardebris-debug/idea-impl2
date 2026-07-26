@@ -55,7 +55,12 @@ def _run_capability_step(step: WorkflowStep, context: dict[str, Any], *, force: 
     args = render_template(step.args, context).strip()
     cwd = render_template(step.cwd, context).strip()
 
-    from pipeline.capability_tools import invoke_capability
+    from pipeline.capability_tools import (
+        _is_allowed_workdir,
+        invoke_capability,
+        resolve_capability_workdir,
+        rewrite_capability_entrypoint,
+    )
 
     if force:
         # Direct invoke bypassing verified check — load row and run entrypoint
@@ -66,18 +71,33 @@ def _run_capability_step(step: WorkflowStep, context: dict[str, Any], *, force: 
             return {"ok": False, "error": f"registry missing for capability {slug}"}
         conn = _connect()
         row = conn.execute(
-            "SELECT entrypoint, cwd_template, status FROM capabilities WHERE slug = ?",
+            "SELECT entrypoint, cwd_template, status, source_project, slug, kind "
+            "FROM capabilities WHERE slug = ?",
             (slug,),
         ).fetchone()
         conn.close()
         if not row or not row["entrypoint"]:
             return {"ok": False, "error": f"capability '{slug}' has no entrypoint"}
-        entry = row["entrypoint"]
-        work_dir = PROJECT_ROOT
-        if cwd:
-            work_dir = (PROJECT_ROOT / cwd).resolve()
-        elif row["cwd_template"]:
-            work_dir = (PROJECT_ROOT / row["cwd_template"]).resolve()
+        work_dir = resolve_capability_workdir(
+            slug=str(row["slug"] or slug),
+            source_project=str(row["source_project"] or ""),
+            cwd_template=str(row["cwd_template"] or ""),
+            cwd_override=cwd or "",
+            kind=str(row["kind"] or ""),
+        )
+        if not _is_allowed_workdir(work_dir):
+            return {
+                "ok": False,
+                "error": f"cwd must stay inside project root or PIPELINE_DIR (got {work_dir})",
+                "capability": slug,
+            }
+        if not work_dir.is_dir():
+            return {
+                "ok": False,
+                "error": f"cwd does not exist: {work_dir}",
+                "capability": slug,
+            }
+        entry = rewrite_capability_entrypoint(row["entrypoint"], work_dir=work_dir)
         cmd = f"{entry} {args}".strip()
         try:
             argv = shlex.split(cmd, posix=False)

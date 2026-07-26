@@ -255,6 +255,59 @@ def _yield_to_budget(
     return state
 
 
+def _append_consumer_trace(
+    project_dir: Path,
+    *,
+    slug: str,
+    tag: str,
+    action: str,
+    primary: str,
+    fingerprint: str,
+    state: dict[str, Any],
+) -> None:
+    """Durable consume event so reboot/shutdown can reconstruct recovery path.
+
+    Appends to project recovery_history.jsonl and pipeline metrics history.
+    Never deletes prior traces (KEEP_GOAL_TRACES / default keep).
+    """
+    event = {
+        "schema": "recovery_consume.v1",
+        "ts": _utc_now(),
+        "slug": slug,
+        "tag": tag,  # acted | yielded
+        "action": action,
+        "primary_class": primary,
+        "fail_fingerprint": fingerprint,
+        "status_after": state.get("status"),
+        "prefer_thin_field": bool(state.get("prefer_thin_field")),
+        "recovery_act_count": state.get("recovery_act_count"),
+        "budget_note": (state.get("budget_note") or "")[:300],
+    }
+    try:
+        state_dir = project_dir / "state"
+        state_dir.mkdir(parents=True, exist_ok=True)
+        hist = state_dir / "recovery_history.jsonl"
+        with hist.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(
+            f"[troubleshoot_consumer] warn: recovery_history write failed for {slug}: {e}",
+            flush=True,
+        )
+    try:
+        root = get_pipeline_dir()
+        metrics = root / "metrics"
+        metrics.mkdir(parents=True, exist_ok=True)
+        pipe_hist = metrics / "troubleshoot_consumer_history.jsonl"
+        with pipe_hist.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(event, ensure_ascii=False) + "\n")
+    except Exception as e:
+        print(
+            f"[troubleshoot_consumer] warn: metrics history write failed for {slug}: {e}",
+            flush=True,
+        )
+
+
 def process_troubleshoot_project(
     project_dir: Path,
     state: dict[str, Any],
@@ -272,6 +325,12 @@ def process_troubleshoot_project(
         state["slug"] = project_dir.name
     decision = _load_decision(project_dir)
     action, primary, fp, prompt = _resolve_action_and_meta(state, decision)
+
+    # Empty fingerprint thrash: synthesize stable episode key so same-fp
+    # anti-thrash and act budget still work when gate omitted fail_fingerprint.
+    if not fp:
+        slug_key = str(state.get("slug") or state.get("_slug") or project_dir.name)
+        fp = f"no_fp:{slug_key}:{action or 'none'}:{primary or 'none'}"
 
     # Episode tracking: new fingerprint → fresh act budget
     episode_fp = str(state.get("recovery_episode_fingerprint") or "")
@@ -391,6 +450,35 @@ def process_troubleshoot_project(
     return state, "acted"
 
 
+def _record_consume(
+    project_dir: Path,
+    state: dict[str, Any],
+    tag: str,
+) -> None:
+    slug = str(state.get("slug") or state.get("_slug") or project_dir.name)
+    action = str(
+        state.get("last_recovery_consumed_action")
+        or state.get("recovery_yield_action")
+        or state.get("last_recovery_action")
+        or ""
+    )
+    primary = str(state.get("last_recovery_class") or "")
+    fp = str(
+        state.get("recovery_acted_fingerprint")
+        or state.get("recovery_episode_fingerprint")
+        or ""
+    )
+    _append_consumer_trace(
+        project_dir,
+        slug=slug,
+        tag=tag,
+        action=action,
+        primary=primary,
+        fingerprint=fp,
+        state=state,
+    )
+
+
 def tick_troubleshoot_recovery(
     pipeline_dir: Path | None = None,
     bus: Any = None,
@@ -434,6 +522,11 @@ def tick_troubleshoot_recovery(
         try:
             new_st, tag = process_troubleshoot_project(d, st, bus=bus)
             _write_state(sf, new_st)
+            # Durable consume trace (survives runner kill / reboot)
+            try:
+                _record_consume(d, new_st, tag)
+            except Exception:
+                pass
             action = (
                 new_st.get("last_recovery_consumed_action")
                 or new_st.get("recovery_yield_action")

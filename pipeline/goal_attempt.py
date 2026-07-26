@@ -10,7 +10,6 @@ from typing import Any
 from pipeline.goal_backlog import mark_goal_achieved
 from pipeline.goal_tree import (
     GoalBranch,
-    GoalTree,
     completion_branches,
     goals_dir,
     load_goal_tree,
@@ -91,6 +90,10 @@ def attempt_goal(
 
 
 def _attempt_capability(branch: GoalBranch) -> dict[str, Any]:
+    """Capability path via thin goal policy (reuse | compose | build | yield).
+
+    Always writes goal_trace.v1 (durable; survives runner shutdown).
+    """
     bid = branch.id or "?"
     text = branch.description or branch.subgoal or ""
     try:
@@ -99,19 +102,96 @@ def _attempt_capability(branch: GoalBranch) -> dict[str, Any]:
         if legacy_mode():
             return {"branch": bid, "status": "skipped", "reason": "legacy_mode"}
         from pipeline.capability_router import route_task
-        from pipeline.capability_tools import invoke_capability
+        from pipeline.goal_policy import (
+            POLICY_BUILD,
+            POLICY_COMPOSE,
+            POLICY_REUSE,
+            POLICY_YIELD,
+            append_policy_history,
+            classify_goal_branch,
+            execute_policy,
+        )
 
-        hits = route_task(text, limit=3)
-        for hit in hits:
-            if not hit.get("requires_ok"):
-                continue
-            slug = hit.get("slug", "")
-            if not slug:
-                continue
-            out = invoke_capability(slug, args="")
-            if out.startswith("OK (exit 0)"):
-                return {"branch": bid, "status": "achieved", "capability": slug, "output": out[:500]}
-        return {"branch": bid, "status": "failed", "reason": "no invokable capability"}
+        hits = route_task(text, limit=5) if text else []
+        requires = list(getattr(branch, "requires", None) or [])
+        decision = classify_goal_branch(
+            branch_type=str(branch.type or "capability"),
+            text=text,
+            requires=requires,
+            hermes_prompt=str(getattr(branch, "hermes_prompt", "") or ""),
+            route_hits=hits if isinstance(hits, list) else [],
+        )
+        exec_out = execute_policy(
+            decision,
+            goal_text=text or f"branch {bid}",
+            branch_id=bid,
+        )
+        try:
+            append_policy_history(
+                {
+                    "branch": bid,
+                    "policy": decision.policy,
+                    "reason": decision.reason,
+                    "status": exec_out.get("status"),
+                    "goal_trace_id": exec_out.get("goal_id"),
+                    "capability": decision.capability_slug,
+                    "connector": decision.connector_slug,
+                }
+            )
+        except Exception:
+            pass
+
+        status = str(exec_out.get("status") or "failed")
+        if decision.policy == POLICY_REUSE and status == "achieved":
+            return {
+                "branch": bid,
+                "status": "achieved",
+                "policy": POLICY_REUSE,
+                "capability": exec_out.get("capability") or decision.capability_slug,
+                "output": (exec_out.get("output") or "")[:500],
+                "goal_trace_id": exec_out.get("goal_id"),
+            }
+        if decision.policy == POLICY_COMPOSE and status == "achieved":
+            return {
+                "branch": bid,
+                "status": "achieved",
+                "policy": POLICY_COMPOSE,
+                "connector": exec_out.get("connector") or decision.connector_slug,
+                "output": (exec_out.get("output") or "")[:500],
+                "goal_trace_id": exec_out.get("goal_id"),
+            }
+        if decision.policy == POLICY_COMPOSE:
+            return {
+                "branch": bid,
+                "status": "failed",
+                "policy": POLICY_COMPOSE,
+                "reason": exec_out.get("reason") or "compose deeper_work_needed",
+                "connector": decision.connector_slug,
+                "goal_trace_id": exec_out.get("goal_id"),
+            }
+        if decision.policy == POLICY_BUILD:
+            return {
+                "branch": bid,
+                "status": "failed",
+                "policy": POLICY_BUILD,
+                "reason": "build_needed",
+                "goal_trace_id": exec_out.get("goal_id"),
+            }
+        if decision.policy == POLICY_YIELD:
+            return {
+                "branch": bid,
+                "status": "failed",
+                "policy": POLICY_YIELD,
+                "reason": decision.reason,
+                "goal_trace_id": exec_out.get("goal_id"),
+            }
+        return {
+            "branch": bid,
+            "status": "failed",
+            "policy": decision.policy,
+            "reason": exec_out.get("reason") or decision.reason,
+            "goal_trace_id": exec_out.get("goal_id"),
+        }
     except Exception as exc:
         return {"branch": bid, "status": "failed", "reason": str(exc)}
 

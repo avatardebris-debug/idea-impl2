@@ -15,6 +15,8 @@ open questions that should not clutter `master_ideas.md`, `mission.yaml`, or `CO
 | [2026-07-22-overnight-grok-from-list-runbook.md](./2026-07-22-overnight-grok-from-list-runbook.md) | P0 overnight Grok from-list runbook |
 | [2026-07-22-p1-held-out-and-goal-traces.md](./2026-07-22-p1-held-out-and-goal-traces.md) | P1 held-out suite + goal_trace plan |
 | [2026-07-23-budget-ladder-trust-and-status.md](./2026-07-23-budget-ladder-trust-and-status.md) | Ladder, trust vision, **§7: workflow vs Grok Workflows (Rhai) earn order** |
+| [agi-lmaooo.md](./agi-lmaooo.md) | **North star:** capability graph → lego factories (software/connector/skill/MCP); goal policy; scale simple→complex |
+| [2026-07-26-comprehensive-codebase-review.md](./2026-07-26-comprehensive-codebase-review.md) | Full factory audit: path/cwd High bug, overnight resume stickiness, test evidence |
 
 Add new notes as `YYYY-MM-DD-short-slug.md`. Do not treat this folder as something the
 overnight pipeline must read unless we explicitly wire it later.

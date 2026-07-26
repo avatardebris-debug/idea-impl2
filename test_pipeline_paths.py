@@ -136,3 +136,143 @@ def test_agent_modules_importable() -> None:
     assert ExecutorAgent.role == "executor"
     assert ReviewerAgent.role == "reviewer"
     assert ValidatorAgent.role == "validator"
+
+
+def test_resolve_capability_workdir_under_pipeline_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path,
+) -> None:
+    """Legacy .pipeline/projects/... cwd_template must resolve under PIPELINE_DIR."""
+    pipeline = tmp_path / "thepipeline"
+    ws = pipeline / "projects" / "demo_tool" / "workspace"
+    ws.mkdir(parents=True)
+    (ws / "cli.py").write_text("print('ok')\n", encoding="utf-8")
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import PROJECT_ROOT, reload_pipeline_dir
+    from pipeline.capability_tools import (
+        _is_allowed_workdir,
+        resolve_capability_workdir,
+        rewrite_capability_entrypoint,
+    )
+
+    reload_pipeline_dir()
+
+    # Prefer known slug workspace under pipeline even when template points at factory layout
+    work = resolve_capability_workdir(
+        slug="demo_tool",
+        source_project="demo_tool",
+        cwd_template=".pipeline/projects/demo_tool/workspace",
+        kind="project",
+    )
+    assert work == ws.resolve()
+    assert _is_allowed_workdir(work)
+
+    # Template alone (no slug) rewrites .pipeline/projects → PIPELINE_DIR/projects
+    work2 = resolve_capability_workdir(
+        cwd_template=".pipeline/projects/demo_tool/workspace",
+    )
+    assert work2 == ws.resolve()
+
+    # projects/... relative template
+    work3 = resolve_capability_workdir(
+        cwd_template="projects/demo_tool/workspace",
+    )
+    assert work3 == ws.resolve()
+
+    # Entrypoint rewrite from factory-style path
+    entry = rewrite_capability_entrypoint(
+        "python .pipeline/projects/demo_tool/workspace/cli.py",
+        work_dir=work,
+    )
+    assert str(ws).replace("\\", "/") in entry.replace("\\", "/") or "demo_tool" in entry
+    assert ".pipeline/projects" not in entry.replace("\\", "/")
+
+    # Explicit override relative to pipeline
+    work4 = resolve_capability_workdir(
+        slug="demo_tool",
+        cwd_override="projects/demo_tool/workspace",
+    )
+    assert work4 == ws.resolve()
+
+    # Factory PROJECT_ROOT alone must NOT be the only allowed root
+    assert work != (PROJECT_ROOT / ".pipeline" / "projects" / "demo_tool" / "workspace")
+
+    # shared_lib: honor absolute shared_libs cwd even when source_project workspace exists
+    shared = pipeline / "shared_libs" / "util"
+    shared.mkdir(parents=True)
+    work_shared = resolve_capability_workdir(
+        slug="shared_util",
+        source_project="demo_tool",
+        cwd_template=str(shared),
+        kind="shared_lib",
+    )
+    assert work_shared == shared.resolve()
+
+    # workspace-relative entrypoint unchanged
+    assert rewrite_capability_entrypoint("python cli.py", work_dir=work) == "python cli.py"
+
+    # absolute under PIPELINE_DIR not mangled
+    abs_cli = (ws / "cli.py").resolve()
+    entry_abs = rewrite_capability_entrypoint(f"python {abs_cli}", work_dir=work)
+    assert str(abs_cli) in entry_abs or abs_cli.as_posix() in entry_abs.replace("\\", "/")
+
+    # unrelated .../projects/... absolute path not rewritten into PIPELINE_DIR
+    foreign = (tmp_path / "code" / "projects" / "other" / "cli.py").resolve()
+    foreign.parent.mkdir(parents=True)
+    foreign.write_text("x\n", encoding="utf-8")
+    entry_foreign = rewrite_capability_entrypoint(f"python {foreign}")
+    assert str(pipeline.resolve()) not in entry_foreign
+    assert str(foreign) in entry_foreign or foreign.as_posix() in entry_foreign.replace("\\", "/")
+
+    # disallowed absolute cwd
+    outside = tmp_path / "outside_root"
+    outside.mkdir()
+    assert not _is_allowed_workdir(outside)
+
+
+def test_resolve_pipeline_dir_prefers_home_factory_when_nested_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path,
+) -> None:
+    """When nested .pipeline has few projects but home factory has many, prefer home."""
+    from pipeline import pipeline_config
+    from pipeline.pipeline_config import resolve_pipeline_dir
+
+    # Explicit env always wins
+    out = tmp_path / "explicit"
+    (out / "projects").mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(out))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    assert resolve_pipeline_dir() == out.resolve()
+
+    # Controlled factory root: no real sibling thepipeline interference
+    fake_root = tmp_path / "factory_repo"
+    fake_root.mkdir()
+    nested = fake_root / ".pipeline"
+    (nested / "projects" / "lonely").mkdir(parents=True)  # nested_n = 1
+
+    fake_home = tmp_path / "home"
+    home_factory = fake_home / "aicompete" / "thepipeline"
+    for name in ("a", "b", "c"):
+        (home_factory / "projects" / name).mkdir(parents=True)  # home_n = 3
+
+    monkeypatch.setattr(pipeline_config, "PROJECT_ROOT", fake_root.resolve())
+    monkeypatch.setattr(
+        pipeline_config.pathlib.Path,
+        "home",
+        lambda *a, **k: fake_home,
+    )
+
+    # Cloud mode forces nested .pipeline under (patched) PROJECT_ROOT
+    monkeypatch.delenv("PIPELINE_DIR", raising=False)
+    monkeypatch.setenv("PIPELINE_CLOUD", "1")
+    assert resolve_pipeline_dir() == nested.resolve()
+
+    # Home-factory preference when nested is empty-ish and cloud off
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    assert resolve_pipeline_dir() == home_factory.resolve()
+
+    # Sibling thepipeline with projects still wins over home
+    sibling = fake_root.parent / "thepipeline"
+    (sibling / "projects" / "sib").mkdir(parents=True)
+    assert resolve_pipeline_dir() == sibling.resolve()

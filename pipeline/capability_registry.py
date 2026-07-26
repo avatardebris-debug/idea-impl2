@@ -116,16 +116,37 @@ def _project_status(state: dict) -> tuple[str, int, int]:
 
 
 def _find_cli_entry(workspace: pathlib.Path, slug: str) -> tuple[str, str]:
-    """Return (entrypoint, example_invoke)."""
+    """Return (entrypoint, example_invoke).
+
+    Prefer paths relative to *workspace* (``python cli.py``) so invoke with
+    ``cwd_template=projects/<slug>/workspace`` works under PIPELINE_DIR.
+    Fall back to pipeline-root-relative ``projects/...`` paths, never factory
+    ``.pipeline/projects/...`` under PROJECT_ROOT alone.
+    """
     candidates = [
         workspace / "cli.py",
         workspace / slug / "cli.py",
         workspace / slug.replace("_", "") / "cli.py",
     ]
+    pipe = get_pipeline_dir()
     for c in candidates:
-        if c.is_file():
+        if not c.is_file():
+            continue
+        try:
+            rel_ws = c.relative_to(workspace).as_posix()
+            return f"python {rel_ws}", f"python {rel_ws} --help"
+        except ValueError:
+            pass
+        try:
+            rel_pipe = c.relative_to(pipe).as_posix()
+            return f"python {rel_pipe}", f"python {rel_pipe} --help"
+        except ValueError:
+            pass
+        try:
             rel = c.relative_to(PROJECT_ROOT).as_posix()
             return f"python {rel}", f"python {rel} --help"
+        except ValueError:
+            return f"python {c}", f"python {c} --help"
     pyproject = workspace / "pyproject.toml"
     if pyproject.is_file():
         text = pyproject.read_text(encoding="utf-8", errors="ignore")
@@ -138,11 +159,17 @@ def _find_cli_entry(workspace: pathlib.Path, slug: str) -> tuple[str, str]:
     return "", ""
 
 
+def _project_cwd_template(slug: str) -> str:
+    """cwd_template relative to PIPELINE_DIR (not factory .pipeline)."""
+    return f"projects/{slug}/workspace"
+
+
 def _scan_projects(conn: sqlite3.Connection) -> int:
     n = 0
-    if not PROJECTS_DIR.exists():
+    pdir = projects_dir()
+    if not pdir.exists():
         return 0
-    for proj in PROJECTS_DIR.iterdir():
+    for proj in pdir.iterdir():
         if not proj.is_dir():
             continue
         slug = proj.name
@@ -180,7 +207,7 @@ def _scan_projects(conn: sqlite3.Connection) -> int:
                 desc[:300],
                 json.dumps(domains),
                 entry,
-                f".pipeline/projects/{slug}/workspace",
+                _project_cwd_template(slug),
                 json.dumps(deps),
                 example,
                 slug,
@@ -226,7 +253,7 @@ def register_hermes_capability(
             title.strip("[] "),
             status,
             desc,
-            str(GOALS_DIR),
+            str(goals_dir()),
             example,
             _now(),
         ),
@@ -381,7 +408,7 @@ def register_shared_lib_capability(
             status,
             purpose or f"Promoted from {source_project or 'review'}",
             import_path,
-            str(SHARED_LIBS_DIR),
+            str(shared_libs_dir()),
             f"# from shared_libs.{component_name}",
             source_project,
             _now(),
@@ -394,9 +421,10 @@ def register_shared_lib_capability(
 
 def _scan_shared_libs(conn: sqlite3.Connection) -> int:
     n = 0
-    if not SHARED_LIBS_DIR.exists():
+    sdir = shared_libs_dir()
+    if not sdir.exists():
         return 0
-    for d in SHARED_LIBS_DIR.iterdir():
+    for d in sdir.iterdir():
         if not d.is_dir() or d.name.startswith("."):
             continue
         slug = f"shared_{d.name}"
@@ -422,9 +450,9 @@ def _scan_shared_libs(conn: sqlite3.Connection) -> int:
             (
                 slug,
                 f"shared_lib:{d.name}",
-                f"Promoted shared library at .pipeline/shared_libs/{d.name}/",
+                f"Promoted shared library at shared_libs/{d.name}/",
                 import_path,
-                str(SHARED_LIBS_DIR),
+                str(sdir),
                 example,
                 _now(),
             ),
@@ -473,7 +501,7 @@ def refresh_capability(slug: str) -> bool:
     """Upsert one project row after completion. No-op in legacy mode."""
     if legacy_mode():
         return False
-    proj = PROJECTS_DIR / slug
+    proj = projects_dir() / slug
     state_file = proj / "state" / "current_idea.json"
     if not state_file.exists():
         return False
@@ -509,7 +537,7 @@ def refresh_capability(slug: str) -> bool:
             desc[:300],
             json.dumps(domains),
             entry,
-            f".pipeline/projects/{slug}/workspace",
+            _project_cwd_template(slug),
             json.dumps(deps),
             example,
             slug,
@@ -530,10 +558,11 @@ def refresh_capability(slug: str) -> bool:
 
 
 def _prune_orphan_capabilities(conn: sqlite3.Connection) -> int:
-    """Remove project rows (and edges) when .pipeline/projects/<slug>/ is gone."""
+    """Remove project rows (and edges) when projects/<slug>/ is gone under PIPELINE_DIR."""
     live: set[str] = set()
-    if PROJECTS_DIR.exists():
-        for p in PROJECTS_DIR.iterdir():
+    pdir = projects_dir()
+    if pdir.exists():
+        for p in pdir.iterdir():
             if p.is_dir() and (p / "state" / "current_idea.json").exists():
                 live.add(p.name)
     removed = 0
@@ -663,8 +692,9 @@ def write_capabilities_md() -> None:
             lines.append(f"  - example: `{row['example_invoke']}`")
         lines.append("")
 
-    CAPABILITIES_MD.parent.mkdir(parents=True, exist_ok=True)
-    CAPABILITIES_MD.write_text("\n".join(lines), encoding="utf-8")
+    cap_md = capabilities_md()
+    cap_md.parent.mkdir(parents=True, exist_ok=True)
+    cap_md.write_text("\n".join(lines), encoding="utf-8")
 
 
 def capabilities_summary(
@@ -716,9 +746,17 @@ def capabilities_summary(
     if not rows:
         return ""
 
+    cap_md = capabilities_md()
+    try:
+        cap_label = str(cap_md.relative_to(PROJECT_ROOT))
+    except ValueError:
+        try:
+            cap_label = str(cap_md.relative_to(get_pipeline_dir()))
+        except ValueError:
+            cap_label = str(cap_md)
     parts = [
         "## Capability registry (reuse before building)",
-        f"Full catalog: `{CAPABILITIES_MD.relative_to(PROJECT_ROOT)}`",
+        f"Full catalog: `{cap_label}`",
         "",
     ]
     for row in rows:

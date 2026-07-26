@@ -43,6 +43,62 @@ def test_resolve_run_window_from_preflight(tmp_path, monkeypatch):
     assert window.source.startswith("preflight") or "overnight" in window.source or "log" in window.source
 
 
+def test_resolve_run_window_bare_overnight_name(tmp_path):
+    """--since overnight_YYYYMMDD_HHMMSS resolves under pipeline_dir/logs/."""
+    from pipeline.truth_density import resolve_since_path
+
+    name = "overnight_20260724_233953"
+    log_dir = tmp_path / "logs" / name
+    log_dir.mkdir(parents=True)
+    pre = {"ts": "2026-07-24T23:39:53-05:00", "time_limit_min": 300}
+    (log_dir / "preflight.json").write_text(json.dumps(pre), encoding="utf-8")
+    (log_dir / "runner.log").write_text("done\n", encoding="utf-8")
+
+    assert resolve_since_path(tmp_path, name) is not None
+    window = resolve_run_window(pipeline_dir=tmp_path, since=name)
+    assert window.time_limit_min == 300
+    assert "preflight" in window.source
+
+
+def test_resolve_since_path_finds_other_candidate_root(tmp_path, monkeypatch):
+    """Bare overnight name resolves under ~/aicompete/thepipeline even if primary is empty."""
+    from pipeline.truth_density import (
+        pipeline_dir_from_log_dir,
+        resolve_since_path,
+    )
+
+    primary = tmp_path / "worktree_pipeline"
+    primary.mkdir()
+    (primary / "logs").mkdir()
+    # No overnight folder under primary
+
+    factory = tmp_path / "aicompete" / "thepipeline"
+    name = "overnight_20260725_062931"
+    log_dir = factory / "logs" / name
+    log_dir.mkdir(parents=True)
+    (log_dir / "preflight.json").write_text(
+        json.dumps({"ts": "2026-07-25T06:29:31-05:00", "time_limit_min": 180}),
+        encoding="utf-8",
+    )
+    (factory / "projects").mkdir()
+
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    found = resolve_since_path(primary, name)
+    assert found is not None
+    assert found == log_dir.resolve()
+    inferred = pipeline_dir_from_log_dir(found)
+    assert inferred == factory.resolve()
+
+
+def test_pipeline_dir_from_log_dir(tmp_path):
+    from pipeline.truth_density import pipeline_dir_from_log_dir
+
+    log_dir = tmp_path / "logs" / "overnight_demo"
+    log_dir.mkdir(parents=True)
+    assert pipeline_dir_from_log_dir(log_dir) == tmp_path.resolve()
+    assert pipeline_dir_from_log_dir(tmp_path / "not_logs" / "x") is None
+
 def _write_project(root: Path, slug: str, status: str, proven_at: str | None = None):
     d = root / "projects" / slug / "state"
     d.mkdir(parents=True)

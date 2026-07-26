@@ -2,6 +2,11 @@
 goal_trace.v1 — structured goal reasoning traces for FT / always-on later.
 
 Store: {PIPELINE_DIR}/goal_traces/{goal_id}.json and append-only jsonl.
+
+KEEP_GOAL_TRACES (env):
+  Default **true** when unset (1/true/yes/on or missing).
+  Set to 0/false/no/off to skip writing new goal traces and history appends.
+  In-memory trace dicts still update so callers can use goal_id/status.
 """
 
 from __future__ import annotations
@@ -12,15 +17,28 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from pipeline.env_flags import env_bool
 from pipeline.paths import get_pipeline_dir
 
 
 SCHEMA = "goal_trace.v1"
 
 
-def goal_traces_dir() -> Path:
+def keep_goal_traces() -> bool:
+    """Honor KEEP_GOAL_TRACES; default on when unset."""
+    return env_bool("KEEP_GOAL_TRACES", default=True)
+
+
+def goal_traces_dir(*, ensure: bool | None = None) -> Path:
+    """Return goal_traces directory. Mkdir only when writing (KEEP_GOAL_TRACES on).
+
+    *ensure*: if True, always mkdir; if False, never mkdir; if None (default),
+    mkdir only when keep_goal_traces() is True.
+    """
     d = get_pipeline_dir() / "goal_traces"
-    d.mkdir(parents=True, exist_ok=True)
+    do_mkdir = keep_goal_traces() if ensure is None else ensure
+    if do_mkdir:
+        d.mkdir(parents=True, exist_ok=True)
     return d
 
 
@@ -109,25 +127,33 @@ def finalize_trace(
 
 
 def trace_path(goal_id: str) -> Path:
-    return goal_traces_dir() / f"{goal_id}.json"
+    """Path for a goal id; does not create the directory (read-friendly)."""
+    return goal_traces_dir(ensure=False) / f"{goal_id}.json"
 
 
-def save_trace(trace: dict[str, Any]) -> Path:
+def save_trace(trace: dict[str, Any]) -> Path | None:
+    """Persist per-goal JSON. No-op (returns None) when KEEP_GOAL_TRACES is off."""
+    if not keep_goal_traces():
+        return None
     gid = str(trace.get("goal_id") or "unknown")
-    path = trace_path(gid)
+    # ensure=True: we already know flag is on
+    path = goal_traces_dir(ensure=True) / f"{gid}.json"
     path.write_text(json.dumps(trace, indent=2), encoding="utf-8")
     return path
 
 
 def load_trace(goal_id: str) -> dict[str, Any] | None:
-    path = trace_path(goal_id)
+    path = goal_traces_dir(ensure=False) / f"{goal_id}.json"
     if not path.is_file():
         return None
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def append_jsonl(trace: dict[str, Any]) -> Path:
-    path = goal_traces_dir() / "traces.jsonl"
+def append_jsonl(trace: dict[str, Any]) -> Path | None:
+    """Append to traces.jsonl. No-op when KEEP_GOAL_TRACES is off."""
+    if not keep_goal_traces():
+        return None
+    path = goal_traces_dir(ensure=True) / "traces.jsonl"
     with path.open("a", encoding="utf-8") as f:
         f.write(json.dumps(trace, ensure_ascii=False) + "\n")
     return path

@@ -80,6 +80,28 @@ def test_consumer_enabled_default_on(monkeypatch):
     assert troubleshoot_consumer_enabled() is False
 
 
+def test_consumer_writes_durable_history(tmp_path, monkeypatch):
+    """Consume act appends recovery_history + pipeline metrics (reboot-safe)."""
+    monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    try:
+        from pipeline.paths import reload_pipeline_dir
+
+        reload_pipeline_dir()
+    except Exception:
+        pass
+    p = _proj(tmp_path, action=ACTION_THIN_FIELD_RETRY)
+    n = tick_troubleshoot_recovery(tmp_path, limit=1)
+    assert n == 1
+    hist = p / "state" / "recovery_history.jsonl"
+    assert hist.is_file()
+    lines = [json.loads(x) for x in hist.read_text(encoding="utf-8").splitlines() if x.strip()]
+    consume = [r for r in lines if r.get("schema") == "recovery_consume.v1"]
+    assert consume, "expected recovery_consume.v1 line"
+    assert consume[-1]["tag"] in ("acted", "yielded")
+    pipe_hist = tmp_path / "metrics" / "troubleshoot_consumer_history.jsonl"
+    assert pipe_hist.is_file()
+
+
 def test_fix_gate_only_rearms_prefer_thin(tmp_path: Path, monkeypatch):
     monkeypatch.setenv("TROUBLESHOOT_CONSUMER", "1")
     p = _proj(tmp_path, action=ACTION_FIX_GATE_ONLY, fingerprint="fgate1")
@@ -511,3 +533,44 @@ def test_empty_fingerprint_max_acts_bound(tmp_path: Path, monkeypatch):
     out = _load(p)
     assert out.get("status") == "budget_exceeded"
     assert "max_acts" in (out.get("budget_note") or "")
+
+
+def test_empty_fingerprint_synthesized_for_same_fp_anti_thrash(
+    tmp_path: Path, monkeypatch,
+):
+    """Empty fail_fingerprint becomes no_fp:{slug}:{action}:... so second act yields."""
+    monkeypatch.setenv("TROUBLESHOOT_CONSUMER", "1")
+    monkeypatch.setenv("TROUBLESHOOT_MAX_ACTS", "5")
+    p = _proj(
+        tmp_path,
+        slug="empty_fp_proj",
+        action=ACTION_THIN_FIELD_RETRY,
+        fingerprint="",
+        primary=CLASS_SPIN_NO_PROGRESS,
+    )
+    dec = json.loads((p / "state" / "recovery_decision.json").read_text(encoding="utf-8"))
+    dec["fail_fingerprint"] = ""
+    (p / "state" / "recovery_decision.json").write_text(
+        json.dumps(dec), encoding="utf-8"
+    )
+
+    # First tick: cheap act with synthesized fingerprint
+    n1 = tick_troubleshoot_recovery(tmp_path, limit=1)
+    assert n1 == 1
+    out1 = _load(p)
+    assert out1.get("prefer_thin_field") is True
+    syn = out1.get("recovery_acted_fingerprint") or ""
+    assert syn.startswith("no_fp:empty_fp_proj:")
+    assert ACTION_THIN_FIELD_RETRY in syn
+    assert out1.get("recovery_act_count") == 1
+
+    # Simulate ship stall again with same empty decision → same synthetic key → yield
+    out1["status"] = "ship_insufficient"
+    out1["prefer_thin_field"] = False
+    (p / "state" / "current_idea.json").write_text(json.dumps(out1), encoding="utf-8")
+
+    n2 = tick_troubleshoot_recovery(tmp_path, limit=1)
+    assert n2 == 1
+    out2 = _load(p)
+    assert out2.get("status") == "budget_exceeded"
+    assert "same_fingerprint_after_act" in (out2.get("budget_note") or "")

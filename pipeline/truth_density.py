@@ -7,7 +7,6 @@ import os
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
 
 
 def parse_iso_to_utc(s: str) -> datetime:
@@ -34,6 +33,114 @@ def wall_clock_hours(start: datetime, end: datetime) -> float:
     if end < start:
         return 0.0
     return (end - start).total_seconds() / 3600.0
+
+
+def candidate_pipeline_dirs(primary: Path) -> list[Path]:
+    """Ordered unique roots that may hold factory logs/projects.
+
+    Worktrees under ``.grok/worktrees/...`` often resolve ``get_pipeline_dir()``
+    to a local ``.pipeline`` with few projects, while overnight runs write under
+    ``~/aicompete/thepipeline``. Search both (and a few common layouts).
+    """
+    roots: list[Path] = []
+
+    def add(p: Path | None) -> None:
+        if p is None:
+            return
+        try:
+            r = p.expanduser().resolve()
+        except OSError:
+            r = Path(p)
+        key = str(r)
+        if any(str(existing) == key for existing in roots):
+            return
+        roots.append(r)
+
+    add(Path(primary))
+    env = (os.environ.get("PIPELINE_DIR") or "").strip()
+    if env:
+        add(Path(env))
+    try:
+        from pipeline.pipeline_config import PROJECT_ROOT
+
+        add(PROJECT_ROOT / ".pipeline")
+        add(PROJECT_ROOT.parent / "thepipeline")
+        # Walk up a few parents looking for sibling thepipeline (worktrees)
+        cur = PROJECT_ROOT
+        for _ in range(5):
+            add(cur.parent / "thepipeline")
+            if cur.parent == cur:
+                break
+            cur = cur.parent
+    except Exception:
+        pass
+    home = Path.home()
+    add(home / "aicompete" / "thepipeline")
+    add(home / "aicompete" / "idea impl" / ".pipeline")
+    return roots
+
+
+def pipeline_dir_from_log_dir(log_dir: Path) -> Path | None:
+    """If *log_dir* is ``{pipeline}/logs/{name}``, return the pipeline root."""
+    try:
+        p = log_dir.resolve()
+    except OSError:
+        p = Path(log_dir)
+    if p.parent.name.lower() == "logs":
+        root = p.parent.parent
+        if root.is_dir():
+            return root
+    return None
+
+
+def resolve_since_path(pipeline_dir: Path, since: str) -> Path | None:
+    """Resolve --since to an overnight log directory if it names a folder.
+
+    Accepts absolute paths, relative paths, or bare names like
+    ``overnight_20260724_233953`` (looked up under ``{pipeline_dir}/logs/``
+    and other candidate factory roots — e.g. ``~/aicompete/thepipeline/logs/``).
+    """
+    text = (since or "").strip()
+    if not text:
+        return None
+    candidates: list[Path] = [
+        Path(text),
+        Path(text).expanduser(),
+        Path.cwd() / text,
+        Path.cwd() / "logs" / text,
+    ]
+    for root in candidate_pipeline_dirs(pipeline_dir):
+        candidates.append(root / text)
+        candidates.append(root / "logs" / text)
+    # de-dupe while preserving order
+    seen: set[str] = set()
+    for p in candidates:
+        try:
+            key = str(p.resolve()) if p.exists() else str(p)
+        except OSError:
+            key = str(p)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            if p.is_dir():
+                return p.resolve()
+        except OSError:
+            continue
+    return None
+
+
+def tried_log_locations(pipeline_dir: Path, since: str) -> list[str]:
+    """Human-readable log dirs checked for a bare overnight name."""
+    text = (since or "").strip()
+    locs: list[str] = []
+    for root in candidate_pipeline_dirs(pipeline_dir):
+        s = str(root / "logs")
+        if s not in locs:
+            locs.append(s)
+    if text:
+        locs.append(f"(also absolute/relative: {text})")
+    return locs
 
 
 @dataclass
@@ -76,8 +183,8 @@ def resolve_run_window(
         end = parse_iso_to_utc(until)
 
     if since:
-        p = Path(since)
-        if p.is_dir():
+        p = resolve_since_path(pipeline_dir, since)
+        if p is not None and p.is_dir():
             pre_path = p / "preflight.json"
             if pre_path.is_file():
                 try:
@@ -99,8 +206,20 @@ def resolve_run_window(
                 start = datetime.fromtimestamp(p.stat().st_mtime, tz=timezone.utc)
                 source = source or f"dir:{p.name}"
         else:
-            start = parse_iso_to_utc(since)
-            source = "cli_since"
+            try:
+                start = parse_iso_to_utc(since)
+                source = "cli_since"
+            except ValueError as exc:
+                tried = ", ".join(tried_log_locations(pipeline_dir, since))
+                home_ex = Path.home() / "aicompete" / "thepipeline" / "logs" / (
+                    since if since.startswith("overnight_") else "overnight_YYYYMMDD_HHMMSS"
+                )
+                raise ValueError(
+                    f"Invalid --since {since!r}: not an existing log directory "
+                    f"(tried under {tried}) and not a valid ISO timestamp. "
+                    f"Example: --since overnight_20260724_233953 "
+                    f"or --since {home_ex}"
+                ) from exc
 
     if start is None:
         # activity.jsonl last runner_start

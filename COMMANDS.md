@@ -508,6 +508,18 @@ python scripts/connector_canary.py --cli-smoke --api-smoke --require-api
 # Report: $PIPELINE_DIR/metrics/connector_canary_latest.md
 # Plan: notes/2026-07-22-p1-held-out-and-goal-traces.md
 
+# Connector smoke + process oracle + goal_trace.v1 (per case under goal_traces/):
+# Structural YAML under workflows/connectors/ + hard-coded producer→consumer receipt oracle.
+python scripts/connector_smoke.py
+python scripts/connector_smoke.py --slug movie_chain_n8n
+python scripts/connector_smoke.py --execute              # soft: try run_workflow force/native
+python scripts/connector_smoke.py --oracle-only
+# Report: $PIPELINE_DIR/metrics/connector_smoke_latest.{md,json}
+# Traces: $PIPELINE_DIR/goal_traces/*.json (+ traces.jsonl)
+# Overnight preflight runs canary + connector_smoke; keeps goal_traces by default.
+# After reboot: incomplete prior overnight auto truth-density + resume (unless -FreshListOnly).
+# Vision: notes/agi-lmaooo.md  |  Goal policy: reuse|compose|build|research (goal_policy.py)
+
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py
 python scripts/run_held_out.py --json

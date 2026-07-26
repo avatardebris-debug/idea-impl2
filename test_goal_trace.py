@@ -26,6 +26,7 @@ def test_sandbox_file_exists_goal(tmp_path, monkeypatch):
 
 def test_append_and_finalize_failed(tmp_path, monkeypatch):
     monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
     try:
         from pipeline.paths import reload_pipeline_dir
 
@@ -37,3 +38,23 @@ def test_append_and_finalize_failed(tmp_path, monkeypatch):
     out = goal_trace.finalize_trace(tr, status="goal_failed", oracle={"name": "x", "pass": False})
     assert out["status"] == "goal_failed"
     assert out["train_weight"] == 0.1
+
+
+def test_keep_goal_traces_false_no_disk(tmp_path, monkeypatch):
+    monkeypatch.setenv("PIPELINE_DIR", str(tmp_path))
+    monkeypatch.setenv("KEEP_GOAL_TRACES", "false")
+    try:
+        from pipeline.paths import reload_pipeline_dir
+
+        reload_pipeline_dir()
+    except Exception:
+        pass
+    assert goal_trace.keep_goal_traces() is False
+    tr = goal_trace.start_trace("skip write", mode="sandbox")
+    goal_trace.append_event(tr, type="think", content="x")
+    goal_trace.finalize_trace(tr, status="goal_proven", oracle={"name": "x", "pass": True})
+    assert tr["status"] == "goal_proven"
+    assert not (tmp_path / "goal_traces" / f"{tr['goal_id']}.json").is_file()
+    # load/trace_path must not mkdir empty goal_traces/ when flag is off
+    assert goal_trace.load_trace(tr["goal_id"]) is None
+    assert not (tmp_path / "goal_traces").exists()
