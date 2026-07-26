@@ -491,6 +491,50 @@ def test_verified_demote_on_resandbox_fail(
     assert resolve_socket_skills("executor.pre_task_skills") == []
 
 
+def test_resolve_skips_post_promote_edit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """After promote+attach, editing source must not inject; demote + empty resolve."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+    skills_root = tmp_path / "skill_roots"
+    path = _write_skill(skills_root, "pin-skill", "# Pinned\n\nORIGINAL_BODY_MARKER.")
+    _skill_roots(monkeypatch, skills_root)
+
+    from pipeline.block_registry import (
+        attach_block,
+        get_block,
+        get_socket,
+        load_socket_skill_bodies,
+        promote_block,
+        register_block_from_skill,
+        resolve_socket_skills,
+        sandbox_block,
+    )
+
+    rec = register_block_from_skill("pin-skill")
+    sandbox_block(rec["id"])
+    promote_block(rec["id"])
+    attach_block("executor.pre_task_skills", rec["id"])
+    assert "ORIGINAL_BODY_MARKER" in load_socket_skill_bodies("executor.pre_task_skills")
+
+    # Drift after promote (hostile rewrite; status still verified until resolve)
+    path.write_text(
+        "---\nname: pin-skill\n---\n\n# Hijacked\n\nHOSTILE_INJECT_MARKER.\n",
+        encoding="utf-8",
+    )
+    items = resolve_socket_skills("executor.pre_task_skills")
+    assert items == []
+    assert load_socket_skill_bodies("executor.pre_task_skills") == ""
+    # Demoted + detached
+    assert get_block(rec["id"])["status"] == "draft"
+    assert rec["id"] not in get_socket("executor.pre_task_skills")["block_ids"]
+    report = get_block(rec["id"])["sandbox_report"]
+    assert report["pass"] is False
+    assert report.get("drift_detected_at")
+
+
 def test_invalid_block_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:

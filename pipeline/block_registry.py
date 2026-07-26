@@ -782,6 +782,7 @@ def sandbox_block(
                 if not ok:
                     passed = False
 
+    prev_report = rec.get("sandbox_report") if isinstance(rec.get("sandbox_report"), dict) else {}
     report: dict[str, Any] = {
         "checked_at": _iso(),
         "pass": passed,
@@ -789,9 +790,17 @@ def sandbox_block(
         "source": str(path) if path else rec.get("source_path"),
         "content_sha256": content_hash,
     }
+    # Keep promote pin when re-sandboxing verified content that still passes
+    prev = str(rec.get("status") or "draft")
+    if passed and prev == "verified" and content_hash:
+        report["promoted_content_sha256"] = content_hash
+        if prev_report.get("promoted_at"):
+            report["promoted_at"] = prev_report["promoted_at"]
+    elif prev_report.get("promoted_content_sha256") and passed and prev == "verified":
+        report["promoted_content_sha256"] = prev_report["promoted_content_sha256"]
+
     rec["sandbox_report"] = report
     rec["oracle"] = {"name": "skill_sandbox_fixture", "pass": passed}
-    prev = str(rec.get("status") or "draft")
 
     if passed:
         if prev in ("draft", "sandboxed", "verified"):
@@ -984,11 +993,52 @@ def detach_block(socket_name: str, block_id: str | None = None) -> dict[str, Any
     return get_socket(socket_name)
 
 
+def _pinned_content_hash(report: dict[str, Any] | None) -> str | None:
+    """Prefer promote-time pin; fall back to last sandbox content hash."""
+    if not isinstance(report, dict):
+        return None
+    for key in ("promoted_content_sha256", "content_sha256"):
+        v = report.get(key)
+        if isinstance(v, str) and len(v) == 64:
+            return v
+    return None
+
+
+def _demote_verified_on_drift(rec: dict[str, Any], *, live_hash: str | None) -> dict[str, Any]:
+    """Demote verified block to draft, detach sockets, mark sandbox_report failed."""
+    bid = str(rec.get("id") or "")
+    report = dict(rec.get("sandbox_report") or {})
+    report["pass"] = False
+    report["drift_detected_at"] = _iso()
+    report["drift_live_sha256"] = live_hash
+    report.setdefault("checks", []).append(
+        {
+            "name": "content_hash_pin",
+            "pass": False,
+            "detail": "live file hash != promoted/sandbox pin; skipped inject",
+        }
+    )
+    rec["sandbox_report"] = report
+    rec["oracle"] = {"name": "skill_sandbox_fixture", "pass": False}
+    rec["status"] = "draft"
+    _save_block(rec)
+    if bid:
+        _detach_block_from_all_sockets(bid)
+    log.warning(
+        "block %s source drifted after promote (hash mismatch); demoted to draft and detached",
+        bid,
+    )
+    return rec
+
+
 def resolve_socket_skills(socket_name: str) -> list[dict[str, Any]]:
     """Return list of {block_id, path, body, status, name} for attached allowed blocks.
 
     Only statuses in allowed_attach_statuses are included (force-attached draft
     never injects). Paths must remain under allowlisted roots.
+
+    If sandbox_report has promoted_content_sha256 (or content_sha256), the live
+    file is re-hashed; mismatch skips inject and demotes verified → draft + detach.
     """
     sock = get_socket(socket_name)
     allowed = set(sock.get("allowed_statuses") or ["verified"])
@@ -1006,15 +1056,38 @@ def resolve_socket_skills(socket_name: str) -> list[dict[str, Any]]:
             continue
         path = _resolve_source_path(rec)
         body = ""
+        raw: bytes | None = None
         if path is not None and path.is_file():
             try:
-                body = path.read_text(encoding="utf-8", errors="replace")
+                raw = path.read_bytes()
+                body = raw.decode("utf-8", errors="replace")
             except OSError:
                 body = ""
-            if str(rec.get("kind")) == "skill" and body.startswith("---"):
-                end = body.find("\n---", 3)
-                if end >= 0:
-                    body = body[end + 4 :].lstrip("\n")
+                raw = None
+
+        # Integrity: re-check pinned hash for verified (and any pinned) blocks
+        pinned = _pinned_content_hash(report if isinstance(report, dict) else None)
+        if pinned is not None:
+            if raw is None:
+                if st == "verified":
+                    _demote_verified_on_drift(rec, live_hash=None)
+                continue
+            live_hash = _content_sha256(raw)
+            if live_hash != pinned:
+                if st == "verified":
+                    _demote_verified_on_drift(rec, live_hash=live_hash)
+                else:
+                    log.warning(
+                        "block %s content hash mismatch (status=%s); skipping inject",
+                        bid,
+                        st,
+                    )
+                continue
+
+        if body and str(rec.get("kind")) == "skill" and body.startswith("---"):
+            end = body.find("\n---", 3)
+            if end >= 0:
+                body = body[end + 4 :].lstrip("\n")
         out.append(
             {
                 "block_id": rec.get("id"),
