@@ -1,5 +1,5 @@
 """
-Thin goal compose policy (v0) — aligned with notes/agi-lmaooo.md.
+Thin goal compose policy (v0/v1) — aligned with notes/agi-lmaooo.md.
 
 Classify how to pursue a goal branch before execution:
 
@@ -7,6 +7,7 @@ Classify how to pursue a goal branch before execution:
   compose  — run a connector / multi-capability workflow
   build    — needs software factory (not executed here; signal only)
   research — Hermes / knowledge task
+  mcp      — enqueue MCP factory wrap job (never invent server here)
   yield    — cannot act now (blocked requires, unknown)
 
 Durable goal_trace.v1 when KEEP_GOAL_TRACES is default-on (unset/1/true/yes/on).
@@ -29,6 +30,7 @@ POLICY_REUSE = "reuse"
 POLICY_COMPOSE = "compose"
 POLICY_BUILD = "build"
 POLICY_RESEARCH = "research"
+POLICY_MCP = "mcp"
 POLICY_YIELD = "yield"
 
 POLICIES = frozenset(
@@ -37,8 +39,15 @@ POLICIES = frozenset(
         POLICY_COMPOSE,
         POLICY_BUILD,
         POLICY_RESEARCH,
+        POLICY_MCP,
         POLICY_YIELD,
     }
+)
+
+# Text suggests wrapping / exposing something as MCP
+_MCP_TEXT_RE = re.compile(
+    r"\b(as\s+)?mcp\b|\bmodel context protocol\b|\bwrap\b.*\bmcp\b",
+    re.IGNORECASE,
 )
 
 
@@ -94,6 +103,58 @@ def classify_goal_branch(
             reason="hermes_task or hermes_prompt set",
         )
 
+    # MCP: router hit with kind=mcp and requires_ok
+    for hit in hits:
+        if hit.get("requires_ok") and hit.get("slug"):
+            kind = str(hit.get("kind") or "").lower()
+            if kind == "mcp":
+                slug = str(hit["slug"])
+                # Prefer explicit connector_slug on hit; else treat slug as capability
+                if hit.get("connector_slug"):
+                    return GoalPolicyDecision(
+                        policy=POLICY_MCP,
+                        reason=f"router hit mcp {slug}",
+                        connector_slug=str(hit["connector_slug"]),
+                        hits=hits,
+                    )
+                return GoalPolicyDecision(
+                    policy=POLICY_MCP,
+                    reason=f"router hit mcp {slug}",
+                    capability_slug=slug,
+                    hits=hits,
+                )
+
+    # MCP: text suggests wrap/as MCP (prefer first reuse-capable hit as wrap target)
+    text_raw = text or ""
+    if _MCP_TEXT_RE.search(text_raw):
+        wrap_slug: str | None = None
+        wrap_connector = False
+        for hit in hits:
+            if hit.get("requires_ok") and hit.get("slug"):
+                wrap_slug = str(hit["slug"])
+                kind = str(hit.get("kind") or "").lower()
+                wrap_connector = kind in ("workflow", "connector")
+                break
+        if wrap_slug:
+            if wrap_connector:
+                return GoalPolicyDecision(
+                    policy=POLICY_MCP,
+                    reason=f"text requests mcp wrap of connector {wrap_slug}",
+                    connector_slug=wrap_slug,
+                    hits=hits,
+                )
+            return GoalPolicyDecision(
+                policy=POLICY_MCP,
+                reason=f"text requests mcp wrap of {wrap_slug}",
+                capability_slug=wrap_slug,
+                hits=hits,
+            )
+        return GoalPolicyDecision(
+            policy=POLICY_MCP,
+            reason="text requests mcp wrap; no reuse-capable hit (needs wrap target)",
+            hits=hits,
+        )
+
     # Prefer invokable capability hits
     for hit in hits:
         if hit.get("requires_ok") and hit.get("slug"):
@@ -114,7 +175,7 @@ def classify_goal_branch(
             )
 
     # Compose: connector whose requires are subset of branch requires / mentioned slugs
-    text_l = (text or "").lower()
+    text_l = text_raw.lower()
     mentioned = set(requires)
     for m in re.finditer(r"\b([a-z][a-z0-9_]{2,})\b", text_l):
         mentioned.add(m.group(1))
@@ -290,6 +351,75 @@ def execute_policy(
             result["status"] = "failed"
             return result
 
+    if decision.policy == POLICY_MCP:
+        # Do NOT invent an MCP server here — enqueue factory job only.
+        slug = decision.capability_slug or decision.connector_slug
+        if not slug:
+            append_event(
+                tr,
+                type="observe",
+                content="mcp policy: no capability/connector slug to wrap",
+                ok=False,
+            )
+            finalize_trace(
+                tr,
+                status="deeper_work_needed",
+                oracle={
+                    "name": "mcp_factory_enqueued",
+                    "pass": False,
+                    "evidence": "missing wrap target slug",
+                },
+                train_weight=0.0,
+            )
+            result["status"] = "mcp_enqueued"
+            result["reason"] = "mcp policy but no wrap target slug"
+            return result
+        try:
+            from pipeline.mcp_queue import enqueue_wrap
+
+            job_path = enqueue_wrap(
+                slug,
+                goal_id=branch_id or None,
+                reason=decision.reason,
+            )
+            append_event(
+                tr,
+                type="tool",
+                tool="mcp_queue.enqueue_wrap",
+                args={"slug": slug, "goal_id": branch_id or None},
+                result_snip=str(job_path),
+                ok=True,
+            )
+            finalize_trace(
+                tr,
+                status="deeper_work_needed",
+                oracle={
+                    "name": "mcp_factory_enqueued",
+                    "pass": True,
+                    "evidence": str(job_path),
+                },
+                train_weight=0.0,
+            )
+            result["status"] = "mcp_enqueued"
+            result["job_path"] = str(job_path)
+            result["capability"] = slug
+            return result
+        except Exception as exc:
+            append_event(tr, type="observe", content=str(exc), ok=False)
+            finalize_trace(
+                tr,
+                status="goal_failed",
+                oracle={
+                    "name": "mcp_factory_enqueued",
+                    "pass": False,
+                    "evidence": str(exc),
+                },
+                train_weight=0.0,
+            )
+            result["reason"] = str(exc)
+            result["status"] = "failed"
+            return result
+
     if decision.policy == POLICY_BUILD:
         append_event(
             tr,
@@ -297,6 +427,20 @@ def execute_policy(
             content="build policy: software factory should seed/implement this brick",
             ok=None,
         )
+        # Durable handoff signal for software factory (metrics only; no invent)
+        try:
+            metrics = get_pipeline_dir() / "metrics"
+            metrics.mkdir(parents=True, exist_ok=True)
+            handoff = {
+                "branch_id": branch_id or None,
+                "goal_text": (goal_text or "")[:500],
+                "reason": decision.reason,
+                "policy": POLICY_BUILD,
+            }
+            with (metrics / "goal_build_handoffs.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps(handoff, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
         finalize_trace(
             tr,
             status="deeper_work_needed",

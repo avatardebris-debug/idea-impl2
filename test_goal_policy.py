@@ -8,6 +8,7 @@ from pathlib import Path
 from pipeline.goal_policy import (
     POLICY_BUILD,
     POLICY_COMPOSE,
+    POLICY_MCP,
     POLICY_RESEARCH,
     POLICY_REUSE,
     POLICY_YIELD,
@@ -137,3 +138,43 @@ def test_keep_goal_traces_off_skips_write(tmp_path, monkeypatch):
         assert not (traces / "traces.jsonl").is_file()
     else:
         assert not traces.exists()
+
+
+def test_classify_mcp_from_router_kind():
+    d = classify_goal_branch(
+        branch_type="software",
+        text="expose as tools",
+        route_hits=[
+            {"slug": "foo_cli", "requires_ok": True, "kind": "mcp"},
+        ],
+    )
+    assert d.policy == POLICY_MCP
+    assert d.capability_slug == "foo_cli"
+
+
+def test_execute_mcp_enqueues_job(tmp_path, monkeypatch):
+    _reload(tmp_path, monkeypatch)
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
+    d = classify_goal_branch(
+        branch_type="software",
+        text="wrap foo_cli as mcp",
+        route_hits=[
+            {"slug": "foo_cli", "requires_ok": True, "kind": "project"},
+        ],
+    )
+    assert d.policy == POLICY_MCP
+    assert d.capability_slug == "foo_cli"
+    out = execute_policy(d, goal_text="wrap foo_cli as mcp", branch_id="b_mcp1")
+    assert out["status"] == "mcp_enqueued"
+    job_path = Path(out["job_path"])
+    assert job_path.is_file()
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    assert job["schema"] == "mcp_factory_job.v1"
+    assert job["capability_slug"] == "foo_cli"
+    assert job["status"] == "pending"
+    assert job.get("goal_id") == "b_mcp1"
+    tr_path = tmp_path / "goal_traces" / f"{out['goal_id']}.json"
+    assert tr_path.is_file()
+    tr = json.loads(tr_path.read_text(encoding="utf-8"))
+    assert tr["status"] == "deeper_work_needed"
+    assert tr.get("oracle", {}).get("name") == "mcp_factory_enqueued"
