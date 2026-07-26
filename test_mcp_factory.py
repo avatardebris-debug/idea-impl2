@@ -1,4 +1,4 @@
-"""Tests for MCP factory queue (T3) — file-based mcp_factory_job.v1 jobs."""
+"""Tests for MCP factory queue (T3) + factory wrap/smoke (T4)."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ if str(ROOT) not in sys.path:
 def _reload_pipeline(monkeypatch: pytest.MonkeyPatch, pipeline: pathlib.Path) -> None:
     monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
     monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    monkeypatch.setenv("KEEP_GOAL_TRACES", "1")
     from pipeline.pipeline_config import reload_pipeline_dir
 
     reload_pipeline_dir()
@@ -108,3 +109,129 @@ def test_list_pending_returns_new_job(
     assert pending == sorted(pending)
     assert all(p.suffix == ".json" for p in pending)
     assert all(json.loads(p.read_text(encoding="utf-8"))["status"] == "pending" for p in pending)
+
+
+# --- T4: wrap + smoke + list + drain ---
+
+
+def test_scaffold_and_smoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Scaffold server alone is enough for ping+describe smoke (no registry needed)."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import (
+        SCHEMA,
+        list_mcps,
+        mcp_dir,
+        smoke_mcp,
+        wrap_capability_as_mcp,
+    )
+    from pipeline.paths import mcps_dir
+
+    manifest = wrap_capability_as_mcp(
+        "tiny_ping_cap",
+        entrypoint="python cli.py",  # test override recorded only
+        force=True,
+    )
+    assert manifest["schema"] == SCHEMA
+    assert manifest["schema"] == "mcp_manifest.v1"
+    assert manifest["mcp_slug"] == "mcp_tiny_ping_cap"
+    assert manifest["wraps_capability"] == "tiny_ping_cap"
+    assert manifest["transport"] == "stdio_jsonl"
+    assert "ping" in manifest["tools"]
+    assert "describe" in manifest["tools"]
+    assert "invoke" in manifest["tools"]
+    assert manifest["entrypoint_override"] == "python cli.py"
+    assert manifest["status"] in ("draft", "smoked")
+
+    d = mcp_dir("mcp_tiny_ping_cap")
+    assert d == mcps_dir() / "mcp_tiny_ping_cap"
+    assert (d / "server.py").is_file()
+    assert (d / "manifest.json").is_file()
+    server_src = (d / "server.py").read_text(encoding="utf-8")
+    assert "WRAPS_CAPABILITY" in server_src
+    assert "tiny_ping_cap" in server_src
+    assert '"ping"' in server_src or "method == \"ping\"" in server_src
+
+    report = smoke_mcp("mcp_tiny_ping_cap", timeout_s=20.0)
+    assert report["ok"] is True, report
+    assert report["mcp_slug"] == "mcp_tiny_ping_cap"
+    methods = {c["method"]: c for c in report["checks"]}
+    assert methods["ping"]["ok"] is True
+    assert methods["describe"]["ok"] is True
+    assert (d / "smoke_report.json").is_file()
+    smoke_disk = json.loads((d / "smoke_report.json").read_text(encoding="utf-8"))
+    assert smoke_disk["ok"] is True
+
+    # manifest bumped to smoked
+    man2 = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+    assert man2["status"] == "smoked"
+
+    rows = list_mcps()
+    assert any(r.get("mcp_slug") == "mcp_tiny_ping_cap" for r in rows)
+
+
+def test_wrap_idempotent_without_force(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import wrap_capability_as_mcp
+
+    m1 = wrap_capability_as_mcp("idem_cap", force=True)
+    created = m1["created_at"]
+    m2 = wrap_capability_as_mcp("idem_cap", force=False)
+    assert m2["mcp_slug"] == "mcp_idem_cap"
+    assert m2["created_at"] == created
+
+
+def test_drain_queue_wraps_and_marks_done(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import drain_queue, list_mcps
+    from pipeline.mcp_queue import enqueue_wrap, list_pending, load_job, queue_dir
+
+    enqueue_wrap("drain_cap_a", reason="test drain")
+    assert len(list_pending()) == 1
+
+    results = drain_queue(limit=1)
+    assert len(results) == 1
+    assert results[0]["ok"] is True, results[0]
+    assert results[0]["mcp_slug"] == "mcp_drain_cap_a"
+    assert list_pending() == []
+    done = list((queue_dir() / "done").glob("*.json"))
+    assert len(done) == 1
+    job = load_job(done[0])
+    assert job["status"] == "done"
+    assert any(r.get("mcp_slug") == "mcp_drain_cap_a" for r in list_mcps())
+
+
+def test_register_mcp_best_effort(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import register_mcp, wrap_capability_as_mcp
+
+    man = wrap_capability_as_mcp("reg_cap", force=True)
+    # Should not raise even with empty/new registry
+    register_mcp(man)
+    man2 = json.loads(
+        (tmp_path / "out" / "mcps" / "mcp_reg_cap" / "manifest.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert "registry_note" in man2
+    # Prefer success when registry helpers work
+    assert man2["registry_note"].startswith("registry_")
