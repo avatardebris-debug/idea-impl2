@@ -43,6 +43,7 @@ do **not** load new factory code until restart.
 - Infinite idea spawn on stuck chains
 - Wiring the skill *file* into the runner (Python classifier already emits same schema)
 - **Grok Workflows (Rhai) inside idea-impl** — see §7 vocabulary (enhancement later, not earned yet)
+- Tiny graph.v1 + MCP factory v0 shipped via plan 2026-07-26-goal-compose-mcp-factory-v0; **graph engineer product still deferred**
 
 ---
 

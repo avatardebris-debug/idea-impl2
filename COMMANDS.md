@@ -520,6 +520,18 @@ python scripts/connector_smoke.py --oracle-only
 # After reboot: incomplete prior overnight auto truth-density + resume (unless -FreshListOnly).
 # Vision: notes/agi-lmaooo.md  |  Goal policy: reuse|compose|build|research (goal_policy.py)
 
+# Goal compose (graph.v1) + MCP factory v0 (separate loop; see notes/agi-lmaooo.md)
+# set PIPELINE_DIR=...
+python scripts/goal_compose.py compile --goal-id demo --text "wrap tool as mcp"
+python scripts/goal_compose.py plan-factories --goal-id demo
+python scripts/goal_compose.py attempt --goal-id demo --text "..."
+python scripts/mcp_factory.py wrap --slug <verified_capability>
+python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug>
+python scripts/mcp_factory.py drain-queue --limit 1
+python scripts/mcp_factory.py list
+# Graphs: $PIPELINE_DIR/graphs/  MCPs: $PIPELINE_DIR/mcps/  Queue: $PIPELINE_DIR/queues/mcp_factory/
+# Plan: docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md
+
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py
 python scripts/run_held_out.py --json
