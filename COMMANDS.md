@@ -547,12 +547,17 @@ python scripts/factory_feature_matrix.py --json
 # Store: $PIPELINE_DIR/state/block_registry/blocks/*.json  +  sockets.json
 # Sockets: executor.pre_task_skills | manager.blocker_skill | goal.policy_skill | phase_planner.skill
 # Only verified blocks attach by default (sandboxed if socket allow_sandboxed). Draft rejected.
+# Paths: register-prompt only under PROJECT_ROOT / PIPELINE_DIR / skill roots / factory prompts/
+# Promote always re-sandboxes + pins content_sha256 (edits after sandbox refuse promote).
+# Failed re-sandbox demotes verified → draft and detaches sockets.
 python scripts/block_registry.py register-skill --name create-skill
 python scripts/block_registry.py register-prompt --path pipeline/prompts/executor.md --name executor
 python scripts/block_registry.py sandbox --id skill_create-skill
 python scripts/block_registry.py promote --id skill_create-skill
 # one-shot: python scripts/block_registry.py promote --id skill_create-skill --sandbox-if-needed
 python scripts/block_registry.py attach --socket executor.pre_task_skills --id skill_create-skill
+# --force attach is break-glass only: id may sit in sockets.json; resolve still skips
+# non-allowed statuses until a later promote makes the body injectable without re-attach.
 python scripts/block_registry.py list-blocks
 python scripts/block_registry.py list-sockets
 python scripts/block_registry.py resolve --socket executor.pre_task_skills

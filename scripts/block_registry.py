@@ -87,7 +87,11 @@ def main(argv: list[str] | None = None) -> int:
     p_at.add_argument(
         "--force",
         action="store_true",
-        help="Allow draft/revoked/non-verified attach (unsafe)",
+        help=(
+            "Break-glass: attach even if status not allowed. "
+            "resolve/load still skip non-allowed statuses; after a later promote "
+            "the body becomes injectable without re-attach. Prefer not to use."
+        ),
     )
 
     p_dt = sub.add_parser("detach", help="Detach block from socket (or clear socket)")
@@ -180,7 +184,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.cmd == "list-sockets":
-            _print_json(br.list_sockets())
+            # strict_sockets=True: corrupt sockets.json raises after quarantine
+            _print_json(br.list_sockets(strict_sockets=True))
             return 0
 
         if args.cmd == "resolve":

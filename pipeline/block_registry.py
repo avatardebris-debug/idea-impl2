@@ -7,17 +7,25 @@ Layout under PIPELINE_DIR:
 
 Sockets are fixed role slots; only verified (or sandboxed if socket allows)
 blocks may attach. Promote path: register (draft) → sandbox → promote (verified).
+
+Source paths are confined to allowlisted roots (PROJECT_ROOT, PIPELINE_DIR,
+skill search roots, factory prompts/). Promote re-runs sandbox and pins a
+content hash so post-sandbox edits cannot skip re-validation.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from pipeline.paths import get_pipeline_dir, state_dir
+
+log = logging.getLogger(__name__)
 
 SCHEMA = "block.v1"
 BLOCK_STATUSES = frozenset({"draft", "sandboxed", "verified", "revoked"})
@@ -27,7 +35,7 @@ RISK_CLASSES = frozenset({"low", "medium", "high"})
 # Default max skill body size for sandbox (bytes).
 DEFAULT_MAX_BYTES = 200_000
 
-# Socket definitions (code defaults). Override via sockets.json "defs" key optional.
+# Socket definitions (code defaults). Override via sockets.json "defs_override".
 # allow_sandboxed: if True, attach accepts status sandboxed in addition to verified.
 DEFAULT_SOCKETS: dict[str, dict[str, Any]] = {
     "executor.pre_task_skills": {
@@ -64,19 +72,34 @@ DEFAULT_SOCKETS: dict[str, dict[str, Any]] = {
     },
 }
 
-# Obvious secret patterns (static sandbox).
+# Obvious secret patterns (static sandbox). Hyphenated keys + env-style assigns.
 _SECRET_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("private_key_header", re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")),
+    (
+        "private_key_header",
+        re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----"),
+    ),
     ("aws_access_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    # sk-proj-…, sk-ant-…, sk-… (hyphens allowed after prefix)
+    ("openai_sk", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
+    ("xai_key", re.compile(r"\bxai-[A-Za-z0-9_-]{20,}\b")),
+    # api_key: / secret_key= / access_token: value forms
     (
         "generic_api_key_assign",
         re.compile(
-            r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{20,}"
+            r"(?i)\b(?:api[_-]?key|secret[_-]?key|access[_-]?token)\s*[:=]\s*['\"]?[A-Za-z0-9_\-]{16,}"
         ),
     ),
-    ("openai_sk", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
-    ("xai_key", re.compile(r"\bxai-[A-Za-z0-9]{20,}\b")),
+    # OPENAI_API_KEY=…, XAI_API_KEY=…, ANTHROPIC_API_KEY=…, FOO_SECRET=…, PASSWORD=…
+    (
+        "env_style_secret",
+        re.compile(
+            r"(?i)\b[A-Z0-9_]*(?:API[_-]?KEY|SECRET(?:[_-]?KEY)?|TOKEN|PASSWORD|PRIVATE[_-]?KEY)"
+            r"\s*=\s*\S{16,}"
+        ),
+    ),
 ]
+
+_NAME_RE = re.compile(r"^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$")
 
 __all__ = [
     "SCHEMA",
@@ -98,6 +121,8 @@ __all__ = [
     "resolve_socket_skills",
     "load_socket_skill_bodies",
     "allowed_attach_statuses",
+    "assert_source_allowed",
+    "allowed_source_roots",
 ]
 
 
@@ -125,13 +150,26 @@ def _normalize_name(name: str) -> str:
     return (name or "").strip().lower().replace("_", "-")
 
 
-def _block_id(kind: str, name: str) -> str:
+def _validate_block_name(name: str) -> str:
+    """Normalize and reject path-like / unsafe block names early."""
     n = _normalize_name(name)
+    if not n:
+        raise ValueError("name is required")
+    if ".." in n or "/" in n or "\\" in n:
+        raise ValueError(f"invalid block name (path segments not allowed): {name!r}")
+    if not _NAME_RE.match(n):
+        raise ValueError(
+            f"invalid block name {name!r}: use lowercase letters, digits, "
+            f"hyphen, or dot (e.g. my-skill)"
+        )
+    return n
+
+
+def _block_id(kind: str, name: str) -> str:
+    n = _validate_block_name(name)
     k = (kind or "").strip().lower()
     if k not in BLOCK_KINDS:
         raise ValueError(f"kind must be one of {sorted(BLOCK_KINDS)}")
-    if not n:
-        raise ValueError("name is required")
     return f"{k}_{n}"
 
 
@@ -155,30 +193,41 @@ def _default_attachments() -> dict[str, Any]:
     return {name: [] for name in DEFAULT_SOCKETS}
 
 
-def _load_sockets_file() -> dict[str, Any]:
+def _load_sockets_file(*, strict: bool = False) -> dict[str, Any]:
+    """Load sockets.json.
+
+    On corrupt JSON: quarantine the bad file and raise ValueError when
+    *strict* is True (CLI list-sockets). Internal callers use strict=False
+    but still quarantine and start from empty defaults (logged).
+    """
     path = sockets_path()
+    empty = {
+        "schema": "sockets.v1",
+        "updated_at": _iso(),
+        "attachments": _default_attachments(),
+        "defs_override": {},
+    }
     if not path.is_file():
-        return {
-            "schema": "sockets.v1",
-            "updated_at": _iso(),
-            "attachments": _default_attachments(),
-            "defs_override": {},
-        }
+        return empty
     try:
         data = _load_json(path)
-    except (OSError, json.JSONDecodeError):
-        return {
-            "schema": "sockets.v1",
-            "updated_at": _iso(),
-            "attachments": _default_attachments(),
-            "defs_override": {},
-        }
+    except (OSError, json.JSONDecodeError) as exc:
+        quarantine = path.with_suffix(f".corrupt.{_iso()[:19].replace(':', '')}.json")
+        try:
+            path.replace(quarantine)
+            log.error("corrupt sockets.json quarantined to %s: %s", quarantine, exc)
+        except OSError:
+            log.error("corrupt sockets.json at %s: %s", path, exc)
+        if strict:
+            raise ValueError(
+                f"corrupt sockets.json (quarantined to {quarantine.name if quarantine else path}): {exc}"
+            ) from exc
+        return empty
     if not isinstance(data, dict):
         data = {}
     att = data.get("attachments")
     if not isinstance(att, dict):
         att = {}
-    # Ensure all default sockets exist
     for name in DEFAULT_SOCKETS:
         if name not in att or not isinstance(att[name], list):
             att[name] = []
@@ -220,9 +269,9 @@ def allowed_attach_statuses(socket_name: str) -> frozenset[str]:
     return frozenset(allowed)
 
 
-def list_sockets() -> list[dict[str, Any]]:
+def list_sockets(*, strict_sockets: bool = False) -> list[dict[str, Any]]:
     """Return socket defs + current attachments."""
-    data = _load_sockets_file()
+    data = _load_sockets_file(strict=strict_sockets)
     att = data.get("attachments") or {}
     out: list[dict[str, Any]] = []
     for name in DEFAULT_SOCKETS:
@@ -275,6 +324,8 @@ def list_blocks(*, kind: str | None = None, status: str | None = None) -> list[d
             continue
         if status and str(rec.get("status") or "") != status:
             continue
+        # Never surface internal-only keys if present from older records
+        rec.pop("_resolved_source", None)
         out.append(rec)
     return out
 
@@ -283,6 +334,8 @@ def _save_block(rec: dict[str, Any]) -> Path:
     bid = str(rec.get("id") or "")
     if not bid:
         raise ValueError("block id required")
+    rec = dict(rec)
+    rec.pop("_resolved_source", None)  # never persist absolute host paths
     rec["updated_at"] = _iso()
     path = _block_path(bid)
     _save_json(path, rec)
@@ -294,9 +347,8 @@ def _provenance_for_skill_path(skill_dir: Path) -> str:
         from pipeline.pipeline_config import PROJECT_ROOT
 
         resolved = skill_dir.resolve()
-        if PROJECT_ROOT.resolve() in resolved.parents or resolved.is_relative_to(
-            PROJECT_ROOT.resolve()
-        ):
+        root = PROJECT_ROOT.resolve()
+        if resolved == root or resolved.is_relative_to(root):
             return "project"
     except Exception:
         pass
@@ -306,8 +358,80 @@ def _provenance_for_skill_path(skill_dir: Path) -> str:
     return "local"
 
 
+def allowed_source_roots() -> list[Path]:
+    """Roots under which block source files may live."""
+    roots: list[Path] = []
+    try:
+        from pipeline.pipeline_config import PROJECT_ROOT
+
+        roots.append(PROJECT_ROOT.resolve())
+        roots.append((PROJECT_ROOT / "pipeline" / "prompts").resolve())
+        roots.append((PROJECT_ROOT / ".grok" / "skills").resolve())
+    except Exception:
+        pass
+    try:
+        roots.append(get_pipeline_dir().resolve())
+    except Exception:
+        pass
+    # Grok skill homes (same family as skill_load)
+    try:
+        import os
+
+        grok_home = Path(os.environ.get("GROK_HOME", Path.home() / ".grok")).expanduser().resolve()
+        roots.append(grok_home / "skills")
+        roots.append(grok_home / "bundled" / "skills")
+        roots.append(grok_home / "installed-plugins")
+    except Exception:
+        pass
+    try:
+        from pipeline.skill_load import skill_search_roots
+
+        for r in skill_search_roots():
+            try:
+                roots.append(Path(r).resolve())
+            except OSError:
+                continue
+    except Exception:
+        pass
+    # Dedup while preserving order
+    seen: set[str] = set()
+    out: list[Path] = []
+    for r in roots:
+        key = str(r)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
+def assert_source_allowed(path: Path) -> Path:
+    """Resolve *path* and require it under an allowlisted root. Rejects `..` escapes."""
+    try:
+        resolved = path.expanduser().resolve(strict=False)
+    except OSError as exc:
+        raise ValueError(f"cannot resolve source path: {path}: {exc}") from exc
+
+    # Reject if original had .. that escapes after resolve from a relative base —
+    # resolve() already collapses; we only accept under roots.
+    for root in allowed_source_roots():
+        try:
+            root_r = root.resolve()
+        except OSError:
+            continue
+        try:
+            if resolved == root_r or resolved.is_relative_to(root_r):
+                return resolved
+        except (ValueError, OSError):
+            continue
+    raise ValueError(
+        f"source path not under allowlisted roots "
+        f"(PROJECT_ROOT, PIPELINE_DIR, skill roots, factory prompts/): {resolved}"
+    )
+
+
 def _relative_source(path: Path) -> str:
-    """Prefer path relative to PROJECT_ROOT or PIPELINE_DIR; else absolute."""
+    """Prefer path relative to PROJECT_ROOT or PIPELINE_DIR; else skill-root relative."""
     path = path.resolve()
     try:
         from pipeline.pipeline_config import PROJECT_ROOT
@@ -318,7 +442,18 @@ def _relative_source(path: Path) -> str:
     try:
         return str(path.relative_to(get_pipeline_dir().resolve())).replace("\\", "/")
     except Exception:
-        return str(path)
+        pass
+    for root in allowed_source_roots():
+        try:
+            return str(path.relative_to(root.resolve())).replace("\\", "/")
+        except Exception:
+            continue
+    # Last resort: store name only is unsafe; raise so we never catalog outside roots
+    raise ValueError(f"cannot relativize source path under allowlisted roots: {path}")
+
+
+def _content_sha256(raw: bytes) -> str:
+    return hashlib.sha256(raw).hexdigest()
 
 
 def _new_block(
@@ -329,7 +464,7 @@ def _new_block(
     provenance: str,
     risk_class: str = "low",
 ) -> dict[str, Any]:
-    n = _normalize_name(name)
+    n = _validate_block_name(name)
     bid = _block_id(kind, n)
     now = _iso()
     return {
@@ -358,9 +493,7 @@ def register_block_from_skill(
     """Discover skill via skill_load.find_skill_dir; create draft block.v1."""
     from pipeline.skill_load import find_skill_dir
 
-    n = _normalize_name(name)
-    if not n:
-        raise ValueError("skill name is required")
+    n = _validate_block_name(name)
     skill_dir = find_skill_dir(n)
     if skill_dir is None:
         raise FileNotFoundError(f"skill not found: {n}")
@@ -368,11 +501,12 @@ def register_block_from_skill(
     if not skill_md.is_file():
         raise FileNotFoundError(f"SKILL.md missing under {skill_dir}")
 
+    skill_md = assert_source_allowed(skill_md)
+
     bid = _block_id("skill", n)
     existing = get_block(bid)
     if existing is not None and not force:
         if str(existing.get("status")) == "revoked":
-            # Re-register revoked as fresh draft
             pass
         else:
             return existing
@@ -384,10 +518,7 @@ def register_block_from_skill(
         provenance=_provenance_for_skill_path(skill_dir),
         risk_class=risk_class,
     )
-    # Keep absolute path resolution easy: also store resolved when relative fails later
-    rec["_resolved_source"] = str(skill_md.resolve())
     _save_block(rec)
-    # Drop internal key from public view? Keep for resolve reliability.
     return rec
 
 
@@ -399,29 +530,54 @@ def register_block_from_prompt_file(
     risk_class: str = "low",
     provenance: str = "project",
 ) -> dict[str, Any]:
-    """Register a prompt markdown file as draft block."""
-    p = Path(path).expanduser()
-    if not p.is_file():
-        # Try relative to PIPELINE_DIR, factory prompts/, project root
-        candidates = [
-            get_pipeline_dir() / path,
-            Path(__file__).resolve().parent / "prompts" / Path(path).name,
-        ]
+    """Register a prompt markdown file as draft block.
+
+    Path must resolve under allowlisted roots (PROJECT_ROOT, PIPELINE_DIR,
+    factory pipeline/prompts/, skill roots). Absolute paths outside those
+    roots are rejected.
+    """
+    raw = Path(path)
+    # Reject obvious escape attempts in the raw string before joining roots
+    raw_s = str(path).replace("\\", "/")
+    if ".." in Path(raw_s).parts:
+        # Still allow if final resolve lands under a root — but try candidates carefully
+        pass
+
+    p: Path | None = None
+    if raw.expanduser().is_file():
+        try:
+            p = assert_source_allowed(raw)
+        except ValueError:
+            p = None
+
+    if p is None:
+        candidates: list[Path] = []
         try:
             from pipeline.pipeline_config import PROJECT_ROOT
 
             candidates.append(PROJECT_ROOT / path)
             candidates.append(PROJECT_ROOT / "pipeline" / "prompts" / Path(path).name)
+            candidates.append(Path(__file__).resolve().parent / "prompts" / Path(path).name)
         except Exception:
             pass
+        candidates.append(get_pipeline_dir() / path)
+        candidates.append(get_pipeline_dir() / "prompts" / Path(path).name)
         for c in candidates:
-            if c.is_file():
-                p = c
-                break
+            try:
+                if c.is_file():
+                    p = assert_source_allowed(c)
+                    break
+            except (ValueError, OSError):
+                continue
         else:
-            raise FileNotFoundError(f"prompt file not found: {path}")
+            raise FileNotFoundError(
+                f"prompt file not found under allowlisted roots: {path}"
+            )
 
-    n = _normalize_name(name) or _normalize_name(p.stem)
+    assert p is not None
+    p = assert_source_allowed(p)
+
+    n = _validate_block_name(name) if name else _validate_block_name(p.stem)
     bid = _block_id("prompt", n)
     existing = get_block(bid)
     if existing is not None and not force:
@@ -435,48 +591,52 @@ def register_block_from_prompt_file(
         provenance=provenance if provenance in ("local", "bundled", "project") else "project",
         risk_class=risk_class,
     )
-    rec["_resolved_source"] = str(p.resolve())
     _save_block(rec)
     return rec
 
 
 def _resolve_source_path(rec: dict[str, Any]) -> Path | None:
-    """Resolve block source_path to an existing file."""
-    raw_resolved = rec.get("_resolved_source")
-    if raw_resolved:
-        p = Path(str(raw_resolved))
-        if p.is_file():
-            return p
-    src = str(rec.get("source_path") or "").strip()
-    if not src:
-        return None
-    p = Path(src)
-    if p.is_file():
-        return p
-    candidates: list[Path] = []
-    try:
-        from pipeline.pipeline_config import PROJECT_ROOT
+    """Resolve block source_path to an existing allowlisted file.
 
-        candidates.append(PROJECT_ROOT / src)
-    except Exception:
-        pass
-    candidates.append(get_pipeline_dir() / src)
-    candidates.append(Path(src).expanduser())
-    # Skill re-discovery by name
+    Does not trust absolute `_resolved_source` from disk (legacy keys ignored).
+    Relative paths with `..` only succeed if final resolve stays under roots.
+    """
+    candidates: list[Path] = []
+    src = str(rec.get("source_path") or "").strip()
+    if src:
+        # Never join raw src that is absolute outside roots without check
+        p = Path(src)
+        if p.is_absolute():
+            candidates.append(p)
+        else:
+            # Reject path parts that look like pure escape before join? Still check final.
+            try:
+                from pipeline.pipeline_config import PROJECT_ROOT
+
+                candidates.append(PROJECT_ROOT / src)
+            except Exception:
+                pass
+            candidates.append(get_pipeline_dir() / src)
+            for root in allowed_source_roots():
+                candidates.append(root / src)
+
+    # Skill re-discovery by name (preferred for skills)
     if rec.get("kind") == "skill" and rec.get("name"):
         try:
             from pipeline.skill_load import find_skill_dir
 
             d = find_skill_dir(str(rec["name"]))
             if d is not None and (d / "SKILL.md").is_file():
-                candidates.append(d / "SKILL.md")
+                candidates.insert(0, d / "SKILL.md")
         except Exception:
             pass
+
     for c in candidates:
         try:
-            if c.is_file():
-                return c.resolve()
-        except OSError:
+            if not c.is_file():
+                continue
+            return assert_source_allowed(c)
+        except (ValueError, OSError):
             continue
     return None
 
@@ -495,15 +655,41 @@ def _parse_skill_frontmatter_name(text: str) -> str | None:
     return None
 
 
+def _detach_block_from_all_sockets(block_id: str) -> None:
+    data = _load_sockets_file()
+    att = data.get("attachments") or {}
+    changed = False
+    for sock, ids in list(att.items()):
+        if not isinstance(ids, list):
+            continue
+        if block_id in ids:
+            att[sock] = [x for x in ids if x != block_id]
+            changed = True
+    if changed:
+        data["attachments"] = att
+        _save_sockets_file(data)
+
+
+def _count_capacity_ids(socket_name: str, current: list[str]) -> int:
+    """Count attachment slots; drop missing block files from capacity consideration."""
+    # Prefer counting only existing blocks so dead ids don't permanently fill max_n.
+    n = 0
+    for bid in current:
+        if get_block(str(bid)) is not None:
+            n += 1
+    return n
+
+
 def sandbox_block(
     block_id: str,
     *,
     max_bytes: int = DEFAULT_MAX_BYTES,
     write_trace: bool = True,
 ) -> dict[str, Any]:
-    """Static sandbox checks. On pass → sandboxed; on fail stay draft (or keep status).
+    """Static sandbox checks. On pass → sandboxed; on fail → draft (incl. demote verified).
 
-    Writes sandbox_report onto the block. Emits goal_trace mode=block_promote.
+    Writes sandbox_report + content_sha256. Emits goal_trace mode=block_promote.
+    Failed re-sandbox of verified demotes to draft and detaches from sockets.
     """
     rec = get_block(block_id)
     if rec is None:
@@ -514,25 +700,37 @@ def sandbox_block(
     checks: list[dict[str, Any]] = []
     passed = True
     path = _resolve_source_path(rec)
+    content_hash: str | None = None
+    text = ""
+    size = 0
 
     if path is None or not path.is_file():
-        checks.append({"name": "file_exists", "pass": False, "detail": str(rec.get("source_path"))})
+        checks.append(
+            {"name": "file_exists", "pass": False, "detail": str(rec.get("source_path"))}
+        )
         passed = False
-        text = ""
-        size = 0
     else:
-        checks.append({"name": "file_exists", "pass": True, "detail": str(path)})
+        # Path must stay allowlisted (resolve already checked; re-assert)
         try:
-            raw = path.read_bytes()
-            size = len(raw)
-            text = raw.decode("utf-8", errors="replace")
-        except OSError as exc:
-            checks.append({"name": "readable", "pass": False, "detail": str(exc)})
+            path = assert_source_allowed(path)
+            checks.append({"name": "path_allowed", "pass": True, "detail": str(path)})
+        except ValueError as exc:
+            checks.append({"name": "path_allowed", "pass": False, "detail": str(exc)})
             passed = False
-            text = ""
-            size = 0
+            path = None
 
-    if passed:
+        if path is not None:
+            checks.append({"name": "file_exists", "pass": True, "detail": str(path)})
+            try:
+                raw = path.read_bytes()
+                size = len(raw)
+                content_hash = _content_sha256(raw)
+                text = raw.decode("utf-8", errors="replace")
+            except OSError as exc:
+                checks.append({"name": "readable", "pass": False, "detail": str(exc)})
+                passed = False
+
+    if passed and path is not None:
         if size == 0 or not (text or "").strip():
             checks.append({"name": "non_empty", "pass": False, "detail": f"size={size}"})
             passed = False
@@ -584,23 +782,30 @@ def sandbox_block(
                 if not ok:
                     passed = False
 
-    report = {
+    report: dict[str, Any] = {
         "checked_at": _iso(),
         "pass": passed,
         "checks": checks,
         "source": str(path) if path else rec.get("source_path"),
+        "content_sha256": content_hash,
     }
     rec["sandbox_report"] = report
     rec["oracle"] = {"name": "skill_sandbox_fixture", "pass": passed}
-    # Only draft (or re-sandbox of sandboxed/verified) moves to sandboxed on pass.
     prev = str(rec.get("status") or "draft")
-    if passed and prev in ("draft", "sandboxed"):
-        rec["status"] = "sandboxed"
-    # verified stays verified if re-sandboxed pass; fail demotes? v0: stay as-is on fail if verified
-    elif not passed and prev == "draft":
+
+    if passed:
+        if prev in ("draft", "sandboxed", "verified"):
+            # Pass keeps/sets sandboxed; verified re-sandbox pass stays verified
+            if prev == "verified":
+                rec["status"] = "verified"
+            else:
+                rec["status"] = "sandboxed"
+    else:
+        # Fail always demotes to draft (including verified → draft)
         rec["status"] = "draft"
-    elif not passed and prev == "sandboxed":
-        rec["status"] = "draft"  # demote on failed re-sandbox
+        if prev == "verified":
+            _detach_block_from_all_sockets(str(rec.get("id") or block_id))
+
     _save_block(rec)
 
     if write_trace:
@@ -620,7 +825,12 @@ def promote_block(
     sandbox_if_needed: bool = False,
     write_trace: bool = True,
 ) -> dict[str, Any]:
-    """Promote sandboxed → verified. With sandbox_if_needed, draft may sandbox then promote."""
+    """Promote sandboxed → verified.
+
+    Always re-runs sandbox on the current file content and refuses if checks
+    fail or content hash is missing. With sandbox_if_needed, draft may be
+    sandboxed then promoted in one step.
+    """
     rec = get_block(block_id)
     if rec is None:
         raise FileNotFoundError(f"block not found: {block_id}")
@@ -628,24 +838,54 @@ def promote_block(
     if status == "revoked":
         raise ValueError(f"cannot promote revoked block: {block_id}")
     if status == "verified":
-        return rec
-    if status == "draft":
-        if not sandbox_if_needed:
-            raise ValueError(
-                f"block {block_id} is draft; sandbox first or pass sandbox_if_needed=True"
-            )
+        # Still re-validate content has not drifted into secrets
         rec = sandbox_block(block_id, write_trace=write_trace)
-        status = str(rec.get("status") or "")
-        if status != "sandboxed":
-            raise ValueError(f"sandbox failed; cannot promote {block_id}")
-    if status != "sandboxed":
-        raise ValueError(f"promote requires sandboxed status, got {status!r}")
+        if str(rec.get("status")) != "verified" or not (rec.get("sandbox_report") or {}).get(
+            "pass"
+        ):
+            raise ValueError(
+                f"re-sandbox failed for verified block {block_id}; demoted, cannot keep verified"
+            )
+        return rec
+
+    if status == "draft" and not sandbox_if_needed:
+        raise ValueError(
+            f"block {block_id} is draft; sandbox first or pass sandbox_if_needed=True"
+        )
+
+    # Always re-sandbox current content before promote (covers sandboxed + draft)
+    rec = sandbox_block(block_id, write_trace=write_trace)
+    status = str(rec.get("status") or "")
+    report = rec.get("sandbox_report") or {}
+    if status != "sandboxed" or not report.get("pass"):
+        raise ValueError(f"sandbox failed; cannot promote {block_id}")
+    if not report.get("content_sha256"):
+        raise ValueError(f"sandbox missing content hash; cannot promote {block_id}")
+
+    # Final hash check against live file (TOCTOU narrow window)
+    path = _resolve_source_path(rec)
+    if path is None:
+        raise ValueError(f"source missing; cannot promote {block_id}")
+    try:
+        live_hash = _content_sha256(path.read_bytes())
+    except OSError as exc:
+        raise ValueError(f"cannot read source for promote: {exc}") from exc
+    if live_hash != report.get("content_sha256"):
+        raise ValueError(
+            f"source changed after sandbox (hash mismatch); re-sandbox before promote: {block_id}"
+        )
 
     rec["status"] = "verified"
     if notes:
         prev_notes = str(rec.get("promote_notes") or "")
         rec["promote_notes"] = (prev_notes + "\n" + notes).strip() if prev_notes else notes
     rec["oracle"] = {"name": "skill_sandbox_fixture", "pass": True}
+    # Pin hash at promote time
+    rec["sandbox_report"] = {
+        **report,
+        "promoted_at": _iso(),
+        "promoted_content_sha256": live_hash,
+    }
     _save_block(rec)
 
     if write_trace:
@@ -661,18 +901,7 @@ def revoke_block(block_id: str, *, detach: bool = True, write_trace: bool = True
     rec["status"] = "revoked"
     _save_block(rec)
     if detach:
-        data = _load_sockets_file()
-        att = data.get("attachments") or {}
-        changed = False
-        for sock, ids in list(att.items()):
-            if not isinstance(ids, list):
-                continue
-            if block_id in ids:
-                att[sock] = [x for x in ids if x != block_id]
-                changed = True
-        if changed:
-            data["attachments"] = att
-            _save_sockets_file(data)
+        _detach_block_from_all_sockets(block_id)
     if write_trace:
         _trace_block_action(rec, action="revoke", ok=True, detail="revoked")
     return rec
@@ -684,7 +913,12 @@ def attach_block(
     *,
     force: bool = False,
 ) -> dict[str, Any]:
-    """Attach block to socket. Rejects draft/revoked unless force=True."""
+    """Attach block to socket. Rejects draft/revoked unless force=True.
+
+    force=True is break-glass only: id may sit in sockets.json while resolve
+    still skips non-allowed statuses. After a later promote, the body becomes
+    injectable without a second attach — operators must track this.
+    """
     sdef = _socket_def(socket_name)
     rec = get_block(block_id)
     if rec is None:
@@ -695,7 +929,8 @@ def attach_block(
     if not force and status not in allowed:
         raise ValueError(
             f"attach rejected: block status {status!r} not in {sorted(allowed)} "
-            f"for socket {socket_name} (use force=True to override)"
+            f"for socket {socket_name} (force=True is break-glass; resolve still "
+            f"skips non-allowed until status enters allowed set)"
         )
     kinds = set(sdef.get("kinds") or ["skill", "prompt"])
     if str(rec.get("kind") or "") not in kinds:
@@ -713,10 +948,15 @@ def attach_block(
     if block_id in current:
         return get_socket(socket_name)
 
+    # Prune missing block ids so dead slots do not fill capacity forever
+    pruned = [x for x in current if get_block(str(x)) is not None]
+    if pruned != current:
+        current = pruned
+
     if cardinality == "single" or max_n <= 1:
         current = [block_id]
     else:
-        if len(current) >= max_n:
+        if _count_capacity_ids(socket_name, current) >= max_n:
             raise ValueError(
                 f"socket {socket_name} full (max_n={max_n}); detach first"
             )
@@ -745,7 +985,11 @@ def detach_block(socket_name: str, block_id: str | None = None) -> dict[str, Any
 
 
 def resolve_socket_skills(socket_name: str) -> list[dict[str, Any]]:
-    """Return list of {block_id, path, body, status, name} for attached allowed blocks."""
+    """Return list of {block_id, path, body, status, name} for attached allowed blocks.
+
+    Only statuses in allowed_attach_statuses are included (force-attached draft
+    never injects). Paths must remain under allowlisted roots.
+    """
     sock = get_socket(socket_name)
     allowed = set(sock.get("allowed_statuses") or ["verified"])
     out: list[dict[str, Any]] = []
@@ -756,6 +1000,10 @@ def resolve_socket_skills(socket_name: str) -> list[dict[str, Any]]:
         st = str(rec.get("status") or "")
         if st not in allowed:
             continue
+        # Skip if latest sandbox_report explicitly failed (stale verified edge)
+        report = rec.get("sandbox_report")
+        if isinstance(report, dict) and report.get("pass") is False:
+            continue
         path = _resolve_source_path(rec)
         body = ""
         if path is not None and path.is_file():
@@ -763,7 +1011,6 @@ def resolve_socket_skills(socket_name: str) -> list[dict[str, Any]]:
                 body = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 body = ""
-            # Strip skill frontmatter for injection parity with skill_load
             if str(rec.get("kind")) == "skill" and body.startswith("---"):
                 end = body.find("\n---", 3)
                 if end >= 0:
