@@ -95,6 +95,18 @@ class ExecutorAgent(AgentProcess):
         except Exception:
             pass
 
+        # 5. Verified skill/prompt blocks attached to executor.pre_task_skills socket
+        try:
+            from pipeline.block_registry import load_socket_skill_bodies
+
+            socket_body = load_socket_skill_bodies(
+                "executor.pre_task_skills", max_chars=8000
+            ).strip()
+            if socket_body:
+                parts.append(f"## Pre-task skills (socket)\n{socket_body}")
+        except Exception:
+            pass
+
         return "\n\n".join(parts)
 
     def _save_interrupt_checkpoint(self) -> None:

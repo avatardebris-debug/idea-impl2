@@ -526,11 +526,40 @@ python scripts/goal_compose.py compile --goal-id demo --text "wrap tool as mcp"
 python scripts/goal_compose.py plan-factories --goal-id demo
 python scripts/goal_compose.py attempt --goal-id demo --text "..."
 python scripts/mcp_factory.py wrap --slug <verified_capability>
-python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug>
-python scripts/mcp_factory.py drain-queue --limit 1
+python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug>              # default: require invoke --help
+# PowerShell: quote invoke-args so --help is not eaten:  --invoke-args="--help"
+python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug> --no-require-invoke
+python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug> --skip-if-smoked
+python scripts/mcp_factory.py drain-queue --limit 1                    # skips already-smoked; invoke oracle on
 python scripts/mcp_factory.py list
+# Graph fixture from smoked MCPs (map-blocks test):
+python scripts/goal_compose.py fixture-mcps --goal-id utility_mcp_fixture
+python scripts/goal_compose.py fixture-mcps --goal-id util5 --slugs mcp_json_diff_tool,mcp_url_health_checker
 # Graphs: $PIPELINE_DIR/graphs/  MCPs: $PIPELINE_DIR/mcps/  Queue: $PIPELINE_DIR/queues/mcp_factory/
 # Plan: docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md
+# Isolated feature matrix (temp PIPELINE_DIR, PASS/FAIL table; exit 0 = all HARD pass):
+python scripts/factory_feature_matrix.py
+python scripts/factory_feature_matrix.py --keep-temp
+python scripts/factory_feature_matrix.py --live --pipeline-dir $env:PIPELINE_DIR
+python scripts/factory_feature_matrix.py --json
+
+# Block registry v0 (skill/prompt sockets + sandbox → promote; notes/agi-lmaooo2.md Layer A P1–P2)
+# Store: $PIPELINE_DIR/state/block_registry/blocks/*.json  +  sockets.json
+# Sockets: executor.pre_task_skills | manager.blocker_skill | goal.policy_skill | phase_planner.skill
+# Only verified blocks attach by default (sandboxed if socket allow_sandboxed). Draft rejected.
+python scripts/block_registry.py register-skill --name create-skill
+python scripts/block_registry.py register-prompt --path pipeline/prompts/executor.md --name executor
+python scripts/block_registry.py sandbox --id skill_create-skill
+python scripts/block_registry.py promote --id skill_create-skill
+# one-shot: python scripts/block_registry.py promote --id skill_create-skill --sandbox-if-needed
+python scripts/block_registry.py attach --socket executor.pre_task_skills --id skill_create-skill
+python scripts/block_registry.py list-blocks
+python scripts/block_registry.py list-sockets
+python scripts/block_registry.py resolve --socket executor.pre_task_skills
+python scripts/block_registry.py resolve --socket executor.pre_task_skills --bodies
+python scripts/block_registry.py revoke --id skill_create-skill
+# Safe load: pipeline.block_registry.load_socket_skill_bodies("executor.pre_task_skills")
+# Thin hook: ExecutorAgent.build_context injects verified executor.pre_task_skills bodies.
 
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py
