@@ -58,6 +58,7 @@ __all__ = [
     "save_graph",
     "load_graph",
     "graph_path",
+    "plan_factory_actions",
 ]
 
 
@@ -359,3 +360,106 @@ def load_graph(goal_id: str) -> dict[str, Any] | None:
     if not isinstance(data, dict):
         return None
     return data
+
+
+def _base_slug_for_mcp(node_slug: str) -> str:
+    """Strip mcp_ prefix from node slug if present (MCP factory wraps capability slug)."""
+    s = (node_slug or "").strip()
+    if s.startswith("mcp_"):
+        return s[4:] or s
+    return s
+
+
+def plan_factory_actions(graph: dict[str, Any]) -> dict[str, Any]:
+    """After critique: enqueue MCP wraps for missing mcp nodes; handoff software gaps.
+
+    For each node kind==mcp and status==missing: enqueue_wrap(base_slug) where
+    base_slug strips a leading ``mcp_`` prefix from node.slug when present.
+
+    For software nodes with status==missing: append to metrics/goal_build_handoffs.jsonl
+    only (no software factory seed).
+
+    Returns ``{enqueued: [paths], software_handoffs: [...], issues: [...]}``.
+    """
+    from pipeline.paths import get_pipeline_dir
+
+    enqueued: list[str] = []
+    software_handoffs: list[dict[str, Any]] = []
+    issues: list[str] = []
+
+    if not isinstance(graph, dict):
+        return {
+            "enqueued": enqueued,
+            "software_handoffs": software_handoffs,
+            "issues": ["graph is not a dict"],
+        }
+
+    goal_id = str(graph.get("goal_id") or "") or None
+    goal_text = str(graph.get("goal_text") or "")
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        return {
+            "enqueued": enqueued,
+            "software_handoffs": software_handoffs,
+            "issues": ["graph has no nodes list"],
+        }
+
+    for node in nodes:
+        if not isinstance(node, dict):
+            issues.append("invalid node entry")
+            continue
+        kind = str(node.get("kind") or "").strip().lower()
+        status = str(node.get("status") or "").strip().lower()
+        slug = str(node.get("slug") or "").strip()
+        nid = node.get("id") or slug or "?"
+
+        if status != "missing":
+            continue
+
+        if kind == "mcp":
+            if not slug:
+                issues.append(f"node {nid}: mcp missing but no slug")
+                continue
+            base_slug = _base_slug_for_mcp(slug)
+            if not base_slug:
+                issues.append(f"node {nid}: empty base_slug after strip")
+                continue
+            try:
+                from pipeline.mcp_queue import enqueue_wrap
+
+                path = enqueue_wrap(
+                    base_slug,
+                    goal_id=goal_id,
+                    reason=f"graph missing mcp node {nid} ({slug})",
+                )
+                enqueued.append(str(path))
+            except Exception as exc:
+                issues.append(f"node {nid} ({slug}): enqueue failed: {exc}")
+
+        elif kind == "software":
+            handoff = {
+                "goal_id": goal_id,
+                "node_id": nid,
+                "slug": slug,
+                "kind": kind,
+                "status": status,
+                "goal_text": goal_text[:500],
+                "reason": f"graph missing software node {nid} ({slug})",
+                "policy": "build",
+            }
+            software_handoffs.append(handoff)
+            try:
+                metrics = get_pipeline_dir() / "metrics"
+                metrics.mkdir(parents=True, exist_ok=True)
+                with (metrics / "goal_build_handoffs.jsonl").open(
+                    "a", encoding="utf-8"
+                ) as f:
+                    f.write(json.dumps(handoff, ensure_ascii=False) + "\n")
+            except Exception as exc:
+                issues.append(f"node {nid} ({slug}): handoff write failed: {exc}")
+
+    return {
+        "enqueued": enqueued,
+        "software_handoffs": software_handoffs,
+        "issues": issues,
+    }

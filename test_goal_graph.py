@@ -159,3 +159,81 @@ def test_save_load_roundtrip(
     assert loaded["critique"]["ok"] is True
 
     assert load_graph("does_not_exist") is None
+
+
+def test_plan_factory_actions_enqueues_missing_mcp(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+    from pipeline.goal_graph import GRAPH_SCHEMA, plan_factory_actions
+    from pipeline.mcp_queue import list_pending, load_job, queue_dir
+
+    reload_pipeline_dir()
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_mcp_miss",
+        "goal_text": "need mcp wrap for foo_cli",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "mcp",
+                "slug": "mcp_foo_cli",
+                "label": "mcp_foo_cli",
+                "status": "missing",
+                "oracle": "capability_invoke_help",
+                "requires": [],
+            },
+            {
+                "id": "n2",
+                "kind": "software",
+                "slug": "gone_tool",
+                "label": "gone_tool",
+                "status": "missing",
+                "oracle": "capability_invoke_help",
+                "requires": [],
+            },
+            {
+                "id": "n3",
+                "kind": "mcp",
+                "slug": "bar_tool",
+                "label": "bar_tool",
+                "status": "verified",
+                "oracle": "capability_invoke_help",
+                "requires": [],
+            },
+        ],
+        "edges": [],
+        "critique": {"ok": False, "issues": ["node n1 status=missing"]},
+    }
+
+    out = plan_factory_actions(graph)
+    assert len(out["enqueued"]) == 1
+    assert out["issues"] == []
+    assert len(out["software_handoffs"]) == 1
+    assert out["software_handoffs"][0]["slug"] == "gone_tool"
+
+    pending = list_pending()
+    assert len(pending) == 1
+    job = load_job(pending[0])
+    assert job["schema"] == "mcp_factory_job.v1"
+    assert job["capability_slug"] == "foo_cli"  # mcp_ prefix stripped
+    assert job["status"] == "pending"
+    assert job.get("goal_id") == "g_mcp_miss"
+    assert pending[0].is_file()
+    assert pending[0].parent == queue_dir() / "pending"
+
+    handoff_path = pipeline / "metrics" / "goal_build_handoffs.jsonl"
+    assert handoff_path.is_file()
+    lines = [
+        ln for ln in handoff_path.read_text(encoding="utf-8").splitlines() if ln.strip()
+    ]
+    assert len(lines) == 1
+    row = __import__("json").loads(lines[0])
+    assert row["slug"] == "gone_tool"
+    assert row["policy"] == "build"
