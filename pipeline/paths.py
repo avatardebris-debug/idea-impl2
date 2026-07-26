@@ -24,6 +24,8 @@ __all__ = [
     "finetune_corpus_dir",
     "connectors_dir",
     "goals_dir",
+    "graphs_dir",
+    "mcps_dir",
     "shared_libs_dir",
     "registry_db",
     "capabilities_md",
@@ -74,6 +76,14 @@ def finetune_corpus_dir() -> pathlib.Path:
 
 def goals_dir() -> pathlib.Path:
     return get_pipeline_dir() / "goals"
+
+
+def graphs_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "graphs"
+
+
+def mcps_dir() -> pathlib.Path:
+    return get_pipeline_dir() / "mcps"
 
 
 def shared_libs_dir() -> pathlib.Path:
