@@ -85,7 +85,9 @@ def test_process_oracle_goal_proven(tmp_path, monkeypatch):
     tr = json.loads((tmp_path / "goal_traces" / f"{case.goal_id}.json").read_text(encoding="utf-8"))
     assert tr["schema"] == "goal_trace.v1"
     assert tr["status"] == "goal_proven"
+    assert tr["outcome"] == "proven"
     assert tr["train_weight"] == 4.0
+    assert tr.get("failure_class") in (None, "")
     assert any(e.get("type") == "tool" for e in tr["events"])
 
 
@@ -102,7 +104,11 @@ def test_structural_smoke_ok_and_missing_projects(tmp_path, monkeypatch):
     assert case.ok is True  # schema hard-pass
     assert case.status == "deeper_work_needed"  # missing proj_b
     assert case.goal_id
-    assert (tmp_path / "goal_traces" / f"{case.goal_id}.json").is_file()
+    tr_path = tmp_path / "goal_traces" / f"{case.goal_id}.json"
+    assert tr_path.is_file()
+    tr = json.loads(tr_path.read_text(encoding="utf-8"))
+    assert tr["outcome"] == "deeper"
+    assert tr["train_weight"] == 0.5
 
 
 def test_structural_smoke_bad_step(tmp_path, monkeypatch):
@@ -119,6 +125,12 @@ def test_structural_smoke_bad_step(tmp_path, monkeypatch):
     case = structural_smoke_connector(wf)
     assert case.ok is False
     assert case.status == "goal_failed"
+    tr = json.loads(
+        (tmp_path / "goal_traces" / f"{case.goal_id}.json").read_text(encoding="utf-8")
+    )
+    assert tr["outcome"] == "failed"
+    assert tr["failure_class"] == "smoke_fail"
+    assert tr["train_weight"] == 0.1
 
 
 def test_run_connector_smoke_suite(tmp_path, monkeypatch):

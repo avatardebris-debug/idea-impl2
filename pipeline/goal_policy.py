@@ -23,7 +23,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from pipeline.goal_trace import append_event, finalize_trace, start_trace
+from pipeline.goal_trace import (
+    FAILURE_CAPABILITY,
+    FAILURE_COMPOSE,
+    FAILURE_MCP_ENQUEUED,
+    FAILURE_POLICY_YIELD,
+    OUTCOME_DEEPER,
+    OUTCOME_FAILED,
+    OUTCOME_PROVEN,
+    append_event,
+    finalize_trace,
+    start_trace,
+)
 from pipeline.paths import connectors_dir, get_pipeline_dir
 
 POLICY_REUSE = "reuse"
@@ -276,11 +287,14 @@ def execute_policy(
             finalize_trace(
                 tr,
                 status="goal_proven" if ok else "goal_failed",
+                outcome=OUTCOME_PROVEN if ok else OUTCOME_FAILED,
+                failure_class=None if ok else FAILURE_CAPABILITY,
                 oracle={
                     "name": "capability_invoke",
                     "pass": ok,
                     "evidence": decision.capability_slug,
                 },
+                claim="capability_invoke",
                 train_weight=4.0 if ok else 0.1,
             )
             return result
@@ -289,7 +303,10 @@ def execute_policy(
             finalize_trace(
                 tr,
                 status="goal_failed",
+                outcome=OUTCOME_FAILED,
+                failure_class=FAILURE_CAPABILITY,
                 oracle={"name": "capability_invoke", "pass": False, "evidence": str(exc)},
+                claim="capability_invoke",
             )
             result["reason"] = str(exc)
             return result
@@ -320,11 +337,13 @@ def execute_policy(
                 finalize_trace(
                     tr,
                     status="goal_proven",
+                    outcome=OUTCOME_PROVEN,
                     oracle={
                         "name": "connector_compose",
                         "pass": True,
                         "evidence": decision.connector_slug,
                     },
+                    claim="connector_compose",
                     train_weight=3.0,
                 )
             else:
@@ -332,11 +351,14 @@ def execute_policy(
                 finalize_trace(
                     tr,
                     status="deeper_work_needed",
+                    outcome=OUTCOME_DEEPER,
+                    failure_class=FAILURE_COMPOSE,
                     oracle={
                         "name": "connector_compose",
                         "pass": False,
                         "evidence": str(out)[:400],
                     },
+                    claim="connector_compose",
                     train_weight=0.2,
                 )
             return result
@@ -345,7 +367,10 @@ def execute_policy(
             finalize_trace(
                 tr,
                 status="goal_failed",
+                outcome=OUTCOME_FAILED,
+                failure_class=FAILURE_COMPOSE,
                 oracle={"name": "connector_compose", "pass": False, "evidence": str(exc)},
+                claim="connector_compose",
             )
             result["reason"] = str(exc)
             result["status"] = "failed"
@@ -361,9 +386,12 @@ def execute_policy(
                 content="mcp policy: no capability/connector slug to wrap",
                 ok=False,
             )
+            # mcp_enqueued is NOT proven — deeper work for factory loop
             finalize_trace(
                 tr,
                 status="deeper_work_needed",
+                outcome=OUTCOME_DEEPER,
+                failure_class=FAILURE_MCP_ENQUEUED,
                 oracle={
                     "name": "mcp_factory_enqueued",
                     "pass": False,
@@ -390,9 +418,12 @@ def execute_policy(
                 result_snip=str(job_path),
                 ok=True,
             )
+            # Enqueue success is still deeper (factory must smoke later) — not proven
             finalize_trace(
                 tr,
                 status="deeper_work_needed",
+                outcome=OUTCOME_DEEPER,
+                failure_class=FAILURE_MCP_ENQUEUED,
                 oracle={
                     "name": "mcp_factory_enqueued",
                     "pass": True,
@@ -409,6 +440,8 @@ def execute_policy(
             finalize_trace(
                 tr,
                 status="goal_failed",
+                outcome=OUTCOME_FAILED,
+                failure_class=FAILURE_MCP_ENQUEUED,
                 oracle={
                     "name": "mcp_factory_enqueued",
                     "pass": False,
@@ -444,6 +477,7 @@ def execute_policy(
         finalize_trace(
             tr,
             status="deeper_work_needed",
+            outcome=OUTCOME_DEEPER,
             oracle={"name": "policy_build", "pass": False, "evidence": decision.reason},
             train_weight=0.0,
         )
@@ -460,6 +494,7 @@ def execute_policy(
         finalize_trace(
             tr,
             status="deeper_work_needed",
+            outcome=OUTCOME_DEEPER,
             oracle={"name": "policy_research", "pass": False, "evidence": "hermes"},
             train_weight=0.0,
         )
@@ -471,6 +506,8 @@ def execute_policy(
     finalize_trace(
         tr,
         status="deeper_work_needed",
+        outcome=OUTCOME_DEEPER,
+        failure_class=FAILURE_POLICY_YIELD,
         oracle={"name": "policy_yield", "pass": False, "evidence": decision.reason},
         train_weight=0.0,
     )

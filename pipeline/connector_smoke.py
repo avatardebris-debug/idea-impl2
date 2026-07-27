@@ -15,7 +15,7 @@ Layers
    try ``run_workflow`` with force / native backend (skips live n8n).
 
 Every case writes a ``goal_trace.v1`` under ``{PIPELINE_DIR}/goal_traces/``
-with status goal_proven | goal_failed | deeper_work_needed.
+with closed outcome proven | failed | deeper (legacy status still written).
 
 Reports: ``metrics/connector_smoke_latest.{md,json}``.
 """
@@ -30,6 +30,11 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.goal_trace import (
+    FAILURE_COMPOSE,
+    FAILURE_SMOKE,
+    OUTCOME_DEEPER,
+    OUTCOME_FAILED,
+    OUTCOME_PROVEN,
     append_event,
     finalize_trace,
     start_trace,
@@ -183,6 +188,8 @@ def structural_smoke_connector(wf: WorkflowDefinition) -> ConnectorSmokeCase:
 
     if hard_ok and not missing_projects:
         status = "goal_proven"
+        outcome = OUTCOME_PROVEN
+        fc = None
         oracle = {
             "name": "connector_structural",
             "pass": True,
@@ -191,6 +198,8 @@ def structural_smoke_connector(wf: WorkflowDefinition) -> ConnectorSmokeCase:
         train_w = 2.0  # structural is weaker than full process proof
     elif hard_ok:
         status = "deeper_work_needed"
+        outcome = OUTCOME_DEEPER
+        fc = None
         oracle = {
             "name": "connector_structural",
             "pass": True,
@@ -200,6 +209,8 @@ def structural_smoke_connector(wf: WorkflowDefinition) -> ConnectorSmokeCase:
         train_w = 0.5
     else:
         status = "goal_failed"
+        outcome = OUTCOME_FAILED
+        fc = FAILURE_SMOKE
         oracle = {
             "name": "connector_structural",
             "pass": False,
@@ -207,7 +218,15 @@ def structural_smoke_connector(wf: WorkflowDefinition) -> ConnectorSmokeCase:
         }
         train_w = 0.1
 
-    finalize_trace(tr, status=status, oracle=oracle, train_weight=train_w)
+    finalize_trace(
+        tr,
+        status=status,
+        outcome=outcome,
+        failure_class=fc,
+        oracle=oracle,
+        train_weight=train_w,
+        claim="connector_structural",
+    )
     return ConnectorSmokeCase(
         id=f"structural:{wf.slug}",
         slug=wf.slug,
@@ -253,7 +272,15 @@ def structural_smoke_broken_file(path: Path, error: str) -> ConnectorSmokeCase:
     )
     append_event(tr, type="tool", tool="connector.load", args={"path": str(path)}, result_snip=error, ok=False)
     oracle = {"name": "connector_structural", "pass": False, "evidence": error}
-    finalize_trace(tr, status="goal_failed", oracle=oracle, train_weight=0.1)
+    finalize_trace(
+        tr,
+        status="goal_failed",
+        outcome=OUTCOME_FAILED,
+        failure_class=FAILURE_SMOKE,
+        oracle=oracle,
+        train_weight=0.1,
+        claim="connector_structural",
+    )
     return ConnectorSmokeCase(
         id=f"structural:{slug}",
         slug=slug,
@@ -322,6 +349,8 @@ def execute_smoke_connector(
 
     if ok:
         status = "goal_proven"
+        outcome = OUTCOME_PROVEN
+        fc = None
         oracle = {
             "name": "connector_execute",
             "pass": True,
@@ -331,6 +360,8 @@ def execute_smoke_connector(
     else:
         # Draft bridges often fail on missing entrypoints — deeper work, not always hard fail
         status = "deeper_work_needed" if not require_execute else "goal_failed"
+        outcome = OUTCOME_DEEPER if not require_execute else OUTCOME_FAILED
+        fc = FAILURE_COMPOSE
         oracle = {
             "name": "connector_execute",
             "pass": False,
@@ -338,7 +369,15 @@ def execute_smoke_connector(
         }
         train_w = 0.2 if not require_execute else 0.1
 
-    finalize_trace(tr, status=status, oracle=oracle, train_weight=train_w)
+    finalize_trace(
+        tr,
+        status=status,
+        outcome=outcome,
+        failure_class=fc,
+        oracle=oracle,
+        train_weight=train_w,
+        claim="connector_execute",
+    )
     # Soft by default: real ok is reported; overall suite only fails HARD cases.
     return ConnectorSmokeCase(
         id=f"execute:{wf.slug}",
@@ -522,8 +561,11 @@ def run_process_oracle(*, work_dir: Path | None = None) -> ConnectorSmokeCase:
     finalize_trace(
         tr,
         status=status,
+        outcome=OUTCOME_PROVEN if oracle_pass else OUTCOME_FAILED,
+        failure_class=None if oracle_pass else FAILURE_SMOKE,
         oracle=oracle,
         train_weight=4.0 if oracle_pass else 0.1,
+        claim="process_oracle",
     )
 
     return ConnectorSmokeCase(

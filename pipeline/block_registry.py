@@ -839,11 +839,21 @@ def sandbox_block(
     _save_block(rec)
 
     if write_trace:
+        fc = None
+        if not passed:
+            # Prefer secret_fail when no_secrets check failed
+            for ch in checks:
+                if ch.get("name") == "no_secrets" and not ch.get("pass"):
+                    fc = "secret_fail"
+                    break
+            if fc is None:
+                fc = "sandbox_fail"
         _trace_block_action(
             rec,
             action="sandbox",
             ok=passed,
             detail=f"sandbox {'pass' if passed else 'fail'}",
+            failure_class=fc,
         )
     return rec
 
@@ -919,7 +929,9 @@ def promote_block(
     _save_block(rec)
 
     if write_trace:
-        _trace_block_action(rec, action="promote", ok=True, detail="promoted to verified")
+        _trace_block_action(
+            rec, action="promote", ok=True, detail="promoted to verified", failure_class=None
+        )
     return rec
 
 
@@ -933,7 +945,9 @@ def revoke_block(block_id: str, *, detach: bool = True, write_trace: bool = True
     if detach:
         _detach_block_from_all_sockets(block_id)
     if write_trace:
-        _trace_block_action(rec, action="revoke", ok=True, detail="revoked")
+        _trace_block_action(
+            rec, action="revoke", ok=True, detail="revoked", outcome_override="revoked"
+        )
     return rec
 
 
@@ -1154,9 +1168,18 @@ def _trace_block_action(
     action: str,
     ok: bool,
     detail: str = "",
+    failure_class: str | None = None,
+    outcome_override: str | None = None,
 ) -> None:
     try:
-        from pipeline.goal_trace import append_event, finalize_trace, start_trace
+        from pipeline.goal_trace import (
+            OUTCOME_FAILED,
+            OUTCOME_PROVEN,
+            OUTCOME_REVOKED,
+            append_event,
+            finalize_trace,
+            start_trace,
+        )
 
         bid = str(rec.get("id") or "unknown")
         tr = start_trace(
@@ -1173,10 +1196,23 @@ def _trace_block_action(
             result_snip=detail[:500],
             ok=ok,
         )
-        status = "goal_proven" if ok else "goal_failed"
+        if outcome_override == "revoked" or action == "revoke":
+            outcome = OUTCOME_REVOKED
+            status = "revoked"
+            fc = None
+        elif ok:
+            outcome = OUTCOME_PROVEN
+            status = "goal_proven"
+            fc = None
+        else:
+            outcome = OUTCOME_FAILED
+            status = "goal_failed"
+            fc = failure_class or "sandbox_fail"
         finalize_trace(
             tr,
             status=status,
+            outcome=outcome,
+            failure_class=fc,
             oracle={
                 "name": "skill_sandbox_fixture",
                 "pass": ok,
@@ -1184,7 +1220,8 @@ def _trace_block_action(
                 "block_id": bid,
                 "action": action,
             },
-            train_weight=0.0,
+            train_weight=0.0,  # structural; never high-weight field/goal claim
+            claim="block_promote",
         )
     except Exception:
         pass

@@ -94,9 +94,16 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 
 ### Layer D — Learning
 
-9. Unified outcome schema (extend goal_trace family):  
-   `proven | failed | deeper | revoked | human_rejected` + `failure_class` + `train_weight`.  
-10. Never high-weight train on unverified external “success.”
+9. Unified outcome schema (extend goal_trace family) — **shipped Phase 3**:  
+   `outcome ∈ {proven | failed | deeper | revoked | human_rejected}` + `failure_class` + `train_weight`.  
+   Helpers: `pipeline/goal_trace.py` — `set_outcome`, `finalize_trace`, `default_train_weight`, legacy status map.  
+   Writers (≥3): `goal_policy`, `connector_smoke`, `block_registry` (+ `mcp_factory` smoke/revoke).  
+   Legacy `status` (`goal_proven` / `goal_failed` / `deeper_work_needed`) still written; maps into `outcome`.  
+10. Never high-weight train on unverified external “success.”  
+    - `trust=external|untrusted` → train_weight ≤ 0.2 even if outcome=proven.  
+    - Baseline-only field (`field_test_passed` / claim=field_baseline) → not high weight; dual-gated `field_proven` can be proven + high.  
+    - `mcp_enqueued` is **deeper**, not proven (train_weight 0).  
+    - Block sandbox/promote structural pass → train_weight 0 (not field/goal claim).
 
 ---
 

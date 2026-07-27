@@ -44,6 +44,7 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - Docs state what field_proven does / does not mean
 
 ## Phase 3: Unified goal_trace outcomes + learning hygiene
+- **Status**: **DONE** (closed outcomes + train_weight helpers; ≥3 writers; docs)
 - **Description**: Extend goal_trace family so compose, promote, connector, troubleshoot recovery, field_proven events, and (later) external ingest share outcomes: `proven | failed | deeper | revoked | human_rejected` + `failure_class` + `train_weight`. Never high-weight train on untrusted external or weak field claims.
 - **Deliverable**: `pipeline/goal_trace.py` helpers; wire ≥3 writers; tests; docs.
 - **Dependencies**: Phase 2 preferred (so field_proven outcome is honest)

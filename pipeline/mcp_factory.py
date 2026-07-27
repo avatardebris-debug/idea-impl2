@@ -931,9 +931,15 @@ def revoke_mcp(
 
 
 def _trace_revoke(mcp_slug: str, result: dict[str, Any]) -> None:
-    """Best-effort goal_trace for revoke."""
+    """Best-effort goal_trace for revoke (closed outcome=revoked)."""
     try:
-        from pipeline.goal_trace import append_event, finalize_trace, start_trace
+        from pipeline.goal_trace import (
+            OUTCOME_FAILED,
+            OUTCOME_REVOKED,
+            append_event,
+            finalize_trace,
+            start_trace,
+        )
 
         wraps = _capability_from_mcp_slug(mcp_slug)
         tr = start_trace(
@@ -950,15 +956,18 @@ def _trace_revoke(mcp_slug: str, result: dict[str, Any]) -> None:
             result_snip=json.dumps(result, ensure_ascii=False)[:1500],
             ok=bool(result.get("ok")),
         )
+        ok = bool(result.get("ok"))
         finalize_trace(
             tr,
-            status="goal_proven" if result.get("ok") else "goal_failed",
+            status="revoked" if ok else "goal_failed",
+            outcome=OUTCOME_REVOKED if ok else OUTCOME_FAILED,
             oracle={
                 "name": "mcp_revoke",
-                "pass": bool(result.get("ok")),
+                "pass": ok,
                 "evidence": f"revoked {mcp_slug}",
             },
-            train_weight=0.5,
+            train_weight=0.5 if ok else 0.1,
+            claim="mcp_smoke",
         )
         result["goal_trace_id"] = tr.get("goal_id")
     except Exception as exc:
@@ -966,9 +975,21 @@ def _trace_revoke(mcp_slug: str, result: dict[str, Any]) -> None:
 
 
 def _trace_smoke(mcp_slug: str, report: dict[str, Any]) -> None:
-    """Best-effort goal_trace.v1 with mode=mcp_factory."""
+    """Best-effort goal_trace.v1 with mode=mcp_factory + closed outcomes.
+
+    smoke_report.json remains the durable oracle for graph smoke; goal_trace
+    mirrors the same ok/fail for learning hygiene (medium train_weight on pass).
+    """
     try:
-        from pipeline.goal_trace import append_event, finalize_trace, start_trace
+        from pipeline.goal_trace import (
+            FAILURE_INVOKE,
+            FAILURE_SMOKE,
+            OUTCOME_FAILED,
+            OUTCOME_PROVEN,
+            append_event,
+            finalize_trace,
+            start_trace,
+        )
 
         wraps = _capability_from_mcp_slug(mcp_slug)
         plan = [
@@ -992,16 +1013,29 @@ def _trace_smoke(mcp_slug: str, report: dict[str, Any]) -> None:
                 result_snip=json.dumps(ch, ensure_ascii=False)[:1500],
                 ok=bool(ch.get("ok")),
             )
-        status = "goal_proven" if report.get("ok") else "goal_failed"
+        ok = bool(report.get("ok"))
+        status = "goal_proven" if ok else "goal_failed"
+        fc = None
+        if not ok:
+            # Prefer invoke_fail when an invoke check failed
+            for ch in report.get("checks") or []:
+                if ch.get("method") == "invoke" and not ch.get("ok"):
+                    fc = FAILURE_INVOKE
+                    break
+            if fc is None:
+                fc = FAILURE_SMOKE
         finalize_trace(
             tr,
             status=status,
+            outcome=OUTCOME_PROVEN if ok else OUTCOME_FAILED,
+            failure_class=fc,
             oracle={
                 "name": "mcp_smoke",
-                "pass": bool(report.get("ok")),
+                "pass": ok,
                 "evidence": report.get("error") or f"smoke ok for {mcp_slug}",
             },
-            train_weight=1.0 if report.get("ok") else 0.1,
+            train_weight=1.0 if ok else 0.1,
+            claim="mcp_smoke",
         )
         report["goal_trace_id"] = tr.get("goal_id")
     except Exception as exc:

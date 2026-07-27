@@ -12,6 +12,7 @@ from pipeline.goal_policy import (
     POLICY_RESEARCH,
     POLICY_REUSE,
     POLICY_YIELD,
+    GoalPolicyDecision,
     classify_goal_branch,
     execute_policy,
 )
@@ -118,6 +119,8 @@ def test_execute_build_writes_goal_trace(tmp_path, monkeypatch):
     tr = json.loads(tr_path.read_text(encoding="utf-8"))
     assert tr["schema"] == "goal_trace.v1"
     assert tr["status"] == "deeper_work_needed"
+    assert tr["outcome"] == "deeper"
+    assert tr["train_weight"] == 0.0
 
 
 def test_keep_goal_traces_off_skips_write(tmp_path, monkeypatch):
@@ -177,4 +180,106 @@ def test_execute_mcp_enqueues_job(tmp_path, monkeypatch):
     assert tr_path.is_file()
     tr = json.loads(tr_path.read_text(encoding="utf-8"))
     assert tr["status"] == "deeper_work_needed"
+    # mcp_enqueued is NOT proven — deeper + zero train_weight
+    assert tr["outcome"] == "deeper"
+    assert tr["outcome"] != "proven"
+    assert tr["train_weight"] == 0.0
+    assert tr.get("failure_class") == "mcp_enqueued"
     assert tr.get("oracle", {}).get("name") == "mcp_factory_enqueued"
+
+
+def test_execute_yield_outcome_and_train_weight(tmp_path, monkeypatch):
+    """Yield path: outcome=deeper, failure_class=policy_yield, train_weight=0."""
+    _reload(tmp_path, monkeypatch)
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
+    d = GoalPolicyDecision(
+        policy=POLICY_YIELD,
+        reason="has requires but nothing invokable yet",
+        hits=[],
+    )
+    out = execute_policy(d, goal_text="blocked requires", branch_id="b_yield")
+    assert out["status"] == "yielded"
+    assert out.get("goal_id")
+    tr_path = tmp_path / "goal_traces" / f"{out['goal_id']}.json"
+    assert tr_path.is_file()
+    tr = json.loads(tr_path.read_text(encoding="utf-8"))
+    assert tr["schema"] == "goal_trace.v1"
+    assert tr["status"] == "deeper_work_needed"
+    assert tr["outcome"] == "deeper"
+    assert tr["train_weight"] == 0.0
+    assert tr.get("failure_class") == "policy_yield"
+    assert tr.get("oracle", {}).get("name") == "policy_yield"
+
+
+def test_execute_reuse_outcome_and_train_weight(tmp_path, monkeypatch):
+    """Reuse path: capability invoke success → outcome=proven, high train_weight."""
+    _reload(tmp_path, monkeypatch)
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
+
+    def _fake_invoke(slug, args=""):
+        assert slug == "foo_cli"
+        return "OK: invoked foo_cli"
+
+    monkeypatch.setattr(
+        "pipeline.capability_tools.invoke_capability",
+        _fake_invoke,
+        raising=False,
+    )
+    # Import path used inside execute_policy is pipeline.capability_tools
+    import sys
+
+    import types
+
+    mod = types.ModuleType("pipeline.capability_tools")
+    mod.invoke_capability = _fake_invoke
+    monkeypatch.setitem(sys.modules, "pipeline.capability_tools", mod)
+
+    d = GoalPolicyDecision(
+        policy=POLICY_REUSE,
+        reason="router hit",
+        capability_slug="foo_cli",
+        hits=[{"slug": "foo_cli", "requires_ok": True}],
+    )
+    out = execute_policy(d, goal_text="use foo_cli", branch_id="b_reuse")
+    assert out["status"] == "achieved"
+    assert out.get("goal_id")
+    tr_path = tmp_path / "goal_traces" / f"{out['goal_id']}.json"
+    assert tr_path.is_file()
+    tr = json.loads(tr_path.read_text(encoding="utf-8"))
+    assert tr["outcome"] == "proven"
+    assert tr["status"] == "goal_proven"
+    assert tr["train_weight"] == 4.0
+    assert tr.get("claim") == "capability_invoke"
+    assert tr.get("failure_class") in (None, "")
+    assert tr.get("oracle", {}).get("name") == "capability_invoke"
+    assert tr.get("oracle", {}).get("pass") is True
+
+
+def test_execute_reuse_fail_outcome(tmp_path, monkeypatch):
+    """Reuse path fail: outcome=failed, failure_class=capability_fail, low weight."""
+    _reload(tmp_path, monkeypatch)
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
+
+    def _fake_invoke(slug, args=""):
+        return "ERR: not found"
+
+    import sys
+    import types
+
+    mod = types.ModuleType("pipeline.capability_tools")
+    mod.invoke_capability = _fake_invoke
+    monkeypatch.setitem(sys.modules, "pipeline.capability_tools", mod)
+
+    d = GoalPolicyDecision(
+        policy=POLICY_REUSE,
+        reason="router hit",
+        capability_slug="missing_cli",
+    )
+    out = execute_policy(d, goal_text="use missing", branch_id="b_reuse_fail")
+    assert out["status"] == "failed"
+    tr = json.loads(
+        (tmp_path / "goal_traces" / f"{out['goal_id']}.json").read_text(encoding="utf-8")
+    )
+    assert tr["outcome"] == "failed"
+    assert tr["failure_class"] == "capability_fail"
+    assert tr["train_weight"] == 0.1

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
 import sys
 
@@ -107,6 +108,19 @@ def test_sandbox_pass_and_secret_fail(
     names = {c["name"] for c in out2["sandbox_report"]["checks"] if not c["pass"]}
     assert "no_secrets" in names
 
+    # goal_trace on secret fail: outcome=failed, failure_class=secret_fail, low weight
+    traces = list((pipeline / "goal_traces").glob("block_sandbox_*.json"))
+    assert traces, "expected sandbox goal_traces"
+    secret_trs = []
+    for p in traces:
+        t = json.loads(p.read_text(encoding="utf-8"))
+        if t.get("failure_class") == "secret_fail":
+            secret_trs.append(t)
+    assert secret_trs, "expected at least one secret_fail trace"
+    st = secret_trs[-1]
+    assert st["outcome"] == "failed"
+    assert st["train_weight"] == 0.0
+
 
 def test_secret_variants(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
@@ -187,6 +201,14 @@ def test_promote_only_when_sandboxed(
     assert promoted["status"] == "verified"
     assert "v0 ok" in (promoted.get("promote_notes") or "")
     assert (promoted.get("sandbox_report") or {}).get("promoted_content_sha256")
+
+    # promote pass path: outcome proven but train_weight 0 (structural, not field/goal)
+    promo_trs = list((pipeline / "goal_traces").glob("block_promote_*.json"))
+    assert promo_trs, "expected promote goal_traces"
+    pt = json.loads(promo_trs[-1].read_text(encoding="utf-8"))
+    assert pt["outcome"] == "proven"
+    assert pt["train_weight"] == 0.0
+    assert pt.get("claim") == "block_promote"
 
     _write_skill(skills_root, "one-shot", "# One\n\nShot.")
     r2 = register_block_from_skill("one-shot")

@@ -666,6 +666,24 @@ python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder --run-
 
 # Goal traces (goal_trace.v1 under $PIPELINE_DIR/goal_traces/):
 # python -c "from pipeline.goal_trace import sandbox_file_exists_goal; from pathlib import Path; print(sandbox_file_exists_goal(Path('README.md'))['status'])"
+#
+# Closed outcomes (Phase 3 learning hygiene) — field on every finalized trace:
+#   outcome ∈ {proven | failed | deeper | revoked | human_rejected}
+# Legacy status still written: goal_proven | goal_failed | deeper_work_needed | revoked | …
+#   + failure_class (e.g. secret_fail, smoke_fail, mcp_enqueued, policy_yield)
+#   + train_weight (see pipeline/goal_trace.default_train_weight)
+#
+# train_weight rules (operator summary):
+#   HIGH (≥3): dual-gated field_proven, process oracle, trusted capability invoke
+#   MEDIUM (~1–2): MCP smoke pass, connector structural pass
+#   LOW/ZERO: deeper, failed, mcp_enqueued, yield/build, block sandbox/promote,
+#             baseline-only field_test_passed (NOT field_proven), human_rejected
+#   NEVER HIGH on untrusted external "success" (trust=external → ≤0.2 even if proven)
+#   field_proven (Phase 2 dual gate) → outcome=proven + high weight only when claim/dual_gate
+#   field baseline-only / runner green alone → outcome=deeper (or low weight), not high proven
+#
+# KEEP_GOAL_TRACES default ON; set 0/false/no/off to skip disk writes (in-memory still updates).
+# Writers: goal_policy, connector_smoke, block_registry, mcp_factory (smoke/revoke).
 
 # Budget yield ladder: budget_exceeded is a yield (strikes 1→2→3), not permanent death.
 # Skill /blocker-identifier produces the same blocker_report.v1 schema for manual BE3.
