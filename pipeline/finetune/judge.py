@@ -388,6 +388,16 @@ def main() -> None:
     parser.add_argument("--model",     default="qwen3.6:35b-a3b-q4_K_M")
     args = parser.parse_args()
 
+    try:
+        from pipeline.llm_route import apply_llm_route
+
+        args.provider, args.model, _ = apply_llm_route(
+            args.provider, args.model, soft_ollama=True
+        )
+    except Exception as exc:
+        print(f"llm_route: {exc}", file=sys.stderr)
+        sys.exit(2)
+
     llm   = get_llm(args.provider, model=args.model, temperature=0.1)
     judge = CodeJudge(llm)
 

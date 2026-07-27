@@ -134,6 +134,12 @@ def _load_llm(provider: str, model: str):
     """Return an LLMBase adapter. Delegates to project's llm_interface."""
     sys.path.insert(0, str(ROOT))
     from llm_interface import get_llm  # type: ignore[import]
+    try:
+        from pipeline.llm_route import apply_llm_route
+
+        provider, model, _ = apply_llm_route(provider, model, soft_ollama=True)
+    except Exception:
+        pass
     return get_llm(provider, model=model, temperature=0.2)
 
 

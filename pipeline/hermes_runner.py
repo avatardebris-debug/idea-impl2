@@ -285,6 +285,13 @@ def resolve_hermes_route(
 
     *ollama_check* is an optional callable(model) -> bool for tests.
     """
+    try:
+        from pipeline.llm_route import ensure_project_dotenv
+
+        ensure_project_dotenv()
+    except Exception:
+        pass
+
     configured_model = (model or _pipeline_model()).strip()
     # provider arg is informational only for routing; policy always prefers live Ollama
     _ = provider or _pipeline_provider()

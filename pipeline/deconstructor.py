@@ -1479,7 +1479,9 @@ def run_llm_deconstruct(
     if llm_response is None and llm_caller is None:
         from pipeline.llm_route import resolve_pipeline_llm
 
-        provider, model, route_reason = resolve_pipeline_llm(provider, model)
+        provider, model, route_reason = resolve_pipeline_llm(
+            provider, model, soft_ollama=True
+        )
     else:
         # Still load .env so agent callers see XAI_API_KEY
         try:

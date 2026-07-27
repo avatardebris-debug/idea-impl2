@@ -272,7 +272,7 @@ def _run_via_pipeline_llm(
     header: str,
     prompt_err: str,
 ) -> EngineResult:
-    """Execute a skill step via llm_interface (ollama/qwen/…), no GROK_BUILD_CMD."""
+    """Execute a skill step via llm_interface (ollama/qwen or xAI), no GROK_BUILD_CMD."""
     prov = (
         os.environ.get("GROK_BUILD_PROVIDER")
         or os.environ.get("PIPELINE_PROVIDER")
@@ -283,6 +283,19 @@ def _run_via_pipeline_llm(
         or os.environ.get("PIPELINE_MODEL")
         or ""
     ).strip() or None
+
+    try:
+        from pipeline.llm_route import apply_llm_route
+
+        prov, mod, route_reason = apply_llm_route(prov, mod, soft_ollama=True)
+    except Exception as route_exc:
+        return EngineResult(
+            success=False,
+            step=step,
+            exit_code=1,
+            log_path=str(log_path),
+            error=f"llm_route: {route_exc}",
+        )
 
     prompt_text = ""
     if prompt_file and prompt_file.is_file():
@@ -333,7 +346,7 @@ def _run_via_pipeline_llm(
         try:
             log_path.write_text(
                 header
-                + f"# backend=pipeline_llm provider={prov} model={mod}\n"
+                + f"# backend=pipeline_llm provider={prov} model={mod} route={route_reason}\n"
                 + f"# written={written}\n# ---\n"
                 + content[:50000],
                 encoding="utf-8",

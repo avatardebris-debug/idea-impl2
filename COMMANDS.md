@@ -218,7 +218,7 @@ Grok driver — classic executor is **not** dual-scheduled.
 # Local/qwen build steps without grok.exe (optional)
 export PIPELINE_ENGINE=grok_build
 export GROK_BUILD_BACKEND=pipeline_llm
-export PIPELINE_PROVIDER=ollama
+export PIPELINE_PROVIDER=ollama   # soft preference: if model missing, llm_route may use xAI
 export PIPELINE_MODEL=qwen3.6:35b-a3b-q4_K_M
 export FIELD_PLAN_ENGINE=pipeline_llm   # or heuristic / auto
 

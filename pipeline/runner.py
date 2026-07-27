@@ -738,6 +738,21 @@ def main():
             print(f"  [{label:12}] {row['slug']:40} status={row['status']}")
         return
 
+    # Soft llm_route: default --provider ollama is preference only — if the
+    # configured model is not on Ollama, use xAI when XAI_API_KEY/.env present.
+    # Explicit --provider grok|openai|… is honored. Cloud with Qwen installed stays Ollama.
+    try:
+        from pipeline.llm_route import apply_llm_route
+
+        _rp, _rm, _rr = apply_llm_route(
+            args.provider, args.model, soft_ollama=True, set_environ=True
+        )
+        if (_rp, _rm) != (args.provider, args.model):
+            print(f"  [llm_route] {args.provider}/{args.model} → {_rp}/{_rm} ({_rr})")
+        args.provider, args.model = _rp, _rm
+    except Exception as _lr_exc:
+        print(f"  [llm_route] skipped: {_lr_exc}")
+
     if args.list_goals:
         ensure_pipeline_ready(hermes=False)
         from pipeline.goal_attempt import list_attemptable_goals

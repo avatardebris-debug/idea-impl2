@@ -305,6 +305,13 @@ def plan_via_pipeline_llm(
     ).strip() or None
 
     try:
+        from pipeline.llm_route import apply_llm_route
+
+        prov, mod, route_reason = apply_llm_route(prov, mod, soft_ollama=True)
+    except Exception as route_exc:
+        return False, f"llm_route: {route_exc}"
+
+    try:
         from llm_interface import get_llm
 
         llm = get_llm(prov, model=mod, temperature=0.2, slug=slug or project_dir.name)
@@ -325,7 +332,7 @@ def plan_via_pipeline_llm(
             return False, "pipeline_llm response missing Field Tests structure"
         field_path.parent.mkdir(parents=True, exist_ok=True)
         field_path.write_text(body if body.endswith("\n") else body + "\n", encoding="utf-8")
-        return True, f"pipeline_llm:{prov}:{mod or 'default'}"
+        return True, f"pipeline_llm:{prov}:{mod or 'default'}:{route_reason}"
     except Exception as exc:
         return False, f"pipeline_llm failed: {exc}"
 

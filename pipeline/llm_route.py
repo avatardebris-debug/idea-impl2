@@ -92,15 +92,26 @@ def resolve_pipeline_llm(
     model: str | None = None,
     *,
     ollama_check: Any = None,
+    soft_ollama: bool = False,
 ) -> tuple[str, str, str]:
     """Return (provider, model, reason).
 
     Raises ValueError when no backend can run.
+
+    soft_ollama:
+      When True, provider ``ollama`` (or empty/auto) is treated as preference only:
+      if the Ollama model is missing, fall through to xAI when a key is present.
+      When False, explicit ``ollama`` stays ollama even if the model is absent
+      (caller will 404 — useful for force-local).
     """
     ensure_project_dotenv()
 
     p = (provider or "").strip().lower()
     m = (model or "").strip()
+
+    # Soft: treat bare ollama as auto (device-aware default for this workstation)
+    if soft_ollama and p in ("", "auto", "default", "any", "ollama"):
+        p = ""
 
     # Explicit provider from CLI / caller (not auto)
     if p and p not in ("auto", "default", "any"):
@@ -133,3 +144,21 @@ def resolve_pipeline_llm(
         "and XAI_API_KEY / GROK_API_KEY is not set (checked process env and project .env). "
         "Set --provider grok --model grok-3, or install the Ollama model, or put XAI_API_KEY in .env."
     )
+
+
+def apply_llm_route(
+    provider: str | None = None,
+    model: str | None = None,
+    *,
+    soft_ollama: bool = True,
+    ollama_check: Any = None,
+    set_environ: bool = False,
+) -> tuple[str, str, str]:
+    """Resolve and optionally publish PIPELINE_PROVIDER / PIPELINE_MODEL for children."""
+    p, m, reason = resolve_pipeline_llm(
+        provider, model, soft_ollama=soft_ollama, ollama_check=ollama_check
+    )
+    if set_environ:
+        os.environ["PIPELINE_PROVIDER"] = p
+        os.environ["PIPELINE_MODEL"] = m
+    return p, m, reason

@@ -61,3 +61,31 @@ def test_no_backend_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValueError, match="No LLM backend"):
         resolve_pipeline_llm(None, "missing-model", ollama_check=lambda _m: False)
+
+
+def test_soft_ollama_falls_to_grok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XAI_API_KEY", "xai-test-key-not-real-00000000")
+    from pipeline.llm_route import resolve_pipeline_llm
+
+    p, m, reason = resolve_pipeline_llm(
+        "ollama",
+        "qwen3.6:35b-a3b-q4_K_M",
+        soft_ollama=True,
+        ollama_check=lambda _m: False,
+    )
+    assert p == "grok"
+    assert m.startswith("grok")
+
+
+def test_hard_ollama_stays_ollama(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("XAI_API_KEY", "xai-test-key-not-real-00000000")
+    from pipeline.llm_route import resolve_pipeline_llm
+
+    p, m, reason = resolve_pipeline_llm(
+        "ollama",
+        "qwen3.6:35b-a3b-q4_K_M",
+        soft_ollama=False,
+        ollama_check=lambda _m: False,
+    )
+    assert p == "ollama"
+    assert "qwen" in m

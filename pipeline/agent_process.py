@@ -102,16 +102,31 @@ class AgentProcess:
         model: str = DEFAULT_MODEL,
         bus: MessageBus | None = None,
     ):
+        # Device-aware backend: Ollama if configured model is installed, else xAI
+        # when XAI_API_KEY is in env or project .env (same policy as Hermes / deconstructor).
+        self._llm_route_reason = ""
+        try:
+            from pipeline.llm_route import apply_llm_route
+
+            provider, model, self._llm_route_reason = apply_llm_route(
+                provider, model, soft_ollama=True
+            )
+        except Exception as exc:
+            # Keep constructor args; call_llm_direct may still fail with a clear error
+            logger.debug("[%s] llm_route skipped: %s", getattr(self, "role", "?"), exc)
+
         self.provider = provider
         self.model = model
         self.heavy_model = model  # Store the primary loaded heavy model
 
-        # Light-tier model routing: if PIPELINE_LIGHT_MODEL is set and this agent
-        # is marked model_tier="light", use the smaller model automatically.
-        # This lets the 2B model handle planners/manager/validator while the 35B
-        # handles executor/reviewer — zero code changes in the agent subclasses.
+        # Light-tier model routing: only when still on Ollama (local small model).
+        # Do not force an Ollama light tag onto a grok/* xAI route.
         _light_model = os.environ.get("PIPELINE_LIGHT_MODEL", "").strip()
-        if _light_model and getattr(self, "model_tier", "heavy") == "light":
+        if (
+            _light_model
+            and getattr(self, "model_tier", "heavy") == "light"
+            and str(self.provider).strip().lower() == "ollama"
+        ):
             self.model = _light_model
 
         self.bus = bus or MessageBus()
@@ -122,6 +137,14 @@ class AgentProcess:
         self._run_dir = _PROJECT_ROOT
         self._setup_logging()
         self._setup_signal_handlers()
+        if self._llm_route_reason:
+            logger.info(
+                "[%s] llm_route → provider=%s model=%s (%s)",
+                self.role,
+                self.provider,
+                self.model,
+                self._llm_route_reason,
+            )
 
     # --- Lifecycle ---
 
@@ -933,6 +956,14 @@ class AgentProcess:
             system = system[:4000] + "\n...(truncated for direct planner call)"
         if system_prompt_addon:
             system += f"\n\n{system_prompt_addon}"
+
+        # Ensure .env keys are visible for grok adapter (no-op if already loaded).
+        try:
+            from pipeline.llm_route import ensure_project_dotenv
+
+            ensure_project_dotenv()
+        except Exception:
+            pass
 
         # slug="" disables Ollama KV-cache (/api/generate), which can hang on 35B models.
         llm = get_llm(
