@@ -34,6 +34,7 @@ NODE_KINDS = frozenset(
 EXECUTABLE_KINDS = frozenset({"software", "connector", "mcp", "skill"})
 
 DEFAULT_ORACLE = "capability_invoke_help"
+MCP_ORACLE = "mcp_invoke_help"
 
 # Map registry / router hit kinds onto the closed lego enum.
 _KIND_MAP = {
@@ -53,12 +54,14 @@ _KIND_MAP = {
 __all__ = [
     "GRAPH_SCHEMA",
     "DEFAULT_ORACLE",
+    "MCP_ORACLE",
     "compile_goal_graph",
     "critique_graph",
     "save_graph",
     "load_graph",
     "graph_path",
     "plan_factory_actions",
+    "compile_graph_from_smoked_mcps",
 ]
 
 
@@ -98,6 +101,8 @@ def _oracle_for_kind(kind: str, hit: dict[str, Any] | None = None) -> str:
             return str(o["name"])
         if isinstance(o, str) and o.strip():
             return o.strip()
+    if kind == "mcp":
+        return MCP_ORACLE
     if kind in EXECUTABLE_KINDS:
         return DEFAULT_ORACLE
     return ""
@@ -108,6 +113,129 @@ def _slug_tokens_from_text(text: str) -> set[str]:
     for m in re.finditer(r"\b([a-z][a-z0-9_]{2,})\b", (text or "").lower()):
         mentioned.add(m.group(1))
     return mentioned
+
+
+def _smoked_mcp_nodes_for_goal(
+    goal_text: str,
+    *,
+    already: set[str],
+    mentioned: set[str],
+    remaining: int,
+) -> list[dict[str, Any]]:
+    """Include smoked MCPs whose slug or wraps_capability appears in goal text."""
+    if remaining <= 0:
+        return []
+    try:
+        from pipeline.mcp_factory import list_mcps
+    except Exception:
+        return []
+    out: list[dict[str, Any]] = []
+    try:
+        rows = list_mcps()
+    except Exception:
+        return []
+    text_l = (goal_text or "").lower()
+    for man in rows:
+        if remaining <= 0:
+            break
+        if not isinstance(man, dict):
+            continue
+        if str(man.get("status") or "") not in ("smoked", "verified"):
+            continue
+        mslug = str(man.get("mcp_slug") or "").strip()
+        wraps = str(man.get("wraps_capability") or "").strip()
+        if not mslug or mslug in already:
+            continue
+        # Match mcp_foo, foo, or explicit mention
+        if (
+            mslug.lower() in mentioned
+            or wraps.lower() in mentioned
+            or mslug.lower() in text_l
+            or (wraps and wraps.lower() in text_l)
+            or f"mcp_{wraps}".lower() in text_l
+        ):
+            out.append(
+                {
+                    "slug": mslug,
+                    "kind": "mcp",
+                    "label": wraps or mslug,
+                    "status": "verified",
+                    "oracle": MCP_ORACLE,
+                    "requires": [wraps] if wraps else [],
+                }
+            )
+            already.add(mslug)
+            remaining -= 1
+    return out
+
+
+def compile_graph_from_smoked_mcps(
+    *,
+    goal_id: str,
+    goal_text: str = "",
+    mcp_slugs: list[str] | None = None,
+    max_nodes: int = 10,
+) -> dict[str, Any]:
+    """Build graph.v1 from already-smoked MCPs under PIPELINE_DIR/mcps/.
+
+    If *mcp_slugs* is set, only those (must be smoked). Else all smoked MCPs
+    up to *max_nodes*. Primary use: fixture for map-blocks workflow tests.
+    """
+    from pipeline.mcp_factory import is_mcp_smoked, list_mcps, mcp_slug_for
+
+    max_nodes = max(0, int(max_nodes))
+    rows = list_mcps()
+    wanted: set[str] | None = None
+    if mcp_slugs is not None:
+        wanted = {mcp_slug_for(s) for s in mcp_slugs if str(s).strip()}
+
+    hits: list[dict[str, Any]] = []
+    for man in rows:
+        if not isinstance(man, dict):
+            continue
+        mslug = str(man.get("mcp_slug") or "").strip()
+        if not mslug:
+            continue
+        if wanted is not None and mslug not in wanted:
+            continue
+        if str(man.get("status") or "") not in ("smoked", "verified"):
+            if wanted is not None and mslug in wanted and not is_mcp_smoked(mslug):
+                # explicit request but not ready — still add as missing for plan-factories
+                hits.append(
+                    {
+                        "slug": mslug,
+                        "kind": "mcp",
+                        "status": "missing",
+                        "label": man.get("wraps_capability") or mslug,
+                        "oracle": {"name": MCP_ORACLE},
+                        "requires": [man.get("wraps_capability")]
+                        if man.get("wraps_capability")
+                        else [],
+                    }
+                )
+            continue
+        hits.append(
+            {
+                "slug": mslug,
+                "kind": "mcp",
+                "status": "verified",
+                "title": man.get("wraps_capability") or mslug,
+                "oracle": {"name": MCP_ORACLE},
+                "requires": [man.get("wraps_capability")]
+                if man.get("wraps_capability")
+                else [],
+            }
+        )
+        if len(hits) >= max_nodes:
+            break
+
+    text = goal_text or (
+        "Utility MCP workflow fixture: "
+        + ", ".join(h["slug"] for h in hits[:max_nodes])
+    )
+    g = compile_goal_graph(text, goal_id=goal_id, route_hits=hits, max_nodes=max_nodes)
+    g["source"] = "smoked_mcps"
+    return g
 
 
 def _connector_nodes_for_goal(
@@ -232,6 +360,28 @@ def compile_goal_graph(
         seen.add(slug)
         mentioned.add(slug)
         mentioned.add(slug.replace("-", "_"))
+
+    # Smoked MCPs under PIPELINE_DIR/mcps mentioned in text (or all if include_smoked_mcps)
+    remaining = max_nodes - len(nodes)
+    if remaining > 0:
+        for raw in _smoked_mcp_nodes_for_goal(
+            goal_text,
+            already=seen,
+            mentioned=mentioned,
+            remaining=remaining,
+        ):
+            nodes.append(
+                _make_node(
+                    index=len(nodes) + 1,
+                    slug=raw["slug"],
+                    kind="mcp",
+                    label=raw["label"],
+                    status=raw["status"],
+                    oracle=raw["oracle"],
+                    requires=raw.get("requires"),
+                )
+            )
+            seen.add(raw["slug"])
 
     remaining = max_nodes - len(nodes)
     if remaining > 0:

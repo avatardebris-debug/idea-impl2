@@ -41,7 +41,8 @@ Until skill/prompt/MCP/**workflow** each have something like the software column
 | **skill_load** | Find + inject skill markdown into pipeline context. |
 | **Empty block / role socket** | **v0 shipped.** `pipeline/block_registry.py` sockets: `executor.pre_task_skills`, `manager.blocker_skill`, `goal.policy_skill`, `phase_planner.skill`. Attach only `verified` (or `sandboxed` if socket allows). Store: `$PIPELINE_DIR/state/block_registry/`. |
 | **create-a-prompt skill** | **Missing.** No QC’d authoring of role prompts. Register existing prompt files as draft blocks yes (`register_block_from_prompt_file`). |
-| **Skill/prompt promote pipeline** | **v0 shipped (static).** register draft → sandbox (file/size/secrets/frontmatter) → promote verified → attach. CLI: `scripts/block_registry.py`. goal_trace mode=`block_promote`. No critic/mission LLM yet. |
+| **Skill/prompt promote pipeline** | **v0 shipped (static).** register draft → sandbox (file/size/secrets/frontmatter) → promote verified → attach. CLI: `scripts/block_registry.py`. Habit convenience: `register-skill --sandbox` / `register-prompt --sandbox`. goal_trace mode=`block_promote`. No critic/mission LLM yet. |
+| **Deconstructor v0** | **Shipped.** Candidate inventory + closed replacement classes (`pipeline/deconstructor.py`, `scripts/deconstructor.py`). Modes: org\|credits\|tool_surface\|genre\|open. Does **not** write graph.v1. Skill: `.grok/skills/deconstructor`. |
 | **External ingest** (GitHub / MCP market) | **Missing.** No pin/hash/scan/rank/approve. |
 | **Human push approval + mute** | **Missing** — design hook later; product nice-to-have (see below). |
 

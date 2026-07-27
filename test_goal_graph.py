@@ -237,3 +237,49 @@ def test_plan_factory_actions_enqueues_missing_mcp(
     row = __import__("json").loads(lines[0])
     assert row["slug"] == "gone_tool"
     assert row["policy"] == "build"
+
+
+def test_compile_graph_from_smoked_mcps(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    monkeypatch.setenv("KEEP_GOAL_TRACES", "1")
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import (
+        MCP_ORACLE,
+        compile_graph_from_smoked_mcps,
+        critique_graph,
+        save_graph,
+    )
+    from pipeline.mcp_factory import smoke_mcp, wrap_capability_as_mcp
+
+    wrap_capability_as_mcp("util_a", force=True)
+    wrap_capability_as_mcp("util_b", force=True)
+    assert smoke_mcp("mcp_util_a", require_invoke=False)["ok"]
+    assert smoke_mcp("mcp_util_b", require_invoke=False)["ok"]
+
+    g = compile_graph_from_smoked_mcps(
+        goal_id="mcp_fixture",
+        goal_text="use smoked utility MCPs",
+        mcp_slugs=["mcp_util_a", "mcp_util_b"],
+    )
+    assert g["schema"] == "graph.v1"
+    assert g.get("source") == "smoked_mcps"
+    slugs = {n["slug"] for n in g["nodes"]}
+    assert "mcp_util_a" in slugs
+    assert "mcp_util_b" in slugs
+    for n in g["nodes"]:
+        if n["kind"] == "mcp":
+            assert n["status"] == "verified"
+            o = n.get("oracle")
+            name = o.get("name") if isinstance(o, dict) else o
+            assert name == MCP_ORACLE
+    crit = critique_graph(g)
+    assert crit["ok"] is True, crit
+    save_graph(g)

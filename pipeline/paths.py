@@ -82,6 +82,11 @@ def graphs_dir() -> pathlib.Path:
     return get_pipeline_dir() / "graphs"
 
 
+def deconstructs_dir() -> pathlib.Path:
+    """Candidate inventory outputs from deconstructor v0 (not production graphs)."""
+    return get_pipeline_dir() / "deconstructs"
+
+
 def mcps_dir() -> pathlib.Path:
     return get_pipeline_dir() / "mcps"
 

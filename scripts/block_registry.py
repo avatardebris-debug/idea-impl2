@@ -58,12 +58,22 @@ def main(argv: list[str] | None = None) -> int:
     p_rs.add_argument("--name", required=True, help="Skill name (e.g. create-skill)")
     p_rs.add_argument("--force", action="store_true", help="Overwrite existing draft record")
     p_rs.add_argument("--risk", default="low", choices=["low", "medium", "high"])
+    p_rs.add_argument(
+        "--sandbox",
+        action="store_true",
+        help="Run static sandbox immediately after register (habit convenience)",
+    )
 
     p_rp = sub.add_parser("register-prompt", help="Register draft prompt block from markdown file")
     p_rp.add_argument("--path", required=True, help="Path to prompt .md")
     p_rp.add_argument("--name", required=True, help="Block name")
     p_rp.add_argument("--force", action="store_true")
     p_rp.add_argument("--risk", default="low", choices=["low", "medium", "high"])
+    p_rp.add_argument(
+        "--sandbox",
+        action="store_true",
+        help="Run static sandbox immediately after register (habit convenience)",
+    )
 
     p_sb = sub.add_parser("sandbox", help="Static sandbox checks → sandboxed if pass")
     p_sb.add_argument("--id", required=True, help="Block id")
@@ -120,9 +130,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.cmd == "register-skill":
             rec = br.register_block_from_skill(
-                args.name, force=bool(args.force), risk_class=args.risk
+                args.name,
+                force=bool(args.force),
+                risk_class=args.risk,
+                sandbox=bool(args.sandbox),
             )
             _print_json(rec)
+            if args.sandbox and not (rec.get("sandbox_report") or {}).get("pass"):
+                return 1
             return 0
 
         if args.cmd == "register-prompt":
@@ -131,8 +146,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.name,
                 force=bool(args.force),
                 risk_class=args.risk,
+                sandbox=bool(args.sandbox),
             )
             _print_json(rec)
+            if args.sandbox and not (rec.get("sandbox_report") or {}).get("pass"):
+                return 1
             return 0
 
         if args.cmd == "sandbox":

@@ -203,7 +203,7 @@ def test_drain_queue_wraps_and_marks_done(
     enqueue_wrap("drain_cap_a", reason="test drain")
     assert len(list_pending()) == 1
 
-    results = drain_queue(limit=1)
+    results = drain_queue(limit=1, require_invoke=False)
     assert len(results) == 1
     assert results[0]["ok"] is True, results[0]
     assert results[0]["mcp_slug"] == "mcp_drain_cap_a"
@@ -235,3 +235,112 @@ def test_register_mcp_best_effort(
     assert "registry_note" in man2
     # Prefer success when registry helpers work
     assert man2["registry_note"].startswith("registry_")
+
+
+def test_skip_if_smoked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import is_mcp_smoked, smoke_mcp, wrap_capability_as_mcp
+
+    wrap_capability_as_mcp("skip_cap", force=True)
+    r1 = smoke_mcp("mcp_skip_cap", require_invoke=False)
+    assert r1["ok"] is True
+    assert is_mcp_smoked("mcp_skip_cap")
+    r2 = smoke_mcp("mcp_skip_cap", skip_if_smoked=True, require_invoke=False)
+    assert r2["ok"] is True
+    assert r2.get("skipped") is True
+    assert r2.get("skip_reason") == "already_smoked"
+
+
+def test_invoke_oracle_with_real_mini_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """require_invoke=True needs live capability under PIPELINE_DIR (subprocess server)."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    # Mini project + registry row so invoke_capability works inside MCP server process
+    ws = pipeline / "projects" / "inv_cap" / "workspace"
+    ws.mkdir(parents=True)
+    (ws / "cli.py").write_text(
+        "import sys\nprint('usage: inv_cap --help')\nsys.exit(0)\n",
+        encoding="utf-8",
+    )
+    from pipeline.capability_registry import _connect, _now
+    from pipeline.paths import registry_db
+
+    conn = _connect()
+    conn.execute(
+        """
+        INSERT INTO capabilities
+        (slug, title, kind, status, purpose, domains, entrypoint, import_path,
+         cwd_template, requires, example_invoke, source_project, phase, total_phases, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(slug) DO UPDATE SET
+            status=excluded.status,
+            entrypoint=excluded.entrypoint,
+            cwd_template=excluded.cwd_template,
+            updated_at=excluded.updated_at
+        """,
+        (
+            "inv_cap",
+            "Inv Cap",
+            "project",
+            "verified",
+            "test",
+            "[]",
+            "python cli.py",
+            "",
+            "projects/inv_cap/workspace",
+            "[]",
+            "python cli.py --help",
+            "inv_cap",
+            1,
+            1,
+            _now(),
+        ),
+    )
+    conn.commit()
+    conn.close()
+    assert registry_db().is_file()
+
+    from pipeline.mcp_factory import smoke_mcp, wrap_capability_as_mcp
+
+    wrap_capability_as_mcp("inv_cap", force=True)
+    report = smoke_mcp(
+        "mcp_inv_cap",
+        require_invoke=True,
+        invoke_args="--help",
+        timeout_s=20.0,
+    )
+    assert report["ok"] is True, report
+    methods = {c["method"]: c for c in report["checks"]}
+    assert methods["ping"]["ok"] is True
+    assert methods["describe"]["ok"] is True
+    assert methods["invoke"]["ok"] is True
+
+
+def test_drain_skips_already_smoked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.mcp_factory import drain_queue, smoke_mcp, wrap_capability_as_mcp
+    from pipeline.mcp_queue import enqueue_wrap, list_pending
+
+    wrap_capability_as_mcp("pre_smoked", force=True)
+    assert smoke_mcp("mcp_pre_smoked", require_invoke=False)["ok"] is True
+    enqueue_wrap("pre_smoked", reason="already done")
+    assert len(list_pending()) == 1
+    results = drain_queue(limit=1, skip_if_smoked=True, require_invoke=False)
+    assert len(results) == 1
+    assert results[0]["ok"] is True
+    assert results[0].get("skipped") is True
+    assert list_pending() == []

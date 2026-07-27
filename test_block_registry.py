@@ -142,6 +142,25 @@ def test_secret_variants(
         assert detail != "ok", f"no_secrets should fail for {name}: {detail}"
 
 
+def test_register_skill_sandbox_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """register_block_from_skill(..., sandbox=True) runs static sandbox immediately."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _reload_pipeline(monkeypatch, pipeline)
+
+    skills_root = tmp_path / "skill_roots"
+    _write_skill(skills_root, "auto-sb-skill", "# Auto\n\nSandbox on register.")
+    _skill_roots(monkeypatch, skills_root)
+
+    from pipeline.block_registry import register_block_from_skill
+
+    rec = register_block_from_skill("auto-sb-skill", sandbox=True)
+    assert rec["status"] == "sandboxed"
+    assert (rec.get("sandbox_report") or {}).get("pass") is True
+
+
 def test_promote_only_when_sandboxed(
     monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
 ) -> None:

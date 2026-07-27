@@ -2,7 +2,8 @@
 
 **Status:** North-star note. Near-term work stays serial and measured; this is not a mandate to build full KG/MCP OS next.
 
-**Related:** connector smoke + goal_trace, troubleshoot consumer, truth-density, field_proven software factory, notes on held-out / goal traces.
+**Related:** connector smoke + goal_trace, troubleshoot consumer, truth-density, field_proven software factory, notes on held-out / goal traces.  
+**Read next:** [agi-lmaooo2.md](./agi-lmaooo2.md) (block readiness before graph engineer), [lmao-agi-discuss.md](./lmao-agi-discuss.md) (deconstructor / fractal / form↔function—hold lightly).
 **Plan (graph.v1 + MCP factory v0):** [docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md](../docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md)
 
 ---
@@ -106,7 +107,7 @@ Modeling existing success (credits, skill deconstruction) is valid **when** each
 
 ### Later (explicitly deferred)
 
-- **Graph engineer product** (author/critique large graphs) — tiny graph.v1 store is data only; engineer agent still deferred.
+- **Graph engineer product** (author/critique large graphs) — tiny graph.v1 store is data only; engineer agent still deferred. Prerequisites: [agi-lmaooo2.md](./agi-lmaooo2.md); candidate **deconstructor** prep: [lmao-agi-discuss.md](./lmao-agi-discuss.md).
 - Nest whole system as the only tool.
 - Open-world trust / funds / captcha mandate stack.
 - RSI successor improver as primary driver.

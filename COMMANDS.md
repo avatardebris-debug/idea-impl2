@@ -550,8 +550,21 @@ python scripts/factory_feature_matrix.py --json
 # Paths: register-prompt only under PROJECT_ROOT / PIPELINE_DIR / skill roots / factory prompts/
 # Promote always re-sandboxes + pins content_sha256 (edits after sandbox refuse promote).
 # Failed re-sandbox demotes verified → draft and detaches sockets.
+#
+# HABIT after create-skill / new SKILL.md (never skip promote before socket attach):
+#   1. register-skill  → draft
+#   2. sandbox         → sandboxed (static: file/size/secrets/frontmatter)
+#   3. promote         → verified (+ re-sandbox pin)
+#   4. attach          → role socket (verified only by default)
+# Convenience:
+#   register-skill --name X --sandbox              # steps 1+2
+#   promote --id skill_X --sandbox-if-needed       # steps 2+3 from draft
+# Full habit one path:
+#   register --sandbox → promote → attach
 python scripts/block_registry.py register-skill --name create-skill
+python scripts/block_registry.py register-skill --name create-skill --sandbox
 python scripts/block_registry.py register-prompt --path pipeline/prompts/executor.md --name executor
+python scripts/block_registry.py register-prompt --path pipeline/prompts/executor.md --name executor --sandbox
 python scripts/block_registry.py sandbox --id skill_create-skill
 python scripts/block_registry.py promote --id skill_create-skill
 # one-shot: python scripts/block_registry.py promote --id skill_create-skill --sandbox-if-needed
@@ -565,6 +578,19 @@ python scripts/block_registry.py resolve --socket executor.pre_task_skills --bod
 python scripts/block_registry.py revoke --id skill_create-skill
 # Safe load: pipeline.block_registry.load_socket_skill_bodies("executor.pre_task_skills")
 # Thin hook: ExecutorAgent.build_context injects verified executor.pre_task_skills bodies.
+
+# Deconstructor v0 (candidate inventory + replacement classes; NOT production graph.v1)
+# notes/lmao-agi-discuss.md — proposes nodes only; fill via create-skill / MCP factory / register→sandbox→promote
+# Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0
+python scripts/deconstructor.py build --mode org --target "small indie game studio"
+python scripts/deconstructor.py build --mode credits --target "NES platformer credits"
+python scripts/deconstructor.py build --mode tool_surface --target "Blender animation tools"
+python scripts/deconstructor.py build --mode genre --target "platformer"
+python scripts/deconstructor.py validate --id <deconstruct_id>
+python scripts/deconstructor.py plan-fill --id <deconstruct_id>
+python scripts/deconstructor.py from-json --path path/to/inventory.json
+python scripts/deconstructor.py list
+# Skill body for agents: .grok/skills/deconstructor/SKILL.md
 
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py

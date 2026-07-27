@@ -6,7 +6,7 @@
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 480
 #   .\scripts\overnight_grok_from_list.ps1 -DoExtract          # cloud zip
-#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # drain: resume in-flight + parked classic→grok
+#   .\scripts\overnight_grok_from_list.ps1 -NoFreshListOnly    # drain: resume in-flight + parked classic->grok
 #   .\scripts\overnight_grok_from_list.ps1 -FreshListOnly      # force new seeds only (even after crash)
 #
 # Traces / recovery:
@@ -32,7 +32,7 @@ param(
     [switch]$DoExtract,
     [switch]$DryRunEnvOnly,
     # Default ON (--fresh-list-only): new seeds only, not classic backlog zombies.
-    # Pass -NoFreshListOnly to drain parked classic→grok conversions / in-flight resume
+    # Pass -NoFreshListOnly to drain parked classic->grok conversions / in-flight resume
     # (sets CLASSIC_TO_GROK_DRAIN=1 so ladder may unpark sticky engine=grok_build BE).
     [switch]$NoFreshListOnly,
     # Force fresh-list even when prior overnight was incomplete (crash/reboot).
@@ -101,7 +101,7 @@ $env:FIELD_SHIP_REPAIR = "1"
 $env:FIELD_SHIP_REPAIR_BACKEND = "cli"
 $env:PIPELINE_GROK_SIDECAR = "0"
 $env:PYTHONUNBUFFERED = "1"
-# Durable recovery / traces (default keep — do not wipe goal_traces or recovery history)
+# Durable recovery / traces (default keep - do not wipe goal_traces or recovery history)
 if (-not $env:KEEP_GOAL_TRACES) { $env:KEEP_GOAL_TRACES = "1" }
 if (-not $env:TROUBLESHOOT_CONSUMER) { $env:TROUBLESHOOT_CONSUMER = "1" }
 if (-not $env:TROUBLESHOOT_MAX_ACTS) { $env:TROUBLESHOOT_MAX_ACTS = "2" }
@@ -117,7 +117,7 @@ if (-not $Model) {
             $env:PIPELINE_MODEL
         } else { "" }  # resolve from ollama list below
     } else {
-        # grok / openai / etc. — use .env PIPELINE_MODEL when it is an API model
+        # grok / openai / etc. - use .env PIPELINE_MODEL when it is an API model
         $Model = if ($env:PIPELINE_MODEL) { $env:PIPELINE_MODEL } else { "grok-4.3" }
     }
 }
@@ -131,7 +131,7 @@ $preferredOllamaModels = @(
     "llama3.2:latest"
 ) | Where-Object { $_ }
 
-# Detect incomplete prior overnight (no clean "end ..." line) → recover report + prefer resume.
+# Detect incomplete prior overnight (no clean "end ..." line) -> recover report + prefer resume.
 # Skip dirs already recovered: synthetic end line OR INCOMPLETE.md alone (truth_density optional).
 $incompletePrior = $null
 $logsRoot = Join-Path $PipelineDir "logs"
@@ -149,7 +149,7 @@ if (Test-Path $logsRoot) {
             if ($line -match '^\s*end\s+') { $hasEnd = $true; break }
         }
         if ($hasEnd) { continue }
-        # Already recovered once — do not stick forever on auto-resume
+        # Already recovered once - do not stick forever on auto-resume
         $incompleteMd = Join-Path $dir.FullName "INCOMPLETE.md"
         if (Test-Path $incompleteMd) { continue }
         $incompletePrior = $dir.Name
@@ -188,7 +188,7 @@ $pre = [ordered]@{
     warnings       = @()
 }
 if ($incompletePrior) {
-    $pre.warnings += "Incomplete prior overnight '$incompletePrior' (no end line) — will recover truth-density; default resume in-flight unless -FreshListOnly"
+    $pre.warnings += "Incomplete prior overnight '$incompletePrior' (no end line) - will recover truth-density; default resume in-flight unless -FreshListOnly"
 }
 
 # Field rework caps (accumulative; not infinite token/time on stuck ship projects)
@@ -313,7 +313,7 @@ if ($incompletePrior) {
     $ErrorActionPreference = "Continue"
     try {
         $priorDir = Join-Path $logsRoot $incompletePrior
-        # 1) Synthetic end line first — detection matches ^\s*end\s+
+        # 1) Synthetic end line first - detection matches ^\s*end\s+
         $priorRunnerLog = Join-Path $priorDir "runner.log"
         if (Test-Path $priorRunnerLog) {
             $endIso = Get-Date -Format o
@@ -388,10 +388,10 @@ $pyArgs = @(
 )
 if ($useFreshList) {
     $pyArgs += "--fresh-list-only"
-    # Fresh-list: do not unpark parked classic→grok converts
+    # Fresh-list: do not unpark parked classic->grok converts
     if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "0" }
 } else {
-    # Drain / resume path: in-flight + parked classic→grok (serial)
+    # Drain / resume path: in-flight + parked classic->grok (serial)
     if (-not $env:CLASSIC_TO_GROK_DRAIN) { $env:CLASSIC_TO_GROK_DRAIN = "1" }
 }
 $pyArgs = $pyArgs + $ideaArgs

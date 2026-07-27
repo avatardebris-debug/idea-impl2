@@ -35,6 +35,7 @@ __all__ = [
     "TOOLS",
     "mcp_slug_for",
     "mcp_dir",
+    "is_mcp_smoked",
     "wrap_capability_as_mcp",
     "smoke_mcp",
     "register_mcp",
@@ -231,7 +232,11 @@ def wrap_capability_as_mcp(
         try:
             existing = json.loads(manifest_path.read_text(encoding="utf-8"))
             if existing.get("schema") == SCHEMA and (d / "server.py").is_file():
-                # Keep existing; ensure server_path is absolute-ish str
+                # Keep existing; note skip when already smoked (drain safety)
+                if str(existing.get("status") or "") in ("smoked", "verified"):
+                    existing = dict(existing)
+                    existing["skipped"] = True
+                    existing["skip_reason"] = "already_smoked"
                 return existing
         except (json.JSONDecodeError, OSError):
             pass
@@ -312,15 +317,67 @@ def _rpc_line(proc: subprocess.Popen, req: dict, *, timeout_s: float) -> dict:
     return json.loads(out)
 
 
-def smoke_mcp(mcp_slug: str, *, timeout_s: float = 15.0) -> dict:
-    """Spawn server.py, send ping + describe, require ok.
+def is_mcp_smoked(mcp_slug: str) -> bool:
+    """True if manifest status is smoked/verified and server.py exists."""
+    mslug = mcp_slug_for(mcp_slug)
+    d = mcp_dir(mslug)
+    if not (d / "server.py").is_file():
+        return False
+    man = _load_manifest(mslug)
+    if not man:
+        return False
+    return str(man.get("status") or "") in ("smoked", "verified")
+
+
+def smoke_mcp(
+    mcp_slug: str,
+    *,
+    timeout_s: float = 15.0,
+    require_invoke: bool = False,
+    invoke_args: str = "--help",
+    skip_if_smoked: bool = False,
+    force: bool = False,
+) -> dict:
+    """Spawn server.py; ping + describe required; optional invoke oracle.
 
     Writes smoke_report.json next to the server. Records goal_trace
-    mode=mcp_factory. Does **not** require invoke to succeed.
+    mode=mcp_factory.
+
+    *require_invoke*: also require method invoke with *invoke_args* (default
+    ``--help``) to return ok. Use for real capability quality bar.
+    *skip_if_smoked*: if already smoked/verified and not *force*, return prior
+    report without re-spawning (drain-queue bulk safety).
     """
     mslug = mcp_slug_for(mcp_slug)
     d = mcp_dir(mslug)
     server = d / "server.py"
+
+    if skip_if_smoked and not force and is_mcp_smoked(mslug):
+        prior: dict[str, Any] = {
+            "ok": True,
+            "mcp_slug": mslug,
+            "skipped": True,
+            "skip_reason": "already_smoked",
+            "server_path": str(server),
+            "ts": _iso(),
+            "manifest_status": (_load_manifest(mslug) or {}).get("status"),
+        }
+        # Prefer last smoke_report if present
+        sr = d / "smoke_report.json"
+        if sr.is_file():
+            try:
+                old = json.loads(sr.read_text(encoding="utf-8"))
+                if isinstance(old, dict) and old.get("ok"):
+                    prior["prior_smoke"] = {
+                        "ts": old.get("ts"),
+                        "checks": [
+                            c.get("method") for c in (old.get("checks") or [])
+                        ],
+                    }
+            except (json.JSONDecodeError, OSError):
+                pass
+        return prior
+
     if not server.is_file():
         report = {
             "ok": False,
@@ -378,7 +435,7 @@ def smoke_mcp(mcp_slug: str, *, timeout_s: float = 15.0) -> dict:
             checks.append({"method": "ping", "ok": False, "error": str(exc)})
 
         # describe (must ok=True even if capability unknown)
-        if error is None or ok:
+        if ok:
             try:
                 desc_resp = _rpc_line(
                     proc, {"method": "describe", "params": {}}, timeout_s=timeout_s
@@ -394,6 +451,40 @@ def smoke_mcp(mcp_slug: str, *, timeout_s: float = 15.0) -> dict:
                 ok = False
                 error = error or f"describe error: {exc}"
                 checks.append({"method": "describe", "ok": False, "error": str(exc)})
+
+        # invoke oracle (optional hard fail)
+        if ok:
+            inv_args = (invoke_args if invoke_args is not None else "--help") or ""
+            try:
+                inv_resp = _rpc_line(
+                    proc,
+                    {"method": "invoke", "params": {"args": inv_args}},
+                    timeout_s=timeout_s,
+                )
+                inv_ok = bool(inv_resp.get("ok"))
+                checks.append(
+                    {
+                        "method": "invoke",
+                        "ok": inv_ok,
+                        "args": inv_args,
+                        "resp": inv_resp,
+                    }
+                )
+                if require_invoke and not inv_ok:
+                    ok = False
+                    error = error or f"invoke failed: {inv_resp}"
+            except Exception as exc:
+                checks.append(
+                    {
+                        "method": "invoke",
+                        "ok": False,
+                        "args": inv_args,
+                        "error": str(exc),
+                    }
+                )
+                if require_invoke:
+                    ok = False
+                    error = error or f"invoke error: {exc}"
     except Exception as exc:
         ok = False
         error = str(exc)
@@ -428,6 +519,10 @@ def smoke_mcp(mcp_slug: str, *, timeout_s: float = 15.0) -> dict:
         "checks": checks,
         "ts": _iso(),
         "timeout_s": timeout_s,
+        "require_invoke": bool(require_invoke),
+        "invoke_args": invoke_args if require_invoke or any(
+            c.get("method") == "invoke" for c in checks
+        ) else None,
     }
     if error:
         report["error"] = error
@@ -443,6 +538,12 @@ def smoke_mcp(mcp_slug: str, *, timeout_s: float = 15.0) -> dict:
         if ok:
             manifest["status"] = "smoked"
             manifest["smoked_at"] = report["ts"]
+            if require_invoke:
+                manifest["invoke_oracle"] = {
+                    "args": invoke_args,
+                    "ok": True,
+                    "at": report["ts"],
+                }
         else:
             # keep draft/prior; note last smoke failure
             manifest["last_smoke_ok"] = False
@@ -460,14 +561,17 @@ def _trace_smoke(mcp_slug: str, report: dict[str, Any]) -> None:
         from pipeline.goal_trace import append_event, finalize_trace, start_trace
 
         wraps = _capability_from_mcp_slug(mcp_slug)
+        plan = [
+            {"step": 1, "intent": "ping", "tool": "mcp.ping"},
+            {"step": 2, "intent": "describe", "tool": "mcp.describe"},
+        ]
+        if any(c.get("method") == "invoke" for c in (report.get("checks") or [])):
+            plan.append({"step": 3, "intent": "invoke", "tool": "mcp.invoke"})
         tr = start_trace(
             f"MCP factory smoke for {mcp_slug} (wraps {wraps})",
             goal_id=f"mcp_smoke_{uuid.uuid4().hex[:10]}",
             mode="mcp_factory",
-            plan=[
-                {"step": 1, "intent": "ping", "tool": "mcp.ping"},
-                {"step": 2, "intent": "describe", "tool": "mcp.describe"},
-            ],
+            plan=plan,
         )
         for ch in report.get("checks") or []:
             append_event(
@@ -649,8 +753,17 @@ def list_mcps() -> list[dict]:
     return out
 
 
-def drain_queue(*, limit: int = 1) -> list[dict]:
+def drain_queue(
+    *,
+    limit: int = 1,
+    require_invoke: bool = True,
+    invoke_args: str = "--help",
+    skip_if_smoked: bool = True,
+) -> list[dict]:
     """For each pending mcp_factory job (up to *limit*): wrap + smoke + mark_done.
+
+    Skips re-work when MCP already smoked (*skip_if_smoked*). By default runs
+    invoke oracle with ``--help`` (*require_invoke*).
 
     Returns a list of result dicts (one per job processed).
     """
@@ -678,11 +791,36 @@ def drain_queue(*, limit: int = 1) -> list[dict]:
             continue
 
         try:
+            mslug = mcp_slug_for(cap)
+            if skip_if_smoked and is_mcp_smoked(mslug):
+                man = _load_manifest(mslug) or {"mcp_slug": mslug, "status": "smoked"}
+                res = {
+                    "ok": True,
+                    "skipped": True,
+                    "skip_reason": "already_smoked",
+                    "job_id": job_id,
+                    "capability_slug": cap,
+                    "mcp_slug": mslug,
+                    "manifest": man,
+                }
+                mark_done(job_path, res)
+                results.append(res)
+                continue
+
             manifest = wrap_capability_as_mcp(cap)
-            mslug = str(manifest.get("mcp_slug") or mcp_slug_for(cap))
-            smoke = smoke_mcp(mslug)
+            mslug = str(manifest.get("mcp_slug") or mslug)
+            smoke = smoke_mcp(
+                mslug,
+                require_invoke=require_invoke,
+                invoke_args=invoke_args,
+                skip_if_smoked=False,
+            )
             try:
-                register_mcp(manifest if smoke.get("ok") else {**manifest, "status": manifest.get("status", "draft")})
+                register_mcp(
+                    manifest
+                    if smoke.get("ok")
+                    else {**manifest, "status": manifest.get("status", "draft")}
+                )
             except Exception as reg_exc:
                 smoke = dict(smoke)
                 smoke["register_error"] = str(reg_exc)

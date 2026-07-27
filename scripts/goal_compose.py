@@ -62,6 +62,39 @@ def cmd_compile(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_fixture_mcps(args: argparse.Namespace) -> int:
+    """Build graph.v1 from already-smoked MCPs (map-blocks fixture)."""
+    from pipeline.goal_graph import compile_graph_from_smoked_mcps, critique_graph, save_graph
+
+    slugs = None
+    if args.slugs:
+        slugs = [s.strip() for s in args.slugs.split(",") if s.strip()]
+    graph = compile_graph_from_smoked_mcps(
+        goal_id=args.goal_id,
+        goal_text=args.text
+        or "Utility MCP workflow: compose smoked tools as graph nodes",
+        mcp_slugs=slugs,
+        max_nodes=int(args.max_nodes),
+    )
+    crit = critique_graph(graph)
+    graph["critique"] = crit
+    graph["status"] = "executable" if crit.get("ok") else "blocked"
+    path = save_graph(graph)
+    print(
+        json.dumps(
+            {
+                "path": str(path),
+                "nodes": [n.get("slug") for n in (graph.get("nodes") or [])],
+                "critique": crit,
+                "graph": graph,
+            },
+            indent=2,
+            default=str,
+        )
+    )
+    return 0 if crit.get("ok") else 1
+
+
 def cmd_plan_factories(args: argparse.Namespace) -> int:
     from pipeline.goal_graph import load_graph, plan_factory_actions
 
@@ -168,6 +201,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional route hits when compiling missing graph",
     )
 
+    p_fix = sub.add_parser(
+        "fixture-mcps",
+        help="Compile graph from smoked MCPs under PIPELINE_DIR/mcps/ (map-blocks fixture)",
+    )
+    p_fix.add_argument("--goal-id", default="utility_mcp_fixture")
+    p_fix.add_argument(
+        "--text",
+        default="",
+        help="Optional goal text (default describes utility MCP workflow)",
+    )
+    p_fix.add_argument(
+        "--slugs",
+        default="",
+        help="Comma-separated mcp slugs (default: all smoked)",
+    )
+    p_fix.add_argument("--max-nodes", type=int, default=10)
+
     args = ap.parse_args(argv)
     _bind_pipeline_dir(args.pipeline_dir)
 
@@ -177,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_plan_factories(args)
     if args.cmd == "attempt":
         return cmd_attempt(args)
+    if args.cmd == "fixture-mcps":
+        return cmd_fixture_mcps(args)
     ap.error(f"unknown command: {args.cmd}")
     return 2
 

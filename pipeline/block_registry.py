@@ -489,8 +489,13 @@ def register_block_from_skill(
     *,
     force: bool = False,
     risk_class: str = "low",
+    sandbox: bool = False,
 ) -> dict[str, Any]:
-    """Discover skill via skill_load.find_skill_dir; create draft block.v1."""
+    """Discover skill via skill_load.find_skill_dir; create draft block.v1.
+
+    When *sandbox* is True, run static sandbox immediately after register
+    (habit convenience: register → sandbox without a second CLI step).
+    """
     from pipeline.skill_load import find_skill_dir
 
     n = _validate_block_name(name)
@@ -509,7 +514,10 @@ def register_block_from_skill(
         if str(existing.get("status")) == "revoked":
             pass
         else:
-            return existing
+            rec = existing
+            if sandbox and str(rec.get("status")) == "draft":
+                return sandbox_block(rec["id"])
+            return rec
 
     rec = _new_block(
         kind="skill",
@@ -519,6 +527,8 @@ def register_block_from_skill(
         risk_class=risk_class,
     )
     _save_block(rec)
+    if sandbox:
+        return sandbox_block(rec["id"])
     return rec
 
 
@@ -529,12 +539,15 @@ def register_block_from_prompt_file(
     force: bool = False,
     risk_class: str = "low",
     provenance: str = "project",
+    sandbox: bool = False,
 ) -> dict[str, Any]:
     """Register a prompt markdown file as draft block.
 
     Path must resolve under allowlisted roots (PROJECT_ROOT, PIPELINE_DIR,
     factory pipeline/prompts/, skill roots). Absolute paths outside those
     roots are rejected.
+
+    When *sandbox* is True, run static sandbox immediately after register.
     """
     raw = Path(path)
     # Reject obvious escape attempts in the raw string before joining roots
@@ -582,7 +595,10 @@ def register_block_from_prompt_file(
     existing = get_block(bid)
     if existing is not None and not force:
         if str(existing.get("status")) != "revoked":
-            return existing
+            rec = existing
+            if sandbox and str(rec.get("status")) == "draft":
+                return sandbox_block(rec["id"])
+            return rec
 
     rec = _new_block(
         kind="prompt",
@@ -592,6 +608,8 @@ def register_block_from_prompt_file(
         risk_class=risk_class,
     )
     _save_block(rec)
+    if sandbox:
+        return sandbox_block(rec["id"])
     return rec
 
 
@@ -642,6 +660,9 @@ def _resolve_source_path(rec: dict[str, Any]) -> Path | None:
 
 
 def _parse_skill_frontmatter_name(text: str) -> str | None:
+    # Strip UTF-8 BOM (common when files are written via PowerShell Set-Content)
+    if text.startswith("\ufeff"):
+        text = text.lstrip("\ufeff")
     if not text.startswith("---"):
         return None
     end = text.find("\n---", 3)

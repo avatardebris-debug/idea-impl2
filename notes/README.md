@@ -16,6 +16,8 @@ open questions that should not clutter `master_ideas.md`, `mission.yaml`, or `CO
 | [2026-07-22-p1-held-out-and-goal-traces.md](./2026-07-22-p1-held-out-and-goal-traces.md) | P1 held-out suite + goal_trace plan |
 | [2026-07-23-budget-ladder-trust-and-status.md](./2026-07-23-budget-ladder-trust-and-status.md) | Ladder, trust vision, **§7: workflow vs Grok Workflows (Rhai) earn order** |
 | [agi-lmaooo.md](./agi-lmaooo.md) | **North star:** capability graph → lego factories (software/connector/skill/MCP); goal policy; scale simple→complex |
+| [agi-lmaooo2.md](./agi-lmaooo2.md) | **Pre–graph-engineer readiness:** sockets, skill/prompt promote, external ingest, graph smoke; blocks before map |
+| [lmao-agi-discuss.md](./lmao-agi-discuss.md) | **Deconstructor + fractal hierarchy:** org/tool 80/20 → classes; form↔function; concepts must pair with agi-lmaooo2 |
 | [2026-07-26-comprehensive-codebase-review.md](./2026-07-26-comprehensive-codebase-review.md) | Full factory audit: path/cwd High bug, overnight resume stickiness, test evidence |
 | [../docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md](../docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md) | **Plan:** goal compose graph.v1 + MCP factory v0 (separate loop; T0–T6) |
 
