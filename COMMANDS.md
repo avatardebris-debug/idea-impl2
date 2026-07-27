@@ -582,10 +582,14 @@ python scripts/block_registry.py revoke --id skill_create-skill
 # Deconstructor (LLM primary — same pattern as idea_planner: prompt + model + critique)
 # Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0  (NOT production graph.v1)
 # Prompt: pipeline/prompts/deconstructor.md  Agent: pipeline/agents/deconstructor.py
-# PRIMARY — invent structure from a bare title (requires Ollama / PIPELINE_MODEL):
+# Provider auto-route (pipeline/llm_route.py — same idea as Hermes):
+#   1. Load project .env (XAI_API_KEY) without clobbering shell env
+#   2. Ollama if PIPELINE_MODEL is actually installed
+#   3. Else grok via XAI_API_KEY / GROK_API_KEY (default model grok-3)
+# This device: prefer Grok/xAI. Cloud: Ollama+Qwen when that model is present.
 python scripts/deconstructor.py run --mode org --target "award-winning modern game studio"
+python scripts/deconstructor.py run --mode org --target "community hospital" --provider grok --model grok-3
 python scripts/deconstructor.py run --mode org --target-file mission.txt
-python scripts/deconstructor.py run --mode credits --target "NES platformer credits"
 python -m pipeline.agents.deconstructor --target "community hospital" --mode org
 # Offline inject (tests): --inject-response path/to/model_output.json
 # SECONDARY — no LLM: parse already-structured text, or from-json:

@@ -104,18 +104,20 @@ def cmd_run(args: argparse.Namespace) -> int:
         _print_json({"error": str(exc)})
         return 1
 
+    path_out = None
+    if not args.no_save:
+        from pipeline.deconstructor import deconstruct_path
+
+        path_out = str(deconstruct_path(str(doc.get("id"))))
     _print_json(
         {
-            "path": str(
-                __import__("pipeline.deconstructor", fromlist=["deconstruct_path"]).deconstruct_path(
-                    str(doc.get("id"))
-                )
-            )
-            if not args.no_save
-            else None,
+            "path": path_out,
             "id": doc.get("id"),
             "status": doc.get("status"),
             "parse_source": doc.get("parse_source"),
+            "llm_provider": doc.get("llm_provider"),
+            "llm_model": doc.get("llm_model"),
+            "llm_route_reason": doc.get("llm_route_reason"),
             "needs_structure": doc.get("needs_structure"),
             "critique": doc.get("critique"),
             "candidate_count": len(doc.get("candidates") or []),
@@ -258,6 +260,14 @@ def cmd_seed_preview(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Load project .env early so XAI_API_KEY is visible before provider auto-route
+    try:
+        from pipeline.llm_route import ensure_project_dotenv
+
+        ensure_project_dotenv()
+    except Exception:
+        pass
+
     ap = argparse.ArgumentParser(
         description="Deconstructor: LLM inventory (run) or parse/validate (build/from-json)"
     )
@@ -266,13 +276,24 @@ def main(argv: list[str] | None = None) -> int:
 
     p_run = sub.add_parser(
         "run",
-        help="PRIMARY: LLM deconstruct target → deconstruct.v0 (uses Ollama/PIPELINE_MODEL)",
+        help=(
+            "PRIMARY: LLM deconstruct → deconstruct.v0. "
+            "Auto: Ollama if model present, else xAI Grok when XAI_API_KEY/.env set"
+        ),
     )
     _add_mode(p_run)
     _add_target_args(p_run)
     p_run.add_argument("--id", default="")
-    p_run.add_argument("--provider", default="", help="Override PIPELINE_PROVIDER")
-    p_run.add_argument("--model", default="", help="Override PIPELINE_MODEL")
+    p_run.add_argument(
+        "--provider",
+        default="",
+        help="ollama | grok | auto (default: auto via llm_route / Hermes policy)",
+    )
+    p_run.add_argument(
+        "--model",
+        default="",
+        help="Model id (Ollama tag or grok-3). Auto picks grok-3 on xAI when Ollama model missing",
+    )
     p_run.add_argument(
         "--inject-response",
         default="",

@@ -1463,19 +1463,40 @@ def run_llm_deconstruct(
 
     if request_timeout_s is None:
         try:
-            request_timeout_s = max(60, int(os.environ.get("OLLAMA_PLANNER_TIMEOUT", "180")))
+            # xAI / cloud may need longer than local; allow both env names
+            request_timeout_s = max(
+                60,
+                int(
+                    os.environ.get("DECONSTRUCTOR_LLM_TIMEOUT")
+                    or os.environ.get("OLLAMA_PLANNER_TIMEOUT")
+                    or "180"
+                ),
+            )
         except ValueError:
             request_timeout_s = 180
 
-    if not provider:
-        provider = os.environ.get("PIPELINE_PROVIDER", "ollama").strip() or "ollama"
-    if not model:
-        try:
-            from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
+    route_reason = "inject" if llm_response is not None else ""
+    if llm_response is None and llm_caller is None:
+        from pipeline.llm_route import resolve_pipeline_llm
 
-            model = os.environ.get("PIPELINE_MODEL", "").strip() or DEFAULT_PIPELINE_MODEL
+        provider, model, route_reason = resolve_pipeline_llm(provider, model)
+    else:
+        # Still load .env so agent callers see XAI_API_KEY
+        try:
+            from pipeline.llm_route import ensure_project_dotenv
+
+            ensure_project_dotenv()
         except Exception:
-            model = os.environ.get("PIPELINE_MODEL", "").strip() or "qwen3.6:35b-a3b-q4_K_M"
+            pass
+        if not provider:
+            provider = os.environ.get("PIPELINE_PROVIDER", "ollama").strip() or "ollama"
+        if not model:
+            try:
+                from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
+
+                model = os.environ.get("PIPELINE_MODEL", "").strip() or DEFAULT_PIPELINE_MODEL
+            except Exception:
+                model = os.environ.get("PIPELINE_MODEL", "").strip() or "qwen3.6:35b-a3b-q4_K_M"
 
     feedback = ""
     last_err: Exception | None = None
@@ -1503,8 +1524,8 @@ def run_llm_deconstruct(
                 raw = _chat_llm(
                     system=system,
                     user=user,
-                    provider=provider,
-                    model=model,
+                    provider=str(provider),
+                    model=str(model),
                     temperature=temperature,
                     request_timeout_s=int(request_timeout_s),
                 )
@@ -1518,6 +1539,9 @@ def run_llm_deconstruct(
                 deconstruct_id=deconstruct_id,
                 raw_llm=raw,
             )
+            doc["llm_provider"] = provider if llm_response is None else "inject"
+            doc["llm_model"] = model if llm_response is None else "inject"
+            doc["llm_route_reason"] = route_reason
             if (doc.get("critique") or {}).get("ok"):
                 break
             feedback = _format_critique_for_retry(doc.get("critique") or {})

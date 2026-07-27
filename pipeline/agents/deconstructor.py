@@ -49,6 +49,20 @@ class DeconstructorAgent(AgentProcess):
             )
 
         try:
+            # Auto-route unless caller forced a cloud API provider.
+            # AgentProcess defaults provider=ollama — on this device that is wrong
+            # when Qwen is not installed; fall through to XAI_API_KEY / .env.
+            from pipeline.llm_route import ensure_project_dotenv, resolve_pipeline_llm
+
+            ensure_project_dotenv()
+            forced = (self.provider or "").strip().lower()
+            if forced in ("", "ollama", "auto", "default"):
+                route_p, route_m, _reason = resolve_pipeline_llm(None, None)
+            else:
+                route_p, route_m, _reason = resolve_pipeline_llm(self.provider, self.model)
+            self.provider = route_p
+            self.model = route_m
+
             doc = run_llm_deconstruct(
                 target,
                 mode=mode,

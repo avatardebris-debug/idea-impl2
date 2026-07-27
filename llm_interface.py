@@ -594,12 +594,25 @@ class GrokAdapter(LLMBase):
             from openai import OpenAI
         except ImportError:
             raise ImportError("pip install openai  # Grok uses the OpenAI-compatible SDK")
-        api_key = os.environ.get("XAI_API_KEY")
+        api_key = (
+            os.environ.get("XAI_API_KEY", "").strip()
+            or os.environ.get("GROK_API_KEY", "").strip()
+        )
+        if not api_key:
+            # Project .env often holds the key; load if still missing
+            try:
+                from pipeline.llm_route import ensure_project_dotenv, xai_api_key
+
+                ensure_project_dotenv()
+                api_key = xai_api_key()
+            except Exception:
+                pass
         if not api_key:
             raise EnvironmentError(
-                "XAI_API_KEY is not set. "
-                "Get your key at https://console.x.ai and set:\n"
-                "  export XAI_API_KEY=xai-..."
+                "XAI_API_KEY (or GROK_API_KEY) is not set. "
+                "Get your key at https://console.x.ai and set it in the environment "
+                "or project .env:\n"
+                "  XAI_API_KEY=xai-..."
             )
         self.client = OpenAI(api_key=api_key, base_url=self.BASE_URL)
         self.model = model
