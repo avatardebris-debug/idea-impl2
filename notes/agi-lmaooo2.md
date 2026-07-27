@@ -22,7 +22,7 @@ Knowledge graph + graph engineer without that is a map of fiction. The aim of th
 |--------|-----------------|----------------|-----|---------------------|
 | Author | plan → implement | create-skill (TUI); **no create-prompt** | wrap verified cap (v0) | graph.v1 compile (thin) |
 | Gate | review, complete-gate | mostly none | smoke ping/describe | critique missing/oracle |
-| Prove | field_tests → field_proven | none | smoke ≠ field | **P3 v0** whole-graph cheap smoke (`smoke_pass`) |
+| Prove | dual gate: runner → `field_test_passed`; + ADEQUATE + min P*/I* → `field_proven` (author≠runner≠eval; skill must not self-prove) | none | smoke ≠ field | **P3 v0** whole-graph cheap smoke (`smoke_pass`) |
 | Register | registry + requires | skill_load roots only | kind=mcp row | graphs/*.json |
 | Insert into runtime | invoke_capability | inject ad hoc | invoke via MCP | policy enqueue only |
 | Recover | troubleshoot consumer | none | none | none |
@@ -155,3 +155,19 @@ Sensible now: `factory_feature_matrix.py`, live one verified MCP wrap, goal_comp
 ## Slogan (readiness)
 
 **No map without blocks; no blocks without sockets, smoke, and promote.**
+
+---
+
+## Field dual-gate honesty (factory software prove)
+
+As of Phase 2 integrity work:
+
+| Status | Meaning |
+|--------|---------|
+| `field_test_passed` | Mechanical runner green only |
+| `field_proven` | Runner green **and** Adequacy ADEQUATE **and** min non-trivial P*/I* bars |
+
+- **Author** ≠ **runner** ≠ **evaluator**. Runner (`field_test_runner`) is sole command oracle.
+- Thin ship uses `FIELD_PLAN_ENGINE` (+ `field_test_plan` prompt), not always `/field-test` skill.
+- Skill must plan → run → stop; must not claim proven because the plan file exists.
+- Overclaim risk: help/syntax/import-only plans used to set `field_proven` on runner green alone — dual gate closes that.

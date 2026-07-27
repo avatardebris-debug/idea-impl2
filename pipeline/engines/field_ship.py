@@ -1,19 +1,26 @@
 """
 Thin field ship for engine=grok_build (closed loop after complete).
 
-Plan backends (FIELD_PLAN_ENGINE):
+Plan backends (FIELD_PLAN_ENGINE) — author only; not the /field-test skill file:
   auto         — existing file → grok CLI → pipeline_llm → heuristic
   grok         — GROK_BUILD_CMD + field_test_plan prompt pack
   pipeline_llm — get_llm(provider/model) e.g. ollama/qwen (no Grok CLI key)
   heuristic    — deterministic smoke plan (no LLM)
   none         — only run if field_tests.md already exists
 
-Run is always local via field_test_runner (no API).
+Run is always local via field_test_runner (sole execution oracle; no LLM).
+
+Dual gate (FIELD_SHIP_DUAL_GATE, default on):
+  field_test_passed — runner all_passed (mechanical)
+  field_proven      — runner pass + ADEQUATE + min product/integration bars
+  Repair cannot promote field_proven without the same dual gate.
 
 Env:
   GROK_BUILD_THIN_SHIP=1       (default on) run thin ship after grok complete
   FIELD_PLAN_ENGINE=auto|...
   FIELD_SHIP_USEFULNESS=1      (default on) write usefulness_report.md
+  FIELD_SHIP_DUAL_GATE=1       (default on) dual-gate honesty
+  FIELD_MIN_PRODUCT / FIELD_MIN_INTEGRATION — min non-trivial P*/I* counts
   PIPELINE_PROVIDER / PIPELINE_MODEL — for pipeline_llm plan backend
   FIELD_PLAN_PROVIDER / FIELD_PLAN_MODEL — optional overrides for plan only
 """
@@ -667,12 +674,24 @@ def run_thin_field_ship(
     skip_if_terminal: bool = True,
 ) -> FieldShipResult:
     """
-    Plan (if needed) + run field tests + set field_proven / ship_insufficient.
+    Plan (if needed) + run field tests + dual-gate status.
 
     Intended for engine=grok_build after _mark_complete (status=complete).
+
+    With FIELD_SHIP_DUAL_GATE (default on):
+      runner fail → ship_insufficient (or deeper_work after rework budget)
+      runner pass → field_test_passed mechanically; field_proven only if
+      ADEQUATE + min product/integration bars (see field_prove_gate).
     """
+    from pipeline.field_prove_gate import (
+        assess_plan_bars,
+        decide_field_status,
+        dual_gate_enabled,
+        write_adequacy_note,
+    )
     from pipeline.field_test_runner import format_results_markdown, run_all_field_tests
     from pipeline.project_state import _write_state_dict
+
 
     project_dir = Path(project_dir)
     state = dict(state or {})
@@ -890,15 +909,38 @@ def run_thin_field_ship(
         )
         result.usefulness_path = str(up)
 
-    if run_all_passed:
+    # Dual gate: runner is sole oracle; field_proven needs ADEQUATE + min bars
+    plan_text = ""
+    try:
+        if field_path.is_file():
+            plan_text = field_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        plan_text = ""
+    bars = assess_plan_bars(plan_text)
+    gate = decide_field_status(
+        runner_all_passed=run_all_passed,
+        bars=bars,
+        dual_gate=dual_gate_enabled(),
+    )
+    result.extra["dual_gate"] = gate.to_dict()
+    try:
+        write_adequacy_note(project_dir, gate, plan_engine=eng)
+    except Exception:
+        pass
+
+    if run_all_passed and gate.field_proven:
         state["status"] = "field_proven"
         state["field_proven_at"] = datetime.now(timezone.utc).isoformat()
+        state["field_test_passed"] = True
         state.pop("field_ship_reason", None)
         _apply_ship_outcome(project_dir, state, "field_proven")
         result.ok = True
         result.status = "field_proven"
         total = result.passed + result.failed
-        result.reason = f"field PASS {result.passed}/{total or result.passed}"
+        result.reason = (
+            f"field PROVEN {result.passed}/{total or result.passed} "
+            f"(dual-gate ADEQUATE + min bars)"
+        )
         try:
             from pipeline.field_rework_budget import end_field_rework_attempt
 
@@ -917,6 +959,29 @@ def run_thin_field_ship(
             from pipeline.github_publish import maybe_publish_project
 
             maybe_publish_project(slug, trigger="field_proven")
+        except Exception:
+            pass
+    elif run_all_passed and not gate.field_proven:
+        # Mechanical pass only — do not overclaim field_proven
+        state["status"] = "field_test_passed"
+        state["field_test_passed"] = True
+        state["field_ship_reason"] = gate.reason
+        state.pop("field_proven_at", None)
+        # Sticky outcome: mechanical pass is not ship_insufficient
+        try:
+            state["ship_outcome"] = "field_test_passed"
+            state["ship_outcome_at"] = datetime.now(timezone.utc).isoformat()
+        except Exception:
+            pass
+        result.ok = False
+        result.status = "field_test_passed"
+        result.reason = gate.reason
+        try:
+            from pipeline.field_rework_budget import end_field_rework_attempt
+
+            state = end_field_rework_attempt(
+                state, slug=slug, project_dir=project_dir
+            )
         except Exception:
             pass
     else:

@@ -52,7 +52,10 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `GROK_BUILD_BACKEND` | `auto` | `auto` = CLI if `GROK_BUILD_CMD` set else `pipeline_llm`; `cli` = require grok.exe template; `pipeline_llm` = ollama/qwen/openai via `llm_interface` |
 | `GROK_BUILD_ALLOW_PIPELINE_LLM` | on | When `auto` and no CLI, use pipeline LLM for skill steps |
 | `GROK_BUILD_PROVIDER` / `GROK_BUILD_MODEL` | fall back to `PIPELINE_*` | Provider/model for `pipeline_llm` build steps |
-| `GROK_BUILD_THIN_SHIP` | on | After grok_build complete, run in-process field plan+run → `field_proven` / `ship_insufficient` (skip classic thermo) |
+| `GROK_BUILD_THIN_SHIP` | on | After grok_build complete, run in-process field plan+run → dual-gate status (skip classic thermo) |
+| `FIELD_SHIP_DUAL_GATE` | on | Dual gate: runner pass → `field_test_passed`; `field_proven` only with ADEQUATE + min P*/I* bars |
+| `FIELD_MIN_PRODUCT` | `1` | Min non-trivial product (`P*`) tasks for field_proven (help/syntax/import smoke do not count) |
+| `FIELD_MIN_INTEGRATION` | `1` | Min non-trivial integration (`I*`) tasks for field_proven |
 | `GROK_BUILD_PLAN_SKILLS` | on | Before implement: run `idea_plan` if no `master_plan.md`, `phase_plan` if no `tasks.md` (Grok skills `idea-plan` / `phase-plan`) |
 | `GROK_BUILD_ALLOW_PARALLEL` | off | Allow `--parallel-seeds`/`--executors` >1 with `PIPELINE_ENGINE=grok_build` (default refuse — serial v1) |
 | `GROK_BUILD_STALE_S` | `3600` | Clear stuck `grok_driver_running` if state older than this many seconds |
@@ -208,11 +211,29 @@ from the main health cycle (at most **one** grok project per health tick).
 Overflow batches (`phase_N_overflow/tasks.md`) under `engine=grok_build` re-enter the
 Grok driver — classic executor is **not** dual-scheduled.
 
-**Thin ship (grok_build closed loop):** on full complete, `run_thin_field_ship` plans
-`phases/ship/field_tests.md` (Grok CLI → pipeline LLM e.g. qwen → heuristic), runs
-`field_test_runner`, writes results + usefulness report, sets `field_proven` or
-`ship_insufficient`. Classic `--ship-prove` uses the same thin path for
-`engine=grok_build` projects; other engines still queue `field_test_planner`.
+**Thin ship (grok_build closed loop) — author ≠ runner ≠ evaluator:**
+
+| Role | Who | Artifact |
+|------|-----|----------|
+| **Author** | `FIELD_PLAN_ENGINE` = `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` (existing file). **Not** auto-load of `~/.grok/skills/field-test/SKILL.md` | `phases/ship/field_tests.md` |
+| **Runner** | Deterministic `field_test_runner` (sole command oracle; no LLM) | `phases/ship/field_test_results.md` |
+| **Evaluator** | Dual gate `pipeline/field_prove_gate.py` (+ classic `ship_evaluator` on agent path) | `ship_evaluation.md`; closed Adequacy |
+
+On full complete, `run_thin_field_ship` plans → runs → dual-gate status:
+
+| Status | Meaning |
+|--------|---------|
+| `field_test_passed` | Mechanical: runner `all_passed` (may still be weak plan) |
+| `field_proven` | Runner pass **and** Adequacy ADEQUATE **and** min product/integration bars |
+| `ship_insufficient` | Runner fail (or rework path) — LLM cannot invent passes |
+
+Defaults: `FIELD_SHIP_DUAL_GATE=1`, `FIELD_MIN_PRODUCT=1`, `FIELD_MIN_INTEGRATION=1`.
+Baseline B* and help/syntax/import-only plans never alone yield `field_proven`.
+Repair bridge re-runs the runner but **cannot** promote `field_proven` without the dual gate.
+
+**Interactive `/field-test` skill:** plan → run → stop before self-judging proven; dual-gate language required. Thin ship often never loads that skill file.
+
+Classic `--ship-prove` uses the same thin path for `engine=grok_build`; other engines still queue `field_test_planner` → thermo → `ship_evaluator`.
 
 ```bash
 # Local/qwen build steps without grok.exe (optional)
@@ -221,6 +242,7 @@ export GROK_BUILD_BACKEND=pipeline_llm
 export PIPELINE_PROVIDER=ollama   # soft preference: if model missing, llm_route may use xAI
 export PIPELINE_MODEL=qwen3.6:35b-a3b-q4_K_M
 export FIELD_PLAN_ENGINE=pipeline_llm   # or heuristic / auto
+export FIELD_SHIP_DUAL_GATE=1           # default on
 
 # Grok CLI for implement; local LLM only for field plan
 export GROK_BUILD_CMD='C:\Users\avata\.grok\bin\grok.exe --cwd "{workspace}" --prompt-file "{prompt_file}" --always-approve --max-turns 40 --output-format plain'

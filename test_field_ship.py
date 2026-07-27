@@ -77,14 +77,14 @@ def test_ensure_field_plan_heuristic(tmp_path: Path, monkeypatch):
     assert (p / "phases/ship/field_tests.md").is_file()
 
 
-def test_run_thin_field_ship_heuristic_pass(tmp_path: Path, monkeypatch):
+def test_run_thin_field_ship_weak_plan_mechanical_only(tmp_path: Path, monkeypatch):
+    """Weak help/syntax/import plan: runner green → field_test_passed, not field_proven."""
     p = _proj(tmp_path)
-    # Help exits 0 with argparse even without args if no required — use py_compile friendly
-    monkeypatch.setenv("FIELD_PLAN_ENGINE", "heuristic")
+    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
     monkeypatch.setenv("GROK_BUILD_THIN_SHIP", "1")
     monkeypatch.setenv("FIELD_SHIP_REPAIR", "0")
+    monkeypatch.setenv("FIELD_SHIP_DUAL_GATE", "1")
     state = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
-    # Pre-write a reliable field plan so we don't depend on --help behavior
     ship = p / "phases/ship"
     ship.mkdir(parents=True)
     py = __import__("sys").executable
@@ -105,14 +105,166 @@ def test_run_thin_field_ship_heuristic_pass(tmp_path: Path, monkeypatch):
 """,
         encoding="utf-8",
     )
-    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
     result = run_thin_field_ship(p, state, slug="proj")
-    assert result.ok is True
-    assert result.status == "field_proven"
+    assert result.ok is False
+    assert result.status == "field_test_passed"
     assert (p / "phases/ship/field_test_results.md").is_file()
     assert (p / "phases/ship/usefulness_report.md").is_file()
     st = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    assert st["status"] == "field_test_passed"
+    assert st.get("status") != "field_proven"
+
+
+def test_run_thin_field_ship_strong_plan_field_proven(tmp_path: Path, monkeypatch):
+    """Non-trivial product + integration + runner green → field_proven under dual gate."""
+    p = _proj(tmp_path)
+    # Workspace needs a real product behavior to exercise
+    (p / "workspace" / "cli.py").write_text(
+        "#!/usr/bin/env python3\n"
+        "import argparse\n"
+        "import json\n"
+        "from pathlib import Path\n"
+        "p=argparse.ArgumentParser()\n"
+        "p.add_argument('--greet', default='hi')\n"
+        "p.add_argument('--out', default='')\n"
+        "a=p.parse_args()\n"
+        "msg=f'GREET:{a.greet}'\n"
+        "print(msg)\n"
+        "if a.out:\n"
+        "    Path(a.out).write_text(json.dumps({'ok': True, 'msg': msg}), encoding='utf-8')\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
+    monkeypatch.setenv("GROK_BUILD_THIN_SHIP", "1")
+    monkeypatch.setenv("FIELD_SHIP_REPAIR", "0")
+    monkeypatch.setenv("FIELD_SHIP_DUAL_GATE", "1")
+    state = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    ship = p / "phases/ship"
+    ship.mkdir(parents=True)
+    py = __import__("sys").executable
+    (ship / "field_tests.md").write_text(
+        f"""# Field Tests
+
+## Product tests
+- [ ] Task P1: greet happy path
+  - Kind: product
+  - Command: `{py} cli.py --greet world`
+  - Expect: GREET:world
+
+## Integration tests
+- [ ] Task I1: write artifact json
+  - Kind: integration
+  - Command: `{py} cli.py --greet ship --out out.json`
+  - Expect: exit 0
+""",
+        encoding="utf-8",
+    )
+    result = run_thin_field_ship(p, state, slug="proj")
+    assert result.ok is True
+    assert result.status == "field_proven"
+    st = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
     assert st["status"] == "field_proven"
+    assert (p / "phases/ship/ship_evaluation.md").is_file()
+
+
+def test_run_thin_field_ship_legacy_single_gate(tmp_path: Path, monkeypatch):
+    """FIELD_SHIP_DUAL_GATE=0 restores runner-only field_proven."""
+    p = _proj(tmp_path)
+    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
+    monkeypatch.setenv("GROK_BUILD_THIN_SHIP", "1")
+    monkeypatch.setenv("FIELD_SHIP_REPAIR", "0")
+    monkeypatch.setenv("FIELD_SHIP_DUAL_GATE", "0")
+    state = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    ship = p / "phases/ship"
+    ship.mkdir(parents=True)
+    py = __import__("sys").executable
+    (ship / "field_tests.md").write_text(
+        f"""# Field Tests
+## Product tests
+- [ ] Task P1: syntax
+  - Kind: product
+  - Command: `{py} -m py_compile cli.py`
+  - Expect: exit 0
+## Integration tests
+- [ ] Task I1: import
+  - Kind: integration
+  - Command: `{py} -c "import cli; print('IMPORT_OK')"`
+  - Expect: IMPORT_OK
+""",
+        encoding="utf-8",
+    )
+    result = run_thin_field_ship(p, state, slug="proj")
+    assert result.ok is True
+    assert result.status == "field_proven"
+
+
+def test_run_thin_field_ship_dual_gate_default_env_unset(tmp_path: Path, monkeypatch):
+    """With FIELD_SHIP_DUAL_GATE unset, default-on keeps weak plan mechanical-only."""
+    p = _proj(tmp_path)
+    monkeypatch.delenv("FIELD_SHIP_DUAL_GATE", raising=False)
+    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
+    monkeypatch.setenv("GROK_BUILD_THIN_SHIP", "1")
+    monkeypatch.setenv("FIELD_SHIP_REPAIR", "0")
+    state = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    ship = p / "phases/ship"
+    ship.mkdir(parents=True)
+    py = __import__("sys").executable
+    (ship / "field_tests.md").write_text(
+        f"""# Field Tests
+## Product tests
+- [ ] Task P1: syntax
+  - Kind: product
+  - Command: `{py} -m py_compile cli.py`
+  - Expect: exit 0
+## Integration tests
+- [ ] Task I1: import
+  - Kind: integration
+  - Command: `{py} -c "import cli; print('IMPORT_OK')"`
+  - Expect: IMPORT_OK
+""",
+        encoding="utf-8",
+    )
+    result = run_thin_field_ship(p, state, slug="proj")
+    assert result.status == "field_test_passed"
+    assert result.ok is False
+
+
+def test_run_thin_field_ship_strong_plan_runner_fail(tmp_path: Path, monkeypatch):
+    """Strong plan shape + failing commands → not field_proven (runner sole oracle)."""
+    p = _proj(tmp_path)
+    (p / "workspace" / "cli.py").write_text(
+        "import sys\nsys.exit(1)\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("FIELD_PLAN_ENGINE", "none")
+    monkeypatch.setenv("GROK_BUILD_THIN_SHIP", "1")
+    monkeypatch.setenv("FIELD_SHIP_REPAIR", "0")
+    monkeypatch.setenv("FIELD_SHIP_DUAL_GATE", "1")
+    monkeypatch.setenv("FIELD_SHIP_USEFULNESS", "0")
+    state = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    ship = p / "phases/ship"
+    ship.mkdir(parents=True)
+    py = __import__("sys").executable
+    (ship / "field_tests.md").write_text(
+        f"""# Field Tests
+## Product tests
+- [ ] Task P1: greet happy path
+  - Kind: product
+  - Command: `{py} cli.py --greet world`
+  - Expect: GREET:world
+## Integration tests
+- [ ] Task I1: write artifact
+  - Kind: integration
+  - Command: `{py} cli.py --out out.json`
+  - Expect: exit 0
+""",
+        encoding="utf-8",
+    )
+    result = run_thin_field_ship(p, state, slug="proj")
+    assert result.status != "field_proven"
+    assert result.ok is False
+    st = json.loads((p / "state/current_idea.json").read_text(encoding="utf-8"))
+    assert st["status"] != "field_proven"
+    assert st["status"] in ("ship_insufficient", "deeper_work_needed", "field_test_failed")
 
 
 def test_usefulness_report(tmp_path: Path):
