@@ -73,8 +73,8 @@ Shared gates still apply: task checkboxes, review FAIL, complete, GitHub publish
 | `CLASSIC_TO_GROK_AUTO_RUN` | **off** | When on + serial ladder focus free: `run_now` (resume + ladder focus). Default **park** = sticky engine, **status stays `budget_exceeded`**, not runnable |
 | `CLASSIC_TO_GROK_NEAR_DONE_ONLY` | **on** | Auto path only converts near-done (`phase>=total` or late review/validate on last/penultimate phase) |
 | `CLASSIC_TO_GROK_DRAIN` | **off** | Ladder may unpark parked classic→grok (serial). Overnight `-NoFreshListOnly` sets this to `1` |
-| `TROUBLESHOOT_CONSUMER` | on | `ship_insufficient` recovery consumer: cheap act or `budget_exceeded` yield |
-| `TROUBLESHOOT_MAX_ACTS` | `2` | Max auto-acts per ship_outcome fingerprint episode before yield |
+| `TROUBLESHOOT_CONSUMER` | on | Health-tick consumer for `ship_insufficient` / `deeper_work_needed`: cheap re-arm or `budget_exceeded` yield |
+| `TROUBLESHOOT_MAX_ACTS` | `2` | Backstop max auto-acts per fingerprint episode (same-fp after one cheap act → yield) |
 | `FIELD_PLAN_ENGINE` | `auto` | Field plan source: `auto` \| `grok` \| `pipeline_llm` \| `heuristic` \| `none` |
 | `FIELD_PLAN_PROVIDER` / `FIELD_PLAN_MODEL` | fall back to `PIPELINE_*` | Overrides for field plan LLM only |
 | `FIELD_SHIP_USEFULNESS` | on | Write `phases/ship/usefulness_report.md` (honesty; goal_fitness later) |
@@ -524,6 +524,10 @@ python scripts/connector_smoke.py --oracle-only
 # set PIPELINE_DIR=...
 python scripts/goal_compose.py compile --goal-id demo --text "wrap tool as mcp"
 python scripts/goal_compose.py plan-factories --goal-id demo
+# P3 whole-graph cheap smoke (after nodes resolved; no LLM / no long field tests):
+python scripts/goal_compose.py smoke --goal-id demo
+# attempt auto-smokes when status is executable or smoke_failed, nodes non-empty,
+# smoke_pass not set, and no missing nodes; skips draft/blocked/critiqued; fail-closed
 python scripts/goal_compose.py attempt --goal-id demo --text "..."
 python scripts/mcp_factory.py wrap --slug <verified_capability>
 python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug>              # default: require invoke --help
@@ -537,6 +541,13 @@ python scripts/goal_compose.py fixture-mcps --goal-id utility_mcp_fixture
 python scripts/goal_compose.py fixture-mcps --goal-id util5 --slugs mcp_json_diff_tool,mcp_url_health_checker
 # Graphs: $PIPELINE_DIR/graphs/  MCPs: $PIPELINE_DIR/mcps/  Queue: $PIPELINE_DIR/queues/mcp_factory/
 # Plan: docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md
+# P3 roadmap: notes/agi-lmaooo2.md (smoke_pass before full goal run)
+
+# Troubleshoot-gate consumer (emit: field_ship → recovery_decision.v1; consume: health tick)
+# Order: BE ladder → troubleshoot consumer (limit 1) → prefer_thin_field ship
+# Cheap auto-act: FIX_GATE_ONLY | THIN_FIELD_RETRY | FIELD_REPAIR_ONCE | DEBUG_TARGETED
+# Surface-only escalate → budget_exceeded: PARK | ASK_OPERATOR | AMBIGUOUS | REPLAN_*
+# One cheap re-arm per fail_fingerprint then yield (empty fp → synthesized no_fp:slug:action)
 # Isolated feature matrix (temp PIPELINE_DIR, PASS/FAIL table; exit 0 = all HARD pass):
 python scripts/factory_feature_matrix.py
 python scripts/factory_feature_matrix.py --keep-temp

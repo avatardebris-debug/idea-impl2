@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Goal compose CLI — compile graph.v1, plan factory actions, attempt via policy.
+Goal compose CLI — compile graph.v1, plan factory actions, smoke, attempt via policy.
 
 Usage:
   python scripts/goal_compose.py compile --goal-id ID --text "..." [--hits-json file]
   python scripts/goal_compose.py plan-factories --goal-id ID
+  python scripts/goal_compose.py smoke --goal-id ID
   python scripts/goal_compose.py attempt --goal-id ID --text "..."
 
 Env:
@@ -107,8 +108,33 @@ def cmd_plan_factories(args: argparse.Namespace) -> int:
     return 0 if not out.get("issues") else 0  # issues are soft; still ok
 
 
+def cmd_smoke(args: argparse.Namespace) -> int:
+    """Whole-graph cheap smoke (P3). Load → smoke_graph → save → JSON; exit 0/1."""
+    from pipeline.goal_graph import load_graph, save_graph, smoke_graph
+
+    graph = load_graph(args.goal_id)
+    if graph is None:
+        print(json.dumps({"error": f"no graph for goal_id={args.goal_id}"}))
+        return 1
+    report = smoke_graph(graph, mutate=True, re_critique=True)
+    path = save_graph(graph)
+    out = {
+        "path": str(path),
+        "goal_id": args.goal_id,
+        "smoke_pass": report.get("smoke_pass"),
+        "ok": report.get("ok"),
+        "blocked": report.get("blocked"),
+        "graph_status": graph.get("status"),
+        "issues": report.get("issues") or [],
+        "node_results": report.get("node_results") or [],
+        "ts": report.get("ts"),
+    }
+    print(json.dumps(out, indent=2, default=str))
+    return 0 if report.get("smoke_pass") else 1
+
+
 def cmd_attempt(args: argparse.Namespace) -> int:
-    from pipeline.goal_graph import compile_goal_graph, load_graph, save_graph
+    from pipeline.goal_graph import compile_goal_graph, load_graph, save_graph, smoke_graph
     from pipeline.goal_policy import (
         append_policy_history,
         classify_goal_branch,
@@ -124,6 +150,66 @@ def cmd_attempt(args: argparse.Namespace) -> int:
             route_hits=hits,
         )
         save_graph(graph)
+
+    # Light P3: if graph is executable (nodes resolved) and not yet smoke_pass,
+    # run whole-graph smoke before policy execute. Fail closed on smoke miss.
+    smoke_report = None
+    g_status = str(graph.get("status") or "")
+    nodes = graph.get("nodes") if isinstance(graph.get("nodes"), list) else []
+    has_missing = any(
+        isinstance(n, dict) and str(n.get("status") or "").lower() == "missing"
+        for n in nodes
+    )
+    # Only auto-smoke when nodes look resolved (executable) or prior smoke failed.
+    # Separate CLI: goal_compose.py smoke --goal-id ID
+    needs_smoke = (
+        not has_missing
+        and not graph.get("smoke_pass")
+        and g_status in ("executable", "smoke_failed")
+        and bool(nodes)
+    )
+    if needs_smoke:
+        smoke_report = smoke_graph(graph, mutate=True, re_critique=True)
+        try:
+            save_graph(graph)
+        except Exception as exc:
+            # Fail closed: do not continue policy execute if smoke mutation
+            # cannot be persisted (disk/ACL/path). Matches cmd_smoke honesty.
+            result = {
+                "goal_id": args.goal_id,
+                "policy": None,
+                "reason": "smoke_save_failed",
+                "execute": {"status": "smoke_save_failed"},
+                "graph_status": graph.get("status"),
+                "smoke": {
+                    "smoke_pass": smoke_report.get("smoke_pass"),
+                    "issues": list(smoke_report.get("issues") or [])
+                    + [f"save_graph failed: {exc}"],
+                    "node_results": smoke_report.get("node_results") or [],
+                    "blocked": smoke_report.get("blocked"),
+                    "save_error": str(exc),
+                },
+                "nodes": len(nodes),
+            }
+            print(json.dumps(result, indent=2, default=str))
+            return 1
+        if not smoke_report.get("smoke_pass"):
+            result = {
+                "goal_id": args.goal_id,
+                "policy": None,
+                "reason": "whole_graph_smoke_failed",
+                "execute": {"status": "smoke_failed"},
+                "graph_status": graph.get("status"),
+                "smoke": {
+                    "smoke_pass": False,
+                    "issues": smoke_report.get("issues") or [],
+                    "node_results": smoke_report.get("node_results") or [],
+                    "blocked": smoke_report.get("blocked"),
+                },
+                "nodes": len(nodes),
+            }
+            print(json.dumps(result, indent=2, default=str))
+            return 1
 
     text = args.text or str(graph.get("goal_text") or "")
     decision = classify_goal_branch(
@@ -160,6 +246,13 @@ def cmd_attempt(args: argparse.Namespace) -> int:
         "graph_status": graph.get("status"),
         "nodes": len(graph.get("nodes") or []),
     }
+    if smoke_report is not None:
+        result["smoke"] = {
+            "smoke_pass": smoke_report.get("smoke_pass"),
+            "issues": smoke_report.get("issues") or [],
+        }
+    elif graph.get("smoke_pass"):
+        result["smoke"] = {"smoke_pass": True, "skipped": "already_smoked"}
     print(json.dumps(result, indent=2, default=str))
     status = str(exec_out.get("status") or "")
     if status in ("failed",):
@@ -189,9 +282,15 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_plan.add_argument("--goal-id", required=True)
 
+    p_smoke = sub.add_parser(
+        "smoke",
+        help="Whole-graph cheap smoke after nodes resolved (P3); exit 0/1",
+    )
+    p_smoke.add_argument("--goal-id", required=True)
+
     p_attempt = sub.add_parser(
         "attempt",
-        help="Compile if missing; classify + execute_policy on text",
+        help="Compile if missing; smoke if needed; classify + execute_policy",
     )
     p_attempt.add_argument("--goal-id", required=True)
     p_attempt.add_argument("--text", required=True, help="Goal / branch text")
@@ -225,6 +324,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_compile(args)
     if args.cmd == "plan-factories":
         return cmd_plan_factories(args)
+    if args.cmd == "smoke":
+        return cmd_smoke(args)
     if args.cmd == "attempt":
         return cmd_attempt(args)
     if args.cmd == "fixture-mcps":

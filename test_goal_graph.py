@@ -283,3 +283,924 @@ def test_compile_graph_from_smoked_mcps(
     crit = critique_graph(g)
     assert crit["ok"] is True, crit
     save_graph(g)
+
+
+def test_smoke_graph_all_verified_pass(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """P3: all resolved executable nodes with local assets → smoke_pass."""
+    import json
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    monkeypatch.setenv("KEEP_GOAL_TRACES", "1")
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import (
+        DEFAULT_ORACLE,
+        GRAPH_SCHEMA,
+        MCP_ORACLE,
+        critique_graph,
+        load_graph,
+        save_graph,
+        smoke_graph,
+    )
+    from pipeline.mcp_factory import smoke_mcp, wrap_capability_as_mcp
+    from pipeline.paths import connectors_dir, projects_dir
+
+    # MCP asset
+    wrap_capability_as_mcp("smoke_util", force=True)
+    assert smoke_mcp("mcp_smoke_util", require_invoke=False)["ok"]
+
+    # Software project asset
+    soft = projects_dir() / "tool_alpha"
+    (soft / "state").mkdir(parents=True)
+    (soft / "state" / "current_idea.json").write_text(
+        json.dumps(
+            {
+                "title": "tool_alpha",
+                "status": "field_proven",
+                "phase": 2,
+                "total_phases": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    # Connector YAML asset
+    cdir = connectors_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+    (cdir / "bridge_alpha.yaml").write_text(
+        "slug: bridge_alpha\nkind: connector\nsteps:\n  - id: s1\n    type: noop\n",
+        encoding="utf-8",
+    )
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_smoke_ok",
+        "goal_text": "compose smoked tools",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "tool_alpha",
+                "label": "tool_alpha",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            },
+            {
+                "id": "n2",
+                "kind": "mcp",
+                "slug": "mcp_smoke_util",
+                "label": "mcp_smoke_util",
+                "status": "verified",
+                "oracle": MCP_ORACLE,
+                "requires": [],
+            },
+            {
+                "id": "n3",
+                "kind": "connector",
+                "slug": "bridge_alpha",
+                "label": "bridge_alpha",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            },
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    assert critique_graph(graph)["ok"] is True
+
+    report = smoke_graph(graph, mutate=True)
+    assert report["blocked"] is False
+    assert report["smoke_pass"] is True
+    assert report["ok"] is True
+    assert report["issues"] == []
+    assert len(report["node_results"]) == 3
+    assert all(r["ok"] for r in report["node_results"])
+    assert graph["smoke_pass"] is True
+    assert graph["status"] == "smoke_pass"
+    assert graph.get("smoked_at")
+
+    path = save_graph(graph)
+    assert path.is_file()
+    loaded = load_graph("g_smoke_ok")
+    assert loaded is not None
+    assert loaded["smoke_pass"] is True
+    assert loaded["status"] == "smoke_pass"
+
+
+def test_smoke_graph_missing_node_blocked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """P3: status=missing nodes → not smoke_pass (blocked)."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_graph
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_smoke_miss",
+        "goal_text": "need missing",
+        "status": "blocked",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "gone_tool",
+                "label": "gone",
+                "status": "missing",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {"ok": False, "issues": ["node n1 (gone_tool) status=missing"]},
+    }
+    report = smoke_graph(graph, mutate=True)
+    assert report["smoke_pass"] is False
+    assert report["ok"] is False
+    assert report["blocked"] is True
+    assert graph["smoke_pass"] is False
+    # critique fails first path (re_critique default)
+    assert any("missing" in i.lower() or "critique" in i.lower() for i in report["issues"])
+    assert report.get("block_reason") == "critique"
+    # status stays blocked (already non-executable)
+    assert graph.get("status") == "blocked"
+
+
+def test_smoke_graph_missing_nodes_branch_without_recritique(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """re_critique=False + stale critique ok forces dedicated missing_nodes block."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_graph
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_smoke_miss_branch",
+        "goal_text": "stale critique",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "gone_tool",
+                "label": "gone",
+                "status": "missing",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        # Stale: claims ok despite missing node
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True, re_critique=False)
+    assert report["smoke_pass"] is False
+    assert report["blocked"] is True
+    assert report.get("block_reason") == "missing_nodes"
+    assert any("missing" in i.lower() for i in report["issues"])
+    assert graph["status"] == "smoke_failed"
+    assert graph["smoke_pass"] is False
+
+
+def test_smoke_graph_software_empty_dir_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Empty projects/{slug}/ without state is not a software smoke pass."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_graph
+    from pipeline.paths import projects_dir
+
+    (projects_dir() / "empty_proj").mkdir(parents=True)
+    # no state/current_idea.json
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_empty_dir",
+        "goal_text": "empty dir only",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "empty_proj",
+                "label": "empty",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True)
+    assert report["smoke_pass"] is False
+    assert report["blocked"] is False
+    assert graph["status"] == "smoke_failed"
+    detail = " ".join(r.get("detail") or "" for r in report["node_results"])
+    assert "project_dir_no_state" in detail or "verified_but_no_project" in detail
+
+
+def test_smoke_graph_unsafe_slug_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Path-like slugs are rejected (no join escape)."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_graph
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_unsafe_slug",
+        "goal_text": "bad slug",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "../etc",
+                "label": "bad",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True)
+    assert report["smoke_pass"] is False
+    assert any(
+        r.get("check") == "slug_safety" or "unsafe" in (r.get("detail") or "")
+        for r in report["node_results"]
+    )
+
+
+def test_smoke_graph_dot_slug_rejected(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Slug '.' must not resolve to projects_dir itself and false-pass."""
+    import json
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_node
+    from pipeline.paths import projects_dir
+
+    # Trap: projects/state/current_idea.json would make '.' look like project_state
+    trap = projects_dir() / "state"
+    trap.mkdir(parents=True)
+    (trap / "current_idea.json").write_text(
+        json.dumps({"status": "complete"}), encoding="utf-8"
+    )
+
+    r = smoke_node(
+        {
+            "id": "n1",
+            "kind": "software",
+            "slug": ".",
+            "label": "dot",
+            "status": "verified",
+            "oracle": DEFAULT_ORACLE,
+            "requires": [],
+        }
+    )
+    assert r.get("ok") is False
+    assert r.get("check") == "slug_safety" or "unsafe" in (r.get("detail") or "")
+
+
+def test_smoke_graph_software_without_asset_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Verified software node with no project/registry → smoke_failed."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, smoke_graph
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_smoke_soft_miss",
+        "goal_text": "ghost software",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "ghost_cli",
+                "label": "ghost",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True)
+    assert report["smoke_pass"] is False
+    assert report["blocked"] is False
+    assert graph["status"] == "smoke_failed"
+    assert any("ghost_cli" in i for i in report["issues"])
+
+
+def test_smoke_graph_mcp_not_smoked_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """MCP node without smoke → fail (is_mcp_smoked false)."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import MCP_ORACLE, GRAPH_SCHEMA, smoke_graph
+    from pipeline.mcp_factory import wrap_capability_as_mcp
+
+    # wrap only — no smoke_mcp
+    wrap_capability_as_mcp("raw_cap", force=True)
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_mcp_raw",
+        "goal_text": "unsmoked mcp",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "mcp",
+                "slug": "mcp_raw_cap",
+                "label": "mcp_raw_cap",
+                "status": "verified",
+                "oracle": MCP_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True)
+    assert report["smoke_pass"] is False
+    assert report["blocked"] is False
+    assert any(
+        r.get("slug") == "mcp_raw_cap" and not r.get("ok") for r in report["node_results"]
+    )
+    # Mutation mirrors software-fail path
+    assert graph["smoke_pass"] is False
+    assert graph["status"] == "smoke_failed"
+    failed = (graph.get("smoke_report") or {}).get("failed") or []
+    assert "mcp_raw_cap" in failed
+
+
+def test_goal_compose_smoke_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """CLI smoke --goal-id loads, smokes, saves, exit code matches smoke_pass."""
+    import json
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, save_graph
+    from pipeline.paths import projects_dir
+
+    soft = projects_dir() / "cli_tool"
+    (soft / "state").mkdir(parents=True)
+    (soft / "state" / "current_idea.json").write_text(
+        json.dumps({"status": "complete", "phase": 1, "total_phases": 1}),
+        encoding="utf-8",
+    )
+    save_graph(
+        {
+            "schema": GRAPH_SCHEMA,
+            "goal_id": "cli_smoke_g",
+            "goal_text": "cli smoke",
+            "status": "executable",
+            "nodes": [
+                {
+                    "id": "n1",
+                    "kind": "software",
+                    "slug": "cli_tool",
+                    "label": "cli_tool",
+                    "status": "verified",
+                    "oracle": DEFAULT_ORACLE,
+                    "requires": [],
+                }
+            ],
+            "edges": [],
+            "critique": {"ok": True, "issues": []},
+        }
+    )
+
+    # Ensure scripts/ is importable via main
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts.goal_compose import main as gc_main
+
+    rc = gc_main(["--pipeline-dir", str(pipeline), "smoke", "--goal-id", "cli_smoke_g"])
+    assert rc == 0
+    loaded = json.loads(
+        (pipeline / "graphs" / "cli_smoke_g.json").read_text(encoding="utf-8")
+    )
+    assert loaded.get("smoke_pass") is True
+    assert loaded.get("status") == "smoke_pass"
+
+    # missing node → exit 1
+    save_graph(
+        {
+            "schema": GRAPH_SCHEMA,
+            "goal_id": "cli_smoke_bad",
+            "goal_text": "bad",
+            "status": "blocked",
+            "nodes": [
+                {
+                    "id": "n1",
+                    "kind": "software",
+                    "slug": "nope",
+                    "label": "nope",
+                    "status": "missing",
+                    "oracle": DEFAULT_ORACLE,
+                    "requires": [],
+                }
+            ],
+            "edges": [],
+            "critique": {"ok": False, "issues": ["missing"]},
+        }
+    )
+    rc2 = gc_main(
+        ["--pipeline-dir", str(pipeline), "smoke", "--goal-id", "cli_smoke_bad"]
+    )
+    assert rc2 == 1
+
+
+def _attempt_graph_fixture(
+    pipeline: pathlib.Path,
+    *,
+    goal_id: str,
+    status: str,
+    slug: str = "att_tool",
+    node_status: str = "verified",
+    smoke_pass: bool | None = None,
+    with_project: bool = False,
+) -> None:
+    import json
+
+    from pipeline.goal_graph import DEFAULT_ORACLE, GRAPH_SCHEMA, save_graph
+    from pipeline.paths import projects_dir
+
+    if with_project:
+        soft = projects_dir() / slug
+        (soft / "state").mkdir(parents=True, exist_ok=True)
+        (soft / "state" / "current_idea.json").write_text(
+            json.dumps({"status": "complete", "phase": 1, "total_phases": 1}),
+            encoding="utf-8",
+        )
+    g: dict = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": goal_id,
+        "goal_text": f"attempt fixture {goal_id}",
+        "status": status,
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": slug,
+                "label": slug,
+                "status": node_status,
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            }
+        ],
+        "edges": [],
+        "critique": {
+            "ok": node_status != "missing",
+            "issues": [] if node_status != "missing" else [f"node n1 status=missing"],
+        },
+    }
+    if smoke_pass is not None:
+        g["smoke_pass"] = smoke_pass
+    save_graph(g)
+
+
+def test_attempt_auto_smoke_fail_closed_no_execute(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """executable + no assets → exit 1; execute_policy not called."""
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    _attempt_graph_fixture(
+        pipeline,
+        goal_id="att_fail",
+        status="executable",
+        slug="ghost_att",
+        with_project=False,
+    )
+
+    called: list[str] = []
+
+    def fake_execute(*a, **k):
+        called.append("execute")
+        return {"status": "ok"}
+
+    monkeypatch.setattr("pipeline.goal_policy.execute_policy", fake_execute)
+    monkeypatch.setattr(
+        "pipeline.goal_policy.classify_goal_branch",
+        lambda **kw: type(
+            "D",
+            (),
+            {
+                "policy": "reuse",
+                "reason": "test",
+                "capability_slug": None,
+                "connector_slug": None,
+            },
+        )(),
+    )
+
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts.goal_compose import main as gc_main
+
+    rc = gc_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "attempt",
+            "--goal-id",
+            "att_fail",
+            "--text",
+            "try me",
+        ]
+    )
+    assert rc == 1
+    assert called == []
+
+
+def test_attempt_skips_auto_smoke_when_draft(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """draft/blocked/critiqued do not auto-smoke (not over-eager)."""
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    _attempt_graph_fixture(
+        pipeline, goal_id="att_draft", status="draft", with_project=False
+    )
+
+    smoke_calls: list[str] = []
+    exec_calls: list[str] = []
+
+    def fake_smoke(graph, **kw):
+        smoke_calls.append("smoke")
+        return {"smoke_pass": True, "ok": True, "issues": [], "node_results": []}
+
+    def fake_execute(*a, **k):
+        exec_calls.append("execute")
+        return {"status": "ok"}
+
+    monkeypatch.setattr("pipeline.goal_graph.smoke_graph", fake_smoke)
+    # cmd_attempt imports smoke_graph into its local namespace at call time
+    monkeypatch.setattr("scripts.goal_compose.smoke_graph", fake_smoke, raising=False)
+    monkeypatch.setattr("pipeline.goal_policy.execute_policy", fake_execute)
+    monkeypatch.setattr(
+        "pipeline.goal_policy.classify_goal_branch",
+        lambda **kw: type(
+            "D",
+            (),
+            {
+                "policy": "research",
+                "reason": "test",
+                "capability_slug": None,
+                "connector_slug": None,
+            },
+        )(),
+    )
+
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts import goal_compose as gc_mod
+
+    # Patch where cmd_attempt will look up via from-import inside function
+    # cmd_attempt does: from pipeline.goal_graph import ... smoke_graph
+    # so patch pipeline.goal_graph.smoke_graph
+    monkeypatch.setattr("pipeline.goal_graph.smoke_graph", fake_smoke)
+
+    rc = gc_mod.main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "attempt",
+            "--goal-id",
+            "att_draft",
+            "--text",
+            "draft goal",
+        ]
+    )
+    assert rc == 0
+    assert smoke_calls == []  # not auto-smoked
+    assert exec_calls == ["execute"]
+
+
+def test_attempt_skips_resmoke_when_smoke_pass_true(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """smoke_pass=True skips re-smoke and proceeds to policy."""
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    _attempt_graph_fixture(
+        pipeline,
+        goal_id="att_done",
+        status="smoke_pass",
+        smoke_pass=True,
+        with_project=True,
+    )
+
+    smoke_calls: list[str] = []
+    exec_calls: list[str] = []
+
+    def fake_smoke(graph, **kw):
+        smoke_calls.append("smoke")
+        return {"smoke_pass": True, "ok": True, "issues": [], "node_results": []}
+
+    def fake_execute(*a, **k):
+        exec_calls.append("execute")
+        return {"status": "ok"}
+
+    monkeypatch.setattr("pipeline.goal_graph.smoke_graph", fake_smoke)
+    monkeypatch.setattr("pipeline.goal_policy.execute_policy", fake_execute)
+    monkeypatch.setattr(
+        "pipeline.goal_policy.classify_goal_branch",
+        lambda **kw: type(
+            "D",
+            (),
+            {
+                "policy": "reuse",
+                "reason": "test",
+                "capability_slug": "att_tool",
+                "connector_slug": None,
+            },
+        )(),
+    )
+
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts.goal_compose import main as gc_main
+
+    rc = gc_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "attempt",
+            "--goal-id",
+            "att_done",
+            "--text",
+            "already smoked",
+        ]
+    )
+    assert rc == 0
+    assert smoke_calls == []
+    assert exec_calls == ["execute"]
+
+
+def test_attempt_resmokes_when_smoke_failed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """status=smoke_failed re-runs smoke; pass then execute."""
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    _attempt_graph_fixture(
+        pipeline,
+        goal_id="att_retry",
+        status="smoke_failed",
+        smoke_pass=False,
+        with_project=True,
+        slug="retry_tool",
+    )
+
+    smoke_calls: list[str] = []
+    exec_calls: list[str] = []
+
+    def fake_smoke(graph, **kw):
+        smoke_calls.append("smoke")
+        graph["smoke_pass"] = True
+        graph["status"] = "smoke_pass"
+        return {
+            "smoke_pass": True,
+            "ok": True,
+            "issues": [],
+            "node_results": [],
+            "blocked": False,
+        }
+
+    def fake_execute(*a, **k):
+        exec_calls.append("execute")
+        return {"status": "ok"}
+
+    monkeypatch.setattr("pipeline.goal_graph.smoke_graph", fake_smoke)
+    monkeypatch.setattr("pipeline.goal_policy.execute_policy", fake_execute)
+    monkeypatch.setattr(
+        "pipeline.goal_policy.classify_goal_branch",
+        lambda **kw: type(
+            "D",
+            (),
+            {
+                "policy": "reuse",
+                "reason": "test",
+                "capability_slug": "retry_tool",
+                "connector_slug": None,
+            },
+        )(),
+    )
+
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts.goal_compose import main as gc_main
+
+    rc = gc_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "attempt",
+            "--goal-id",
+            "att_retry",
+            "--text",
+            "retry smoke",
+        ]
+    )
+    assert rc == 0
+    assert smoke_calls == ["smoke"]
+    assert exec_calls == ["execute"]
+
+
+def test_attempt_save_graph_failure_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """save_graph failure after smoke → exit 1, no execute_policy."""
+    import sys
+
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    _attempt_graph_fixture(
+        pipeline,
+        goal_id="att_save_fail",
+        status="executable",
+        slug="save_tool",
+        with_project=True,
+    )
+
+    exec_calls: list[str] = []
+    n_save = {"n": 0}
+
+    def fake_save(graph):
+        n_save["n"] += 1
+        # First save is fixture; attempt's post-smoke save should fail.
+        # cmd_attempt only calls save after smoke; fixture already on disk.
+        raise OSError("simulated disk full")
+
+    def fake_execute(*a, **k):
+        exec_calls.append("execute")
+        return {"status": "ok"}
+
+    def fake_smoke(graph, **kw):
+        graph["smoke_pass"] = True
+        graph["status"] = "smoke_pass"
+        return {
+            "smoke_pass": True,
+            "ok": True,
+            "issues": [],
+            "node_results": [],
+            "blocked": False,
+        }
+
+    monkeypatch.setattr("pipeline.goal_graph.smoke_graph", fake_smoke)
+    monkeypatch.setattr("pipeline.goal_graph.save_graph", fake_save)
+    monkeypatch.setattr("pipeline.goal_policy.execute_policy", fake_execute)
+    monkeypatch.setattr(
+        "pipeline.goal_policy.classify_goal_branch",
+        lambda **kw: type(
+            "D",
+            (),
+            {
+                "policy": "reuse",
+                "reason": "test",
+                "capability_slug": None,
+                "connector_slug": None,
+            },
+        )(),
+    )
+
+    root = pathlib.Path(__file__).resolve().parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from scripts.goal_compose import main as gc_main
+
+    rc = gc_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "attempt",
+            "--goal-id",
+            "att_save_fail",
+            "--text",
+            "save fail",
+        ]
+    )
+    assert rc == 1
+    assert exec_calls == []
+    assert n_save["n"] >= 1

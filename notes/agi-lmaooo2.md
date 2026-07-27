@@ -1,6 +1,6 @@
 # AGI-lmaooo2 — Pre–graph-engineer block readiness (prior discussion)
 
-**Status:** Design / readiness note. **P1–P2 (sockets + skill/prompt promote) shipped v0** — `pipeline/block_registry.py`, CLI `scripts/block_registry.py`, tests `test_block_registry.py`.  
+**Status:** Design / readiness note. **P1–P2 (sockets + skill/prompt promote) shipped v0** — `pipeline/block_registry.py`, CLI `scripts/block_registry.py`, tests `test_block_registry.py`. **P3 whole-graph smoke shipped v0** — `smoke_graph` in `pipeline/goal_graph.py`, CLI `python scripts/goal_compose.py smoke --goal-id ID`, tests in `test_goal_graph.py`.  
 **Date context:** 2026-07-26 session (after graph.v1 + MCP factory v0).  
 **Parent north star:** [agi-lmaooo.md](./agi-lmaooo.md)  
 **Companion conceptual discussion:** [lmao-agi-discuss.md](./lmao-agi-discuss.md)  
@@ -22,7 +22,7 @@ Knowledge graph + graph engineer without that is a map of fiction. The aim of th
 |--------|-----------------|----------------|-----|---------------------|
 | Author | plan → implement | create-skill (TUI); **no create-prompt** | wrap verified cap (v0) | graph.v1 compile (thin) |
 | Gate | review, complete-gate | mostly none | smoke ping/describe | critique missing/oracle |
-| Prove | field_tests → field_proven | none | smoke ≠ field | no whole-graph smoke yet |
+| Prove | field_tests → field_proven | none | smoke ≠ field | **P3 v0** whole-graph cheap smoke (`smoke_pass`) |
 | Register | registry + requires | skill_load roots only | kind=mcp row | graphs/*.json |
 | Insert into runtime | invoke_capability | inject ad hoc | invoke via MCP | policy enqueue only |
 | Recover | troubleshoot consumer | none | none | none |
@@ -106,7 +106,7 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 |-------|--------|----------------|
 | **P1** | Sockets + registry kinds skill/prompt | **v0 done** — JSON block catalog + role sockets; attach gates draft/revoked |
 | **P2** | Skill/prompt promote (sandbox → verified) | **v0 done** — static sandbox + promote + revoke; executor socket hook thin |
-| **P3** | Whole-graph smoke after nodes resolved | `smoke_pass` before full goal run |
+| **P3** | Whole-graph smoke after nodes resolved | **v0 done** — `smoke_graph` / `goal_compose smoke`; attempt auto-smokes when `executable`; cheap per-node checks only |
 | **P4** | MCP factory v1 (re-smoke, revoke, invoke oracle) | MCP as real block |
 | **P5** | External ingest **manual** (pin + sandbox + human CLI) | One external asset under audit log |
 | **P6** | Graph engineer (later plan) | Only authors into P3 pipeline |

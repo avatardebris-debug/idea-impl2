@@ -55,8 +55,10 @@ __all__ = [
     "GRAPH_SCHEMA",
     "DEFAULT_ORACLE",
     "MCP_ORACLE",
+    "EXECUTABLE_KINDS",
     "compile_goal_graph",
     "critique_graph",
+    "smoke_graph",
     "save_graph",
     "load_graph",
     "graph_path",
@@ -475,6 +477,517 @@ def critique_graph(graph: dict[str, Any]) -> dict[str, Any]:
 
     ok = len(issues) == 0
     return {"ok": ok, "issues": issues}
+
+
+def _safe_node_slug(slug: str) -> str | None:
+    """Reject path traversal / absolute / reserved slugs before joining under PIPELINE_DIR.
+
+    Returns cleaned slug or None if unsafe (separators, ``.`` / ``..``, drive letters).
+    A software slug must be a single child name under projects/, not base itself.
+    """
+    s = (slug or "").strip()
+    if not s:
+        return None
+    # "." / ".." / pure-dot names resolve to base or parent — not a child project
+    if s in (".", "..") or s.strip(".") == "":
+        return None
+    # Absolute / drive / UNC / parent / separator — never join into base dirs
+    if (
+        ".." in s
+        or "/" in s
+        or "\\" in s
+        or ":" in s
+        or s.startswith(("~",))
+        or "\x00" in s
+    ):
+        return None
+    return s
+
+
+def _path_under(base: Any, *parts: str) -> Any | None:
+    """Join *parts under *base*; return path only if resolve stays under base."""
+    from pathlib import Path
+
+    try:
+        root = Path(base).resolve()
+        candidate = root.joinpath(*parts).resolve()
+        candidate.relative_to(root)
+        return candidate
+    except (OSError, ValueError, RuntimeError):
+        return None
+
+
+def _registry_capability_row(slug: str) -> dict[str, Any] | None:
+    """Public-path registry lookup by slug (no private capability_tools API)."""
+    import sqlite3
+
+    from pipeline.paths import registry_db
+
+    db = registry_db()
+    if not db.exists():
+        return None
+    try:
+        conn = sqlite3.connect(db)
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT slug, title, kind, status, purpose, entrypoint "
+            "FROM capabilities WHERE slug = ?",
+            (slug,),
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+
+def _smoke_software_node(slug: str, node: dict[str, Any]) -> dict[str, Any]:
+    """Cheap software check: project state and/or registry row — no field tests."""
+    from pipeline.paths import projects_dir
+
+    safe = _safe_node_slug(slug)
+    if safe is None:
+        return {
+            "ok": False,
+            "detail": "unsafe_slug",
+            "check": "slug_safety",
+        }
+
+    detail_parts: list[str] = []
+    # Live project under PIPELINE_DIR/projects/ — require state/current_idea.json
+    try:
+        pdir = _path_under(projects_dir(), safe)
+        if pdir is None:
+            detail_parts.append("project_path_escape")
+        else:
+            state_f = pdir / "state" / "current_idea.json"
+            if state_f.is_file():
+                try:
+                    st = json.loads(state_f.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    st = {}
+                if isinstance(st, dict):
+                    st_status = str(st.get("status") or "")
+                    detail_parts.append(f"project_status={st_status or 'present'}")
+                    # Any present project with state is enough for cheap smoke
+                    return {
+                        "ok": True,
+                        "detail": "project:" + ",".join(detail_parts),
+                        "check": "project_state",
+                    }
+            elif pdir.is_dir():
+                # Empty dir or dir without state is NOT a pass (map honesty)
+                detail_parts.append("project_dir_no_state")
+    except Exception as exc:
+        detail_parts.append(f"project_err={exc}")
+
+    # Capability registry (verified + entrypoint preferred) via public DB path
+    try:
+        row = _registry_capability_row(safe)
+        if row:
+            rstatus = str(row.get("status") or "")
+            entry = str(row.get("entrypoint") or "").strip()
+            detail_parts.append(f"registry_status={rstatus}")
+            if entry:
+                detail_parts.append("has_entrypoint")
+            if rstatus in ("verified", "field_proven", "complete") or entry:
+                return {
+                    "ok": True,
+                    "detail": "registry:" + ",".join(detail_parts),
+                    "check": "registry",
+                }
+            return {
+                "ok": False,
+                "detail": "registry_not_ready:" + ",".join(detail_parts),
+                "check": "registry",
+            }
+    except Exception as exc:
+        detail_parts.append(f"registry_err={exc}")
+
+    # Node already marked verified without local asset → soft fail (honest map)
+    nstatus = str(node.get("status") or "").lower()
+    if nstatus == "verified":
+        return {
+            "ok": False,
+            "detail": "verified_but_no_project_or_registry:"
+            + (",".join(detail_parts) if detail_parts else "empty"),
+            "check": "presence",
+        }
+    return {
+        "ok": False,
+        "detail": "software_not_found:"
+        + (",".join(detail_parts) if detail_parts else "empty"),
+        "check": "presence",
+    }
+
+
+def _smoke_connector_node(slug: str) -> dict[str, Any]:
+    """Cheap connector check: YAML exists under workflows/connectors/."""
+    from pipeline.paths import connectors_dir
+
+    safe = _safe_node_slug(slug)
+    if safe is None:
+        return {
+            "ok": False,
+            "detail": "unsafe_slug",
+            "check": "slug_safety",
+        }
+
+    root = connectors_dir()
+    for name in (f"{safe}.yaml", f"{safe}.yml"):
+        path = _path_under(root, name)
+        if path is not None and path.is_file():
+            return {
+                "ok": True,
+                "detail": f"connector_yaml={path.name}",
+                "check": "connector_yaml",
+                "path": str(path),
+            }
+    return {
+        "ok": False,
+        "detail": f"connector_yaml_missing under {root}",
+        "check": "connector_yaml",
+    }
+
+
+def _smoke_mcp_node(slug: str) -> dict[str, Any]:
+    """Cheap MCP check: is_mcp_smoked (manifest + server.py); no re-spawn."""
+    safe = _safe_node_slug(slug)
+    if safe is None:
+        return {
+            "ok": False,
+            "detail": "unsafe_slug",
+            "check": "slug_safety",
+        }
+    try:
+        from pipeline.mcp_factory import is_mcp_smoked, mcp_slug_for
+
+        mslug = mcp_slug_for(safe)
+        # Re-validate after normalize (mcp_ prefix only; still no path junk)
+        if _safe_node_slug(mslug) is None:
+            return {
+                "ok": False,
+                "detail": "unsafe_mcp_slug",
+                "check": "slug_safety",
+                "mcp_slug": mslug,
+            }
+        ok = is_mcp_smoked(mslug)
+        return {
+            "ok": bool(ok),
+            "detail": "mcp_smoked" if ok else "mcp_not_smoked",
+            "check": "is_mcp_smoked",
+            "mcp_slug": mslug,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "detail": f"mcp_check_error={exc}",
+            "check": "is_mcp_smoked",
+        }
+
+
+def _smoke_skill_node(slug: str) -> dict[str, Any]:
+    """Cheap skill check: SKILL.md via skill_load, or verified block_registry row."""
+    safe = _safe_node_slug(slug)
+    if safe is None:
+        return {
+            "ok": False,
+            "detail": "unsafe_slug",
+            "check": "slug_safety",
+        }
+
+    skill_load_err = ""
+    # 1) filesystem skill
+    try:
+        from pipeline.skill_load import find_skill_dir
+
+        d = find_skill_dir(safe)
+        if d is not None and (d / "SKILL.md").is_file():
+            return {
+                "ok": True,
+                "detail": f"skill_dir={d.name}",
+                "check": "skill_load",
+                "path": str(d / "SKILL.md"),
+            }
+    except (OSError, ImportError) as exc:
+        skill_load_err = f"skill_load_err={exc}"
+    except Exception as exc:
+        skill_load_err = f"skill_load_err={exc}"
+
+    # 2) block registry by id or name
+    try:
+        from pipeline.block_registry import get_block, list_blocks
+
+        rec = get_block(safe)
+        if rec is None:
+            # try common id forms / name match
+            for b in list_blocks(kind="skill"):
+                bid = str(b.get("id") or "")
+                name = str(b.get("name") or "").lower().replace("_", "-")
+                slug_n = safe.lower().replace("_", "-")
+                if bid == safe or name == slug_n or bid.endswith(f"-{slug_n}"):
+                    rec = b
+                    break
+        if rec and isinstance(rec, dict):
+            st = str(rec.get("status") or "")
+            if st in ("verified", "sandboxed"):
+                return {
+                    "ok": True,
+                    "detail": f"block_registry status={st} id={rec.get('id')}",
+                    "check": "block_registry",
+                    "block_id": rec.get("id"),
+                }
+            detail = f"block_not_promoted status={st}"
+            if skill_load_err:
+                detail = f"{detail};{skill_load_err}"
+            return {
+                "ok": False,
+                "detail": detail,
+                "check": "block_registry",
+            }
+    except Exception as exc:
+        detail = f"skill_check_error={exc}"
+        if skill_load_err:
+            detail = f"{detail};{skill_load_err}"
+        return {
+            "ok": False,
+            "detail": detail,
+            "check": "skill",
+        }
+
+    detail = "skill_not_found (no SKILL.md and no block)"
+    if skill_load_err:
+        detail = f"{detail};{skill_load_err}"
+    return {
+        "ok": False,
+        "detail": detail,
+        "check": "skill",
+    }
+
+
+def smoke_node(node: dict[str, Any]) -> dict[str, Any]:
+    """Cheap per-node smoke for one graph node. No LLM, no long field tests."""
+    if not isinstance(node, dict):
+        return {
+            "ok": False,
+            "id": "?",
+            "slug": "?",
+            "kind": "?",
+            "detail": "invalid node entry",
+            "skipped": False,
+        }
+    nid = str(node.get("id") or node.get("slug") or "?")
+    slug = str(node.get("slug") or nid).strip()
+    kind = str(node.get("kind") or "").strip().lower()
+    base = {
+        "id": nid,
+        "slug": slug,
+        "kind": kind,
+        "node_status": str(node.get("status") or ""),
+    }
+
+    if kind not in EXECUTABLE_KINDS:
+        return {
+            **base,
+            "ok": True,
+            "skipped": True,
+            "detail": f"non-executable kind={kind or 'empty'}",
+            "check": "skip",
+        }
+
+    if kind == "mcp":
+        r = _smoke_mcp_node(slug)
+    elif kind == "software":
+        r = _smoke_software_node(slug, node)
+    elif kind == "connector":
+        r = _smoke_connector_node(slug)
+    elif kind == "skill":
+        r = _smoke_skill_node(slug)
+    else:
+        r = {"ok": False, "detail": f"unhandled kind={kind}", "check": "unknown"}
+
+    return {
+        **base,
+        "ok": bool(r.get("ok")),
+        "skipped": False,
+        "detail": str(r.get("detail") or ""),
+        "check": r.get("check"),
+        **{k: v for k, v in r.items() if k not in ("ok", "detail", "check")},
+    }
+
+
+def smoke_graph(
+    graph: dict[str, Any],
+    *,
+    mutate: bool = True,
+    re_critique: bool = True,
+) -> dict[str, Any]:
+    """Whole-graph cheap smoke after nodes are resolved (P3).
+
+    Precondition: critique ok (re-runs critique by default); no status=missing
+    nodes. Per executable node (software|connector|mcp|skill): cheap presence /
+    prior-smoke checks only — no LLM, no long field tests, no MCP re-spawn.
+
+    Returns::
+
+        {
+          "ok": bool,           # overall (preconditions + all node smokes)
+          "smoke_pass": bool,   # same as ok for callers that key on smoke_pass
+          "blocked": bool,      # precondition failed (critique / missing)
+          "node_results": [...],
+          "issues": [str, ...],
+          "ts": iso,
+        }
+
+    When *mutate* is True (default), sets graph fields:
+      smoke_pass, smoked_at, smoke_report (summary), status smoke_pass|smoke_failed
+      (or leaves prior status when blocked by critique before executable path).
+    """
+    ts = _iso()
+    issues: list[str] = []
+    node_results: list[dict[str, Any]] = []
+
+    if not isinstance(graph, dict):
+        report = {
+            "ok": False,
+            "smoke_pass": False,
+            "blocked": True,
+            "node_results": [],
+            "issues": ["graph is not a dict"],
+            "ts": ts,
+        }
+        return report
+
+    # --- preconditions ---
+    if re_critique:
+        crit = critique_graph(graph)
+        if mutate:
+            graph["critique"] = crit
+    else:
+        crit = graph.get("critique") if isinstance(graph.get("critique"), dict) else None
+        if crit is None:
+            crit = critique_graph(graph)
+            if mutate:
+                graph["critique"] = crit
+
+    if not crit.get("ok"):
+        issues.extend(list(crit.get("issues") or []) or ["critique not ok"])
+        issues.append("smoke blocked: critique failed")
+        report = {
+            "ok": False,
+            "smoke_pass": False,
+            "blocked": True,
+            "node_results": [],
+            "issues": issues,
+            "ts": ts,
+            "block_reason": "critique",
+        }
+        if mutate:
+            graph["smoke_pass"] = False
+            graph["smoked_at"] = ts
+            graph["smoke_report"] = {
+                "ok": False,
+                "blocked": True,
+                "issues": issues,
+                "ts": ts,
+            }
+            # Keep blocked/critiqued status if already non-executable; else mark smoke_failed
+            cur = str(graph.get("status") or "")
+            if cur not in ("blocked", "draft"):
+                graph["status"] = "smoke_failed"
+            graph["updated_at"] = ts
+        return report
+
+    nodes = graph.get("nodes")
+    if not isinstance(nodes, list):
+        issues.append("graph has no nodes list")
+        report = {
+            "ok": False,
+            "smoke_pass": False,
+            "blocked": True,
+            "node_results": [],
+            "issues": issues,
+            "ts": ts,
+            "block_reason": "no_nodes",
+        }
+        if mutate:
+            graph["smoke_pass"] = False
+            graph["smoked_at"] = ts
+            graph["status"] = "smoke_failed"
+            graph["smoke_report"] = report
+            graph["updated_at"] = ts
+        return report
+
+    missing_nodes = [
+        n
+        for n in nodes
+        if isinstance(n, dict) and str(n.get("status") or "").lower() == "missing"
+    ]
+    if missing_nodes:
+        for n in missing_nodes:
+            nid = n.get("id") or n.get("slug") or "?"
+            slug = n.get("slug") or nid
+            issues.append(f"node {nid} ({slug}) status=missing — resolve before smoke")
+        report = {
+            "ok": False,
+            "smoke_pass": False,
+            "blocked": True,
+            "node_results": [],
+            "issues": issues,
+            "ts": ts,
+            "block_reason": "missing_nodes",
+        }
+        if mutate:
+            graph["smoke_pass"] = False
+            graph["smoked_at"] = ts
+            graph["status"] = "smoke_failed"
+            graph["smoke_report"] = {
+                "ok": False,
+                "blocked": True,
+                "issues": issues,
+                "ts": ts,
+            }
+            graph["updated_at"] = ts
+        return report
+
+    # --- per-node cheap smoke ---
+    for node in nodes:
+        result = smoke_node(node if isinstance(node, dict) else {})
+        node_results.append(result)
+        if not result.get("ok") and not result.get("skipped"):
+            issues.append(
+                f"node {result.get('id')} ({result.get('slug')}) "
+                f"kind={result.get('kind')}: {result.get('detail')}"
+            )
+
+    all_ok = all(r.get("ok") for r in node_results) if node_results else True
+    # Empty graph with critique ok: smoke_pass True (nothing executable to fail)
+    smoke_pass = bool(all_ok) and not issues
+    report = {
+        "ok": smoke_pass,
+        "smoke_pass": smoke_pass,
+        "blocked": False,
+        "node_results": node_results,
+        "issues": issues,
+        "ts": ts,
+    }
+
+    if mutate:
+        graph["smoke_pass"] = smoke_pass
+        graph["smoked_at"] = ts
+        graph["smoke_report"] = {
+            "ok": smoke_pass,
+            "blocked": False,
+            "issues": list(issues),
+            "node_count": len(node_results),
+            "failed": [
+                r.get("slug") for r in node_results if not r.get("ok") and not r.get("skipped")
+            ],
+            "ts": ts,
+        }
+        graph["status"] = "smoke_pass" if smoke_pass else "smoke_failed"
+        graph["updated_at"] = ts
+
+    return report
 
 
 def graph_path(goal_id: str) -> Any:
