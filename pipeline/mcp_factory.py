@@ -1,22 +1,31 @@
 """
-mcp_factory v0 — wrap verified capabilities as local stdio JSONL MCP servers.
+mcp_factory v1 — wrap verified capabilities as local stdio JSONL MCP servers.
 
 Layout under PIPELINE_DIR:
   mcps/mcp_{slug}/server.py
-  mcps/mcp_{slug}/manifest.json   (mcp_manifest.v1)
-  mcps/mcp_{slug}/smoke_report.json
+  mcps/mcp_{slug}/manifest.json      (mcp_manifest.v1 + provenance)
+  mcps/mcp_{slug}/smoke_report.json  (ping/describe/[invoke] checks)
+  mcps/mcp_{slug}/invoke_report.json (durable invoke-oracle evidence)
+
+mcp_manifest.v1 fields (v1 provenance extensions):
+  schema, mcp_slug, wraps_capability / capability_slug, transport,
+  server_path, tools, status (draft|smoked|verified|revoked),
+  wrap_version, content_sha256 (server.py), created_at,
+  last_smoke_at, last_smoke_ok, smoked_at, invoke_oracle, revoked_at.
 
 Factory is a separate loop from the software factory: scaffold + smoke +
-best-effort registry insert. Does not invent product code — only wraps an
-existing capability_slug via pipeline.capability_tools.
+re-smoke + revoke + best-effort registry insert. Does not invent product
+code — only wraps an existing capability_slug via pipeline.capability_tools.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
 import sys
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,21 +35,30 @@ from pipeline.paths import get_pipeline_dir, mcps_dir
 from pipeline.pipeline_config import PROJECT_ROOT
 
 SCHEMA = "mcp_manifest.v1"
+WRAP_VERSION = "1"
 TRANSPORT = "stdio_jsonl"
 TOOLS = ["ping", "describe", "invoke"]
+STATUS_SMOKED = frozenset({"smoked", "verified"})
+STATUS_REVOKED = "revoked"
 
 __all__ = [
     "SCHEMA",
+    "WRAP_VERSION",
     "TRANSPORT",
     "TOOLS",
     "mcp_slug_for",
     "mcp_dir",
     "is_mcp_smoked",
+    "is_mcp_revoked",
     "wrap_capability_as_mcp",
     "smoke_mcp",
+    "resmoke_mcp",
+    "revoke_mcp",
     "register_mcp",
     "list_mcps",
     "drain_queue",
+    "load_invoke_report",
+    "load_smoke_report",
 ]
 
 
@@ -48,23 +66,89 @@ def _iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def mcp_slug_for(capability_slug: str) -> str:
-    """Normalize capability slug to mcp_ prefix form."""
-    s = (capability_slug or "").strip()
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _sha256_file(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        h = hashlib.sha256()
+        with path.open("rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except OSError:
+        return None
+
+
+def _validate_slug_segment(raw: str, *, label: str = "slug") -> str:
+    """Reject path traversal / separators / empty names (raises ValueError)."""
+    s = (raw or "").strip()
     if not s:
-        raise ValueError("capability_slug is required")
+        raise ValueError(f"{label} is required")
+    if s in (".", "..") or s.strip(".") == "":
+        raise ValueError(f"unsafe {label}: {raw!r}")
+    if (
+        ".." in s
+        or "/" in s
+        or "\\" in s
+        or ":" in s
+        or s.startswith("~")
+        or "\x00" in s
+    ):
+        raise ValueError(f"unsafe {label}: {raw!r}")
+    return s
+
+
+def mcp_slug_for(capability_slug: str) -> str:
+    """Normalize capability slug to mcp_ prefix form (path-safe single segment).
+
+    Rejects ``..``, path separators, drive letters, and empty names so
+    ``mcp_dir`` cannot escape ``mcps/``.
+    """
+    s = _validate_slug_segment(capability_slug, label="capability_slug")
     if s.startswith("mcp_"):
+        rest = s[4:]
+        if not rest:
+            raise ValueError("capability_slug empty after mcp_ prefix")
+        # Re-check body alone (whole string already checked for separators)
+        _validate_slug_segment(rest, label="capability_slug")
         return s
     return f"mcp_{s}"
 
 
 def mcp_dir(mcp_slug: str) -> Path:
-    """Return mcps/{mcp_slug}/ (does not create)."""
-    return mcps_dir() / mcp_slug_for(mcp_slug)
+    """Return mcps/{mcp_slug}/ (does not create). Raises ValueError if unsafe."""
+    mslug = mcp_slug_for(mcp_slug)
+    base = mcps_dir().resolve()
+    target = (base / mslug).resolve()
+    try:
+        target.relative_to(base)
+    except ValueError as exc:
+        raise ValueError(f"mcp path escapes mcps/: {mcp_slug!r}") from exc
+    return mcps_dir() / mslug
+
+
+def _clear_sibling_reports(d: Path, *, invoke: bool = True, smoke: bool = False) -> None:
+    """Remove durable reports under an MCP dir (best-effort)."""
+    names: list[str] = []
+    if invoke:
+        names.append("invoke_report.json")
+    if smoke:
+        names.append("smoke_report.json")
+    for name in names:
+        p = d / name
+        if p.is_file():
+            try:
+                p.unlink()
+            except OSError:
+                pass
 
 
 def _capability_from_mcp_slug(mcp_slug: str) -> str:
-    s = (mcp_slug or "").strip()
+    s = mcp_slug_for(mcp_slug)
     if s.startswith("mcp_"):
         return s[4:]
     return s
@@ -209,31 +293,34 @@ def wrap_capability_as_mcp(
     only missing pieces). Server always implements ping/describe/invoke;
     invoke routes through capability_tools.invoke_capability.
     """
-    cap = (capability_slug or "").strip()
-    if not cap:
-        raise ValueError("capability_slug is required")
-    # Allow passing mcp_foo as capability: strip prefix for wraps_capability
-    if cap.startswith("mcp_"):
-        wraps = cap[4:]
-        mslug = cap
-    else:
-        wraps = cap
-        mslug = f"mcp_{cap}"
+    # Path-safe normalize (rejects .. / separators)
+    mslug = mcp_slug_for(capability_slug)
+    wraps = mslug[4:] if mslug.startswith("mcp_") else mslug
 
     root = mcps_dir()
     root.mkdir(parents=True, exist_ok=True)
-    d = root / mslug
+    d = mcp_dir(mslug)
     d.mkdir(parents=True, exist_ok=True)
 
     server_path = d / "server.py"
     manifest_path = d / "manifest.json"
+
+    # Force re-wrap: drop stale oracle/smoke evidence for new server binary
+    if force:
+        _clear_sibling_reports(d, invoke=True, smoke=True)
 
     if manifest_path.is_file() and not force:
         try:
             existing = json.loads(manifest_path.read_text(encoding="utf-8"))
             if existing.get("schema") == SCHEMA and (d / "server.py").is_file():
                 # Keep existing; note skip when already smoked (drain safety)
-                if str(existing.get("status") or "") in ("smoked", "verified"):
+                st = str(existing.get("status") or "")
+                if st == STATUS_REVOKED:
+                    existing = dict(existing)
+                    existing["skipped"] = True
+                    existing["skip_reason"] = "revoked"
+                    return existing
+                if st in STATUS_SMOKED:
                     existing = dict(existing)
                     existing["skipped"] = True
                     existing["skip_reason"] = "already_smoked"
@@ -241,8 +328,9 @@ def wrap_capability_as_mcp(
         except (json.JSONDecodeError, OSError):
             pass
 
+    server_src = _server_template(wraps, mslug)
     server_path.write_text(
-        _server_template(wraps, mslug),
+        server_src,
         encoding="utf-8",
         newline="\n",
     )
@@ -253,11 +341,26 @@ def wrap_capability_as_mcp(
         server_rel = str(server_path)
 
     status = "draft"
+    last_smoke_at = None
+    last_smoke_ok = None
     if (d / "smoke_report.json").is_file() and not force:
         try:
             sr = json.loads((d / "smoke_report.json").read_text(encoding="utf-8"))
             if sr.get("ok"):
                 status = "smoked"
+            last_smoke_at = sr.get("ts")
+            last_smoke_ok = bool(sr.get("ok"))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    content_sha = _sha256_text(server_src)
+    created = _iso()
+    # Preserve created_at when force-rewrapping an existing manifest
+    if manifest_path.is_file():
+        try:
+            prev = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if isinstance(prev, dict) and prev.get("created_at"):
+                created = str(prev["created_at"])
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -265,12 +368,19 @@ def wrap_capability_as_mcp(
         "schema": SCHEMA,
         "mcp_slug": mslug,
         "wraps_capability": wraps,
+        "capability_slug": wraps,
         "transport": TRANSPORT,
         "server_path": server_rel,
         "tools": list(TOOLS),
         "status": status,
-        "created_at": _iso(),
+        "wrap_version": WRAP_VERSION,
+        "content_sha256": content_sha,
+        "created_at": created,
     }
+    if last_smoke_at is not None:
+        manifest["last_smoke_at"] = last_smoke_at
+    if last_smoke_ok is not None:
+        manifest["last_smoke_ok"] = last_smoke_ok
     if entrypoint:
         manifest["entrypoint_override"] = entrypoint
     if cwd:
@@ -305,20 +415,53 @@ def _save_manifest(manifest: dict[str, Any]) -> Path:
 
 
 def _rpc_line(proc: subprocess.Popen, req: dict, *, timeout_s: float) -> dict:
-    """Write one JSON-L request and read one JSON-L response."""
+    """Write one JSON-L request and read one JSON-L response within *timeout_s*.
+
+    Uses a reader thread so a hung MCP server cannot block forever. On timeout
+    the process is killed and ``TimeoutError`` is raised.
+    """
     assert proc.stdin is not None and proc.stdout is not None
     line = json.dumps(req, ensure_ascii=False) + "\n"
     proc.stdin.write(line)
     proc.stdin.flush()
-    # readline with overall process timeout handled by caller
-    out = proc.stdout.readline()
+
+    box: list[Any] = []
+    err: list[BaseException] = []
+
+    def _read() -> None:
+        try:
+            box.append(proc.stdout.readline())  # type: ignore[union-attr]
+        except BaseException as exc:  # noqa: BLE001 — surface to caller
+            err.append(exc)
+
+    t = threading.Thread(target=_read, daemon=True)
+    t.start()
+    budget = max(0.05, float(timeout_s) if timeout_s is not None else 15.0)
+    t.join(timeout=budget)
+    if t.is_alive():
+        try:
+            proc.kill()
+        except Exception:
+            pass
+        raise TimeoutError(f"MCP RPC timed out after {budget}s waiting for response")
+    if err:
+        raise err[0]
+    out = box[0] if box else ""
     if not out:
         raise RuntimeError("MCP server closed stdout without response")
     return json.loads(out)
 
 
+def is_mcp_revoked(mcp_slug: str) -> bool:
+    """True if manifest status is revoked."""
+    man = _load_manifest(mcp_slug_for(mcp_slug))
+    if not man:
+        return False
+    return str(man.get("status") or "") == STATUS_REVOKED
+
+
 def is_mcp_smoked(mcp_slug: str) -> bool:
-    """True if manifest status is smoked/verified and server.py exists."""
+    """True if manifest status is smoked/verified, server.py exists, not revoked."""
     mslug = mcp_slug_for(mcp_slug)
     d = mcp_dir(mslug)
     if not (d / "server.py").is_file():
@@ -326,7 +469,34 @@ def is_mcp_smoked(mcp_slug: str) -> bool:
     man = _load_manifest(mslug)
     if not man:
         return False
-    return str(man.get("status") or "") in ("smoked", "verified")
+    st = str(man.get("status") or "")
+    if st == STATUS_REVOKED:
+        return False
+    return st in STATUS_SMOKED
+
+
+def load_invoke_report(mcp_slug: str) -> dict[str, Any] | None:
+    """Load durable invoke_report.json if present."""
+    path = mcp_dir(mcp_slug_for(mcp_slug)) / "invoke_report.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def load_smoke_report(mcp_slug: str) -> dict[str, Any] | None:
+    """Load durable smoke_report.json if present."""
+    path = mcp_dir(mcp_slug_for(mcp_slug)) / "smoke_report.json"
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except (json.JSONDecodeError, OSError):
+        return None
 
 
 def smoke_mcp(
@@ -340,17 +510,43 @@ def smoke_mcp(
 ) -> dict:
     """Spawn server.py; ping + describe required; optional invoke oracle.
 
-    Writes smoke_report.json next to the server. Records goal_trace
-    mode=mcp_factory.
+    Writes smoke_report.json next to the server. Invoke report policy:
+      - require_invoke or invoke ok → write/update invoke_report.json
+      - soft smoke with failed invoke → **delete** prior invoke_report
+        (restore presence fallback; no stale ok oracle)
+      - smoke fails before invoke (ping/describe) → delete prior invoke_report
+
+    Records goal_trace mode=mcp_factory. Updates last_smoke_at on every run.
 
     *require_invoke*: also require method invoke with *invoke_args* (default
     ``--help``) to return ok. Use for real capability quality bar.
     *skip_if_smoked*: if already smoked/verified and not *force*, return prior
     report without re-spawning (drain-queue bulk safety).
+    Revoked MCPs refuse smoke (ok=False) until re-wrapped with force.
     """
     mslug = mcp_slug_for(mcp_slug)
     d = mcp_dir(mslug)
     server = d / "server.py"
+
+    man0 = _load_manifest(mslug)
+    # Revoked blocks are never smoked until re-wrap (force=True on wrap).
+    if man0 and str(man0.get("status") or "") == STATUS_REVOKED:
+        report = {
+            "ok": False,
+            "mcp_slug": mslug,
+            "error": "mcp is revoked; re-wrap with force before smoke/re-smoke",
+            "ts": _iso(),
+            "manifest_status": STATUS_REVOKED,
+        }
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "smoke_report.json").write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        _clear_sibling_reports(d, invoke=True, smoke=False)
+        report["invoke_report_cleared"] = "revoked"
+        _trace_smoke(mslug, report)
+        return report
 
     if skip_if_smoked and not force and is_mcp_smoked(mslug):
         prior: dict[str, Any] = {
@@ -379,17 +575,27 @@ def smoke_mcp(
         return prior
 
     if not server.is_file():
+        ts_miss = _iso()
         report = {
             "ok": False,
             "mcp_slug": mslug,
             "error": f"server.py missing under {d}",
-            "ts": _iso(),
+            "ts": ts_miss,
         }
         d.mkdir(parents=True, exist_ok=True)
         (d / "smoke_report.json").write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+        # Stale invoke success must not outlive a broken server
+        _clear_sibling_reports(d, invoke=True, smoke=False)
+        report["invoke_report_cleared"] = "server_missing"
+        manifest = _load_manifest(mslug)
+        if manifest is not None:
+            manifest["last_smoke_at"] = ts_miss
+            manifest["last_smoke_ok"] = False
+            _save_manifest(manifest)
+            report["manifest_status"] = manifest.get("status")
         _trace_smoke(mslug, report)
         return report
 
@@ -452,7 +658,7 @@ def smoke_mcp(
                 error = error or f"describe error: {exc}"
                 checks.append({"method": "describe", "ok": False, "error": str(exc)})
 
-        # invoke oracle (optional hard fail)
+        # invoke oracle (always attempt when ping+describe ok; hard-fail if require_invoke)
         if ok:
             inv_args = (invoke_args if invoke_args is not None else "--help") or ""
             try:
@@ -512,17 +718,19 @@ def smoke_mcp(
             except Exception:
                 pass
 
+    ts = _iso()
+    inv_check = next((c for c in checks if c.get("method") == "invoke"), None)
     report: dict[str, Any] = {
         "ok": ok,
         "mcp_slug": mslug,
         "server_path": str(server),
         "checks": checks,
-        "ts": _iso(),
+        "ts": ts,
         "timeout_s": timeout_s,
         "require_invoke": bool(require_invoke),
-        "invoke_args": invoke_args if require_invoke or any(
-            c.get("method") == "invoke" for c in checks
-        ) else None,
+        "invoke_args": invoke_args
+        if require_invoke or inv_check is not None
+        else None,
     }
     if error:
         report["error"] = error
@@ -532,27 +740,229 @@ def smoke_mcp(
         encoding="utf-8",
     )
 
-    # Bump manifest status on success
+    # Durable invoke oracle report (sibling of smoke_report).
+    # Always keep reports consistent with this smoke run so graph honesty
+    # cannot pass on a stale prior invoke_report.ok=true.
+    if inv_check is not None and (require_invoke or bool(inv_check.get("ok"))):
+        inv_report: dict[str, Any] = {
+            "schema": "mcp_invoke_report.v1",
+            "ok": bool(inv_check.get("ok")),
+            "mcp_slug": mslug,
+            "args": inv_check.get("args", invoke_args),
+            "require_invoke": bool(require_invoke),
+            "ts": ts,
+            "check": inv_check,
+            "smoke_ok": ok,
+        }
+        if inv_check.get("error"):
+            inv_report["error"] = inv_check["error"]
+        elif not inv_check.get("ok"):
+            inv_report["error"] = error or "invoke returned not ok"
+        (d / "invoke_report.json").write_text(
+            json.dumps(inv_report, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        report["invoke_report"] = inv_report
+    elif inv_check is not None and not inv_check.get("ok"):
+        # Soft smoke: invoke failed — drop prior success so presence fallback works
+        _clear_sibling_reports(d, invoke=True, smoke=False)
+        report["invoke_report_cleared"] = "soft_smoke_invoke_failed"
+    elif not ok:
+        # Failed before invoke (or no inv check) — drop stale oracle success
+        _clear_sibling_reports(d, invoke=True, smoke=False)
+        report["invoke_report_cleared"] = "smoke_failed_before_invoke"
+
+    # Update manifest: status + provenance timestamps
     manifest = _load_manifest(mslug)
     if manifest is not None:
+        # Refresh content hash if server present
+        content_sha = _sha256_file(server)
+        if content_sha:
+            manifest["content_sha256"] = content_sha
+        if not manifest.get("capability_slug"):
+            manifest["capability_slug"] = manifest.get("wraps_capability") or (
+                _capability_from_mcp_slug(mslug)
+            )
+        if not manifest.get("wrap_version"):
+            manifest["wrap_version"] = WRAP_VERSION
+        manifest["last_smoke_at"] = ts
+        manifest["last_smoke_ok"] = bool(ok)
         if ok:
             manifest["status"] = "smoked"
-            manifest["smoked_at"] = report["ts"]
-            if require_invoke:
+            manifest["smoked_at"] = ts
+            if inv_check is not None:
                 manifest["invoke_oracle"] = {
-                    "args": invoke_args,
-                    "ok": True,
-                    "at": report["ts"],
+                    "args": inv_check.get("args", invoke_args),
+                    "ok": bool(inv_check.get("ok")),
+                    "at": ts,
                 }
         else:
-            # keep draft/prior; note last smoke failure
-            manifest["last_smoke_ok"] = False
-            manifest["last_smoke_at"] = report["ts"]
+            # keep draft/prior smoked; note last smoke failure (do not un-smoke
+            # a previously good block on soft re-smoke fail unless was draft)
+            if str(manifest.get("status") or "") not in STATUS_SMOKED:
+                # leave draft; already not smoked
+                pass
+            if inv_check is not None:
+                manifest["invoke_oracle"] = {
+                    "args": inv_check.get("args", invoke_args),
+                    "ok": bool(inv_check.get("ok")),
+                    "at": ts,
+                }
         _save_manifest(manifest)
         report["manifest_status"] = manifest.get("status")
 
     _trace_smoke(mslug, report)
     return report
+
+
+def resmoke_mcp(
+    mcp_slug: str,
+    *,
+    timeout_s: float = 15.0,
+    require_invoke: bool = True,
+    invoke_args: str = "--help",
+) -> dict:
+    """Re-run smoke checks; always updates smoke_report + last_smoke_at.
+
+    Equivalent to ``smoke_mcp(..., force=True, skip_if_smoked=False)``.
+    Default *require_invoke* True (v1 quality bar). Does not un-revoke;
+    revoked MCPs still fail until re-wrapped.
+    """
+    return smoke_mcp(
+        mcp_slug,
+        timeout_s=timeout_s,
+        require_invoke=require_invoke,
+        invoke_args=invoke_args,
+        skip_if_smoked=False,
+        force=True,
+    )
+
+
+def revoke_mcp(
+    mcp_slug: str,
+    *,
+    reason: str = "",
+    update_registry: bool = True,
+) -> dict:
+    """Mark MCP status=revoked so list/smoke_graph treat it as not smoked.
+
+    Detaches from registry use by setting registry status to draft/revoked
+    when possible. Does not delete server files (audit-friendly).
+    """
+    mslug = mcp_slug_for(mcp_slug)
+    d = mcp_dir(mslug)
+    man = _load_manifest(mslug)
+    ts = _iso()
+    if man is None:
+        # Minimal stub so revoke is durable even without prior wrap
+        if not (d / "server.py").is_file() and not d.is_dir():
+            return {
+                "ok": False,
+                "mcp_slug": mslug,
+                "error": f"MCP not found under {d}",
+                "ts": ts,
+            }
+        man = {
+            "schema": SCHEMA,
+            "mcp_slug": mslug,
+            "wraps_capability": _capability_from_mcp_slug(mslug),
+            "capability_slug": _capability_from_mcp_slug(mslug),
+            "transport": TRANSPORT,
+            "tools": list(TOOLS),
+            "status": STATUS_REVOKED,
+            "wrap_version": WRAP_VERSION,
+            "created_at": ts,
+        }
+    else:
+        man = dict(man)
+
+    man["status"] = STATUS_REVOKED
+    man["revoked_at"] = ts
+    if reason:
+        man["revoke_reason"] = reason
+    man["last_smoke_ok"] = False
+    if not man.get("capability_slug"):
+        man["capability_slug"] = man.get("wraps_capability") or _capability_from_mcp_slug(
+            mslug
+        )
+    # Drop oracle evidence so graph cannot pass invoke-oracle on a revoked block
+    # if status check is skipped by an older client.
+    _clear_sibling_reports(d, invoke=True, smoke=False)
+    _save_manifest(man)
+
+    registry_note = "registry_not_touched"
+    if update_registry:
+        try:
+            from pipeline.capability_registry import _connect, _now  # type: ignore
+
+            conn = _connect()
+            conn.execute(
+                """
+                UPDATE capabilities
+                SET status = 'draft', updated_at = ?
+                WHERE slug = ? AND kind = 'mcp'
+                """,
+                (_now(), mslug),
+            )
+            conn.commit()
+            conn.close()
+            registry_note = "registry_demoted_draft"
+            man["registry_note"] = registry_note
+            _save_manifest(man)
+        except Exception as exc:
+            registry_note = f"registry_skip: {exc}"
+            try:
+                man["registry_note"] = registry_note
+                _save_manifest(man)
+            except Exception:
+                pass
+
+    result = {
+        "ok": True,
+        "mcp_slug": mslug,
+        "status": STATUS_REVOKED,
+        "revoked_at": ts,
+        "reason": reason or None,
+        "registry_note": registry_note,
+        "is_mcp_smoked": is_mcp_smoked(mslug),
+    }
+    _trace_revoke(mslug, result)
+    return result
+
+
+def _trace_revoke(mcp_slug: str, result: dict[str, Any]) -> None:
+    """Best-effort goal_trace for revoke."""
+    try:
+        from pipeline.goal_trace import append_event, finalize_trace, start_trace
+
+        wraps = _capability_from_mcp_slug(mcp_slug)
+        tr = start_trace(
+            f"MCP factory revoke for {mcp_slug} (wraps {wraps})",
+            goal_id=f"mcp_revoke_{uuid.uuid4().hex[:10]}",
+            mode="mcp_factory",
+            plan=[{"step": 1, "intent": "revoke", "tool": "mcp.revoke"}],
+        )
+        append_event(
+            tr,
+            type="tool",
+            tool="mcp.revoke",
+            args={"mcp_slug": mcp_slug, "reason": result.get("reason")},
+            result_snip=json.dumps(result, ensure_ascii=False)[:1500],
+            ok=bool(result.get("ok")),
+        )
+        finalize_trace(
+            tr,
+            status="goal_proven" if result.get("ok") else "goal_failed",
+            oracle={
+                "name": "mcp_revoke",
+                "pass": bool(result.get("ok")),
+                "evidence": f"revoked {mcp_slug}",
+            },
+            train_weight=0.5,
+        )
+        result["goal_trace_id"] = tr.get("goal_id")
+    except Exception as exc:
+        result["goal_trace_error"] = str(exc)
 
 
 def _trace_smoke(mcp_slug: str, report: dict[str, Any]) -> None:

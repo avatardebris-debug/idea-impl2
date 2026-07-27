@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """
-MCP factory CLI v0 — wrap verified capabilities as stdio JSONL MCP servers.
+MCP factory CLI v1 — wrap verified capabilities as stdio JSONL MCP servers.
 
 Usage:
   python scripts/mcp_factory.py wrap --slug CAP
   python scripts/mcp_factory.py smoke --mcp-slug mcp_CAP
+  python scripts/mcp_factory.py re-smoke --mcp-slug mcp_CAP
+  python scripts/mcp_factory.py revoke --mcp-slug mcp_CAP
   python scripts/mcp_factory.py drain-queue --limit 1
   python scripts/mcp_factory.py list
 
@@ -39,7 +41,7 @@ def _bind_pipeline_dir(explicit: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="MCP factory v0: wrap capability → stdio JSONL server + smoke"
+        description="MCP factory v1: wrap → smoke → re-smoke → revoke (stdio JSONL)"
     )
     ap.add_argument("--pipeline-dir", default="", help="Override PIPELINE_DIR")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -86,6 +88,43 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Re-run smoke even if already smoked",
     )
+
+    p_resmoke = sub.add_parser(
+        "re-smoke",
+        help="Force re-run smoke checks; update smoke_report + last_smoke_at",
+    )
+    p_resmoke.add_argument("--mcp-slug", required=True, help="MCP slug (mcp_CAP)")
+    p_resmoke.add_argument("--timeout", type=float, default=15.0, help="Smoke timeout seconds")
+    p_resmoke.set_defaults(require_invoke=True)
+    p_resmoke.add_argument(
+        "--require-invoke",
+        dest="require_invoke",
+        action="store_true",
+        help="Require invoke oracle (default)",
+    )
+    p_resmoke.add_argument(
+        "--no-require-invoke",
+        dest="require_invoke",
+        action="store_false",
+        help="Only ping + describe",
+    )
+    p_resmoke.add_argument(
+        "--invoke-args",
+        default="--help",
+        help="Args for invoke oracle (default: --help)",
+    )
+    p_resmoke.add_argument(
+        "--register",
+        action="store_true",
+        help="Register after successful re-smoke",
+    )
+
+    p_revoke = sub.add_parser(
+        "revoke",
+        help="Mark MCP revoked (not smoked for list/smoke_graph)",
+    )
+    p_revoke.add_argument("--mcp-slug", required=True, help="MCP slug (mcp_CAP)")
+    p_revoke.add_argument("--reason", default="", help="Optional revoke reason")
 
     p_drain = sub.add_parser("drain-queue", help="Process pending mcp_factory jobs")
     p_drain.add_argument("--limit", type=int, default=1, help="Max jobs to process")
@@ -139,6 +178,28 @@ def main(argv: list[str] | None = None) -> int:
                 mf.register_mcp(man)
         print(json.dumps(report, indent=2, ensure_ascii=False))
         return 0 if report.get("ok") else 1
+
+    if args.cmd == "re-smoke":
+        report = mf.resmoke_mcp(
+            args.mcp_slug,
+            timeout_s=float(args.timeout),
+            require_invoke=bool(args.require_invoke),
+            invoke_args=str(args.invoke_args or "--help"),
+        )
+        if args.register and report.get("ok"):
+            man = mf._load_manifest(args.mcp_slug)  # noqa: SLF001
+            if man:
+                mf.register_mcp(man)
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return 0 if report.get("ok") else 1
+
+    if args.cmd == "revoke":
+        result = mf.revoke_mcp(
+            args.mcp_slug,
+            reason=str(args.reason or ""),
+        )
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return 0 if result.get("ok") else 1
 
     if args.cmd == "drain-queue":
         results = mf.drain_queue(

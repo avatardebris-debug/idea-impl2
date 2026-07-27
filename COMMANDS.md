@@ -520,28 +520,41 @@ python scripts/connector_smoke.py --oracle-only
 # After reboot: incomplete prior overnight auto truth-density + resume (unless -FreshListOnly).
 # Vision: notes/agi-lmaooo.md  |  Goal policy: reuse|compose|build|research (goal_policy.py)
 
-# Goal compose (graph.v1) + MCP factory v0 (separate loop; see notes/agi-lmaooo.md)
+# Goal compose (graph.v1) + MCP factory v1 (separate loop; see notes/agi-lmaooo2.md P4)
 # set PIPELINE_DIR=...
 python scripts/goal_compose.py compile --goal-id demo --text "wrap tool as mcp"
 python scripts/goal_compose.py plan-factories --goal-id demo
 # P3 whole-graph cheap smoke (after nodes resolved; no LLM / no long field tests):
 python scripts/goal_compose.py smoke --goal-id demo
+# MCP honesty in smoke_graph (no re-spawn):
+#   - presence: is_mcp_smoked (manifest smoked/verified + server.py) when no oracle report
+#   - invoke-oracle: prefer mcps/{slug}/invoke_report.json (or smoke_report require_invoke)
+#   - newer failed smoke_report supersedes stale ok invoke_report
+#   - revoked MCPs always fail graph smoke
+#   - soft re-smoke that fails invoke deletes invoke_report (restores presence fallback)
+#   - force re-wrap clears smoke_report + invoke_report (re-smoke before graph oracle pass)
+#   - recovery: delete $PIPELINE_DIR/mcps/mcp_<slug>/invoke_report.json for presence-only
 # attempt auto-smokes when status is executable or smoke_failed, nodes non-empty,
 # smoke_pass not set, and no missing nodes; skips draft/blocked/critiqued; fail-closed
 python scripts/goal_compose.py attempt --goal-id demo --text "..."
+# MCP factory v1 lifecycle: wrap → smoke (invoke) → re-smoke → revoke
 python scripts/mcp_factory.py wrap --slug <verified_capability>
 python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug>              # default: require invoke --help
 # PowerShell: quote invoke-args so --help is not eaten:  --invoke-args="--help"
-python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug> --no-require-invoke
+python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug> --no-require-invoke   # presence-only soft smoke
 python scripts/mcp_factory.py smoke --mcp-slug mcp_<slug> --skip-if-smoked
+python scripts/mcp_factory.py re-smoke --mcp-slug mcp_<slug>           # force re-run; updates last_smoke_at
+python scripts/mcp_factory.py re-smoke --mcp-slug mcp_<slug> --no-require-invoke
+python scripts/mcp_factory.py revoke --mcp-slug mcp_<slug> --reason "dep drift"
 python scripts/mcp_factory.py drain-queue --limit 1                    # skips already-smoked; invoke oracle on
 python scripts/mcp_factory.py list
+# Artifacts: $PIPELINE_DIR/mcps/mcp_<slug>/{manifest,server,smoke_report,invoke_report}.json|py
 # Graph fixture from smoked MCPs (map-blocks test):
 python scripts/goal_compose.py fixture-mcps --goal-id utility_mcp_fixture
 python scripts/goal_compose.py fixture-mcps --goal-id util5 --slugs mcp_json_diff_tool,mcp_url_health_checker
 # Graphs: $PIPELINE_DIR/graphs/  MCPs: $PIPELINE_DIR/mcps/  Queue: $PIPELINE_DIR/queues/mcp_factory/
 # Plan: docs/superpowers/plans/2026-07-26-goal-compose-mcp-factory-v0.md
-# P3 roadmap: notes/agi-lmaooo2.md (smoke_pass before full goal run)
+# P4 roadmap: notes/agi-lmaooo2.md (MCP re-smoke / revoke / invoke oracle)
 
 # Troubleshoot-gate consumer (emit: field_ship → recovery_decision.v1; consume: health tick)
 # Order: BE ladder → troubleshoot consumer (limit 1) → prefer_thin_field ship

@@ -649,8 +649,32 @@ def _smoke_connector_node(slug: str) -> dict[str, Any]:
     }
 
 
+def _report_ts(report: dict[str, Any] | None) -> str:
+    """ISO ts string for report recency compares (empty if missing)."""
+    if not isinstance(report, dict):
+        return ""
+    return str(report.get("ts") or "")
+
+
 def _smoke_mcp_node(slug: str) -> dict[str, Any]:
-    """Cheap MCP check: is_mcp_smoked (manifest + server.py); no re-spawn."""
+    """MCP graph smoke with honesty ladder (no re-spawn by default).
+
+    Prefer durable oracle reports when present:
+
+    1. path-safe slug (no ``..`` / separators)
+    2. revoked → fail
+    3. failed smoke_report when newer-or-equal than invoke_report → fail
+       (stale invoke success must not mask a later smoke failure)
+    4. invoke_report.json present → use its ok (invoke-oracle)
+    5. smoke_report with require_invoke + invoke check → invoke-oracle
+    6. smoke_report.json present and not ok → fail
+    7. else presence: is_mcp_smoked (manifest smoked/verified + server.py)
+
+    Presence fallback is intentional for cheap smoke_graph; it is *not*
+    an invoke-oracle proof. Factory smoke invalidates stale invoke_report on
+    soft-fail / pre-invoke fail; force re-wrap clears reports. Operators can
+    also delete mcps/{slug}/invoke_report.json to recover presence-only.
+    """
     safe = _safe_node_slug(slug)
     if safe is None:
         return {
@@ -659,9 +683,22 @@ def _smoke_mcp_node(slug: str) -> dict[str, Any]:
             "check": "slug_safety",
         }
     try:
-        from pipeline.mcp_factory import is_mcp_smoked, mcp_slug_for
+        from pipeline.mcp_factory import (
+            is_mcp_revoked,
+            is_mcp_smoked,
+            load_invoke_report,
+            load_smoke_report,
+            mcp_slug_for,
+        )
 
-        mslug = mcp_slug_for(safe)
+        try:
+            mslug = mcp_slug_for(safe)
+        except ValueError:
+            return {
+                "ok": False,
+                "detail": "unsafe_mcp_slug",
+                "check": "slug_safety",
+            }
         # Re-validate after normalize (mcp_ prefix only; still no path junk)
         if _safe_node_slug(mslug) is None:
             return {
@@ -670,12 +707,83 @@ def _smoke_mcp_node(slug: str) -> dict[str, Any]:
                 "check": "slug_safety",
                 "mcp_slug": mslug,
             }
+
+        if is_mcp_revoked(mslug):
+            return {
+                "ok": False,
+                "detail": "mcp_revoked",
+                "check": "revoked",
+                "mcp_slug": mslug,
+            }
+
+        inv = load_invoke_report(mslug)
+        smoke = load_smoke_report(mslug)
+        inv_ts = _report_ts(inv)
+        smoke_ts = _report_ts(smoke)
+
+        # Prefer newer-or-equal failed smoke over a stale ok invoke_report
+        if smoke is not None and not smoke.get("ok"):
+            if inv is None or smoke_ts >= inv_ts:
+                return {
+                    "ok": False,
+                    "detail": "smoke_report_failed",
+                    "check": "smoke_report",
+                    "mcp_slug": mslug,
+                    "smoke_ts": smoke.get("ts"),
+                    "stale_invoke_superseded": bool(inv and inv.get("ok")),
+                }
+
+        if inv is not None:
+            ok = bool(inv.get("ok"))
+            return {
+                "ok": ok,
+                "detail": "invoke_report_ok" if ok else "invoke_report_failed",
+                "check": "invoke_oracle",
+                "mcp_slug": mslug,
+                "invoke_ts": inv.get("ts"),
+            }
+
+        if smoke is not None:
+            # Only treat smoke's invoke check as oracle when require_invoke was set
+            # (matches durable invoke_report policy). Soft smoke may include a
+            # failed invoke attempt without hard-failing overall smoke.
+            if smoke.get("require_invoke"):
+                checks = smoke.get("checks") or []
+                inv_check = next(
+                    (
+                        c
+                        for c in checks
+                        if isinstance(c, dict) and c.get("method") == "invoke"
+                    ),
+                    None,
+                )
+                if inv_check is not None:
+                    ok = bool(inv_check.get("ok"))
+                    return {
+                        "ok": ok,
+                        "detail": (
+                            "smoke_invoke_ok" if ok else "smoke_invoke_failed"
+                        ),
+                        "check": "invoke_oracle",
+                        "mcp_slug": mslug,
+                        "smoke_ts": smoke.get("ts"),
+                    }
+            if not smoke.get("ok"):
+                return {
+                    "ok": False,
+                    "detail": "smoke_report_failed",
+                    "check": "smoke_report",
+                    "mcp_slug": mslug,
+                    "smoke_ts": smoke.get("ts"),
+                }
+
         ok = is_mcp_smoked(mslug)
         return {
             "ok": bool(ok),
             "detail": "mcp_smoked" if ok else "mcp_not_smoked",
             "check": "is_mcp_smoked",
             "mcp_slug": mslug,
+            "presence_only": True,
         }
     except Exception as exc:
         return {
@@ -826,6 +934,13 @@ def smoke_graph(
     Precondition: critique ok (re-runs critique by default); no status=missing
     nodes. Per executable node (software|connector|mcp|skill): cheap presence /
     prior-smoke checks only — no LLM, no long field tests, no MCP re-spawn.
+
+    MCP honesty (see ``_smoke_mcp_node``):
+      - Newer failed smoke_report supersedes stale ok invoke_report.
+      - Prefer ``invoke_report.json`` / smoke require_invoke invoke check
+        (invoke-oracle path).
+      - Else presence via ``is_mcp_smoked`` (manifest smoked + server.py).
+      - Revoked MCPs always fail. Presence is not invoke-oracle proof.
 
     Returns::
 

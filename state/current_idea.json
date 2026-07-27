@@ -1,0 +1,10 @@
+{
+  "title": "Factory capability ladder — compose, trace, external, graph",
+  "description": "Serial roadmap from conversation: goal_compose + smoke + policy, goal_trace learning, MCP factory v1, deconstructor→graph bridge, external GitHub/MCP ingest (manual then careful auto), troubleshoot/ops hardening, thin graph engineer later. Builds on already-shipped graph.v1, smoke P3, block_registry, deconstructor LLM, llm_route, troubleshoot consumer.",
+  "slug": "factory_capability_ladder",
+  "phase": 2,
+  "total_phases": 7,
+  "status": "phase_1_complete",
+  "engine": "grok_build",
+  "source": "session-planner-2026-07-27"
+}

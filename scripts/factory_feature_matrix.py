@@ -151,11 +151,40 @@ def check_mcp_wrap_smoke_list() -> str:
     mslug = man.get("mcp_slug") or mcp_slug_for(slug)
     server = mcps_dir() / mslug / "server.py"
     assert server.is_file(), f"missing server {server}"
-    rep = smoke_mcp(mslug)
+    # Soft smoke: matrix has no live capability project for invoke oracle
+    rep = smoke_mcp(mslug, require_invoke=False)
     assert rep.get("ok") is True, rep
     listed = list_mcps()
     assert any(m.get("mcp_slug") == mslug for m in listed), listed
     return f"mcp={mslug} smoke_ok tools={man.get('tools')}"
+
+
+def check_mcp_resmoke_revoke() -> str:
+    """HARD: re-smoke updates last_smoke_at; revoke clears is_mcp_smoked."""
+    from pipeline.mcp_factory import (
+        is_mcp_smoked,
+        resmoke_mcp,
+        revoke_mcp,
+        smoke_mcp,
+        wrap_capability_as_mcp,
+    )
+    from pipeline.paths import mcps_dir
+
+    slug = "matrix_resmoke_cap"
+    wrap_capability_as_mcp(slug, force=True)
+    mslug = f"mcp_{slug}"
+    assert smoke_mcp(mslug, require_invoke=False).get("ok") is True
+    r2 = resmoke_mcp(mslug, require_invoke=False)
+    assert r2.get("ok") is True, r2
+    man = json.loads(
+        (mcps_dir() / mslug / "manifest.json").read_text(encoding="utf-8")
+    )
+    assert man.get("last_smoke_at"), man
+    assert is_mcp_smoked(mslug)
+    rev = revoke_mcp(mslug, reason="matrix")
+    assert rev.get("ok") is True, rev
+    assert not is_mcp_smoked(mslug)
+    return f"mcp={mslug} resmoke_ok revoked"
 
 
 def check_drain_queue() -> str:
@@ -260,6 +289,7 @@ def run_matrix(
                 ("goal_compile", True, "isolated", check_goal_compile),
                 ("plan_factories_mcp", True, "isolated", check_plan_factories_missing_mcp),
                 ("mcp_wrap_smoke_list", True, "isolated", check_mcp_wrap_smoke_list),
+                ("mcp_resmoke_revoke", True, "isolated", check_mcp_resmoke_revoke),
                 ("drain_queue", True, "isolated", check_drain_queue),
                 ("policy_mcp_enqueue", True, "isolated", check_policy_mcp_enqueue),
                 ("goal_traces", True, "isolated", check_goal_traces_dir),

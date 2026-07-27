@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 import sys
 
@@ -698,6 +699,206 @@ def test_smoke_graph_mcp_not_smoked_fails(
     assert graph["status"] == "smoke_failed"
     failed = (graph.get("smoke_report") or {}).get("failed") or []
     assert "mcp_raw_cap" in failed
+
+
+def test_smoke_graph_mcp_invoke_oracle_and_revoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """MCP honesty: presence pass; failed invoke_report fails; revoke fails."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import MCP_ORACLE, GRAPH_SCHEMA, smoke_graph, smoke_node
+    from pipeline.mcp_factory import (
+        revoke_mcp,
+        smoke_mcp,
+        wrap_capability_as_mcp,
+    )
+    from pipeline.paths import mcps_dir
+
+    wrap_capability_as_mcp("honest_cap", force=True)
+    # Soft smoke → presence only (no durable failed invoke_report)
+    assert smoke_mcp("mcp_honest_cap", require_invoke=False)["ok"] is True
+
+    node = {
+        "id": "n1",
+        "kind": "mcp",
+        "slug": "mcp_honest_cap",
+        "label": "mcp_honest_cap",
+        "status": "verified",
+        "oracle": MCP_ORACLE,
+        "requires": [],
+    }
+    r_presence = smoke_node(node)
+    assert r_presence["ok"] is True
+    assert r_presence.get("check") == "is_mcp_smoked"
+    assert r_presence.get("presence_only") is True
+
+    graph_ok = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_mcp_honest_ok",
+        "goal_text": "smoked presence mcp",
+        "status": "executable",
+        "nodes": [dict(node)],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    rep_ok = smoke_graph(graph_ok, mutate=True)
+    assert rep_ok["smoke_pass"] is True, rep_ok
+
+    # Failed invoke oracle on disk → graph smoke fails
+    inv_path = mcps_dir() / "mcp_honest_cap" / "invoke_report.json"
+    inv_path.write_text(
+        json.dumps(
+            {
+                "schema": "mcp_invoke_report.v1",
+                "ok": False,
+                "mcp_slug": "mcp_honest_cap",
+                "args": "--help",
+                "require_invoke": True,
+                "ts": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    r_inv = smoke_node(node)
+    assert r_inv["ok"] is False
+    assert r_inv.get("check") == "invoke_oracle"
+
+    graph_fail = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_mcp_honest_inv",
+        "goal_text": "failed invoke mcp",
+        "status": "executable",
+        "nodes": [dict(node)],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    rep_fail = smoke_graph(graph_fail, mutate=True)
+    assert rep_fail["smoke_pass"] is False
+    assert graph_fail["status"] == "smoke_failed"
+
+    # Successful invoke_report → pass via invoke-oracle check
+    inv_path.write_text(
+        json.dumps(
+            {
+                "schema": "mcp_invoke_report.v1",
+                "ok": True,
+                "mcp_slug": "mcp_honest_cap",
+                "args": "--help",
+                "require_invoke": True,
+                "ts": "2026-01-01T00:00:01+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    r_ok_inv = smoke_node(node)
+    assert r_ok_inv["ok"] is True
+    assert r_ok_inv.get("check") == "invoke_oracle"
+
+    # Revoke → fail even if invoke_report was ok
+    revoke_mcp("mcp_honest_cap", reason="graph honesty")
+    r_rev = smoke_node(node)
+    assert r_rev["ok"] is False
+    assert r_rev.get("check") == "revoked"
+
+    graph_rev = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_mcp_honest_rev",
+        "goal_text": "revoked mcp",
+        "status": "executable",
+        "nodes": [dict(node)],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    rep_rev = smoke_graph(graph_rev, mutate=True)
+    assert rep_rev["smoke_pass"] is False
+
+
+def test_smoke_graph_mcp_failed_smoke_and_stale_invoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Ladder: smoke_report.ok=false fails; newer failed smoke beats stale ok invoke."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import MCP_ORACLE, smoke_node
+    from pipeline.mcp_factory import smoke_mcp, wrap_capability_as_mcp
+    from pipeline.paths import mcps_dir
+
+    wrap_capability_as_mcp("ladder_cap", force=True)
+    assert smoke_mcp("mcp_ladder_cap", require_invoke=False)["ok"] is True
+    d = mcps_dir() / "mcp_ladder_cap"
+    node = {
+        "id": "n1",
+        "kind": "mcp",
+        "slug": "mcp_ladder_cap",
+        "label": "mcp_ladder_cap",
+        "status": "verified",
+        "oracle": MCP_ORACLE,
+        "requires": [],
+    }
+
+    # (1) only failed smoke_report, no invoke_report → fail check=smoke_report
+    if (d / "invoke_report.json").is_file():
+        (d / "invoke_report.json").unlink()
+    (d / "smoke_report.json").write_text(
+        json.dumps(
+            {
+                "ok": False,
+                "mcp_slug": "mcp_ladder_cap",
+                "ts": "2026-06-01T00:00:00+00:00",
+                "error": "ping failed",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    r1 = smoke_node(node)
+    assert r1["ok"] is False
+    assert r1.get("check") == "smoke_report"
+
+    # (2) stale ok invoke + newer failed smoke → still fail (Issue 1 regression)
+    (d / "invoke_report.json").write_text(
+        json.dumps(
+            {
+                "schema": "mcp_invoke_report.v1",
+                "ok": True,
+                "mcp_slug": "mcp_ladder_cap",
+                "ts": "2026-01-01T00:00:00+00:00",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (d / "smoke_report.json").write_text(
+        json.dumps(
+            {
+                "ok": False,
+                "mcp_slug": "mcp_ladder_cap",
+                "ts": "2026-06-01T00:00:00+00:00",
+                "error": "later fail",
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    r2 = smoke_node(node)
+    assert r2["ok"] is False
+    assert r2.get("check") == "smoke_report"
+    assert r2.get("stale_invoke_superseded") is True
 
 
 def test_goal_compose_smoke_cli(

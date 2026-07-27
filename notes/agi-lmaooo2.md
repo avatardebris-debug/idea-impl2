@@ -107,7 +107,7 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 | **P1** | Sockets + registry kinds skill/prompt | **v0 done** — JSON block catalog + role sockets; attach gates draft/revoked |
 | **P2** | Skill/prompt promote (sandbox → verified) | **v0 done** — static sandbox + promote + revoke; executor socket hook thin |
 | **P3** | Whole-graph smoke after nodes resolved | **v0 done** — `smoke_graph` / `goal_compose smoke`; attempt auto-smokes when `executable`; cheap per-node checks only |
-| **P4** | MCP factory v1 (re-smoke, revoke, invoke oracle) | MCP as real block |
+| **P4** | MCP factory v1 (re-smoke, revoke, invoke oracle) | **v1 partial / in progress** — `resmoke_mcp` + `revoke_mcp` + CLI `re-smoke`/`revoke`; durable `invoke_report.json` on require_invoke; manifest provenance (`capability_slug`, `wrap_version`, `content_sha256`, `last_smoke_at`); graph smoke prefers invoke report else presence; revoked fails |
 | **P5** | External ingest **manual** (pin + sandbox + human CLI) | One external asset under audit log |
 | **P6** | Graph engineer (later plan) | Only authors into P3 pipeline |
 | **Defer** | Push notifications + mute windows | Note until approval state exists |
