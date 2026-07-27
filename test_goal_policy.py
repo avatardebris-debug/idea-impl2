@@ -283,3 +283,51 @@ def test_execute_reuse_fail_outcome(tmp_path, monkeypatch):
     assert tr["outcome"] == "failed"
     assert tr["failure_class"] == "capability_fail"
     assert tr["train_weight"] == 0.1
+
+
+def test_execute_reuse_external_trust_clamp(tmp_path, monkeypatch):
+    """Phase 6: external-touched reuse → trust=external, train_weight ≤ 0.2.
+
+    Internal reuse (existing test) stays high weight; external presence/smoke
+    is never field_proven.
+    """
+    _reload(tmp_path, monkeypatch)
+    monkeypatch.delenv("KEEP_GOAL_TRACES", raising=False)
+
+    def _fake_invoke(slug, args=""):
+        return "OK: invoked external skill"
+
+    import sys
+    import types
+
+    mod = types.ModuleType("pipeline.capability_tools")
+    mod.invoke_capability = _fake_invoke
+    monkeypatch.setitem(sys.modules, "pipeline.capability_tools", mod)
+
+    from pipeline.goal_trace import EXTERNAL_MAX_TRAIN_WEIGHT
+
+    d = GoalPolicyDecision(
+        policy=POLICY_REUSE,
+        reason="router hit external_promoted skill_ext",
+        capability_slug="skill_ext",
+        hits=[
+            {
+                "slug": "skill_ext",
+                "kind": "skill",
+                "requires_ok": True,
+                "trust": "external",
+                "external_asset_id": "skill_ext",
+            }
+        ],
+    )
+    out = execute_policy(d, goal_text="use skill_ext", branch_id="b_ext_reuse")
+    assert out["status"] == "achieved"
+    assert out.get("trust") == "external"
+    tr = json.loads(
+        (tmp_path / "goal_traces" / f"{out['goal_id']}.json").read_text(encoding="utf-8")
+    )
+    assert tr["outcome"] == "proven"
+    assert tr.get("trust") == "external"
+    assert float(tr["train_weight"]) <= EXTERNAL_MAX_TRAIN_WEIGHT
+    assert float(tr["train_weight"]) <= 0.2
+    assert tr.get("claim") == "capability_invoke"

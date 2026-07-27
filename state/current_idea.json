@@ -1,10 +1,10 @@
 {
   "title": "Factory capability ladder \u2014 compose, trace, external, graph",
-  "description": "Serial roadmap: MCP v1 done; Phase 2 field-prove integrity; Phase 3 goal_trace outcomes done; Phase 4 deconstructor\u2192draft graph bridge done; Phase 5 external ingest manual done; next compose policy/smoke for external nodes (Phase 6).",
+  "description": "Serial roadmap: MCP v1 done; Phase 2 field-prove integrity; Phase 3 goal_trace outcomes done; Phase 4 deconstructor\u2192draft graph bridge done; Phase 5 external ingest manual done; Phase 6 compose policy/smoke for external nodes done; next ops hardening (Phase 7).",
   "slug": "factory_capability_ladder",
-  "phase": 6,
+  "phase": 7,
   "total_phases": 8,
-  "status": "phase_5_complete",
+  "status": "phase_6_complete",
   "engine": "grok_build",
   "source": "session-planner-2026-07-27"
 }

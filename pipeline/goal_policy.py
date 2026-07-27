@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeline.goal_trace import (
+    EXTERNAL_MAX_TRAIN_WEIGHT,
     FAILURE_CAPABILITY,
     FAILURE_COMPOSE,
     FAILURE_MCP_ENQUEUED,
@@ -224,6 +225,47 @@ def classify_goal_branch(
     )
 
 
+def decision_touches_external(decision: GoalPolicyDecision) -> bool:
+    """True when attempt/reuse touches an external-promoted capability.
+
+    Marks trust=external so train_weight stays ≤ EXTERNAL_MAX. Presence smoke
+    alone is never field_proven.
+    """
+    reason = (decision.reason or "").lower()
+    if "trust=external" in reason or "external_promoted" in reason:
+        return True
+    for hit in decision.hits or []:
+        if not isinstance(hit, dict):
+            continue
+        if str(hit.get("trust") or "").strip().lower() == "external":
+            return True
+        if str(hit.get("provenance") or "").strip().lower() == "external":
+            return True
+        if str(hit.get("kind") or "").strip().lower() == "external_mcp":
+            return True
+        if hit.get("external_asset_id"):
+            return True
+        slug = str(hit.get("slug") or "").strip()
+        if slug.startswith("external_"):
+            return True
+    for slug in (decision.capability_slug, decision.connector_slug):
+        if not slug:
+            continue
+        s = str(slug).strip()
+        if s.startswith("external_"):
+            return True
+        try:
+            from pipeline.external_ingest import resolve_promoted
+
+            resolve_promoted(s)
+            return True
+        except (FileNotFoundError, ValueError, OSError):
+            continue
+        except Exception:
+            continue
+    return False
+
+
 def execute_policy(
     decision: GoalPolicyDecision,
     *,
@@ -231,7 +273,11 @@ def execute_policy(
     branch_id: str = "",
     force_compose: bool = True,
 ) -> dict[str, Any]:
-    """Execute reuse/compose (build/research/yield are signals). Always goal_trace."""
+    """Execute reuse/compose (build/research/yield are signals). Always goal_trace.
+
+    External-touched paths set trust=external so train_weight ≤ EXTERNAL_MAX
+    even on proven claims (Phase 6). Internal reuse unchanged.
+    """
     plan = [
         {"step": 1, "intent": "classify", "tool": "goal_policy.classify"},
         {"step": 2, "intent": f"act_{decision.policy}", "tool": f"policy.{decision.policy}"},
@@ -242,10 +288,17 @@ def execute_policy(
         plan=plan,
         budget={"max_tokens": 0, "max_minutes": 15},
     )
+    external = decision_touches_external(decision)
+    trust_kw: dict[str, Any] = {"trust": "external"} if external else {}
+    if external:
+        tr["trust"] = "external"
     append_event(
         tr,
         type="think",
-        content=f"policy={decision.policy} reason={decision.reason}",
+        content=(
+            f"policy={decision.policy} reason={decision.reason}"
+            + (" trust=external" if external else "")
+        ),
     )
     append_event(
         tr,
@@ -255,6 +308,7 @@ def execute_policy(
             "policy": decision.policy,
             "capability": decision.capability_slug,
             "connector": decision.connector_slug,
+            "trust": "external" if external else None,
         },
         result_snip=decision.reason[:500],
         ok=True,
@@ -266,6 +320,8 @@ def execute_policy(
         "goal_id": tr.get("goal_id"),
         "status": "failed",
     }
+    if external:
+        result["trust"] = "external"
 
     if decision.policy == POLICY_REUSE and decision.capability_slug:
         try:
@@ -284,6 +340,12 @@ def execute_policy(
             result["output"] = str(out)[:500]
             result["capability"] = decision.capability_slug
             result["status"] = "achieved" if ok else "failed"
+            # Proven claim OK for reuse success, but external stays ≤ EXTERNAL_MAX
+            tw = (
+                (EXTERNAL_MAX_TRAIN_WEIGHT if ok else 0.1)
+                if external
+                else (4.0 if ok else 0.1)
+            )
             finalize_trace(
                 tr,
                 status="goal_proven" if ok else "goal_failed",
@@ -295,7 +357,8 @@ def execute_policy(
                     "evidence": decision.capability_slug,
                 },
                 claim="capability_invoke",
-                train_weight=4.0 if ok else 0.1,
+                train_weight=tw,
+                **trust_kw,
             )
             return result
         except Exception as exc:
@@ -307,6 +370,7 @@ def execute_policy(
                 failure_class=FAILURE_CAPABILITY,
                 oracle={"name": "capability_invoke", "pass": False, "evidence": str(exc)},
                 claim="capability_invoke",
+                **trust_kw,
             )
             result["reason"] = str(exc)
             return result
@@ -334,6 +398,7 @@ def execute_policy(
             # Compose often deeper_work until product oracles exist
             if ok:
                 result["status"] = "achieved"
+                tw_ok = EXTERNAL_MAX_TRAIN_WEIGHT if external else 3.0
                 finalize_trace(
                     tr,
                     status="goal_proven",
@@ -344,7 +409,8 @@ def execute_policy(
                         "evidence": decision.connector_slug,
                     },
                     claim="connector_compose",
-                    train_weight=3.0,
+                    train_weight=tw_ok,
+                    **trust_kw,
                 )
             else:
                 result["status"] = "deeper_work_needed"
@@ -359,7 +425,8 @@ def execute_policy(
                         "evidence": str(out)[:400],
                     },
                     claim="connector_compose",
-                    train_weight=0.2,
+                    train_weight=0.2 if not external else min(0.2, EXTERNAL_MAX_TRAIN_WEIGHT),
+                    **trust_kw,
                 )
             return result
         except Exception as exc:
@@ -371,6 +438,7 @@ def execute_policy(
                 failure_class=FAILURE_COMPOSE,
                 oracle={"name": "connector_compose", "pass": False, "evidence": str(exc)},
                 claim="connector_compose",
+                **trust_kw,
             )
             result["reason"] = str(exc)
             result["status"] = "failed"

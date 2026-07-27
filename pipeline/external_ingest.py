@@ -124,6 +124,17 @@ def _secret_patterns() -> list[tuple[str, re.Pattern[str]]]:
         ]
 
 
+# Map external_asset kind → graph.v1 node kind (closed lego enum).
+_KIND_TO_GRAPH_KIND = {
+    "skill": "skill",
+    "software": "software",
+    "mcp": "mcp",
+    "external_mcp": "external_mcp",
+}
+
+# Promoted JSON uses registry-style status "draft" (not field_proven). Compose-usable.
+_PROMOTED_USABLE_STATUSES = frozenset({"draft", "promoted", "verified"})
+
 __all__ = [
     "SCHEMA",
     "PROMOTED_SCHEMA",
@@ -143,6 +154,12 @@ __all__ = [
     "list_assets",
     "show_asset",
     "content_sha256_tree",
+    "kind_to_graph_kind",
+    "load_promoted",
+    "list_promoted",
+    "resolve_promoted",
+    "route_hit_from_promoted",
+    "assert_promoted_usable",
 ]
 
 
@@ -228,6 +245,214 @@ def _promoted_path(asset_id: str) -> Path:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def kind_to_graph_kind(kind: str) -> str:
+    """Map external asset kind → graph.v1 node kind.
+
+    skill → skill, software → software, mcp → mcp, external_mcp → external_mcp.
+    """
+    k = (kind or "").strip().lower()
+    if k not in _KIND_TO_GRAPH_KIND:
+        raise ValueError(
+            f"kind must be one of {sorted(_KIND_TO_GRAPH_KIND)}; got {kind!r}"
+        )
+    return _KIND_TO_GRAPH_KIND[k]
+
+
+def assert_promoted_usable(
+    data: dict[str, Any],
+    *,
+    asset_id: str | None = None,
+) -> None:
+    """Raise ValueError if a promoted record is not safe for compose/smoke.
+
+    Fail closed on revoked / missing pin. Registry-style status ``draft`` on the
+    promoted JSON is OK (means not field_proven). Live asset must be ``promoted``
+    when an asset.json exists.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("promoted record is not a dict")
+    aid = str(
+        asset_id
+        or data.get("external_asset_id")
+        or data.get("id")
+        or "?"
+    )
+    status = str(data.get("status") or "").strip().lower()
+    if status == "revoked":
+        raise ValueError(f"promoted asset revoked: {aid}")
+    if status and status not in _PROMOTED_USABLE_STATUSES:
+        raise ValueError(
+            f"promoted record not usable for compose (status={status!r}): {aid}"
+        )
+    pin = data.get("pin") if isinstance(data.get("pin"), dict) else {}
+    if not (pin.get("content_sha256") or pin.get("commit_sha")):
+        raise ValueError(f"promoted asset missing pin hash: {aid}")
+
+    # Live asset gate when quarantine record exists
+    live_id = str(data.get("external_asset_id") or asset_id or "").strip()
+    if live_id:
+        try:
+            live_id = _validate_id(live_id)
+        except ValueError:
+            live_id = ""
+    if live_id:
+        rec = get_asset(live_id)
+        if rec is not None:
+            ast = str(rec.get("status") or "").strip().lower()
+            if ast == "revoked":
+                raise ValueError(f"asset revoked: {live_id}")
+            if ast != "promoted":
+                raise ValueError(
+                    f"asset {live_id} status={ast!r} is not promoted "
+                    f"(compose/smoke require promoted-only; never draft/quarantine/"
+                    f"scanned/approved-not-promoted)"
+                )
+
+
+def load_promoted(
+    asset_id: str,
+    *,
+    require_usable: bool = True,
+) -> dict[str, Any]:
+    """Load ``external/promoted/{id}.json`` by path-safe asset id.
+
+    Fail closed: missing file, non-promoted live asset, revoked, or unpinned.
+    Does **not** load draft-only quarantine assets (no promoted file).
+    Never git-clones.
+    """
+    safe = _validate_id(asset_id)
+    path = _promoted_path(safe)
+    if not path.is_file():
+        rec = get_asset(safe)
+        if rec is None:
+            raise FileNotFoundError(f"promoted asset not found: {asset_id}")
+        st = str(rec.get("status") or "")
+        raise ValueError(
+            f"asset {asset_id} is not promoted (status={st!r}); "
+            f"only promoted records under external/promoted/ are loadable "
+            f"for compose/smoke (sequence: pin → scan → approve → promote)"
+        )
+    try:
+        data = _load_json(path)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"promoted record unreadable for {asset_id}: {exc}") from exc
+    if require_usable:
+        assert_promoted_usable(data, asset_id=safe)
+    return data
+
+
+def list_promoted(*, usable_only: bool = True) -> list[dict[str, Any]]:
+    """List promoted-only asset records (from ``external/promoted/*.json``).
+
+    Path-unsafe filenames are skipped. When *usable_only*, revoked / unpinned /
+    non-promoted live assets are omitted (fail closed for compose consumers).
+    """
+    out: list[dict[str, Any]] = []
+    root = promoted_dir()
+    if not root.is_dir():
+        return out
+    for path in sorted(root.glob("*.json")):
+        try:
+            safe = _validate_id(path.stem)
+        except ValueError:
+            continue
+        try:
+            data = _load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        # Prefer stem as external_asset_id when missing
+        if not data.get("external_asset_id"):
+            data = dict(data)
+            data["external_asset_id"] = safe
+        if usable_only:
+            try:
+                assert_promoted_usable(data, asset_id=safe)
+            except ValueError:
+                continue
+        out.append(data)
+    return out
+
+
+def resolve_promoted(slug_or_id: str, *, require_usable: bool = True) -> dict[str, Any]:
+    """Resolve a graph slug / promoted draft id / asset id → usable promoted record.
+
+    Lookup order:
+      1. path-safe asset id → ``promoted/{id}.json``
+      2. match ``external_asset_id`` or promoted ``id`` across promoted files
+
+    Fail closed when nothing usable matches. Never git-clones.
+    """
+    raw = (slug_or_id or "").strip()
+    if not raw:
+        raise ValueError("empty external slug/id")
+    # 1) direct asset id
+    try:
+        safe = _validate_id(raw)
+    except ValueError:
+        safe = ""
+    if safe:
+        path = _promoted_path(safe)
+        if path.is_file():
+            return load_promoted(safe, require_usable=require_usable)
+
+    # 2) scan promoted by draft id / external_asset_id / slug alias
+    for rec in list_promoted(usable_only=False):
+        eid = str(rec.get("external_asset_id") or "").strip()
+        pid = str(rec.get("id") or "").strip()
+        if raw not in (eid, pid) and raw.lower() not in (
+            eid.lower(),
+            pid.lower(),
+        ):
+            continue
+        # Prefer file key = external_asset_id (promoted/{asset_id}.json)
+        if eid:
+            try:
+                return load_promoted(eid, require_usable=require_usable)
+            except (FileNotFoundError, ValueError):
+                if not require_usable:
+                    return rec
+                raise
+        if require_usable:
+            assert_promoted_usable(rec, asset_id=pid or raw)
+        return rec
+
+    raise FileNotFoundError(
+        f"no promoted external asset matching {slug_or_id!r}; "
+        f"compose/smoke require a promoted record (not draft/quarantine)"
+    )
+
+
+def route_hit_from_promoted(asset_id: str) -> dict[str, Any]:
+    """Build a router hit for ``compile_goal_graph`` from a promoted asset.
+
+    Status is ``verified`` only for presence-promoted assets (not field_proven).
+    Includes ``trust=external`` so policy/attempt clamp train_weight.
+    """
+    rec = load_promoted(asset_id)
+    eid = str(rec.get("external_asset_id") or asset_id)
+    try:
+        eid = _validate_id(eid)
+    except ValueError:
+        eid = _validate_id(asset_id)
+    kind = kind_to_graph_kind(str(rec.get("kind") or "software"))
+    return {
+        "slug": eid,
+        "kind": kind,
+        "status": "verified",
+        "title": str(rec.get("id") or eid),
+        "label": str(rec.get("id") or eid),
+        "requires_ok": True,
+        "trust": "external",
+        "external_asset_id": eid,
+        "promoted_id": rec.get("id"),
+        "pin": dict(rec.get("pin") or {}),
+        "oracle": "external_promoted_presence",
+        "provenance": "external",
+    }
 
 
 def _save_json(path: Path, data: dict[str, Any]) -> None:

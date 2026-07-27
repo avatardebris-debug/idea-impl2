@@ -88,7 +88,8 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 7. **Ingest pipeline (P5 manual — shipped):** pin local path/fixture → static scan → license/provenance note → **human CLI approve** → presence smoke → `external_*` draft under `$PIPELINE_DIR/external/promoted/`.  
    CLI: `python scripts/external_ingest.py pin|scan|approve|reject|promote|list|show`.  
    **No unattended GitHub search/auto-pull.** Live network fetch default-off / not implemented in library path.  
-   Audit: `$PIPELINE_DIR/external/audit.jsonl`. Traces: `trust=external` (train_weight ≤ 0.2).
+   Audit: `$PIPELINE_DIR/external/audit.jsonl`. Traces: `trust=external` (train_weight ≤ 0.2).  
+   **Compose/smoke (P6 — shipped):** only **promoted** ids via `load_promoted` / `--include-external` / hits-json; `smoke_node` fails draft/quarantine/revoked/unpinned; never git-clones; smoke_pass ≠ field_proven; attempt paths stamp `trust=external` so train_weight ≤ 0.2.
 
 8. **Human approval hook (defer product):**  
    `needs_human_approval(action, risk_class)` on disk first.  

@@ -77,13 +77,20 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - CLI: `python scripts/external_ingest.py pin|scan|approve|reject|promote|list|show|revoke`
   - Store: `$PIPELINE_DIR/external/{assets,promoted,audit.jsonl}`
 
-## Phase 6: Compose policy + smoke for external nodes
+## Phase 6: Compose policy + smoke for external nodes — **DONE**
+- **Status**: **DONE** (promoted-only load/list; smoke honesty; compile/hits; policy trust=external)
 - **Description**: goal_policy / smoke_graph / attempt treat promoted external nodes with provenance + low train_weight until goal/field proven.
 - **Deliverable**: policy + smoke updates; tests; docs.
 - **Dependencies**: Phase 5
 - **Success criteria**:
-  - smoke rejects draft/unpinned external
-  - traces show low train_weight by default
+  - smoke rejects draft/unpinned external — **met**
+  - traces show low train_weight by default — **met** (trust=external ≤ 0.2)
+- **API**:
+  - `pipeline.external_ingest`: `load_promoted` / `list_promoted` / `resolve_promoted` / `route_hit_from_promoted` / `kind_to_graph_kind`
+  - `pipeline.goal_graph`: `smoke_node` external path; `compile_goal_graph(..., include_promoted_ids=...)`
+  - `pipeline.goal_policy`: `decision_touches_external` → finalize `trust=external`
+  - CLI: `python scripts/goal_compose.py compile ... --include-external id1,id2` then `smoke --goal-id ...`
+  - Compose never clones; field dual-gate unchanged
 
 ## Phase 7: Ops hardening — troubleshoot BE, feature matrix, GitHub L1–L2 thin
 - **Description**: Matrix/docs for smoke + MCP v1 + field dual gate; optional GitHub **outputs** L1–L2 (publish), not ingest.

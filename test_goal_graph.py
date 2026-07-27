@@ -1405,3 +1405,219 @@ def test_attempt_save_graph_failure_fail_closed(
     assert rc == 1
     assert exec_calls == []
     assert n_save["n"] >= 1
+
+
+def _promote_skill_fixture(
+    monkeypatch: pytest.MonkeyPatch, pipeline: pathlib.Path, tmp_path: pathlib.Path, asset_id: str
+) -> dict:
+    """pin→scan→approve→promote a skill fixture; return promoted record."""
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    monkeypatch.setenv("KEEP_GOAL_TRACES", "1")
+    monkeypatch.setenv("EXTERNAL_INGEST_ACTOR", "test-operator")
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    sk = tmp_path / "fx" / asset_id
+    sk.mkdir(parents=True, exist_ok=True)
+    (sk / "SKILL.md").write_text(
+        f"---\nname: {asset_id}\n---\n\n# {asset_id}\n", encoding="utf-8"
+    )
+    (sk / "LICENSE").write_text("MIT\n", encoding="utf-8")
+    from pipeline.external_ingest import (
+        approve_asset,
+        load_promoted,
+        pin_asset,
+        promote_asset,
+        scan_asset,
+    )
+
+    pin_asset(sk, kind="skill", asset_id=asset_id)
+    scan_asset(asset_id)
+    approve_asset(asset_id)
+    promote_asset(asset_id)
+    return load_promoted(asset_id)
+
+
+def test_smoke_external_promoted_pass(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Promoted external skill node presence-smokes; not field_proven."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    prom = _promote_skill_fixture(monkeypatch, pipeline, tmp_path, "skill_smokepass")
+    from pipeline.goal_graph import EXTERNAL_ORACLE, GRAPH_SCHEMA, smoke_graph, smoke_node
+
+    node = {
+        "id": "n1",
+        "kind": "skill",
+        "slug": "skill_smokepass",
+        "label": prom.get("id"),
+        "status": "verified",
+        "oracle": EXTERNAL_ORACLE,
+        "requires": [],
+        "trust": "external",
+        "external_asset_id": "skill_smokepass",
+    }
+    r = smoke_node(node)
+    assert r["ok"] is True
+    assert r.get("check") == "external_promoted"
+    assert r.get("field_proven") is False
+    assert r.get("presence_only") is True
+    assert r.get("trust") == "external"
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "g_ext_smoke_ok",
+        "goal_text": "use skill_smokepass",
+        "status": "executable",
+        "nodes": [node],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True, re_critique=True)
+    assert report["smoke_pass"] is True
+    assert report["ok"] is True
+
+
+def test_smoke_external_not_promoted_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Draft / missing promoted external node → smoke fail with clear issue."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.goal_graph import EXTERNAL_ORACLE, smoke_node
+
+    r = smoke_node(
+        {
+            "id": "n1",
+            "kind": "external_mcp",
+            "slug": "ghost_external",
+            "status": "verified",
+            "oracle": EXTERNAL_ORACLE,
+            "trust": "external",
+        }
+    )
+    assert r["ok"] is False
+    assert "external" in (r.get("detail") or "").lower()
+    assert r.get("check") in ("external_promoted", "slug_safety")
+
+
+def test_smoke_external_revoked_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Revoked external asset → smoke fail."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    _promote_skill_fixture(monkeypatch, pipeline, tmp_path, "skill_revsmoke")
+    from pipeline.external_ingest import revoke_asset
+    from pipeline.goal_graph import EXTERNAL_ORACLE, smoke_node
+
+    revoke_asset("skill_revsmoke", reason="dep drift")
+    r = smoke_node(
+        {
+            "id": "n1",
+            "kind": "skill",
+            "slug": "skill_revsmoke",
+            "status": "verified",
+            "oracle": EXTERNAL_ORACLE,
+            "trust": "external",
+            "external_asset_id": "skill_revsmoke",
+        }
+    )
+    assert r["ok"] is False
+    assert "revok" in (r.get("detail") or "").lower() or "not_usable" in (
+        r.get("detail") or ""
+    )
+
+
+def test_smoke_external_unpinned_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Promoted JSON without pin hash → smoke fail."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    monkeypatch.setenv("PIPELINE_DIR", str(pipeline))
+    monkeypatch.delenv("PIPELINE_CLOUD", raising=False)
+    from pipeline.pipeline_config import reload_pipeline_dir
+
+    reload_pipeline_dir()
+    from pipeline.external_ingest import promoted_dir
+    from pipeline.goal_graph import EXTERNAL_ORACLE, smoke_node
+
+    # Orphan promoted file: no pin, no live asset → unpinned fail closed
+    p = promoted_dir() / "skill_nopin.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(
+        json.dumps(
+            {
+                "schema": "external_promoted.v1",
+                "id": "external_skill_skill_nopin",
+                "external_asset_id": "skill_nopin",
+                "kind": "skill",
+                "status": "draft",
+                "trust": "external",
+                "pin": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    r = smoke_node(
+        {
+            "id": "n1",
+            "kind": "skill",
+            "slug": "skill_nopin",
+            "status": "verified",
+            "oracle": EXTERNAL_ORACLE,
+            "trust": "external",
+            "external_asset_id": "skill_nopin",
+        }
+    )
+    assert r["ok"] is False
+    detail = (r.get("detail") or "").lower()
+    assert "pin" in detail or "not_usable" in detail or "missing" in detail
+
+
+def test_compile_with_promoted_external_fixture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Compile graph including a promoted external node without live pin/scan."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir(parents=True)
+    prom = _promote_skill_fixture(monkeypatch, pipeline, tmp_path, "skill_compile")
+    from pipeline.goal_graph import compile_goal_graph, smoke_graph
+    from pipeline.external_ingest import route_hit_from_promoted
+
+    hit = route_hit_from_promoted("skill_compile")
+    g = compile_goal_graph(
+        "use skill_compile external fixture",
+        goal_id="g_ext_compile",
+        route_hits=[hit],
+        max_nodes=10,
+    )
+    assert g["schema"] == "graph.v1"
+    nodes = g.get("nodes") or []
+    assert any(n.get("slug") == "skill_compile" for n in nodes)
+    ext_nodes = [n for n in nodes if n.get("trust") == "external"]
+    assert ext_nodes
+    assert ext_nodes[0].get("external_asset_id") == "skill_compile"
+    assert ext_nodes[0].get("status") == "verified"
+    # include_promoted_ids path
+    g2 = compile_goal_graph(
+        "include promoted",
+        goal_id="g_ext_include",
+        route_hits=[],
+        include_promoted_ids=["skill_compile"],
+    )
+    assert any(
+        n.get("slug") == "skill_compile" and n.get("trust") == "external"
+        for n in (g2.get("nodes") or [])
+    )
+    report = smoke_graph(g2, mutate=True)
+    assert report["smoke_pass"] is True
+    assert prom["pin"]["content_sha256"]

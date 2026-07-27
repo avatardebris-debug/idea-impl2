@@ -419,3 +419,80 @@ def test_goal_trace_external_clamp_on_promote(
     assert tr["trust"] == "external"
     assert tr["train_weight"] <= EXTERNAL_MAX_TRAIN_WEIGHT
     assert tr["train_weight"] > 0  # promote success is low-but-nonzero external
+
+
+def test_load_promoted_and_list_fail_closed(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Phase 6: load/list promoted-only; draft/quarantine/revoked fail closed."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    fixture = _write_skill_fixture(tmp_path / "fixtures", name="p6-skill")
+    from pipeline.external_ingest import (
+        approve_asset,
+        kind_to_graph_kind,
+        list_promoted,
+        load_promoted,
+        pin_asset,
+        promote_asset,
+        resolve_promoted,
+        revoke_asset,
+        route_hit_from_promoted,
+        scan_asset,
+    )
+
+    assert kind_to_graph_kind("skill") == "skill"
+    assert kind_to_graph_kind("external_mcp") == "external_mcp"
+    with pytest.raises(ValueError):
+        kind_to_graph_kind("not_a_kind")
+
+    # Path-unsafe ids rejected
+    with pytest.raises(ValueError, match="path|invalid"):
+        load_promoted("../etc/passwd")
+    with pytest.raises(ValueError, match="path|invalid"):
+        load_promoted("foo/bar")
+
+    rec = pin_asset(fixture, kind="skill", asset_id="skill_p6")
+    # Quarantined only — no promoted file
+    with pytest.raises((FileNotFoundError, ValueError), match="not promoted|not found"):
+        load_promoted("skill_p6")
+    assert list_promoted() == []
+
+    scan_asset(rec["id"])
+    with pytest.raises((FileNotFoundError, ValueError), match="not promoted|not found"):
+        load_promoted("skill_p6")
+
+    approve_asset(rec["id"])
+    # Approved-but-not-promoted still fails closed
+    with pytest.raises((FileNotFoundError, ValueError), match="not promoted|not found"):
+        load_promoted("skill_p6")
+
+    promote_asset(rec["id"])
+    draft = load_promoted("skill_p6")
+    assert draft["schema"] == "external_promoted.v1"
+    assert draft["trust"] == "external"
+    assert draft["pin"]["content_sha256"]
+    assert draft["external_asset_id"] == "skill_p6"
+
+    # Resolve by promoted draft id as well
+    by_draft = resolve_promoted(str(draft["id"]))
+    assert by_draft["external_asset_id"] == "skill_p6"
+
+    listed = list_promoted()
+    assert len(listed) == 1
+    assert listed[0]["external_asset_id"] == "skill_p6"
+
+    hit = route_hit_from_promoted("skill_p6")
+    assert hit["trust"] == "external"
+    assert hit["status"] == "verified"
+    assert hit["kind"] == "skill"
+    assert hit["slug"] == "skill_p6"
+    assert hit["pin"]["content_sha256"]
+
+    # Revoke → load/list fail closed
+    revoke_asset("skill_p6", reason="test revoke")
+    with pytest.raises(ValueError, match="revoked"):
+        load_promoted("skill_p6")
+    assert list_promoted() == []

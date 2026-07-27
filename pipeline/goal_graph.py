@@ -31,10 +31,14 @@ NODE_KINDS = frozenset(
 )
 
 # Kinds that need a named oracle for critique to pass.
-EXECUTABLE_KINDS = frozenset({"software", "connector", "mcp", "skill"})
+# external_mcp is executable for presence-smoke only (promoted + pin; not field).
+EXECUTABLE_KINDS = frozenset(
+    {"software", "connector", "mcp", "skill", "external_mcp"}
+)
 
 DEFAULT_ORACLE = "capability_invoke_help"
 MCP_ORACLE = "mcp_invoke_help"
+EXTERNAL_ORACLE = "external_promoted_presence"
 
 # Map registry / router hit kinds onto the closed lego enum.
 _KIND_MAP = {
@@ -55,16 +59,19 @@ __all__ = [
     "GRAPH_SCHEMA",
     "DEFAULT_ORACLE",
     "MCP_ORACLE",
+    "EXTERNAL_ORACLE",
     "EXECUTABLE_KINDS",
     "compile_goal_graph",
     "compile_graph_from_deconstruct",
     "critique_graph",
     "smoke_graph",
+    "smoke_node",
     "save_graph",
     "load_graph",
     "graph_path",
     "plan_factory_actions",
     "compile_graph_from_smoked_mcps",
+    "node_is_external",
 ]
 
 
@@ -106,9 +113,52 @@ def _oracle_for_kind(kind: str, hit: dict[str, Any] | None = None) -> str:
             return o.strip()
     if kind == "mcp":
         return MCP_ORACLE
+    if kind == "external_mcp":
+        return EXTERNAL_ORACLE
     if kind in EXECUTABLE_KINDS:
         return DEFAULT_ORACLE
     return ""
+
+
+def node_is_external(node: dict[str, Any]) -> bool:
+    """True when a graph node must resolve via external/promoted (not internal registry).
+
+    Triggers: kind=external_mcp, trust/provenance=external, slug external_*,
+    or explicit external_asset_id.
+    """
+    if not isinstance(node, dict):
+        return False
+    kind = str(node.get("kind") or "").strip().lower()
+    if kind == "external_mcp":
+        return True
+    if str(node.get("trust") or "").strip().lower() == "external":
+        return True
+    if str(node.get("provenance") or "").strip().lower() == "external":
+        return True
+    if node.get("external_asset_id"):
+        return True
+    slug = str(node.get("slug") or node.get("id") or "").strip()
+    if slug.startswith("external_"):
+        return True
+    return False
+
+
+def _hit_is_external(hit: dict[str, Any]) -> bool:
+    if not isinstance(hit, dict):
+        return False
+    kind = _normalize_kind(hit.get("kind"))
+    if kind == "external_mcp":
+        return True
+    if str(hit.get("trust") or "").strip().lower() == "external":
+        return True
+    if str(hit.get("provenance") or "").strip().lower() == "external":
+        return True
+    if hit.get("external_asset_id"):
+        return True
+    slug = str(hit.get("slug") or "").strip()
+    if slug.startswith("external_"):
+        return True
+    return False
 
 
 def _slug_tokens_from_text(text: str) -> set[str]:
@@ -303,8 +353,12 @@ def _make_node(
     status: str,
     oracle: str,
     requires: list[str] | None = None,
+    trust: str | None = None,
+    external_asset_id: str | None = None,
+    provenance: str | None = None,
+    pin: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    node: dict[str, Any] = {
         "id": f"n{index}",
         "kind": kind,
         "slug": slug,
@@ -313,6 +367,15 @@ def _make_node(
         "oracle": oracle,
         "requires": list(requires or []),
     }
+    if trust:
+        node["trust"] = trust
+    if external_asset_id:
+        node["external_asset_id"] = external_asset_id
+    if provenance:
+        node["provenance"] = provenance
+    if pin:
+        node["pin"] = dict(pin)
+    return node
 
 
 def _slugify_node(raw: str, *, max_len: int = 48) -> str:
@@ -556,14 +619,29 @@ def compile_goal_graph(
     goal_id: str,
     route_hits: list[dict[str, Any]] | None = None,
     max_nodes: int = 10,
+    include_promoted_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build a graph.v1 dict from goal text + router hits (no LLM).
 
     Nodes come from route_hits first, then matching connectors (best-effort).
     Edges are linear control edges in node order. Caps at max_nodes (default 10).
+
+    *include_promoted_ids*: optional external asset ids already under
+    ``external/promoted/`` — attached as route hits (trust=external). Fail closed
+    if an id is not promoted. Deconstruct→graph still does **not** auto-ingest.
+    Never git-clones.
     """
     max_nodes = max(0, int(max_nodes))
     hits = list(route_hits or [])
+    # Attach promoted external assets as hits (thin compose path; Phase 6)
+    if include_promoted_ids:
+        from pipeline.external_ingest import route_hit_from_promoted
+
+        for pid in include_promoted_ids:
+            pid_s = str(pid or "").strip()
+            if not pid_s:
+                continue
+            hits.append(route_hit_from_promoted(pid_s))
     now = _iso()
     nodes: list[dict[str, Any]] = []
     seen: set[str] = set()
@@ -584,6 +662,56 @@ def compile_goal_graph(
         req = hit.get("requires") or hit.get("missing_requires") or []
         if not isinstance(req, list):
             req = []
+
+        trust: str | None = None
+        external_asset_id: str | None = None
+        provenance: str | None = None
+        pin: dict[str, Any] | None = None
+
+        # External honesty: verified only if promoted + pin; never clone
+        if _hit_is_external(hit):
+            trust = "external"
+            provenance = str(hit.get("provenance") or "external")
+            eid = str(
+                hit.get("external_asset_id") or hit.get("slug") or ""
+            ).strip()
+            external_asset_id = eid or None
+            if isinstance(hit.get("pin"), dict):
+                pin = dict(hit["pin"])
+            promoted_ok = False
+            try:
+                from pipeline.external_ingest import resolve_promoted
+
+                prom = resolve_promoted(eid or slug)
+                promoted_ok = True
+                external_asset_id = str(
+                    prom.get("external_asset_id") or eid or slug
+                )
+                if isinstance(prom.get("pin"), dict):
+                    pin = dict(prom["pin"])
+                # Align graph kind from promoted record when hit was generic
+                try:
+                    from pipeline.external_ingest import kind_to_graph_kind
+
+                    kind = kind_to_graph_kind(str(prom.get("kind") or kind))
+                except ValueError:
+                    pass
+            except (FileNotFoundError, ValueError, OSError):
+                promoted_ok = False
+            if not promoted_ok:
+                # Fail closed: never claim verified for draft/unpinned/not-promoted
+                if status == "verified":
+                    status = "draft"
+                if not oracle:
+                    oracle = EXTERNAL_ORACLE
+            else:
+                # Presence-promoted may keep verified; not field_proven
+                if status in ("unknown", ""):
+                    status = "verified"
+                oracle = oracle or EXTERNAL_ORACLE
+            if kind == "external_mcp" or trust == "external":
+                oracle = oracle or EXTERNAL_ORACLE
+
         nodes.append(
             _make_node(
                 index=len(nodes) + 1,
@@ -593,6 +721,10 @@ def compile_goal_graph(
                 status=status,
                 oracle=oracle,
                 requires=[str(r) for r in req],
+                trust=trust,
+                external_asset_id=external_asset_id,
+                provenance=provenance,
+                pin=pin,
             )
         )
         seen.add(slug)
@@ -1108,8 +1240,148 @@ def _smoke_skill_node(slug: str) -> dict[str, Any]:
     }
 
 
+def _smoke_external_node(node: dict[str, Any]) -> dict[str, Any]:
+    """Presence-only smoke for external-promoted nodes. Never git-clones.
+
+    Requires a **promoted** record + pin hash + quarantine/payload presence as
+    recorded at promote. Draft / quarantined / scanned / approved-not-promoted /
+    revoked → fail. smoke_pass ≠ field_proven.
+    """
+    slug = str(node.get("slug") or node.get("id") or "").strip()
+    eid = str(node.get("external_asset_id") or slug).strip()
+    if not eid:
+        return {
+            "ok": False,
+            "detail": "external_missing_id",
+            "check": "external_promoted",
+            "field_proven": False,
+        }
+    # Path-safety: reject traversal before any disk join
+    if (
+        ".." in eid
+        or "/" in eid
+        or "\\" in eid
+        or ":" in eid
+        or "\x00" in eid
+    ):
+        return {
+            "ok": False,
+            "detail": f"external_unsafe_id={eid!r}",
+            "check": "slug_safety",
+            "field_proven": False,
+        }
+
+    try:
+        from pipeline.external_ingest import resolve_promoted
+    except ImportError as exc:
+        return {
+            "ok": False,
+            "detail": f"external_ingest_unavailable={exc}",
+            "check": "external_promoted",
+            "field_proven": False,
+        }
+
+    try:
+        rec = resolve_promoted(eid)
+    except FileNotFoundError as exc:
+        return {
+            "ok": False,
+            "detail": f"external_not_promoted: {exc}",
+            "check": "external_promoted",
+            "field_proven": False,
+        }
+    except ValueError as exc:
+        # draft/quarantine/approved-not-promoted/revoked/unpinned
+        return {
+            "ok": False,
+            "detail": f"external_not_usable: {exc}",
+            "check": "external_promoted",
+            "field_proven": False,
+        }
+
+    pin = rec.get("pin") if isinstance(rec.get("pin"), dict) else {}
+    pin_hash = str(pin.get("content_sha256") or pin.get("commit_sha") or "")
+    if not pin_hash:
+        return {
+            "ok": False,
+            "detail": "external_missing_pin_hash",
+            "check": "external_pin",
+            "field_proven": False,
+        }
+
+    # Payload / quarantine presence (recorded at promote; no re-clone)
+    from pathlib import Path
+
+    qpath = rec.get("quarantine_path")
+    payload_ok = False
+    payload_detail = "no_quarantine_path"
+    if qpath:
+        qp = Path(str(qpath))
+        if qp.is_dir():
+            payload_ok = True
+            payload_detail = f"payload={qp.name}"
+        else:
+            return {
+                "ok": False,
+                "detail": f"external_payload_missing path={qpath}",
+                "check": "external_payload",
+                "field_proven": False,
+                "pin": pin_hash[:16],
+            }
+    else:
+        # Fall back to assets/{id}/payload via external_asset_id
+        try:
+            from pipeline.external_ingest import assets_dir
+
+            live_id = str(rec.get("external_asset_id") or eid)
+            payload = assets_dir() / live_id / "payload"
+            if payload.is_dir():
+                payload_ok = True
+                payload_detail = f"payload={live_id}"
+        except Exception as exc:
+            payload_detail = f"payload_lookup_err={exc}"
+
+    if not payload_ok:
+        return {
+            "ok": False,
+            "detail": f"external_payload_missing ({payload_detail})",
+            "check": "external_payload",
+            "field_proven": False,
+            "pin": pin_hash[:16],
+        }
+
+    presence = rec.get("presence_smoke") if isinstance(rec.get("presence_smoke"), dict) else {}
+    if presence and presence.get("pass") is False:
+        return {
+            "ok": False,
+            "detail": "external_presence_smoke_failed_at_promote",
+            "check": "external_presence",
+            "field_proven": False,
+            "pin": pin_hash[:16],
+        }
+
+    return {
+        "ok": True,
+        "detail": (
+            f"external_promoted id={rec.get('external_asset_id') or eid} "
+            f"pin={pin_hash[:12]} {payload_detail}"
+        ),
+        "check": "external_promoted",
+        "presence_only": True,
+        "field_proven": False,
+        "trust": "external",
+        "pin": pin_hash[:16],
+        "promoted_id": rec.get("id"),
+        "external_asset_id": rec.get("external_asset_id") or eid,
+    }
+
+
 def smoke_node(node: dict[str, Any]) -> dict[str, Any]:
-    """Cheap per-node smoke for one graph node. No LLM, no long field tests."""
+    """Cheap per-node smoke for one graph node. No LLM, no long field tests.
+
+    External kinds (external_mcp, trust=external, slug external_*) require a
+    **promoted** record + pin; draft/quarantine/revoked fail. Never git-clones.
+    """
     if not isinstance(node, dict):
         return {
             "ok": False,
@@ -1129,6 +1401,18 @@ def smoke_node(node: dict[str, Any]) -> dict[str, Any]:
         "node_status": str(node.get("status") or ""),
     }
 
+    # External path first (even for skill/software with external provenance)
+    if node_is_external(node) or kind == "external_mcp":
+        r = _smoke_external_node(node)
+        return {
+            **base,
+            "ok": bool(r.get("ok")),
+            "skipped": False,
+            "detail": str(r.get("detail") or ""),
+            "check": r.get("check"),
+            **{k: v for k, v in r.items() if k not in ("ok", "detail", "check")},
+        }
+
     if kind not in EXECUTABLE_KINDS:
         return {
             **base,
@@ -1146,6 +1430,8 @@ def smoke_node(node: dict[str, Any]) -> dict[str, Any]:
         r = _smoke_connector_node(slug)
     elif kind == "skill":
         r = _smoke_skill_node(slug)
+    elif kind == "external_mcp":
+        r = _smoke_external_node(node)
     else:
         r = {"ok": False, "detail": f"unhandled kind={kind}", "check": "unknown"}
 
@@ -1168,8 +1454,9 @@ def smoke_graph(
     """Whole-graph cheap smoke after nodes are resolved (P3).
 
     Precondition: critique ok (re-runs critique by default); no status=missing
-    nodes. Per executable node (software|connector|mcp|skill): cheap presence /
-    prior-smoke checks only — no LLM, no long field tests, no MCP re-spawn.
+    nodes. Per executable node (software|connector|mcp|skill|external_mcp):
+    cheap presence / prior-smoke checks only — no LLM, no long field tests,
+    no MCP re-spawn, **no git-clone**.
 
     MCP honesty (see ``_smoke_mcp_node``):
       - Newer failed smoke_report supersedes stale ok invoke_report.
@@ -1177,6 +1464,12 @@ def smoke_graph(
         (invoke-oracle path).
       - Else presence via ``is_mcp_smoked`` (manifest smoked + server.py).
       - Revoked MCPs always fail. Presence is not invoke-oracle proof.
+
+    External honesty (see ``_smoke_external_node``):
+      - kind=external_mcp or trust/provenance=external / slug external_*
+        require **promoted** record + pin + payload presence.
+      - Draft / quarantine / scanned / approved-not-promoted / revoked → fail.
+      - smoke_pass is presence only — never field_proven.
 
     Returns::
 

@@ -4,6 +4,7 @@ Goal compose CLI — compile graph.v1, plan factory actions, smoke, attempt via 
 
 Usage:
   python scripts/goal_compose.py compile --goal-id ID --text "..." [--hits-json file]
+      [--include-external id1,id2]
   python scripts/goal_compose.py from-deconstruct --id DECONSTRUCT_ID [--goal-id ID]
   python scripts/goal_compose.py plan-factories --goal-id ID
   python scripts/goal_compose.py smoke --goal-id ID
@@ -14,6 +15,10 @@ Env:
 
 from-deconstruct writes **draft** graph.v1 only. Smoke is a separate step
 (never auto smoke_pass from deconstruct convert).
+
+External nodes (Phase 6): only **promoted** ids under external/promoted/ may
+be attached via --include-external or hits-json (trust=external). Compose never
+git-clones. Smoke fails on draft/quarantine/approved-not-promoted/revoked.
 """
 
 from __future__ import annotations
@@ -53,15 +58,40 @@ def _load_hits(path: str | None) -> list[dict] | None:
     raise SystemExit(f"hits-json must be a list or {{hits: [...]}}: {path}")
 
 
+def _parse_include_external(raw: str | None) -> list[str] | None:
+    if not raw or not str(raw).strip():
+        return None
+    ids = [x.strip() for x in str(raw).split(",") if x.strip()]
+    return ids or None
+
+
 def cmd_compile(args: argparse.Namespace) -> int:
     from pipeline.goal_graph import compile_goal_graph, save_graph
 
     hits = _load_hits(args.hits_json)
-    graph = compile_goal_graph(
-        args.text,
-        goal_id=args.goal_id,
-        route_hits=hits,
-    )
+    include_ext = _parse_include_external(getattr(args, "include_external", None))
+    try:
+        graph = compile_goal_graph(
+            args.text,
+            goal_id=args.goal_id,
+            route_hits=hits,
+            include_promoted_ids=include_ext,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(
+            json.dumps(
+                {
+                    "error": str(exc),
+                    "hint": (
+                        "External ids must be promoted first: "
+                        "pin → scan → approve → promote. "
+                        "Compose never git-clones."
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return 1
     path = save_graph(graph)
     print(json.dumps({"path": str(path), "graph": graph}, indent=2, default=str))
     return 0
@@ -322,6 +352,14 @@ def main(argv: list[str] | None = None) -> int:
         "--hits-json",
         default="",
         help="Optional JSON file of route hits (list or {hits: [...]})",
+    )
+    p_compile.add_argument(
+        "--include-external",
+        default="",
+        help=(
+            "Comma-separated promoted external asset ids "
+            "(from external/promoted/; trust=external; never clones)"
+        ),
     )
 
     p_fd = sub.add_parser(

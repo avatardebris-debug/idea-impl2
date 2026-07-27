@@ -652,7 +652,25 @@ python scripts/external_ingest.py list
 python scripts/external_ingest.py list --status approved
 python scripts/external_ingest.py show --id skill_fixture
 python scripts/external_ingest.py revoke --id skill_fixture --reason "dep drift"
-# Out of scope: unattended search/clone/auto-promote; Phase 6 will teach smoke_graph about external nodes.
+# Out of scope: unattended search/clone/auto-promote.
+
+# --- Phase 6: compose / smoke promoted external nodes (after promote) ---
+# Graph/policy may only reference **promoted** ids under $PIPELINE_DIR/external/promoted/.
+# Compose NEVER git-clones. smoke_pass is presence-only — not field_proven (dual-gate separate).
+# Hits with trust=external → goal_policy attempt stamps trust=external → train_weight ≤ 0.2.
+#
+# HABIT pin → … → promote, then compile + smoke:
+#   1. promote as above
+#   2. compile with --include-external <asset_id>  (or hits-json with trust=external)
+#   3. smoke --goal-id …   (fails if draft/quarantine/approved-not-promoted/revoked/unpinned)
+python scripts/goal_compose.py compile --goal-id g_ext --text "use skill_fixture" --include-external skill_fixture
+# hits-json alternative (status=verified only sticks when promoted; else downgraded to draft):
+#   [{"slug":"skill_fixture","kind":"skill","status":"verified","trust":"external","requires_ok":true}]
+python scripts/goal_compose.py smoke --goal-id g_ext
+# Fail closed examples: not promoted → compile --include-external errors; revoked → smoke fail.
+# Library helpers: pipeline.external_ingest.load_promoted / list_promoted / route_hit_from_promoted
+#                 pipeline.goal_graph.smoke_node / compile_goal_graph(..., include_promoted_ids=...)
+# Deconstruct→graph still does NOT auto-ingest external assets.
 
 # Deconstructor (LLM primary — same pattern as idea_planner: prompt + model + critique)
 # Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0  (NOT production graph.v1)
