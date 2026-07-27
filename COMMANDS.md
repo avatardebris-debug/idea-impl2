@@ -221,11 +221,18 @@ Grok driver — classic executor is **not** dual-scheduled.
 
 On full complete, `run_thin_field_ship` plans → runs → dual-gate status:
 
-| Status | Meaning |
-|--------|---------|
-| `field_test_passed` | Mechanical: runner `all_passed` (may still be weak plan) |
-| `field_proven` | Runner pass **and** Adequacy ADEQUATE **and** min product/integration bars |
-| `ship_insufficient` | Runner fail (or rework path) — LLM cannot invent passes |
+### Ops status map (field / recovery honesty)
+
+| Status | Meaning | Auto-act? | Recovery |
+|--------|---------|-----------|----------|
+| `field_test_passed` | **Mechanical only**: runner `all_passed`. May still be a weak plan (help/syntax/import). **Not** product-proven. | Prefer thin re-ship / replan bars | Do **not** treat as ship; dual gate still required |
+| `field_proven` | Runner pass **and** Adequacy `ADEQUATE` **and** min product/integration bars (`FIELD_MIN_*`) | Local git L1; optional GitHub L2 | Terminal for field claim |
+| `ship_insufficient` | Runner fail (or rework exhausted path) — LLM **cannot** invent passes | Troubleshoot consumer: cheap act once per fingerprint, else yield `budget_exceeded` | Re-arm thin field or BE ladder |
+| `deeper_work_needed` | Field rework budget / idle park | Consumer may yield to BE | Ladder / operator |
+| `budget_exceeded` | Yielded; BE1–BE3 ladder owns resume | BE ladder tick only | auto-retry / prefer_thin / blocker |
+| `complete` | All planned phases done (not field-proven) | Thin field ship may run | Author→runner→dual gate |
+
+**Honesty rule:** runner green alone never writes `field_proven` when `FIELD_SHIP_DUAL_GATE=1` (default). Help/syntax/import-only plans stay `field_test_passed`. Matrix HARD check `dual_gate_field_status` guards this.
 
 Defaults: `FIELD_SHIP_DUAL_GATE=1`, `FIELD_MIN_PRODUCT=1`, `FIELD_MIN_INTEGRATION=1`.
 Baseline B* and help/syntax/import-only plans never alone yield `field_proven`.
@@ -250,6 +257,25 @@ export FIELD_PLAN_ENGINE=auto
 ```
 
 ### Overnight Grok from-list (P0 hardened)
+
+**Operator preflight (before a long run):**
+
+1. **Feature matrix** (isolated temp `PIPELINE_DIR`; exit 0 = all HARD pass — includes graph smoke, dual-gate field honesty, external promote+smoke):
+   ```powershell
+   python scripts/factory_feature_matrix.py
+   # optional: --json  |  --keep-temp  |  --live --pipeline-dir $env:PIPELINE_DIR
+   ```
+2. **Dual-gate field** — leave `FIELD_SHIP_DUAL_GATE=1` (default). Runner green alone → `field_test_passed`; `field_proven` only with ADEQUATE + min P*/I* bars. Do not set `=0` overnight unless intentionally testing legacy single-gate.
+3. **External nodes** (if compose will use promoted assets): pin → scan → approve → promote first, then compile with `--include-external` and smoke (presence only — not field_proven):
+   ```powershell
+   python scripts/external_ingest.py pin --path path\to\fixture --kind skill --id skill_fixture
+   python scripts/external_ingest.py scan --id skill_fixture
+   python scripts/external_ingest.py approve --id skill_fixture --notes "preflight"
+   python scripts/external_ingest.py promote --id skill_fixture
+   python scripts/goal_compose.py compile --goal-id g_ext --text "use skill_fixture" --include-external skill_fixture
+   python scripts/goal_compose.py smoke --goal-id g_ext
+   ```
+4. Overnight script: `.\scripts\overnight_grok_from_list.ps1` (see runbook notes in script header). Matrix is not auto-run by overnight — run step 1 yourself.
 
 ```powershell
 # Preflight + env freeze only
@@ -357,26 +383,31 @@ SHIP_PROVE_BACKGROUND=1 ./scripts/run_ship_prove.sh --serial --provider grok --m
 `ship_insufficient` without clearing the ship bus — use the script. Eligibility is
 `status=complete` only (terminals are skipped).
 
-### Per-project GitHub publish
+### Per-project GitHub publish (outputs L1–L2 — not ingest)
 
-On **`complete`** and **`field_proven`**, the pipeline **local-commits** the whole
-`projects/<slug>/` tree (workspace + state + phases). **Push to GitHub is opt-in** and
-best-effort (never fails the project).
+**Factory outputs** only (`projects/<slug>/`). External **ingest** is Phase 5 (`external_ingest`) — separate.
+
+| Layer | When | What | Fail mode |
+|-------|------|------|-----------|
+| **L1 local git** | Trigger matches `PIPELINE_GITHUB_ON` (default `complete,complete_with_bugs,field_proven`) | Commit whole `projects/<slug>/` (workspace + state + phases) | Logged; never raises |
+| **L2 remote push** | `PIPELINE_GITHUB_PUBLISH=1` **and** L1 ok | `gh repo create` / `git push` under `PIPELINE_GITHUB_ORG` | Fail-soft: writes `github_status.json` error; project continues |
+
+On **`complete`** / **`field_proven`**, hooks call `maybe_publish_project` (L1 always on trigger; L2 opt-in). No live network required in unit tests (pure helpers + local git).
 
 ```bash
-# Enable remote publish (private repos under your org)
+# Enable remote publish (private repos under your org) — L2
 export PIPELINE_GITHUB_PUBLISH=1
 export PIPELINE_GITHUB_ORG=your-github-org
 export PIPELINE_GITHUB_REPO_PREFIX=pipe-          # repo = pipe-<slug>
 export PIPELINE_GITHUB_VISIBILITY=private
-export PIPELINE_GITHUB_ON=complete,field_proven   # default
+export PIPELINE_GITHUB_ON=complete,field_proven   # default also complete_with_bugs
 export GIT_COMMIT_AUTHOR="You <you@example.com>"
 # Auth: gh auth login   OR   GITHUB_TOKEN=...
 
-# Manual / backfill (local only)
+# Manual / backfill (L1 local only)
 python scripts/publish_project_github.py --slug ship_canary --local-only
 
-# Manual push one project
+# Manual push one project (L1+L2)
 python scripts/publish_project_github.py --slug ship_canary --push
 
 # All complete + field_proven
@@ -579,11 +610,20 @@ python scripts/goal_compose.py fixture-mcps --goal-id util5 --slugs mcp_json_dif
 # P4 roadmap: notes/agi-lmaooo2.md (MCP re-smoke / revoke / invoke oracle)
 
 # Troubleshoot-gate consumer (emit: field_ship → recovery_decision.v1; consume: health tick)
-# Order: BE ladder → troubleshoot consumer (limit 1) → prefer_thin_field ship
+# Health-tick order matches pipeline/run_loop.py (do not reorder casually):
+#   1) BE ladder: tick_process_budget_yields
+#   2) Troubleshoot consumer: tick_troubleshoot_recovery(limit=1) → may re-arm prefer_thin
+#   3) prefer_thin_field: tick_prefer_thin_field_ship(limit=1, preferred_slugs=consumer_acted)
+#      so same-cycle thin ship prefers slugs just re-armed by the consumer
 # Cheap auto-act: FIX_GATE_ONLY | THIN_FIELD_RETRY | FIELD_REPAIR_ONCE | DEBUG_TARGETED
 # Surface-only escalate → budget_exceeded: PARK | ASK_OPERATOR | AMBIGUOUS | REPLAN_*
 # One cheap re-arm per fail_fingerprint then yield (empty fp → synthesized no_fp:slug:action)
+# Env: TROUBLESHOOT_CONSUMER=1 (default on), TROUBLESHOOT_MAX_ACTS=2, BUDGET_THIN_FIELD_TICK=1
+#
 # Isolated feature matrix (temp PIPELINE_DIR, PASS/FAIL table; exit 0 = all HARD pass):
+# HARD ids include: paths, goal_compile, plan_factories_mcp, mcp_*, drain_queue, policy_*,
+#   goal_traces, connector_process_oracle, smoke_graph_fixture, dual_gate_field_status,
+#   external_promote_smoke
 python scripts/factory_feature_matrix.py
 python scripts/factory_feature_matrix.py --keep-temp
 python scripts/factory_feature_matrix.py --live --pipeline-dir $env:PIPELINE_DIR

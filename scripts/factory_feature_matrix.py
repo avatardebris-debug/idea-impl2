@@ -251,6 +251,256 @@ def check_connector_process_oracle() -> str:
     return f"hard_pass={len(hard)} process_oracle ok"
 
 
+def check_smoke_graph_fixture() -> str:
+    """HARD: tiny verified fixture graph → smoke_graph smoke_pass (no LLM, no field)."""
+    from pipeline.goal_graph import (
+        DEFAULT_ORACLE,
+        GRAPH_SCHEMA,
+        MCP_ORACLE,
+        critique_graph,
+        save_graph,
+        smoke_graph,
+    )
+    from pipeline.mcp_factory import smoke_mcp, wrap_capability_as_mcp
+    from pipeline.paths import connectors_dir, projects_dir
+
+    wrap_capability_as_mcp("matrix_smoke_util", force=True)
+    assert smoke_mcp("mcp_matrix_smoke_util", require_invoke=False).get("ok") is True
+
+    soft = projects_dir() / "matrix_tool_alpha"
+    (soft / "state").mkdir(parents=True, exist_ok=True)
+    (soft / "state" / "current_idea.json").write_text(
+        json.dumps(
+            {
+                "title": "matrix_tool_alpha",
+                "status": "field_proven",
+                "phase": 1,
+                "total_phases": 1,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    cdir = connectors_dir()
+    cdir.mkdir(parents=True, exist_ok=True)
+    (cdir / "matrix_bridge.yaml").write_text(
+        "slug: matrix_bridge\nkind: connector\nsteps:\n  - id: s1\n    type: noop\n",
+        encoding="utf-8",
+    )
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "matrix_smoke_g",
+        "goal_text": "compose smoked matrix tools",
+        "status": "executable",
+        "nodes": [
+            {
+                "id": "n1",
+                "kind": "software",
+                "slug": "matrix_tool_alpha",
+                "label": "matrix_tool_alpha",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            },
+            {
+                "id": "n2",
+                "kind": "mcp",
+                "slug": "mcp_matrix_smoke_util",
+                "label": "mcp_matrix_smoke_util",
+                "status": "verified",
+                "oracle": MCP_ORACLE,
+                "requires": [],
+            },
+            {
+                "id": "n3",
+                "kind": "connector",
+                "slug": "matrix_bridge",
+                "label": "matrix_bridge",
+                "status": "verified",
+                "oracle": DEFAULT_ORACLE,
+                "requires": [],
+            },
+        ],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    assert critique_graph(graph).get("ok") is True, graph.get("critique")
+    report = smoke_graph(graph, mutate=True)
+    assert report.get("blocked") is False, report
+    assert report.get("smoke_pass") is True, report
+    assert report.get("ok") is True, report
+    assert all(r.get("ok") for r in (report.get("node_results") or [])), report
+    save_graph(graph)
+    return (
+        f"nodes={len(report.get('node_results') or [])} "
+        f"smoke_pass={report.get('smoke_pass')} goal_id=matrix_smoke_g"
+    )
+
+
+def check_dual_gate_field_status() -> str:
+    """HARD: runner-green weak plan → field_test_passed, not field_proven without ADEQUATE+bars."""
+    from pipeline.field_prove_gate import (
+        VERDICT_ADEQUATE,
+        assess_plan_bars,
+        decide_field_status,
+    )
+
+    weak_plan = """# Field Tests
+
+## Product tests
+- [ ] Task P1: help
+  - Kind: product
+  - Command: `python cli.py --help`
+  - Expect: exit 0
+
+- [ ] Task P2: syntax
+  - Kind: product
+  - Command: `python -m py_compile cli.py`
+  - Expect: exit 0
+
+## Integration tests
+- [ ] Task I1: import
+  - Kind: integration
+  - Command: `python -c "import cli; print('IMPORT_OK')"`
+  - Expect: IMPORT_OK
+"""
+    strong_plan = """# Field Tests
+
+## Product tests
+- [ ] Task P1: core greet path
+  - Kind: product
+  - Command: `python cli.py --greet world`
+  - Expect: GREET:world
+
+## Integration tests
+- [ ] Task I1: write out.json
+  - Kind: integration
+  - Command: `python cli.py --out out.json`
+  - Expect: exit 0
+"""
+    weak_bars = assess_plan_bars(weak_plan)
+    d_weak = decide_field_status(
+        runner_all_passed=True,
+        bars=weak_bars,
+        dual_gate=True,
+    )
+    assert d_weak.runner_all_passed is True, d_weak
+    assert d_weak.mechanical_status == "field_test_passed", d_weak
+    assert d_weak.status == "field_test_passed", d_weak
+    assert d_weak.field_proven is False, d_weak
+    assert d_weak.ok is False, d_weak
+
+    # Even LLM ADEQUATE cannot override weak bars
+    d_llm = decide_field_status(
+        runner_all_passed=True,
+        bars=weak_bars,
+        evaluator_verdict=VERDICT_ADEQUATE,
+        dual_gate=True,
+    )
+    assert d_llm.field_proven is False, d_llm
+    assert d_llm.status == "field_test_passed", d_llm
+
+    strong_bars = assess_plan_bars(strong_plan)
+    d_strong = decide_field_status(
+        runner_all_passed=True,
+        bars=strong_bars,
+        dual_gate=True,
+    )
+    assert d_strong.field_proven is True, d_strong
+    assert d_strong.status == "field_proven", d_strong
+    assert d_strong.ok is True, d_strong
+
+    d_fail = decide_field_status(
+        runner_all_passed=False,
+        bars=strong_bars,
+        evaluator_verdict=VERDICT_ADEQUATE,
+        dual_gate=True,
+    )
+    assert d_fail.field_proven is False, d_fail
+    assert d_fail.status != "field_proven", d_fail
+    assert d_fail.mechanical_status == "field_test_failed", d_fail
+
+    return (
+        f"weak→{d_weak.status} llm_override→{d_llm.status} "
+        f"strong→{d_strong.status} runner_fail→{d_fail.status}"
+    )
+
+
+def check_external_promote_smoke() -> str:
+    """HARD: pin→scan→approve→promote fixture then resolve_promoted + smoke external node."""
+    from pipeline.external_ingest import (
+        approve_asset,
+        pin_asset,
+        promote_asset,
+        resolve_promoted,
+        scan_asset,
+    )
+    from pipeline.goal_graph import (
+        EXTERNAL_ORACLE,
+        GRAPH_SCHEMA,
+        smoke_graph,
+        smoke_node,
+    )
+    from pipeline.paths import get_pipeline_dir
+
+    asset_id = "skill_matrix_ext"
+    fx_root = get_pipeline_dir() / "_matrix_fixtures" / asset_id
+    fx_root.mkdir(parents=True, exist_ok=True)
+    (fx_root / "SKILL.md").write_text(
+        f"---\nname: {asset_id}\n---\n\n# {asset_id}\n\nMatrix external skill fixture.\n",
+        encoding="utf-8",
+    )
+    (fx_root / "LICENSE").write_text("MIT License\n", encoding="utf-8")
+
+    pin_asset(fx_root, kind="skill", asset_id=asset_id)
+    scanned = scan_asset(asset_id)
+    assert scanned.get("status") == "scanned", scanned
+    approved = approve_asset(asset_id, notes="matrix hard check")
+    assert approved.get("status") == "approved", approved
+    # promote_asset returns the asset record (status=promoted), not the draft
+    asset_after = promote_asset(asset_id, notes="matrix promote")
+    assert asset_after.get("status") == "promoted", asset_after
+
+    # resolve_promoted returns external_promoted.v1 draft (id may be external_skill_*)
+    prom = resolve_promoted(asset_id)
+    assert prom and prom.get("trust") == "external", prom
+    assert str(prom.get("external_asset_id") or "") == asset_id, prom
+
+    node = {
+        "id": "n_ext",
+        "kind": "skill",
+        "slug": asset_id,
+        "label": asset_id,
+        "status": "verified",
+        "oracle": EXTERNAL_ORACLE,
+        "requires": [],
+        "trust": "external",
+        "external_asset_id": asset_id,
+    }
+    r = smoke_node(node)
+    assert r.get("ok") is True, r
+    assert r.get("field_proven") is False, r
+    assert r.get("presence_only") is True or r.get("check") == "external_promoted", r
+
+    graph = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": "matrix_ext_g",
+        "goal_text": f"use {asset_id}",
+        "status": "executable",
+        "nodes": [node],
+        "edges": [],
+        "critique": {"ok": True, "issues": []},
+    }
+    report = smoke_graph(graph, mutate=True, re_critique=True)
+    assert report.get("smoke_pass") is True, report
+    assert report.get("ok") is True, report
+    return (
+        f"asset={asset_id} promote_ok smoke_pass={report.get('smoke_pass')} "
+        f"node_check={r.get('check')} presence_only not field_proven"
+    )
+
+
 def check_live_pipeline_root() -> str:
     from pipeline.paths import get_pipeline_dir, projects_dir
 
@@ -294,6 +544,10 @@ def run_matrix(
                 ("policy_mcp_enqueue", True, "isolated", check_policy_mcp_enqueue),
                 ("goal_traces", True, "isolated", check_goal_traces_dir),
                 ("connector_process_oracle", True, "isolated", check_connector_process_oracle),
+                # Phase 7 ladder surfaces
+                ("smoke_graph_fixture", True, "isolated", check_smoke_graph_fixture),
+                ("dual_gate_field_status", True, "isolated", check_dual_gate_field_status),
+                ("external_promote_smoke", True, "isolated", check_external_promote_smoke),
             ]
         )
     if live:

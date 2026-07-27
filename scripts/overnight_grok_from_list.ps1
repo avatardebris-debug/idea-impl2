@@ -1,6 +1,12 @@
 # P0: Overnight-hardened Grok Build from-list (Windows)
 # Freezes env, preflights, runs serial runner, then morning report + optional extract.
 #
+# Operator note (Phase 7): before a long run, from factory root run
+#   python scripts/factory_feature_matrix.py
+# (isolated HARD checks: graph smoke, dual-gate field, external promote+smoke).
+# Keep FIELD_SHIP_DUAL_GATE=1; promote external assets before --include-external smoke.
+# See COMMANDS.md "Overnight Grok from-list" preflight subsection.
+#
 # Usage (from factory repo root):
 #   .\scripts\overnight_grok_from_list.ps1
 #   .\scripts\overnight_grok_from_list.ps1 -TimeLimitMinutes 30

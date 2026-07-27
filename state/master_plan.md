@@ -92,13 +92,16 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - CLI: `python scripts/goal_compose.py compile ... --include-external id1,id2` then `smoke --goal-id ...`
   - Compose never clones; field dual-gate unchanged
 
-## Phase 7: Ops hardening — troubleshoot BE, feature matrix, GitHub L1–L2 thin
-- **Description**: Matrix/docs for smoke + MCP v1 + field dual gate; optional GitHub **outputs** L1–L2 (publish), not ingest.
-- **Deliverable**: matrix checks; COMMANDS; optional github_publish.
+## Phase 7: Ops hardening — troubleshoot BE, feature matrix, GitHub L1–L2 thin — **DONE**
+- **Status**: **DONE** (matrix HARD ladder surfaces; COMMANDS ops map + health-tick order; GitHub outputs L1–L2 thin)
+- **Description**: Matrix/docs for smoke + MCP v1 + field dual gate; GitHub **outputs** L1–L2 (publish), not ingest.
+- **Deliverable**: matrix checks; COMMANDS; github_publish L1+optional L2 fail-soft.
 - **Dependencies**: Phases 1–2
 - **Success criteria**:
-  - HARD checks for dual-gate field path or documented manual
-  - GitHub L1–L2 shipped thin or explicitly deferred
+  - HARD checks for dual-gate field path — **met** (`dual_gate_field_status` in `factory_feature_matrix.py`)
+  - HARD smoke_graph fixture + external promote→smoke — **met**
+  - GitHub L1–L2 shipped thin — **met** (L1 local commit always on trigger; L2 `PIPELINE_GITHUB_PUBLISH=1` fail-soft; unit tests, no live network)
+  - COMMANDS: health-tick order BE ladder → consumer limit 1 → prefer_thin preferred_slugs; status map honesty; overnight preflight notes — **met**
 
 ## Phase 8: Graph engineer thin + success-model import (later)
 - **Description**: Thin graph engineer only authors into critique→resolve→smoke→attempt. Optional success-model import. No KG OS / RSI / trust stack.
