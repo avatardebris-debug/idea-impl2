@@ -644,6 +644,12 @@ python scripts/deconstructor.py from-json --path path/to/inventory.json
 python scripts/deconstructor.py validate --id <deconstruct_id>
 python scripts/deconstructor.py plan-fill --id <deconstruct_id>
 python scripts/deconstructor.py list
+# Draft graph bridge (Phase 4) — draft graph.v1 ONLY; never sets smoke_pass:
+python scripts/deconstructor.py to-graph --id <deconstruct_id> [--goal-id <gid>] [--goal-text "..."]
+python scripts/goal_compose.py from-deconstruct --id <deconstruct_id> [--goal-id <gid>] [--text "..."]
+# Store: $PIPELINE_DIR/graphs/{goal_id}.json  status draft|critiqued  production_graph=false
+# Smoke is SEPARATE after nodes resolve (do not auto-smoke on convert):
+python scripts/goal_compose.py smoke --goal-id <gid>
 # Skill: .grok/skills/deconstructor/SKILL.md
 
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):

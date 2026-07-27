@@ -11,12 +11,13 @@ Secondary (no LLM):
   python scripts/deconstructor.py from-json ... # validate supplied inventory
 
 Other:
-  validate | plan-fill | list | seed-preview
+  validate | plan-fill | list | seed-preview | to-graph
 
 Env:
   PIPELINE_DIR, PIPELINE_PROVIDER, PIPELINE_MODEL, OLLAMA_PLANNER_TIMEOUT
 
-Does not write production graph.v1.
+to-graph writes **draft** graph.v1 only (never smoke_pass). Smoke separately:
+  python scripts/goal_compose.py smoke --goal-id <id>
 """
 
 from __future__ import annotations
@@ -259,6 +260,61 @@ def cmd_seed_preview(args: argparse.Namespace) -> int:
     return 0 if (doc.get("critique") or {}).get("ok") else 1
 
 
+def cmd_to_graph(args: argparse.Namespace) -> int:
+    """deconstruct.v0 → draft graph.v1 (no smoke). Save under graphs/{goal_id}.json."""
+    from pipeline.deconstructor import load_deconstruct
+    from pipeline.goal_graph import compile_graph_from_deconstruct, save_graph
+
+    doc = load_deconstruct(args.id)
+    if doc is None:
+        _print_json({"error": f"not found: {args.id}"})
+        return 1
+
+    goal_id = (args.goal_id or "").strip() or None
+    goal_text = (args.goal_text or "").strip() or None
+    max_nodes = int(args.max_nodes) if args.max_nodes else None
+
+    graph = compile_graph_from_deconstruct(
+        doc,
+        goal_id=goal_id,
+        goal_text=goal_text,
+        max_nodes=max_nodes,
+        attach_plan_fill=not bool(args.no_plan_fill),
+    )
+
+    path_out = None
+    if not args.no_save:
+        path_out = str(save_graph(graph))
+
+    crit = graph.get("critique") or {}
+    status = str(graph.get("status") or "")
+    _print_json(
+        {
+            "path": path_out,
+            "goal_id": graph.get("goal_id"),
+            "deconstruct_id": graph.get("deconstruct_id"),
+            "status": status,
+            "smoke_pass": graph.get("smoke_pass"),
+            "production_graph": graph.get("production_graph"),
+            "critique": crit,
+            "node_count": len(graph.get("nodes") or []),
+            "edge_count": len(graph.get("edges") or []),
+            "names": [n.get("label") for n in (graph.get("nodes") or [])],
+            "hint": (
+                "Draft only. Run smoke separately: "
+                f"python scripts/goal_compose.py smoke --goal-id {graph.get('goal_id')}"
+            ),
+            "graph": graph,
+        }
+    )
+    # Exit 0 when critique ok or soft draft (critiqued/draft); 1 if blocked/missing.
+    if status in ("blocked",) and not crit.get("ok"):
+        return 1
+    if not (graph.get("nodes") or []) and doc.get("needs_structure"):
+        return 2
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     # Load project .env early so XAI_API_KEY is visible before provider auto-route
     try:
@@ -351,6 +407,38 @@ def main(argv: list[str] | None = None) -> int:
     _add_target_args(p_s)
     _add_budget(p_s)
     p_s.set_defaults(func=cmd_seed_preview)
+
+    p_tg = sub.add_parser(
+        "to-graph",
+        help=(
+            "Bridge deconstruct.v0 → draft graph.v1 (CLASS_TO_GRAPH_KIND, parent_id edges). "
+            "Never sets smoke_pass; run goal_compose smoke separately."
+        ),
+    )
+    p_tg.add_argument("--id", required=True, help="Saved deconstruct id")
+    p_tg.add_argument(
+        "--goal-id",
+        default="",
+        help="graph goal_id (default: deconstruct id)",
+    )
+    p_tg.add_argument(
+        "--goal-text",
+        default="",
+        help="Optional goal text (default: deconstruct target)",
+    )
+    p_tg.add_argument(
+        "--max-nodes",
+        type=int,
+        default=0,
+        help="Cap nodes (0 = use deconstruct max_nodes / default)",
+    )
+    p_tg.add_argument("--no-save", action="store_true")
+    p_tg.add_argument(
+        "--no-plan-fill",
+        action="store_true",
+        help="Skip attaching plan_fill metadata on graph notes",
+    )
+    p_tg.set_defaults(func=cmd_to_graph)
 
     args = ap.parse_args(argv)
     _bind_pipeline_dir(args.pipeline_dir)

@@ -53,13 +53,17 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - field_proven / ship_insufficient map into outcomes with sensible train_weight
   - Explicit rule: no high train_weight on untrusted external success or baseline-only field pass
 
-## Phase 4: Deconstructor → draft graph bridge
+## Phase 4: Deconstructor → draft graph bridge — **DONE**
 - **Description**: Bridge deconstruct.v0 candidates into **draft** graph.v1 nodes/edges without claiming smoke_pass. Keep knowledge vs workflow separate.
-- **Deliverable**: helper + CLI; fixtures; tests; skill doc.
+- **Deliverable**: `compile_graph_from_deconstruct` + CLI `to-graph` / `from-deconstruct`; domain fixtures; tests; skill + COMMANDS.
 - **Dependencies**: Phase 1–3 not hard-required
 - **Success criteria**:
-  - deconstruct id → draft graph under graphs/; critique runs; no auto smoke_pass
-  - Domain A vs B differ
+  - deconstruct id → draft graph under graphs/; critique runs; no auto smoke_pass — **met**
+  - Domain A vs B differ — **met**
+- **API**: `pipeline.goal_graph.compile_graph_from_deconstruct`; CLIs:
+  - `python scripts/deconstructor.py to-graph --id ...`
+  - `python scripts/goal_compose.py from-deconstruct --id ...`
+  - Smoke remains separate: `python scripts/goal_compose.py smoke --goal-id ...`
 
 ## Phase 5: External ingest manual (P5) — pin, sandbox, human gate
 - **Description**: Manual path for GitHub tool/software/MCP/skill: pin → scan → quarantine → human CLI → external_* draft → smoke → promote. No unattended auto-pull.

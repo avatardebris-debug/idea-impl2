@@ -503,3 +503,166 @@ def test_llm_bad_class_critique_fail(
         max_retries=0,
     )
     assert doc["critique"]["ok"] is False
+
+
+# --- Phase 4: deconstruct.v0 → draft graph.v1 bridge ---
+
+LAW_FIRM = """\
+Law firm
+- Litigation: partner, associate
+- Intake: paralegal
+"""
+
+
+def test_compile_graph_from_deconstruct_multi_level() -> None:
+    from pipeline.deconstructor import build_deconstruct
+    from pipeline.goal_graph import (
+        EXECUTABLE_KINDS,
+        NODE_KINDS,
+        compile_graph_from_deconstruct,
+        critique_graph,
+    )
+
+    doc = build_deconstruct(HOSPITAL, mode="org", deconstruct_id="hospital-bridge")
+    assert doc["needs_structure"] is False
+    depths = {int(c.get("depth") or 0) for c in doc["candidates"]}
+    assert max(depths) >= 2
+
+    graph = compile_graph_from_deconstruct(doc, goal_id="hospital-draft")
+    assert graph["schema"] == "graph.v1"
+    assert graph["goal_id"] == "hospital-draft"
+    assert graph["source"] == "deconstruct"
+    assert graph["deconstruct_id"] == doc["id"]
+    assert graph["production_graph"] is False
+    assert graph.get("smoke_pass") in (False, None)
+    assert graph["status"] in ("draft", "critiqued")
+    assert graph["status"] not in ("smoke_pass", "executable", "smoke_failed")
+
+    nodes = graph["nodes"]
+    assert len(nodes) >= 5
+    labels = {n["label"] for n in nodes}
+    assert any("triage" in str(lb).lower() for lb in labels)
+    for n in nodes:
+        assert n["kind"] in NODE_KINDS
+        assert n["status"] == "draft"
+        if n["kind"] in EXECUTABLE_KINDS:
+            assert n.get("oracle")
+
+    edges = graph["edges"]
+    assert edges
+    assert any(e.get("kind") == "hierarchy" for e in edges)
+    # parent Emergency → triage nurse edge present via hierarchy
+    triage_ids = [n["id"] for n in nodes if "triage" in n["label"].lower()]
+    emerg_ids = [n["id"] for n in nodes if n["label"].lower() == "emergency"]
+    if triage_ids and emerg_ids:
+        assert any(
+            e["from"] == emerg_ids[0] and e["to"] == triage_ids[0] for e in edges
+        )
+
+    crit = critique_graph(graph)
+    assert "ok" in crit
+    assert graph["critique"]["ok"] == crit["ok"]
+    # plan_fill metadata attached lightly
+    assert "plan_fill" in graph
+    assert graph["plan_fill"].get("production_graph") is False
+    assert graph["plan_fill"].get("action_count", 0) >= 1
+
+
+def test_domain_a_vs_b_draft_graphs_differ() -> None:
+    from pipeline.deconstructor import build_deconstruct
+    from pipeline.goal_graph import compile_graph_from_deconstruct
+
+    a = build_deconstruct(HOSPITAL, mode="org", deconstruct_id="domain-hospital")
+    b = build_deconstruct(LAW_FIRM, mode="org", deconstruct_id="domain-law")
+    ga = compile_graph_from_deconstruct(a, goal_id="domain-a")
+    gb = compile_graph_from_deconstruct(b, goal_id="domain-b")
+
+    names_a = {n["label"].lower() for n in ga["nodes"]}
+    names_b = {n["label"].lower() for n in gb["nodes"]}
+    assert names_a != names_b
+    assert any("emergency" in n or "triage" in n for n in names_a)
+    assert any("litigation" in n or "associate" in n or "paralegal" in n for n in names_b)
+    # no shared fake studio template leakage
+    for names in (names_a, names_b):
+        assert "implementer" not in names
+        assert "pixel artist" not in names
+
+    for g in (ga, gb):
+        assert g["status"] in ("draft", "critiqued")
+        assert g.get("smoke_pass") in (False, None)
+        assert g["production_graph"] is False
+        assert all(n.get("status") == "draft" for n in g["nodes"])
+
+
+def test_cli_to_graph_roundtrip(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.deconstructor import build_deconstruct, save_deconstruct
+
+    doc = build_deconstruct(HOSPITAL, mode="org", deconstruct_id="cli-hospital")
+    save_deconstruct(doc)
+
+    cli_main = _cli_main()
+    rc = cli_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "to-graph",
+            "--id",
+            "cli-hospital",
+            "--goal-id",
+            "cli-hospital-graph",
+        ]
+    )
+    assert rc == 0
+    gpath = pipeline / "graphs" / "cli-hospital-graph.json"
+    assert gpath.is_file()
+    graph = json.loads(gpath.read_text(encoding="utf-8"))
+    assert graph["schema"] == "graph.v1"
+    assert graph["status"] in ("draft", "critiqued")
+    assert graph.get("smoke_pass") is False
+    assert graph["production_graph"] is False
+    assert len(graph["nodes"]) >= 2
+
+
+def test_goal_compose_from_deconstruct_cli(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.deconstructor import build_deconstruct, save_deconstruct
+
+    doc = build_deconstruct(LAW_FIRM, mode="org", deconstruct_id="law-firm-dc")
+    save_deconstruct(doc)
+
+    cli_path = ROOT / "scripts" / "goal_compose.py"
+    spec = importlib.util.spec_from_file_location("goal_compose_cli_dc", cli_path)
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+
+    rc = mod.main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "from-deconstruct",
+            "--id",
+            "law-firm-dc",
+            "--goal-id",
+            "law-from-dc",
+        ]
+    )
+    assert rc == 0
+    gpath = pipeline / "graphs" / "law-from-dc.json"
+    assert gpath.is_file()
+    graph = json.loads(gpath.read_text(encoding="utf-8"))
+    assert graph["source"] == "deconstruct"
+    assert graph["status"] not in ("executable", "smoke_pass")
+    names = {n["label"].lower() for n in graph["nodes"]}
+    assert any("litigation" in n or "paralegal" in n or "associate" in n for n in names)

@@ -1,0 +1,528 @@
+1\. What “robust blocks” means (same bar as software factory)
+
+
+
+For each lego type you need a factory loop, not just a file on disk:
+
+
+
+┌─────────────────────┬────────────────────────────┬──────────────────────────┬───────────────────────┬─────────────────────────┐
+
+│ Stage               │ Software (have)            │ Skill / prompt (weak)    │ MCP (v0 only)         │ Graph/workflow (thin)   │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Author              │ idea → plan → implement    │ create-skill (human/TUI) │ wrap verified cap     │ graph.v1 compile        │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Gate                │ review, complete-gate      │ mostly none              │ smoke ping/describe   │ critique missing/oracle │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Prove               │ field\_tests → field\_proven │ none                     │ smoke ≠ field         │ none                    │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Register            │ registry + requires        │ skill\_load roots         │ kind=mcp row          │ graphs/\*.json           │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Insert into runtime │ invoke\_capability          │ inject skill body ad hoc │ invoke via MCP        │ policy enqueue only     │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Recover             │ troubleshoot consumer      │ none                     │ none                  │ none                    │
+
+├─────────────────────┼────────────────────────────┼──────────────────────────┼───────────────────────┼─────────────────────────┤
+
+│ Learn               │ finetune + goal\_trace      │ none systematic          │ goal\_trace on factory │ goal\_trace on policy    │
+
+└─────────────────────┴────────────────────────────┴──────────────────────────┴───────────────────────┴─────────────────────────┘
+
+
+
+Until skill/prompt/MCP/workflow-from-graph each have something like the software columns, the graph engineer is premature as a product.
+
+
+
+───
+
+
+
+2\. What you already have (relevant to your list)
+
+
+
+┌─────────────────────────────────┬───────────────────────────────────────────────────────────────────────────────────────────────────────┐
+
+│ Piece                           │ Reality                                                                                               │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ create-skill                    │ Interactive Grok skill → SKILL.md on disk. Not a factory loop: no review, mission/security gate,      │
+
+│                                 │ registry “block slot”, or sandbox-before-promote.                                                     │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Agentic prompts                 │ pipeline/prompts/\*.md + agent roles; static, hand-edited.                                             │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ skill\_load                      │ Can find and inject skill markdown into pipeline context — not auto-wire into a role “socket”.        │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Empty block / socket for skills │ No. No first-class “role R has slot S; only status=verified skills attach.”                           │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ create-a-prompt skill           │ No. No skill that authors role prompts with QC.                                                       │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ MCP factory                     │ v0 wrap of already verified software — good substrate, not full MCP factory.                          │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ External ingest (GitHub / MCP   │ No crawl → security → rank → approve pipeline.                                                        │
+
+│ marketplace)                    │                                                                                                       │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Human push approval             │ No (correct to defer as notes “nice to have”).                                                        │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ goal\_trace / finetune weights   │ Partial: software phases + goal\_policy/MCP factory traces; not full success/failure taxonomy for      │
+
+│                                 │ skills/prompts/workflows.                                                                             │
+
+├─────────────────────────────────┼───────────────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ graph.v1                        │ Map only; not “evaluate workflow before filling blocks, then smoke whole graph.”                      │
+
+└─────────────────────────────────┴───────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+Your instinct matches the code: blocks exist for software; almost everything else is still “files + hope.”
+
+
+
+───
+
+
+
+3\. What to build before graph engineer (ordered)
+
+
+
+Think in layers of trust, bottom → top.
+
+
+
+Layer A — Inventory \& sockets (so the map can match reality)
+
+
+
+1\. Capability/block registry extension
+
+&#x20;  Closed kinds: software | connector | skill | prompt | mcp | external\_mcp | human | research
+
+&#x20;  Each row: id, status (draft|sandboxed|verified|revoked), entrypoint, requires, oracle, provenance, last\_smoke\_at, risk\_class.
+
+
+
+2\. Role sockets (“empty blocks”)
+
+&#x20;  e.g. executor.pre\_task\_skills\[], manager.blocker\_skill, goal.policy\_skill
+
+&#x20;  Only verified (or sandboxed-allowlisted) skills/prompts attach.
+
+&#x20;  Without sockets, graph engineer has nowhere truthful to “plug in.”
+
+
+
+3\. create-prompt factory (thin)
+
+&#x20;  Input: role + mission slice + examples → draft prompt → static checks (secrets patterns, disallowed tools, length) → human or critic pass → versioned file under prompts/ or registry.
+
+&#x20;  Parallel to create-skill, not a free monologue.
+
+
+
+4\. create-skill → promote pipeline
+
+&#x20;  create-skill → sandbox run on fixture tasks → (optional) external/static critic → mission/constitution checklist → promote to verified + attach to socket.
+
+&#x20;  Alternate path you mentioned: always sandbox first; never write straight into production sockets. Prefer that as default.
+
+
+
+Layer B — Same factory discipline for MCP \& workflows
+
+
+
+5\. MCP factory beyond wrap
+
+&#x20;  v0 wrap is “hello world.” Need: versioning, revoke, re-smoke on capability change, real invoke oracle, no silent registry invent.
+
+
+
+6\. Workflow-from-graph factory (pre–graph-engineer)
+
+&#x20;  Process you described is exactly right:
+
+
+
+draft graph → graph critique (structure, missing oracles, cycles, risk)
+
+&#x20;       → freeze graph version
+
+&#x20;       → resolve/fill nodes (only verified blocks or enqueue factories)
+
+&#x20;       → per-node smoke
+
+&#x20;       → whole-graph smoke (cheap path)
+
+&#x20;       → goal run under budget
+
+&#x20;       → oracles + traces + weights
+
+
+
+&#x20;  Graph engineer later only authors/revises graphs into that same pipeline; it does not skip it.
+
+
+
+Layer C — External world (harder; after A–B)
+
+
+
+7\. Ingest pipeline for external assets
+
+&#x20;  GitHub skill / MCP / repo / raw file:
+
+
+
+find → fetch (pinned commit/hash) → static scan → malware/secrets heuristics
+
+&#x20;       → license/provenance → sandbox execute (if runnable)
+
+&#x20;       → rank (usefulness vs risk) → human gate (later: push)
+
+&#x20;       → registry as external\_\* draft → promote after smoke
+
+
+
+&#x20;  Without pin + hash + revoke, external is a supply-chain time bomb.
+
+
+
+8\. Human approval channel (defer, but design the hook now)
+
+&#x20;  Interface only: needs\_human\_approval(action, risk\_class) → block until receipt.
+
+&#x20;  Later: push + “mute for N requests / D days / action\_class.”
+
+&#x20;  Do not build notifications before the approval state machine exists on disk.
+
+
+
+Layer D — Learning loop (parallel, lightweight)
+
+
+
+9\. Unified outcome schema
+
+&#x20;  Extend goal\_trace (or sibling):
+
+&#x20;  outcome ∈ {proven, failed, deeper, revoked, human\_rejected} + failure\_class + train\_weight.
+
+&#x20;  Skills/prompts/MCP/workflow all emit the same family so FT doesn’t only learn “write code.”
+
+
+
+10\. Never train on unverified external success as high weight until sandboxed-proven.
+
+
+
+───
+
+
+
+4\. Your proposed order for graph/workflow (correct)
+
+
+
+Yes:
+
+
+
+1\. Evaluate knowledge graph / workflow graph first (structure + oracles + risk).
+
+2\. Then fill lego blocks (or enqueue software/MCP/skill factories).
+
+3\. Then node QC + graph smoke.
+
+4\. Then full goal under budget.
+
+5\. Along the way traces weighted by outcome.
+
+
+
+That is the same spirit as: master plan → phases → field\_tests → field\_proven, just for composition.
+
+
+
+What we have now: (1) thin critique, (2) partial enqueue for mcp only, (3) process oracle for connectors, not full graph smoke or skill fill.
+
+
+
+───
+
+
+
+5\. Blind spots / things easy to under-weight
+
+
+
+┌───────────────────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐
+
+│ Blind spot                                │ Why it matters                                                                              │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Provenance \& pinning                      │ “Pulled from GitHub yesterday” isn’t reproducible; need commit SHA, content hash, license.  │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Revocation \& drift                        │ Capability upgraded → MCP/skill still points at old behavior; need re-smoke on dependency   │
+
+│                                           │ change.                                                                                     │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Privilege of skills vs software           │ Skills can instruct tools with broad authority; a bad skill is often worse than a bad CLI.  │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Prompt injection via skills/MCP           │ External text becomes system policy if injected raw.                                        │
+
+│ descriptions                              │                                                                                             │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Socket conflicts                          │ Two skills both claim “debug”; need priority / exclusivity.                                 │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Evaluation gaming                         │ Oracles that only check “file exists” train cheats; need outcome-aligned oracles.           │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Multi-tenant / shared PIPELINE\_DIR        │ Operator + overnight + ingest on same dir = race; already true for field\_prove.             │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Cost/latency of graph smoke               │ Full graph smoke can cost as much as the goal; need cheap path + full path.                 │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Human mute rules                          │ “Don’t ask for 7 days” is itself a security control; log and expire.                        │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Compliance / data egress                  │ External MCP may phone home; need network allow-lists in sandbox.                           │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Identity of “who approved”                │ For FT and audits later.                                                                    │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Partial graph success                     │ Node 3 of 5 proven ≠ workflow proven; graph-level status required.                          │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Classic dual-engine                       │ Graph must not assume only grok\_build; status is what matters.                              │
+
+├───────────────────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤
+
+│ Hermes vs tool goals                      │ Research branches shouldn’t force software/MCP sockets.                                     │
+
+└───────────────────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+───
+
+
+
+6\. Have you covered enough of the big picture?
+
+
+
+Yes for direction. The arc is coherent:
+
+
+
+Trustworthy blocks (software → MCP → skill/prompt → connector)
+
+&#x20; → sockets + registry truth
+
+&#x20; → graph as workflow map with critique + smoke
+
+&#x20; → graph engineer authors maps into that machine
+
+&#x20; → external ingest under security + human gate
+
+&#x20; → traces train better mapping (not freer monologue)
+
+
+
+Not yet enough for “graph engineer next sprint.”
+
+Enough for: deepen factories + sockets + graph smoke, while graph engineer stays a later plan (as in agi-lmaooo / budget-ladder deferred list).
+
+
+
+───
+
+
+
+7\. Are you ready to test external GitHub + internal goal-achieve?
+
+
+
+┌──────────────────────┬────────────┬────────────────────────────────────────────────────────────────────┬────────────────────────────────┐
+
+│ Path                 │ Ready?     │ What you can test now                                              │ What you should not claim yet  │
+
+├──────────────────────┼────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+
+│ Internal goal-       │ Partially  │ goal\_compose compile/attempt; policy reuse/compose/mcp enqueue;    │ “Goal OS that plans complex    │
+
+│ achieve              │            │ attempt\_goal for hermes/software branches; factory feature matrix; │ multi-lego workflows and       │
+
+│                      │            │ sandbox goal\_trace file\_exists                                     │ proves them”                   │
+
+├──────────────────────┼────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+
+│ Internal GitHub as   │ Thin / ad  │ Manual gh / publish\_project\_github patterns if present; no         │ Automated “open PR / merge /   │
+
+│ tool                 │ hoc        │ systematic goal\_trace GitHub oracle suite                          │ prove” as first-class goal     │
+
+│                      │            │                                                                    │ template                       │
+
+├──────────────────────┼────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+
+│ External GitHub      │ Not ready  │ Manual human review only                                           │ Auto crawl/rank/install        │
+
+│ skill/MCP/software   │            │                                                                    │                                │
+
+│ ingest               │            │                                                                    │                                │
+
+├──────────────────────┼────────────┼────────────────────────────────────────────────────────────────────┼────────────────────────────────┤
+
+│ Graph engineer       │ Not ready  │ graph.v1 as data                                                   │ Authoring agent trusted to     │
+
+│                      │            │                                                                    │ fill production graphs         │
+
+└──────────────────────┴────────────┴────────────────────────────────────────────────────────────────────┴────────────────────────────────┘
+
+
+
+Sensible near tests (ready):
+
+
+
+1\. factory\_feature\_matrix.py (isolated) + optional --live.
+
+2\. Internal goal: compile graph for a real goal id; inspect critique; plan-factories.
+
+3\. One verified software → MCP wrap → smoke → invoke (live).
+
+4\. attempt\_goal on a small goal with known complete deps (if any).
+
+5\. Hold GitHub goal\_trace as sandbox template (as p1 note said)—one file\_exists / one dry-run gh with human watch—not unattended external pull.
+
+
+
+Not ready: unattended “search GitHub, install skill/MCP, attach to executor, run goal.”
+
+
+
+───
+
+
+
+8\. Suggested prep roadmap (serial, not all at once)
+
+
+
+┌───────┬────────────────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────┐
+
+│ Phase │ Focus                                                                  │ Exit criteria                                          │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P1    │ Sockets + registry kinds for skill/prompt; skill\_load only into        │ Can’t inject arbitrary skill into production role      │
+
+│       │ sockets                                                                │ without status                                         │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P2    │ Skill/prompt promote: sandbox fixture → critic checklist → verified    │ create-skill doesn’t land hot                          │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P3    │ Graph smoke (whole-graph cheap path) after nodes resolved              │ graph status smoke\_pass before goal run                │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P4    │ MCP factory v1 (re-smoke, revoke, invoke oracle)                       │ MCP as real block, not demo                            │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P5    │ External ingest manual path: pin hash + sandbox + human approve (CLI,  │ One external asset promoted under audit log            │
+
+│       │ no push yet)                                                           │                                                        │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ P6    │ Graph engineer (later plan)                                            │ Only authors graphs into P3 pipeline                   │
+
+├───────┼────────────────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────┤
+
+│ Defer │ Push notifications + mute windows                                      │ Note only until approval state machine exists          │
+
+└───────┴────────────────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────┘
+
+
+
+───
+
+
+
+9\. Bottom line
+
+
+
+• You’re thinking about this the right way: map ↔ blocks, graph QC before fill, QC again after, traces by outcome.
+
+• Gap that blocks graph engineer most: no socketed, promoted skill/prompt blocks, no graph-level smoke, no external ingest security, MCP still wrap-only.
+
+• create-a-prompt + create-skill→promote (+ sandbox default) are higher leverage than KG tooling right now.
+
+• Human push approve is the right security layer but should be hooks + notes first, product second.
+
+• Big picture: yes. Ready for unattended external GitHub + full goal OS: no. Ready to test internal compose/MCP/matrix and careful GitHub sandboxes: yes.
+
+
+
+If useful next, I can turn this into notes/pre-graph-engineer-block-readiness.md (and a one-line pointer from agi-lmaooo) so it doesn’t drift—same way we did for the MCP plan.
+

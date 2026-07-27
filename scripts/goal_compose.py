@@ -4,12 +4,16 @@ Goal compose CLI — compile graph.v1, plan factory actions, smoke, attempt via 
 
 Usage:
   python scripts/goal_compose.py compile --goal-id ID --text "..." [--hits-json file]
+  python scripts/goal_compose.py from-deconstruct --id DECONSTRUCT_ID [--goal-id ID]
   python scripts/goal_compose.py plan-factories --goal-id ID
   python scripts/goal_compose.py smoke --goal-id ID
   python scripts/goal_compose.py attempt --goal-id ID --text "..."
 
 Env:
   PIPELINE_DIR  — factory output root (graphs/ lives here)
+
+from-deconstruct writes **draft** graph.v1 only. Smoke is a separate step
+(never auto smoke_pass from deconstruct convert).
 """
 
 from __future__ import annotations
@@ -60,6 +64,50 @@ def cmd_compile(args: argparse.Namespace) -> int:
     )
     path = save_graph(graph)
     print(json.dumps({"path": str(path), "graph": graph}, indent=2, default=str))
+    return 0
+
+
+def cmd_from_deconstruct(args: argparse.Namespace) -> int:
+    """Load deconstruct.v0 → draft graph.v1 → save. Smoke is separate."""
+    from pipeline.deconstructor import load_deconstruct
+    from pipeline.goal_graph import compile_graph_from_deconstruct, save_graph
+
+    doc = load_deconstruct(args.id)
+    if doc is None:
+        print(json.dumps({"error": f"not found deconstruct id={args.id}"}))
+        return 1
+
+    goal_id = (args.goal_id or "").strip() or None
+    goal_text = (args.text or "").strip() or None
+    max_nodes = int(args.max_nodes) if getattr(args, "max_nodes", 0) else None
+
+    graph = compile_graph_from_deconstruct(
+        doc,
+        goal_id=goal_id,
+        goal_text=goal_text,
+        max_nodes=max_nodes,
+    )
+    path = save_graph(graph)
+    crit = graph.get("critique") or {}
+    out = {
+        "path": str(path),
+        "goal_id": graph.get("goal_id"),
+        "deconstruct_id": graph.get("deconstruct_id"),
+        "status": graph.get("status"),
+        "smoke_pass": graph.get("smoke_pass"),
+        "production_graph": graph.get("production_graph"),
+        "critique": crit,
+        "nodes": [n.get("label") or n.get("slug") for n in (graph.get("nodes") or [])],
+        "hint": (
+            "Draft candidate map only. Smoke separately: "
+            f"python scripts/goal_compose.py smoke --goal-id {graph.get('goal_id')}"
+        ),
+        "graph": graph,
+    }
+    print(json.dumps(out, indent=2, default=str))
+    status = str(graph.get("status") or "")
+    if status == "blocked" and not crit.get("ok"):
+        return 1
     return 0
 
 
@@ -276,6 +324,26 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional JSON file of route hits (list or {hits: [...]})",
     )
 
+    p_fd = sub.add_parser(
+        "from-deconstruct",
+        help=(
+            "Bridge saved deconstruct.v0 → draft graph.v1 "
+            "(never smoke_pass; use smoke subcommand separately)"
+        ),
+    )
+    p_fd.add_argument("--id", required=True, help="deconstruct id under deconstructs/")
+    p_fd.add_argument(
+        "--goal-id",
+        default="",
+        help="graph goal_id (default: deconstruct id)",
+    )
+    p_fd.add_argument(
+        "--text",
+        default="",
+        help="Optional goal text (default: deconstruct target)",
+    )
+    p_fd.add_argument("--max-nodes", type=int, default=0)
+
     p_plan = sub.add_parser(
         "plan-factories",
         help="Load graph; enqueue missing MCPs; log software handoffs",
@@ -322,6 +390,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "compile":
         return cmd_compile(args)
+    if args.cmd == "from-deconstruct":
+        return cmd_from_deconstruct(args)
     if args.cmd == "plan-factories":
         return cmd_plan_factories(args)
     if args.cmd == "smoke":

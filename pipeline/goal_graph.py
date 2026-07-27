@@ -57,6 +57,7 @@ __all__ = [
     "MCP_ORACLE",
     "EXECUTABLE_KINDS",
     "compile_goal_graph",
+    "compile_graph_from_deconstruct",
     "critique_graph",
     "smoke_graph",
     "save_graph",
@@ -312,6 +313,241 @@ def _make_node(
         "oracle": oracle,
         "requires": list(requires or []),
     }
+
+
+def _slugify_node(raw: str, *, max_len: int = 48) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (raw or "").strip().lower()).strip("-")
+    if not s:
+        s = "node"
+    return s[:max_len].rstrip("-") or "node"
+
+
+def compile_graph_from_deconstruct(
+    doc: dict[str, Any],
+    *,
+    goal_id: str | None = None,
+    goal_text: str | None = None,
+    max_nodes: int | None = None,
+    attach_plan_fill: bool = True,
+) -> dict[str, Any]:
+    """Map deconstruct.v0 candidates → **draft** graph.v1 (pure; no smoke).
+
+    - NODE_KINDS via CLASS_TO_GRAPH_KIND / replacement_class / graph_kind_hint
+    - oracle stubs from oracle_hint (never implies smoke_pass)
+    - edges from parent_id hierarchy; sequential control fallback
+    - status is ``draft`` or ``critiqued`` (after critique_graph) or ``blocked``
+    - never sets smoke_pass / executable / production_graph=true from convert alone
+    """
+    from pipeline.deconstructor import (
+        CLASS_TO_GRAPH_KIND,
+        plan_fill_actions,
+        slugify_target,
+    )
+
+    if not isinstance(doc, dict):
+        raise TypeError("doc must be a deconstruct.v0 dict")
+
+    now = _iso()
+    did = str(doc.get("id") or "").strip()
+    gid = str(goal_id or did or "from_deconstruct").strip()
+    # goal graph files use goal_id as filename stem — keep path-safe
+    gid = slugify_target(gid, max_len=64) if gid else "from_deconstruct"
+    gtext = (
+        goal_text
+        if goal_text is not None
+        else str(doc.get("target") or did or "deconstruct draft")
+    )
+
+    cap = max_nodes
+    if cap is None:
+        cap = int(doc.get("max_nodes") or 40)
+    cap = max(0, int(cap))
+
+    cands_raw = doc.get("candidates") if isinstance(doc.get("candidates"), list) else []
+    # Preserve document order; drop pure needs_structure placeholders
+    cands: list[dict[str, Any]] = []
+    for c in cands_raw:
+        if not isinstance(c, dict):
+            continue
+        if "needs structure" in str(c.get("name") or "").lower():
+            continue
+        cands.append(c)
+        if len(cands) >= cap:
+            break
+
+    nodes: list[dict[str, Any]] = []
+    cand_id_to_node_id: dict[str, str] = {}
+    seen_slugs: set[str] = set()
+
+    for c in cands:
+        cid = str(c.get("id") or "").strip()
+        name = str(c.get("name") or cid or f"candidate_{len(nodes)}").strip()
+        rc = str(c.get("replacement_class") or "").strip().lower()
+        kind_raw = (
+            c.get("graph_kind_hint")
+            or CLASS_TO_GRAPH_KIND.get(rc)
+            or "research"
+        )
+        kind = _normalize_kind(kind_raw)
+
+        base_slug = _slugify_node(cid or name)
+        slug = base_slug
+        n = 2
+        while slug in seen_slugs:
+            slug = f"{base_slug}-{n}"
+            n += 1
+        seen_slugs.add(slug)
+
+        oh = str(c.get("oracle_hint") or "").strip()
+        if oh:
+            oracle = oh
+        elif kind in EXECUTABLE_KINDS:
+            oracle = DEFAULT_ORACLE if kind != "mcp" else MCP_ORACLE
+        else:
+            oracle = ""
+
+        node = _make_node(
+            index=len(nodes) + 1,
+            slug=slug,
+            kind=kind,
+            label=name,
+            status="draft",
+            oracle=oracle,
+            requires=[],
+        )
+        # Provenance for later factories / graph engineer (not runtime proof)
+        node["replacement_class"] = rc or None
+        node["candidate_id"] = cid or None
+        node["depth"] = int(c.get("depth") or 0)
+        if c.get("parent_id"):
+            node["parent_candidate_id"] = str(c.get("parent_id"))
+        if c.get("department"):
+            node["department"] = str(c.get("department"))
+        nodes.append(node)
+        if cid:
+            cand_id_to_node_id[cid] = node["id"]
+
+    edges: list[dict[str, Any]] = []
+    edge_keys: set[tuple[str, str]] = set()
+    for c in cands:
+        if not isinstance(c, dict):
+            continue
+        cid = str(c.get("id") or "").strip()
+        pid = c.get("parent_id")
+        if not cid or pid in (None, ""):
+            continue
+        child_nid = cand_id_to_node_id.get(cid)
+        parent_nid = cand_id_to_node_id.get(str(pid).strip())
+        if not child_nid or not parent_nid:
+            continue
+        key = (parent_nid, child_nid)
+        if key in edge_keys:
+            continue
+        edge_keys.add(key)
+        edges.append({"from": parent_nid, "to": child_nid, "kind": "hierarchy"})
+
+    # Sequential control among roots (or all nodes if no hierarchy edges)
+    if not edges and len(nodes) > 1:
+        for i in range(len(nodes) - 1):
+            edges.append(
+                {
+                    "from": nodes[i]["id"],
+                    "to": nodes[i + 1]["id"],
+                    "kind": "control",
+                }
+            )
+    elif edges and len(nodes) > 1:
+        # Also linear control among depth-0 roots for a walkable order
+        roots = [
+            n
+            for n in nodes
+            if not n.get("parent_candidate_id")
+            or n.get("parent_candidate_id") not in cand_id_to_node_id
+        ]
+        if len(roots) > 1:
+            for i in range(len(roots) - 1):
+                key = (roots[i]["id"], roots[i + 1]["id"])
+                if key not in edge_keys:
+                    edge_keys.add(key)
+                    edges.append(
+                        {
+                            "from": roots[i]["id"],
+                            "to": roots[i + 1]["id"],
+                            "kind": "control",
+                        }
+                    )
+
+    notes_parts = [
+        "Draft candidate map from deconstruct.v0 — not production workflow.",
+        "smoke_pass requires separate goal_compose smoke after nodes resolve.",
+        "Do not auto-wrap MCP or seed software from this convert path.",
+    ]
+    if doc.get("needs_structure"):
+        notes_parts.append(
+            "Source deconstruct needs_structure; re-run LLM deconstruct before treating as map."
+        )
+
+    graph: dict[str, Any] = {
+        "schema": GRAPH_SCHEMA,
+        "goal_id": gid,
+        "goal_text": gtext if isinstance(gtext, str) else str(gtext),
+        "created_at": now,
+        "updated_at": now,
+        "status": "draft",
+        "source": "deconstruct",
+        "deconstruct_id": did or None,
+        "production_graph": False,
+        "nodes": nodes,
+        "edges": edges,
+        "critique": {"ok": True, "issues": []},
+        "notes": " ".join(notes_parts),
+    }
+    # Explicit: convert alone never claims smoke or production
+    # (omit smoke_pass key, or false — tests accept either)
+    graph["smoke_pass"] = False
+
+    if attach_plan_fill and cands:
+        try:
+            plan = plan_fill_actions(doc)
+            summary = {
+                "deconstruct_id": plan.get("deconstruct_id"),
+                "by_class": plan.get("by_class") or {},
+                "action_count": len(plan.get("actions") or []),
+                "production_graph": False,
+                "notes": (
+                    "Enqueue hints only — plan-fill does not auto MCP wrap or seed."
+                ),
+            }
+            # Light per-action index (no execution)
+            summary["actions_preview"] = [
+                {
+                    "name": a.get("name"),
+                    "replacement_class": a.get("replacement_class"),
+                    "graph_kind_hint": a.get("graph_kind_hint"),
+                    "next_action": a.get("next_action"),
+                }
+                for a in (plan.get("actions") or [])[:20]
+            ]
+            graph["plan_fill"] = summary
+            graph["notes"] = (
+                f"{graph['notes']} plan_fill: {summary['action_count']} actions "
+                f"by_class={summary['by_class']}."
+            )
+        except Exception:
+            pass
+
+    critique = critique_graph(graph)
+    graph["critique"] = critique
+    graph["updated_at"] = _iso()
+    # Status: draft → critiqued if critique ok; blocked if not.
+    # Never executable / smoke_pass from this path alone.
+    if not critique.get("ok"):
+        graph["status"] = "blocked"
+    else:
+        graph["status"] = "critiqued" if nodes else "draft"
+    graph["production_graph"] = False
+    graph["smoke_pass"] = False
+    return graph
 
 
 def compile_goal_graph(
