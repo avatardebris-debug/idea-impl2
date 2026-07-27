@@ -579,21 +579,22 @@ python scripts/block_registry.py revoke --id skill_create-skill
 # Safe load: pipeline.block_registry.load_socket_skill_bodies("executor.pre_task_skills")
 # Thin hook: ExecutorAgent.build_context injects verified executor.pre_task_skills bodies.
 
-# Deconstructor v0 (parse target structure → classify; NOT production graph.v1)
-# notes/lmao-agi-discuss.md — proposes nodes only; fill via create-skill / MCP factory / register→sandbox→promote
-# Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0
-# Bare titles return needs_structure (exit 2) — no fixed indie-studio template.
-# Pass real parts: bullets, "Dept: a, b", credits "Role - Name", or prose "includes X, Y".
-python scripts/deconstructor.py build --mode org --target-file hospital.txt
-python scripts/deconstructor.py build --mode org --target "Emergency: triage, attending; Radiology: MRI tech"
-python scripts/deconstructor.py build --mode credits --target "Director - A`nProgrammer - B`nTester - C"
-python scripts/deconstructor.py build --mode tool_surface --target "Core IO: open, save; Animation: keyframe, bake"
-python scripts/deconstructor.py build --mode genre --target "core loop, controls, levels, enemies, audio"
+# Deconstructor (LLM primary — same pattern as idea_planner: prompt + model + critique)
+# Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0  (NOT production graph.v1)
+# Prompt: pipeline/prompts/deconstructor.md  Agent: pipeline/agents/deconstructor.py
+# PRIMARY — invent structure from a bare title (requires Ollama / PIPELINE_MODEL):
+python scripts/deconstructor.py run --mode org --target "award-winning modern game studio"
+python scripts/deconstructor.py run --mode org --target-file mission.txt
+python scripts/deconstructor.py run --mode credits --target "NES platformer credits"
+python -m pipeline.agents.deconstructor --target "community hospital" --mode org
+# Offline inject (tests): --inject-response path/to/model_output.json
+# SECONDARY — no LLM: parse already-structured text, or from-json:
+python scripts/deconstructor.py build --mode org --target-file hospital_structured.txt
+python scripts/deconstructor.py from-json --path path/to/inventory.json
 python scripts/deconstructor.py validate --id <deconstruct_id>
 python scripts/deconstructor.py plan-fill --id <deconstruct_id>
-python scripts/deconstructor.py from-json --path path/to/inventory.json
 python scripts/deconstructor.py list
-# Skill body for agents: .grok/skills/deconstructor/SKILL.md
+# Skill: .grok/skills/deconstructor/SKILL.md
 
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py

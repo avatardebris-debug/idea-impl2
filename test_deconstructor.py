@@ -300,3 +300,206 @@ def test_enum_closed_on_hospital() -> None:
     for c in cands:
         assert c["replacement_class"] in REPLACEMENT_CLASSES
         assert c["oracle_hint"]
+
+
+# --- LLM path (inject response; no live Ollama required) ---
+
+_FAKE_STUDIO_LLM = {
+    "schema": "deconstruct.v0",
+    "mode": "org",
+    "target": "award-winning modern game studio",
+    "candidates": [
+        {
+            "id": "eng",
+            "name": "Engineering",
+            "replacement_class": "process_series",
+            "depth": 0,
+            "oracle_hint": "ship builds green",
+            "primary_use": "Ship game systems",
+        },
+        {
+            "id": "impl",
+            "name": "gameplay implementer",
+            "replacement_class": "skill",
+            "parent_id": "eng",
+            "depth": 1,
+            "oracle_hint": "features match design checklist",
+            "primary_use": "Implement mechanics",
+        },
+        {
+            "id": "art",
+            "name": "Art",
+            "replacement_class": "mcp_complex",
+            "depth": 0,
+            "oracle_hint": "asset pipeline smoke",
+            "primary_use": "Visual production",
+        },
+        {
+            "id": "anim",
+            "name": "animation cluster",
+            "replacement_class": "mcp_complex",
+            "parent_id": "art",
+            "depth": 1,
+            "oracle_hint": "export animation clips",
+            "primary_use": "Animation tools",
+        },
+        {
+            "id": "dir",
+            "name": "creative director",
+            "replacement_class": "human",
+            "depth": 0,
+            "oracle_hint": "taste sign-off",
+            "primary_use": "Vision and liability",
+        },
+    ],
+    "departments": [
+        {"id": "eng", "name": "Engineering", "replacement_class": "process_series"},
+        {"id": "art", "name": "Art", "replacement_class": "mcp_complex"},
+    ],
+    "notes": "fixture LLM invent for bare studio title",
+}
+
+
+def test_extract_json_from_fence() -> None:
+    from pipeline.deconstructor import extract_json_object
+
+    text = 'Here you go:\n```json\n{"a": 1, "candidates": []}\n```\n'
+    obj = extract_json_object(text)
+    assert obj["a"] == 1
+
+
+def test_run_llm_deconstruct_inject(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """Bare title works via LLM inject — not the structure parser."""
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    from pipeline.deconstructor import run_llm_deconstruct
+
+    raw = "```json\n" + json.dumps(_FAKE_STUDIO_LLM) + "\n```"
+    doc = run_llm_deconstruct(
+        "award-winning modern game studio",
+        mode="org",
+        deconstruct_id="llm-studio",
+        llm_response=raw,
+        save=True,
+    )
+    assert doc["parse_source"] == "llm"
+    assert doc["needs_structure"] is False
+    assert doc["critique"]["ok"] is True
+    names = {c["name"].lower() for c in doc["candidates"]}
+    assert "engineering" in names
+    assert "creative director" in names
+    assert (pipeline / "deconstructs" / "llm-studio.json").is_file()
+
+
+def test_run_llm_hospital_not_studio_names(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    hospital_llm = {
+        "schema": "deconstruct.v0",
+        "mode": "org",
+        "target": "community hospital",
+        "candidates": [
+            {
+                "id": "er",
+                "name": "Emergency",
+                "replacement_class": "process_series",
+                "depth": 0,
+                "oracle_hint": "door-to-doc time",
+            },
+            {
+                "id": "rn",
+                "name": "triage nurse",
+                "replacement_class": "skill",
+                "parent_id": "er",
+                "depth": 1,
+                "oracle_hint": "triage acuity recorded",
+            },
+            {
+                "id": "md",
+                "name": "attending physician",
+                "replacement_class": "human",
+                "parent_id": "er",
+                "depth": 1,
+                "oracle_hint": "sign-off on disposition",
+            },
+        ],
+        "notes": "hospital domain",
+    }
+    from pipeline.deconstructor import run_llm_deconstruct
+
+    doc = run_llm_deconstruct(
+        "community hospital",
+        mode="org",
+        llm_response=json.dumps(hospital_llm),
+        save=False,
+    )
+    names = " ".join(c["name"].lower() for c in doc["candidates"])
+    assert "emergency" in names
+    assert "pixel" not in names
+    assert "implementer" not in names
+
+
+def test_cli_run_inject(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    inj = tmp_path / "llm.txt"
+    inj.write_text(json.dumps(_FAKE_STUDIO_LLM), encoding="utf-8")
+    cli_main = _cli_main()
+    rc = cli_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "run",
+            "--mode",
+            "org",
+            "--target",
+            "award-winning modern game studio",
+            "--inject-response",
+            str(inj),
+            "--id",
+            "cli-llm-studio",
+        ]
+    )
+    assert rc == 0
+    data = json.loads((pipeline / "deconstructs" / "cli-llm-studio.json").read_text(encoding="utf-8"))
+    assert data["parse_source"] == "llm"
+    assert data["critique"]["ok"] is True
+
+
+def test_llm_bad_class_critique_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+
+    bad = {
+        "candidates": [
+            {
+                "id": "x",
+                "name": "X",
+                "replacement_class": "magic_ai",
+                "oracle_hint": "nope",
+            }
+        ]
+    }
+    from pipeline.deconstructor import run_llm_deconstruct
+
+    doc = run_llm_deconstruct(
+        "whatever",
+        mode="open",
+        llm_response=json.dumps(bad),
+        save=False,
+        max_retries=0,
+    )
+    assert doc["critique"]["ok"] is False

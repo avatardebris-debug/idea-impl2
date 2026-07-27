@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
-Deconstructor v0 CLI — candidate inventory + replacement classes.
+Deconstructor CLI — LLM candidate inventory + replacement classes.
 
-Usage:
-  python scripts/deconstructor.py build --mode org --target "small indie game studio"
-  python scripts/deconstructor.py build --mode credits --target "NES platformer credits"
-  python scripts/deconstructor.py validate --id org_small-indie-game-studio
-  python scripts/deconstructor.py plan-fill --id org_small-indie-game-studio
-  python scripts/deconstructor.py from-json --path inventory.json
-  python scripts/deconstructor.py list
+Primary (LLM — invents structure from a bare target):
+  python scripts/deconstructor.py run --mode org --target "award-winning game studio"
+  python scripts/deconstructor.py run --mode org --target-file mission.txt
+
+Secondary (no LLM):
+  python scripts/deconstructor.py build ...     # parse structured text only
+  python scripts/deconstructor.py from-json ... # validate supplied inventory
+
+Other:
+  validate | plan-fill | list | seed-preview
 
 Env:
-  PIPELINE_DIR  — factory output root (deconstructs/ lives here)
+  PIPELINE_DIR, PIPELINE_PROVIDER, PIPELINE_MODEL, OLLAMA_PLANNER_TIMEOUT
 
-Does not write production graph.v1. See notes/lmao-agi-discuss.md.
+Does not write production graph.v1.
 """
 
 from __future__ import annotations
@@ -46,18 +49,85 @@ def _print_json(obj: object) -> None:
 
 
 def _resolve_target(args: argparse.Namespace) -> str:
-    """Prefer --target-file for multi-line structure; else --target."""
     tf = getattr(args, "target_file", None) or ""
     if tf:
-        p = Path(tf)
-        return p.read_text(encoding="utf-8")
+        return Path(tf).read_text(encoding="utf-8")
     t = getattr(args, "target", None) or ""
     if not str(t).strip():
-        raise SystemExit("provide --target TEXT or --target-file PATH (structured lists deconstruct)")
+        raise SystemExit("provide --target TEXT or --target-file PATH")
     return str(t)
 
 
+def _add_target_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--target", default="", help="What to deconstruct")
+    p.add_argument("--target-file", default="", help="Multi-line target from file")
+
+
+def _add_budget(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--max-nodes", type=int, default=20)
+    p.add_argument("--max-depth", type=int, default=3)
+
+
+def _add_mode(p: argparse.ArgumentParser) -> None:
+    p.add_argument(
+        "--mode",
+        required=True,
+        choices=sorted(["org", "credits", "tool_surface", "genre", "open"]),
+    )
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Primary: LLM deconstruct → critique → save."""
+    from pipeline.deconstructor import run_llm_deconstruct
+
+    target = _resolve_target(args)
+    inject = None
+    if getattr(args, "inject_json", None):
+        inject = Path(args.inject_json).read_text(encoding="utf-8")
+    elif getattr(args, "inject_response", None):
+        inject = Path(args.inject_response).read_text(encoding="utf-8")
+
+    try:
+        doc = run_llm_deconstruct(
+            target,
+            mode=args.mode,
+            max_nodes=int(args.max_nodes),
+            max_depth=int(args.max_depth),
+            deconstruct_id=args.id or None,
+            provider=args.provider or None,
+            model=args.model or None,
+            save=not bool(args.no_save),
+            llm_response=inject,
+            max_retries=int(args.retries),
+        )
+    except Exception as exc:
+        _print_json({"error": str(exc)})
+        return 1
+
+    _print_json(
+        {
+            "path": str(
+                __import__("pipeline.deconstructor", fromlist=["deconstruct_path"]).deconstruct_path(
+                    str(doc.get("id"))
+                )
+            )
+            if not args.no_save
+            else None,
+            "id": doc.get("id"),
+            "status": doc.get("status"),
+            "parse_source": doc.get("parse_source"),
+            "needs_structure": doc.get("needs_structure"),
+            "critique": doc.get("critique"),
+            "candidate_count": len(doc.get("candidates") or []),
+            "names": [c.get("name") for c in (doc.get("candidates") or [])],
+            "doc": doc,
+        }
+    )
+    return 0 if (doc.get("critique") or {}).get("ok") else 1
+
+
 def cmd_build(args: argparse.Namespace) -> int:
+    """Secondary: structure-parse only (no LLM). Bare titles → needs_structure."""
     from pipeline.deconstructor import build_deconstruct, save_deconstruct
 
     target = _resolve_target(args)
@@ -80,11 +150,12 @@ def cmd_build(args: argparse.Namespace) -> int:
             "critique": doc.get("critique"),
             "candidate_count": len(doc.get("candidates") or []),
             "names": [c.get("name") for c in (doc.get("candidates") or [])],
+            "hint": "Use `run` for LLM deconstruct of bare titles.",
             "doc": doc,
         }
     )
     if doc.get("needs_structure"):
-        return 2  # distinct from critique fail
+        return 2
     return 0 if (doc.get("critique") or {}).get("ok") else 1
 
 
@@ -159,8 +230,7 @@ def cmd_plan_fill(args: argparse.Namespace) -> int:
     if doc is None:
         _print_json({"error": f"not found: {args.id}"})
         return 1
-    out = plan_fill_actions(doc)
-    _print_json(out)
+    _print_json(plan_fill_actions(doc))
     return 0
 
 
@@ -172,7 +242,6 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 
 def cmd_seed_preview(args: argparse.Namespace) -> int:
-    """Print parse+classify result without saving."""
     from pipeline.deconstructor import build_deconstruct
 
     target = _resolve_target(args)
@@ -190,40 +259,49 @@ def cmd_seed_preview(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="Deconstructor v0: candidate inventory + replacement classes (not graph.v1)"
+        description="Deconstructor: LLM inventory (run) or parse/validate (build/from-json)"
     )
     ap.add_argument("--pipeline-dir", default="", help="Override PIPELINE_DIR")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    def add_budget(p: argparse.ArgumentParser) -> None:
-        p.add_argument("--max-nodes", type=int, default=20)
-        p.add_argument("--max-depth", type=int, default=3)
+    p_run = sub.add_parser(
+        "run",
+        help="PRIMARY: LLM deconstruct target → deconstruct.v0 (uses Ollama/PIPELINE_MODEL)",
+    )
+    _add_mode(p_run)
+    _add_target_args(p_run)
+    p_run.add_argument("--id", default="")
+    p_run.add_argument("--provider", default="", help="Override PIPELINE_PROVIDER")
+    p_run.add_argument("--model", default="", help="Override PIPELINE_MODEL")
+    p_run.add_argument(
+        "--inject-response",
+        default="",
+        help="Skip LLM: use this file as model response (tests/offline)",
+    )
+    p_run.add_argument(
+        "--inject-json",
+        default="",
+        help="Alias of --inject-response",
+    )
+    p_run.add_argument("--no-save", action="store_true")
+    p_run.add_argument("--retries", type=int, default=1, help="Critique-repair retries")
+    _add_budget(p_run)
+    p_run.set_defaults(func=cmd_run)
 
     p_b = sub.add_parser(
         "build",
-        help="Parse target structure → classify → save deconstruct.v0 (no fixed templates)",
+        help="SECONDARY: parse structured target only (no LLM; bare title → needs_structure)",
     )
-    p_b.add_argument("--mode", required=True, choices=sorted(
-        ["org", "credits", "tool_surface", "genre", "open"]
-    ))
-    p_b.add_argument(
-        "--target",
-        default="",
-        help="Text to deconstruct (lists, 'Dept: a, b', credits Role - Name). Bare titles need structure.",
-    )
-    p_b.add_argument(
-        "--target-file",
-        default="",
-        help="Read multi-line structured target from file (preferred for org charts)",
-    )
-    p_b.add_argument("--id", default="", help="Optional deconstruct id")
+    _add_mode(p_b)
+    _add_target_args(p_b)
+    p_b.add_argument("--id", default="")
     p_b.add_argument("--notes", default="")
-    add_budget(p_b)
+    _add_budget(p_b)
     p_b.set_defaults(func=cmd_build)
 
-    p_j = sub.add_parser("from-json", help="Validate/save agent- or fixture-supplied candidates")
-    p_j.add_argument("--path", required=True, help="JSON list or {candidates, target, mode}")
-    p_j.add_argument("--target", default="", help="Override target")
+    p_j = sub.add_parser("from-json", help="Validate/save agent-supplied candidates")
+    p_j.add_argument("--path", required=True)
+    p_j.add_argument("--target", default="")
     p_j.add_argument(
         "--mode",
         default="open",
@@ -231,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_j.add_argument("--id", default="")
     p_j.add_argument("--notes", default="")
-    add_budget(p_j)
+    _add_budget(p_j)
     p_j.set_defaults(func=cmd_from_json)
 
     p_v = sub.add_parser("validate", help="Re-critique a saved deconstruct")
@@ -240,20 +318,17 @@ def main(argv: list[str] | None = None) -> int:
     p_v.add_argument("--max-depth", type=int, default=0)
     p_v.set_defaults(func=cmd_validate)
 
-    p_p = sub.add_parser("plan-fill", help="Map candidates → next factory/promote actions")
+    p_p = sub.add_parser("plan-fill", help="Map candidates → factory/promote actions")
     p_p.add_argument("--id", required=True)
     p_p.set_defaults(func=cmd_plan_fill)
 
     p_l = sub.add_parser("list", help="List saved deconstructs")
     p_l.set_defaults(func=cmd_list)
 
-    p_s = sub.add_parser("seed-preview", help="Print parse+classify without saving")
-    p_s.add_argument("--mode", required=True, choices=sorted(
-        ["org", "credits", "tool_surface", "genre", "open"]
-    ))
-    p_s.add_argument("--target", default="")
-    p_s.add_argument("--target-file", default="")
-    add_budget(p_s)
+    p_s = sub.add_parser("seed-preview", help="Structure-parse preview without save")
+    _add_mode(p_s)
+    _add_target_args(p_s)
+    _add_budget(p_s)
     p_s.set_defaults(func=cmd_seed_preview)
 
     args = ap.parse_args(argv)

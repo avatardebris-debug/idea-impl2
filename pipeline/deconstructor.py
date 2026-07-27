@@ -1,20 +1,17 @@
 """
-deconstructor v0 — candidate inventory + replacement classification.
+deconstructor — candidate inventory + replacement classification.
 
-Produces deconstruct.v0 JSON under PIPELINE_DIR/deconstructs/.
-Does **not** write production graph.v1. Output is proposal-only.
+Primary path (intended product):
+  **LLM deconstruct** via ``run_llm_deconstruct`` / agent ``deconstructor``
+  (prompt ``pipeline/prompts/deconstructor.md``) → JSON → critique → save.
 
-v0 actually deconstructs the **target text**:
-  - hierarchical bullets / indentation
-  - "Department: role, role" lines
-  - flat lists (bullets, numbers, commas, newlines)
-  - credits "Role - Name" / "Role: Name"
+Secondary paths (no LLM):
+  - ``from_candidates`` / CLI ``from-json`` — already-built inventory
+  - ``build_deconstruct`` / CLI ``build`` — structure *parser* only when the
+    target already lists parts (bullets, Dept: a,b). Bare titles do NOT invent
+    orgs (that is the LLM's job).
 
-It does **not** invent a fixed org chart (no hardcoded indie-game-studio
-template). A bare title with no parts returns needs_structure guidance.
-
-Modes bias classification heuristics: org | credits | tool_surface | genre | open
-See notes/lmao-agi-discuss.md.
+Does **not** write production graph.v1. Proposal only.
 """
 
 from __future__ import annotations
@@ -301,6 +298,11 @@ __all__ = [
     "list_deconstructs",
     "plan_fill_actions",
     "from_candidates",
+    "load_deconstructor_system_prompt",
+    "build_llm_user_prompt",
+    "extract_json_object",
+    "doc_from_llm_payload",
+    "run_llm_deconstruct",
 ]
 
 
@@ -1224,6 +1226,315 @@ def plan_fill_actions(doc: dict[str, Any]) -> dict[str, Any]:
         "notes": (
             "Do not auto-attach. Skills/prompts need register→sandbox→promote. "
             "mcp_complex needs further deconstruct or external MCP first. "
-            "If needs_structure, re-run with structured target text."
+            "If needs_structure, re-run with LLM (`run`) or structured target / from-json."
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# LLM path (primary product)
+# ---------------------------------------------------------------------------
+
+_PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+_JSON_FENCE_RE = re.compile(
+    r"```(?:json)?\s*(\{.*?\})\s*```",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def load_deconstructor_system_prompt() -> str:
+    path = _PROMPTS_DIR / "deconstructor.md"
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    return (
+        "You are the deconstructor. Emit deconstruct.v0 JSON with candidates "
+        "using closed replacement classes only."
+    )
+
+
+def build_llm_user_prompt(
+    target: str,
+    *,
+    mode: str = "open",
+    max_nodes: int = DEFAULT_MAX_NODES,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+    critique_feedback: str = "",
+) -> str:
+    m = (mode or "open").strip().lower()
+    classes = ", ".join(sorted(REPLACEMENT_CLASSES))
+    feedback = ""
+    if critique_feedback.strip():
+        feedback = (
+            "\n## Previous attempt failed critique — fix these issues\n"
+            f"{critique_feedback.strip()}\n"
+            "Return a corrected full JSON object.\n"
+        )
+    return (
+        f"## Mode\n{m}\n\n"
+        f"## Target to deconstruct\n{target.strip()}\n\n"
+        f"## Budgets\n"
+        f"- max candidates (nodes): {int(max_nodes)}\n"
+        f"- max depth: {int(max_depth)}\n"
+        f"- closed replacement_class enum: {classes}\n\n"
+        f"## Job\n"
+        f"Deconstruct THIS target into departments/roles/clusters appropriate to the domain. "
+        f"A hospital is not a game studio. Invent 80/20 structure when the target is a short title. "
+        f"Every leaf needs replacement_class + oracle_hint.\n"
+        f"{feedback}\n"
+        f"Respond with a single JSON object only (schema deconstruct.v0).\n"
+    )
+
+
+def extract_json_object(text: str) -> dict[str, Any]:
+    """Pull first JSON object from model text (fenced or raw)."""
+    raw = (text or "").strip()
+    if not raw:
+        raise ValueError("empty LLM response")
+
+    # Prefer fenced ```json
+    m = _JSON_FENCE_RE.search(raw)
+    if m:
+        try:
+            obj = json.loads(m.group(1))
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError:
+            pass
+
+    # Whole string
+    try:
+        obj = json.loads(raw)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+
+    # First { ... last }
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start >= 0 and end > start:
+        chunk = raw[start : end + 1]
+        try:
+            obj = json.loads(chunk)
+            if isinstance(obj, dict):
+                return obj
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"could not parse JSON from LLM response: {exc}") from exc
+
+    raise ValueError("no JSON object found in LLM response")
+
+
+def doc_from_llm_payload(
+    payload: dict[str, Any],
+    *,
+    target: str,
+    mode: str,
+    max_nodes: int = DEFAULT_MAX_NODES,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+    deconstruct_id: str | None = None,
+    raw_llm: str = "",
+) -> dict[str, Any]:
+    """Normalize LLM JSON into a deconstruct.v0 document + critique."""
+    m = (mode or str(payload.get("mode") or "open")).strip().lower()
+    if m not in MODES:
+        m = "open"
+    t = (target or str(payload.get("target") or "")).strip()
+    if not t:
+        raise ValueError("target is required")
+
+    cands_raw = payload.get("candidates")
+    if not isinstance(cands_raw, list) or not cands_raw:
+        raise ValueError("LLM payload missing non-empty candidates[]")
+
+    cands = [_normalize_candidate(c, index=i) for i, c in enumerate(cands_raw)]
+    depts_raw = payload.get("departments")
+    depts: list[dict[str, Any]] = []
+    if isinstance(depts_raw, list):
+        for d in depts_raw:
+            if isinstance(d, dict) and d.get("name"):
+                depts.append(d)
+
+    title = t.split("\n")[0].strip()
+    did = (deconstruct_id or f"{m}_{slugify_target(title)}").strip()
+    did = slugify_target(did, max_len=64)
+
+    notes = str(payload.get("notes") or "").strip()
+    if not notes:
+        notes = "LLM deconstruct proposal — critique then fill classes; not graph.v1"
+
+    doc: dict[str, Any] = {
+        "schema": SCHEMA,
+        "id": did,
+        "mode": m,
+        "target": t,
+        "created_at": _iso(),
+        "updated_at": _iso(),
+        "max_nodes": max_nodes,
+        "max_depth": max_depth,
+        "production_graph": False,
+        "status": "candidate",
+        "notes": notes,
+        "needs_structure": False,
+        "parse_source": "llm",
+        "structure_hint": None,
+        "departments": depts,
+        "candidates": cands,
+        "critique": {},
+        "llm_raw_chars": len(raw_llm or ""),
+    }
+    crit = critique_deconstruct(doc, max_nodes=max_nodes, max_depth=max_depth)
+    doc["critique"] = crit
+    doc["status"] = "candidate_ok" if crit.get("ok") else "candidate_blocked"
+    return doc
+
+
+def _format_critique_for_retry(crit: dict[str, Any]) -> str:
+    issues = crit.get("issues") or []
+    lines = [f"- {i.get('code')}: {i.get('detail')}" for i in issues if isinstance(i, dict)]
+    return "\n".join(lines) if lines else json.dumps(crit, indent=2)[:2000]
+
+
+def _chat_llm(
+    *,
+    system: str,
+    user: str,
+    provider: str,
+    model: str,
+    temperature: float,
+    request_timeout_s: int,
+) -> str:
+    from llm_interface import get_llm
+
+    llm = get_llm(
+        provider,
+        model,
+        temperature=temperature,
+        think=False,
+        num_ctx=8192,
+        slug="",
+    )
+    messages = [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+    resp = llm.chat(messages, tools=None, request_timeout=request_timeout_s)
+    return (resp.content or "") if resp is not None else ""
+
+
+def run_llm_deconstruct(
+    target: str,
+    *,
+    mode: str = "open",
+    max_nodes: int = DEFAULT_MAX_NODES,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+    deconstruct_id: str | None = None,
+    provider: str | None = None,
+    model: str | None = None,
+    temperature: float = 0.4,
+    request_timeout_s: int | None = None,
+    save: bool = True,
+    llm_response: str | None = None,
+    llm_caller: Any | None = None,
+    max_retries: int = 1,
+) -> dict[str, Any]:
+    """Call LLM (or inject response) → parse JSON → critique → optional save.
+
+    Parameters
+    ----------
+    llm_response:
+        If set, skip the network LLM call (tests / offline inject).
+    llm_caller:
+        Optional callable(user_prompt, system_addon='') -> object with .answer
+        or str. Used by DeconstructorAgent to reuse call_llm_direct.
+    """
+    import os
+
+    t = (target or "").strip()
+    if not t:
+        raise ValueError("target is required")
+    m = (mode or "open").strip().lower()
+    if m not in MODES:
+        raise ValueError(f"mode must be one of {sorted(MODES)}")
+
+    system = load_deconstructor_system_prompt()
+    # Keep system prompt bounded for local models (same spirit as planners)
+    if len(system) > 6000:
+        system = system[:6000] + "\n...(truncated)"
+
+    if request_timeout_s is None:
+        try:
+            request_timeout_s = max(60, int(os.environ.get("OLLAMA_PLANNER_TIMEOUT", "180")))
+        except ValueError:
+            request_timeout_s = 180
+
+    if not provider:
+        provider = os.environ.get("PIPELINE_PROVIDER", "ollama").strip() or "ollama"
+    if not model:
+        try:
+            from pipeline.pipeline_config import DEFAULT_PIPELINE_MODEL
+
+            model = os.environ.get("PIPELINE_MODEL", "").strip() or DEFAULT_PIPELINE_MODEL
+        except Exception:
+            model = os.environ.get("PIPELINE_MODEL", "").strip() or "qwen3.6:35b-a3b-q4_K_M"
+
+    feedback = ""
+    last_err: Exception | None = None
+    doc: dict[str, Any] | None = None
+
+    attempts = max(1, int(max_retries) + 1)
+    for attempt in range(attempts):
+        user = build_llm_user_prompt(
+            t,
+            mode=m,
+            max_nodes=max_nodes,
+            max_depth=max_depth,
+            critique_feedback=feedback,
+        )
+        try:
+            if llm_response is not None and attempt == 0:
+                raw = llm_response
+            elif llm_caller is not None:
+                result = llm_caller(user, "")
+                if isinstance(result, str):
+                    raw = result
+                else:
+                    raw = str(getattr(result, "answer", None) or result or "")
+            else:
+                raw = _chat_llm(
+                    system=system,
+                    user=user,
+                    provider=provider,
+                    model=model,
+                    temperature=temperature,
+                    request_timeout_s=int(request_timeout_s),
+                )
+            payload = extract_json_object(raw)
+            doc = doc_from_llm_payload(
+                payload,
+                target=t,
+                mode=m,
+                max_nodes=max_nodes,
+                max_depth=max_depth,
+                deconstruct_id=deconstruct_id,
+                raw_llm=raw,
+            )
+            if (doc.get("critique") or {}).get("ok"):
+                break
+            feedback = _format_critique_for_retry(doc.get("critique") or {})
+            last_err = ValueError(f"critique failed: {feedback}")
+            # On inject-only path, do not invent a second response
+            if llm_response is not None:
+                break
+        except Exception as exc:
+            last_err = exc
+            feedback = f"parse/error: {exc}"
+            if llm_response is not None:
+                break
+            continue
+
+    if doc is None:
+        raise ValueError(f"LLM deconstruct failed: {last_err}")
+
+    if save:
+        save_deconstruct(doc)
+    return doc

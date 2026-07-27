@@ -296,7 +296,7 @@ Earn Rhai by **compressing proven workflows**, not by using Rhai to invent unpro
 
 When ready to plan implementation, candidate epic order:
 
-1. **Deconstructor v0** — **IMPLEMENTED** — `pipeline/deconstructor.py` + `scripts/deconstructor.py` + `.grok/skills/deconstructor/SKILL.md` + `test_deconstructor.py`. Schema `deconstruct.v0`; modes org|credits|tool_surface|genre|open; seed + from-json + critique + plan-fill. Store: `$PIPELINE_DIR/deconstructs/`. Not production graph.v1.  
+1. **Deconstructor** — **LLM path shipped** — `pipeline/prompts/deconstructor.md` + `pipeline/agents/deconstructor.py` + `run_llm_deconstruct` + CLI `scripts/deconstructor.py run`. Schema `deconstruct.v0` + critique gate. Structure-only `build` / `from-json` are secondary. Store: `$PIPELINE_DIR/deconstructs/`. Not production graph.v1. (Notes here were conversation summaries — product intent is agent/LLM deconstruct, not a fixed template.)
 2. **Socket + skill/prompt promote** (agi-lmaooo2 P1–P2)—**v0 done** (`block_registry`). Habit: register→sandbox→promote; `--sandbox` on register.  
 3. **Graph smoke** (P3); keep knowledge vs workflow graphs separate.  
 4. **MCP surface elicit + cluster** (help crawl → tool clusters).  
