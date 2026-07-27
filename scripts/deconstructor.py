@@ -45,11 +45,24 @@ def _print_json(obj: object) -> None:
     print(json.dumps(obj, indent=2, ensure_ascii=False, default=str))
 
 
+def _resolve_target(args: argparse.Namespace) -> str:
+    """Prefer --target-file for multi-line structure; else --target."""
+    tf = getattr(args, "target_file", None) or ""
+    if tf:
+        p = Path(tf)
+        return p.read_text(encoding="utf-8")
+    t = getattr(args, "target", None) or ""
+    if not str(t).strip():
+        raise SystemExit("provide --target TEXT or --target-file PATH (structured lists deconstruct)")
+    return str(t)
+
+
 def cmd_build(args: argparse.Namespace) -> int:
     from pipeline.deconstructor import build_deconstruct, save_deconstruct
 
+    target = _resolve_target(args)
     doc = build_deconstruct(
-        args.target,
+        target,
         mode=args.mode,
         deconstruct_id=args.id or None,
         max_nodes=int(args.max_nodes),
@@ -62,11 +75,16 @@ def cmd_build(args: argparse.Namespace) -> int:
             "path": str(path),
             "id": doc.get("id"),
             "status": doc.get("status"),
+            "needs_structure": doc.get("needs_structure"),
+            "parse_source": doc.get("parse_source"),
             "critique": doc.get("critique"),
             "candidate_count": len(doc.get("candidates") or []),
+            "names": [c.get("name") for c in (doc.get("candidates") or [])],
             "doc": doc,
         }
     )
+    if doc.get("needs_structure"):
+        return 2  # distinct from critique fail
     return 0 if (doc.get("critique") or {}).get("ok") else 1
 
 
@@ -154,16 +172,19 @@ def cmd_list(args: argparse.Namespace) -> int:
 
 
 def cmd_seed_preview(args: argparse.Namespace) -> int:
-    """Print seed candidates without saving (fixture inspection)."""
+    """Print parse+classify result without saving."""
     from pipeline.deconstructor import build_deconstruct
 
+    target = _resolve_target(args)
     doc = build_deconstruct(
-        args.target,
+        target,
         mode=args.mode,
         max_nodes=int(args.max_nodes),
         max_depth=int(args.max_depth),
     )
     _print_json(doc)
+    if doc.get("needs_structure"):
+        return 2
     return 0 if (doc.get("critique") or {}).get("ok") else 1
 
 
@@ -178,11 +199,23 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--max-nodes", type=int, default=20)
         p.add_argument("--max-depth", type=int, default=3)
 
-    p_b = sub.add_parser("build", help="Seed + save deconstruct.v0 for mode/target")
+    p_b = sub.add_parser(
+        "build",
+        help="Parse target structure → classify → save deconstruct.v0 (no fixed templates)",
+    )
     p_b.add_argument("--mode", required=True, choices=sorted(
         ["org", "credits", "tool_surface", "genre", "open"]
     ))
-    p_b.add_argument("--target", required=True, help="What you are deconstructing")
+    p_b.add_argument(
+        "--target",
+        default="",
+        help="Text to deconstruct (lists, 'Dept: a, b', credits Role - Name). Bare titles need structure.",
+    )
+    p_b.add_argument(
+        "--target-file",
+        default="",
+        help="Read multi-line structured target from file (preferred for org charts)",
+    )
     p_b.add_argument("--id", default="", help="Optional deconstruct id")
     p_b.add_argument("--notes", default="")
     add_budget(p_b)
@@ -214,11 +247,12 @@ def main(argv: list[str] | None = None) -> int:
     p_l = sub.add_parser("list", help="List saved deconstructs")
     p_l.set_defaults(func=cmd_list)
 
-    p_s = sub.add_parser("seed-preview", help="Print seed without saving")
+    p_s = sub.add_parser("seed-preview", help="Print parse+classify without saving")
     p_s.add_argument("--mode", required=True, choices=sorted(
         ["org", "credits", "tool_surface", "genre", "open"]
     ))
-    p_s.add_argument("--target", required=True)
+    p_s.add_argument("--target", default="")
+    p_s.add_argument("--target-file", default="")
     add_budget(p_s)
     p_s.set_defaults(func=cmd_seed_preview)
 

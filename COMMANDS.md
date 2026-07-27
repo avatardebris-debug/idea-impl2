@@ -579,13 +579,16 @@ python scripts/block_registry.py revoke --id skill_create-skill
 # Safe load: pipeline.block_registry.load_socket_skill_bodies("executor.pre_task_skills")
 # Thin hook: ExecutorAgent.build_context injects verified executor.pre_task_skills bodies.
 
-# Deconstructor v0 (candidate inventory + replacement classes; NOT production graph.v1)
+# Deconstructor v0 (parse target structure → classify; NOT production graph.v1)
 # notes/lmao-agi-discuss.md — proposes nodes only; fill via create-skill / MCP factory / register→sandbox→promote
 # Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0
-python scripts/deconstructor.py build --mode org --target "small indie game studio"
-python scripts/deconstructor.py build --mode credits --target "NES platformer credits"
-python scripts/deconstructor.py build --mode tool_surface --target "Blender animation tools"
-python scripts/deconstructor.py build --mode genre --target "platformer"
+# Bare titles return needs_structure (exit 2) — no fixed indie-studio template.
+# Pass real parts: bullets, "Dept: a, b", credits "Role - Name", or prose "includes X, Y".
+python scripts/deconstructor.py build --mode org --target-file hospital.txt
+python scripts/deconstructor.py build --mode org --target "Emergency: triage, attending; Radiology: MRI tech"
+python scripts/deconstructor.py build --mode credits --target "Director - A`nProgrammer - B`nTester - C"
+python scripts/deconstructor.py build --mode tool_surface --target "Core IO: open, save; Animation: keyframe, bake"
+python scripts/deconstructor.py build --mode genre --target "core loop, controls, levels, enemies, audio"
 python scripts/deconstructor.py validate --id <deconstruct_id>
 python scripts/deconstructor.py plan-fill --id <deconstruct_id>
 python scripts/deconstructor.py from-json --path path/to/inventory.json

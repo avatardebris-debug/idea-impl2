@@ -2,11 +2,18 @@
 deconstructor v0 — candidate inventory + replacement classification.
 
 Produces deconstruct.v0 JSON under PIPELINE_DIR/deconstructs/.
-Does **not** write production graph.v1. Output is proposal-only:
-critique, then fill classes via create-skill / MCP factory / block_registry
-promote (register → sandbox → promote → attach).
+Does **not** write production graph.v1. Output is proposal-only.
 
-Modes: org | credits | tool_surface | genre | open
+v0 actually deconstructs the **target text**:
+  - hierarchical bullets / indentation
+  - "Department: role, role" lines
+  - flat lists (bullets, numbers, commas, newlines)
+  - credits "Role - Name" / "Role: Name"
+
+It does **not** invent a fixed org chart (no hardcoded indie-game-studio
+template). A bare title with no parts returns needs_structure guidance.
+
+Modes bias classification heuristics: org | credits | tool_surface | genre | open
 See notes/lmao-agi-discuss.md.
 """
 
@@ -18,12 +25,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from pipeline.paths import deconstructs_dir, get_pipeline_dir
+from pipeline.paths import deconstructs_dir
 
 SCHEMA = "deconstruct.v0"
 MODES = frozenset({"org", "credits", "tool_surface", "genre", "open"})
 
-# Closed replacement classes (align with agi-lmaooo2 / lmao-agi-discuss).
 REPLACEMENT_CLASSES = frozenset(
     {
         "skill",
@@ -39,7 +45,6 @@ REPLACEMENT_CLASSES = frozenset(
     }
 )
 
-# Soft map → graph.v1 / block kinds (hints only; not auto-compiled).
 CLASS_TO_GRAPH_KIND = {
     "skill": "skill",
     "prompt": "skill",
@@ -70,6 +75,211 @@ DEFAULT_MAX_NODES = 20
 DEFAULT_MAX_DEPTH = 3
 
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+_BULLET_RE = re.compile(r"^\s*(?:[-*•]|\d+[.)])\s+")
+_HEADER_CHILDREN_RE = re.compile(
+    r"^(?P<head>[^:\n]{1,80}?)\s*:\s*(?P<body>.+)$"
+)
+_CREDITS_DASH_RE = re.compile(
+    r"^(?P<role>[A-Za-z][A-Za-z0-9 /&+.-]{0,60}?)\s*[-–—]\s*(?P<who>.+)$"
+)
+# stopwords when splitting free prose (not used as standalone nodes)
+_STOP = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "of",
+        "for",
+        "to",
+        "in",
+        "on",
+        "with",
+        "by",
+        "from",
+        "as",
+        "is",
+        "are",
+        "be",
+        "this",
+        "that",
+        "these",
+        "those",
+        "its",
+        "into",
+        "via",
+        "at",
+        "our",
+        "we",
+        "their",
+        "mode",
+        "org",
+        "credits",
+        "genre",
+        "tool",
+        "surface",
+        "target",
+        "deconstruct",
+        "small",
+        "large",
+        "new",
+        "old",
+    }
+)
+
+# (regex, class) — first match wins. Applied to lowercased name.
+_CLASS_RULES: list[tuple[re.Pattern[str], str]] = [
+    (
+        re.compile(
+            r"\b("
+            r"legal|counsel|compliance|liability|attorney|judge|signer|approver|"
+            r"director|ceo|cfo|cto|owner|founder|partner|principal|"
+            r"physician|doctor|surgeon|anesthesiologist|attending|radiologist|"
+            r"nurse.?manager|charge.?nurse|"
+            r"composer|musician|conductor|"
+            r"art.?direction|creative.?director|taste|brand.?guard|"
+            r"on[- ]?call|incident.?commander|"
+            r"acceptance|sign[- ]?off|executive"
+            r")\b"
+        ),
+        "human",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"animation|animator|rigging|rendering|renderer|shader|vfx|"
+            r"blender|maya|cinema.?4d|unreal|unity.?editor|"
+            r"3d|complex.?surface|full.?api|plugin.?host"
+            r")\b"
+        ),
+        "mcp_complex",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"cli|api|sdk|export|import|build|ci|cd|git|docker|"
+            r"tooling|tool|plugin|mcp|linter|formatter|"
+            r"sprite|pixel|texture.?export|audio.?tool|"
+            r"mri|scanner|device.?driver|instrument"
+            r")\b"
+        ),
+        "mcp_simple",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"engine|platform|framework|factory|product.?line|"
+            r"content.?pipeline|level.?pipeline|data.?platform"
+            r")\b"
+        ),
+        "factory",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"review|reviewer|critique|critic|design(?:er)?|"
+            r"judgment|eval(?:uator)?|triage.?decision|"
+            r"mechanics|balance|narrative.?design"
+            r")\b"
+        ),
+        "prompt",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"research|survey|study|history|literature|market.?scan|"
+            r"difficulty.?ladder|era|genre.?study|docs.?crawl|help.?docs"
+            r")\b"
+        ),
+        "research",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"department|division|unit|org|organization|studio|clinic|"
+            r"hospital|ward|series|pipeline.?chain|multi[- ]step"
+            r")\b"
+        ),
+        "process_series",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"deploy|ops|operations|process|workflow|roadmap|schedule|"
+            r"billing|collections|intake|admission|discharge|"
+            r"localization|producer|production|coordination|"
+            r"core.?loop|controls|levels|enemies|audio.?mix"
+            r")\b"
+        ),
+        "process",
+    ),
+    (
+        re.compile(
+            r"\b("
+            r"checklist|skill|implement(?:er)?|program(?:mer)?|"
+            r"developer|engineer|coding|coder|"
+            r"test(?:er|ing)?|qa|playtest|"
+            r"triage|scribe|technician|tech\b|"
+            r"nurse|cna|phlebotomy|"
+            r"pixel.?artist|artist"
+            r")\b"
+        ),
+        "skill",
+    ),
+]
+
+# Mode default when no keyword matches
+_MODE_LEAF_DEFAULT = {
+    "org": "skill",
+    "credits": "skill",
+    "tool_surface": "mcp_simple",
+    "genre": "process",
+    "open": "research",
+}
+_MODE_GROUP_DEFAULT = {
+    "org": "process_series",
+    "credits": "process_series",
+    "tool_surface": "mcp_complex",
+    "genre": "process_series",
+    "open": "process_series",
+}
+
+_STRUCTURE_HINTS = {
+    "org": (
+        "Pass structured org text, e.g.:\n"
+        "  Emergency\n"
+        "    - triage nurse\n"
+        "    - attending physician\n"
+        "  Radiology: MRI tech, radiologist\n"
+        "  Billing: coder, collections"
+    ),
+    "credits": (
+        "Pass a credits role list, e.g.:\n"
+        "  Director - Alice\n"
+        "  Programmer - Bob\n"
+        "  Composer\n"
+        "  Tester"
+    ),
+    "tool_surface": (
+        "Pass tool clusters or commands, e.g.:\n"
+        "  Core IO: open, save, export\n"
+        "  Animation: keyframe, bake, retarget\n"
+        "  Scripting"
+    ),
+    "genre": (
+        "Pass genre systems, e.g.:\n"
+        "  core loop\n"
+        "  controls\n"
+        "  levels\n"
+        "  enemies\n"
+        "  difficulty ladder v1"
+    ),
+    "open": (
+        "Pass any structured list of parts to classify, or re-run with "
+        "mode=org|credits|tool_surface|genre and a structured target."
+    ),
+}
 
 __all__ = [
     "SCHEMA",
@@ -80,7 +290,10 @@ __all__ = [
     "DEFAULT_MAX_NODES",
     "DEFAULT_MAX_DEPTH",
     "slugify_target",
+    "classify_name",
+    "parse_structure",
     "seed_candidates",
+    "deconstruct_target",
     "build_deconstruct",
     "critique_deconstruct",
     "save_deconstruct",
@@ -135,242 +348,510 @@ def _cand(
     }
 
 
-def seed_candidates(mode: str, target: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    """Return (candidates, departments) skeleton for a mode.
+def classify_name(
+    name: str,
+    *,
+    mode: str = "open",
+    has_children: bool = False,
+    depth: int = 0,
+) -> str:
+    """Heuristic replacement class from the item's own words + mode bias."""
+    m = (mode or "open").strip().lower()
+    if m not in MODES:
+        m = "open"
+    text = (name or "").strip().lower()
+    if not text:
+        return "research"
 
-    Deterministic seeds for fixture eval — not LLM invention. Agents may
-    replace/expand via from_candidates / from-json.
+    for pat, cls in _CLASS_RULES:
+        if pat.search(text):
+            return cls
+
+    if has_children or (depth == 0 and m in ("org", "tool_surface", "genre")):
+        return _MODE_GROUP_DEFAULT.get(m, "process_series")
+    return _MODE_LEAF_DEFAULT.get(m, "research")
+
+
+def _indent_level(line: str) -> int:
+    """Count indent in spaces (tabs → 4)."""
+    n = 0
+    for ch in line:
+        if ch == " ":
+            n += 1
+        elif ch == "\t":
+            n += 4
+        else:
+            break
+    return n
+
+
+def _clean_item(s: str) -> str:
+    s = (s or "").strip()
+    s = _BULLET_RE.sub("", s).strip()
+    s = s.strip(" \t-–—:;,")
+    # drop trailing parenthetical person counts etc.
+    s = re.sub(r"\s+\(\d+\)$", "", s).strip()
+    return s
+
+
+def _split_children(body: str) -> list[str]:
+    """Split 'a, b; c / d | e' into items."""
+    parts = re.split(r"[,;/|]+", body)
+    out: list[str] = []
+    for p in parts:
+        item = _clean_item(p)
+        if item and item.lower() not in _STOP and len(item) > 1:
+            out.append(item)
+    return out
+
+
+def _looks_structured(lines: list[str]) -> bool:
+    if len(lines) <= 1:
+        s = lines[0].strip() if lines else ""
+        if _BULLET_RE.match(s):
+            return True
+        hm = _HEADER_CHILDREN_RE.match(s)
+        if hm and _split_children(hm.group("body")):
+            return True
+        if re.search(r"[,;/|]", s):
+            return len(_split_children(s)) >= 2
+        return False
+    for ln in lines:
+        s = ln.strip()
+        if not s:
+            continue
+        if _BULLET_RE.match(s) or _BULLET_RE.match(ln):
+            return True
+        hm = _HEADER_CHILDREN_RE.match(s)
+        if hm and _split_children(hm.group("body")):
+            return True
+        if _CREDITS_DASH_RE.match(s):
+            return True
+    # multiple non-empty plain lines count as a list
+    nonempty = [ln.strip() for ln in lines if ln.strip()]
+    return len(nonempty) >= 2
+
+
+def parse_structure(text: str) -> list[dict[str, Any]]:
+    """Parse hierarchical / list structure from target text.
+
+    Returns ordered nodes: {name, depth, parent_name, source}.
+    parent_name is the nearest enclosing group name (not id).
     """
+    raw = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    if not raw:
+        return []
+
+    lines = raw.split("\n")
+    nodes: list[dict[str, Any]] = []
+
+    # Single-line CSV / list before hierarchical path (avoids one blob node)
+    if len([ln for ln in lines if ln.strip()]) == 1 and re.search(r"[,;/|]", raw):
+        items = _split_children(raw)
+        if len(items) >= 2:
+            for it in items:
+                nodes.append(
+                    {"name": it, "depth": 0, "parent_name": None, "source": "csv"}
+                )
+            return _dedupe_nodes(nodes)
+
+    if _looks_structured(lines):
+        # Optional title line: plain first line, rest structured → root group
+        nonempty_idx = [i for i, ln in enumerate(lines) if ln.strip()]
+        title_root: str | None = None
+        start_i = 0
+        if len(nonempty_idx) >= 2:
+            first_i = nonempty_idx[0]
+            first = lines[first_i].strip()
+            rest = [lines[i].strip() for i in nonempty_idx[1:]]
+            first_is_plain = (
+                not _BULLET_RE.match(first)
+                and not _CREDITS_DASH_RE.match(first)
+                and not (
+                    _HEADER_CHILDREN_RE.match(first)
+                    and _split_children(_HEADER_CHILDREN_RE.match(first).group("body"))  # type: ignore[union-attr]
+                )
+            )
+            rest_structured = any(
+                _BULLET_RE.match(r)
+                or _CREDITS_DASH_RE.match(r)
+                or (
+                    _HEADER_CHILDREN_RE.match(r)
+                    and _split_children(_HEADER_CHILDREN_RE.match(r).group("body"))  # type: ignore[union-attr]
+                )
+                or _indent_level(lines[nonempty_idx[j + 1]]) > 0
+                for j, r in enumerate(rest)
+            )
+            if first_is_plain and rest_structured:
+                title_root = _clean_item(first.rstrip(":"))
+                start_i = first_i + 1
+                if title_root:
+                    nodes.append(
+                        {
+                            "name": title_root,
+                            "depth": 0,
+                            "parent_name": None,
+                            "source": "title_root",
+                        }
+                    )
+
+        # Stack of (indent_level, name); seed with title root at -1 indent
+        stack: list[tuple[int, str]] = []
+        if title_root:
+            stack.append((-1, title_root))
+
+        for ln in lines[start_i:]:
+            if not ln.strip():
+                continue
+            # Effective indent: bullets at column 0 still nest under title_root
+            raw_indent = _indent_level(ln)
+            content = ln.strip()
+            has_bullet = bool(_BULLET_RE.match(content))
+            # Treat bullet markers as +2 indent so nesting under title works
+            indent = raw_indent + (2 if has_bullet else 0)
+            if title_root and raw_indent == 0 and has_bullet:
+                indent = 2
+
+            # Credits: Role - Person
+            cm = _CREDITS_DASH_RE.match(content)
+            if cm and not content.rstrip().endswith(":"):
+                role = _clean_item(cm.group("role"))
+                who = _clean_item(cm.group("who"))
+                # strip bullet from role if present
+                role = _BULLET_RE.sub("", role).strip() if role else role
+                role = _clean_item(role)
+                if role:
+                    while stack and stack[-1][0] >= indent:
+                        stack.pop()
+                    parent = stack[-1][1] if stack else None
+                    depth = len(stack)
+                    nodes.append(
+                        {
+                            "name": role,
+                            "depth": depth,
+                            "parent_name": parent,
+                            "source": "credits_dash",
+                            "secondary_use": who,
+                        }
+                    )
+                    continue
+
+            # Header: child, child  (may be bulleted)
+            content_nb = _BULLET_RE.sub("", content).strip()
+            hm = _HEADER_CHILDREN_RE.match(content_nb)
+            if hm and _split_children(hm.group("body")):
+                head = _clean_item(hm.group("head"))
+                kids = _split_children(hm.group("body"))
+                if head:
+                    while stack and stack[-1][0] >= indent:
+                        stack.pop()
+                    parent = stack[-1][1] if stack else None
+                    depth = len(stack)
+                    nodes.append(
+                        {
+                            "name": head,
+                            "depth": depth,
+                            "parent_name": parent,
+                            "source": "header",
+                        }
+                    )
+                    stack.append((indent, head))
+                    for kid in kids:
+                        nodes.append(
+                            {
+                                "name": kid,
+                                "depth": depth + 1,
+                                "parent_name": head,
+                                "source": "header_child",
+                            }
+                        )
+                continue
+
+            # Bullet / plain line
+            item = _clean_item(content_nb if has_bullet else content)
+            if item.endswith(":"):
+                item = item[:-1].strip()
+            if not item:
+                continue
+
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            parent = stack[-1][1] if stack else None
+            depth = len(stack)
+            nodes.append(
+                {
+                    "name": item,
+                    "depth": depth,
+                    "parent_name": parent,
+                    "source": "line",
+                }
+            )
+            stack.append((indent, item))
+
+        if nodes:
+            return _dedupe_nodes(nodes)
+
+    # Single-line list separators
+    if re.search(r"[,;/|]", raw) and "\n" not in raw:
+        items = _split_children(raw)
+        for it in items:
+            nodes.append(
+                {"name": it, "depth": 0, "parent_name": None, "source": "csv"}
+            )
+        if len(nodes) >= 2:
+            return _dedupe_nodes(nodes)
+
+    nodes = _extract_from_prose(raw)
+    return _dedupe_nodes(nodes)
+
+
+def _extract_from_prose(text: str) -> list[dict[str, Any]]:
+    """Pull candidate parts from free prose without inventing a domain template."""
+    nodes: list[dict[str, Any]] = []
+    lower = text.lower()
+
+    # Cue phrases: "departments include X, Y and Z"
+    cue = re.search(
+        r"\b(?:departments?|roles?|teams?|units?|sections?|includes?|with|"
+        r"comprising|composed of|systems?|tools?|features?|credits?)\b"
+        r"\s*(?:include|includes|are|:)?\s*(.+)$",
+        text,
+        re.I | re.S,
+    )
+    if cue:
+        tail = cue.group(1)
+        # split on commas / and
+        parts = re.split(r",|\band\b|&", tail, flags=re.I)
+        for p in parts:
+            item = _clean_item(p)
+            item = re.sub(r"[.!?].*$", "", item).strip()
+            if item and len(item) > 1 and item.lower() not in _STOP:
+                # drop trailing junk words
+                if len(item.split()) <= 6:
+                    nodes.append(
+                        {
+                            "name": item,
+                            "depth": 0,
+                            "parent_name": None,
+                            "source": "prose_cue",
+                        }
+                    )
+        if len(nodes) >= 2:
+            return nodes
+
+    # Capitalized multi-word phrases (Title Case runs)
+    for m in re.finditer(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\b", text):
+        item = m.group(1).strip()
+        if item.lower() in _STOP or len(item) < 3:
+            continue
+        nodes.append(
+            {
+                "name": item,
+                "depth": 0,
+                "parent_name": None,
+                "source": "title_case",
+            }
+        )
+    if len(nodes) >= 2:
+        return nodes
+
+    # Last resort: significant tokens from the whole string (no template)
+    # Only if many tokens — still better than fake studio
+    tokens = [
+        t
+        for t in re.split(r"[^A-Za-z0-9+]+", text)
+        if len(t) > 2 and t.lower() not in _STOP
+    ]
+    # If the whole target is just a short title (1–4 tokens), no structure
+    if len(tokens) <= 4:
+        return []
+
+    for t in tokens[: DEFAULT_MAX_NODES - 1]:
+        nodes.append(
+            {
+                "name": t,
+                "depth": 0,
+                "parent_name": None,
+                "source": "token",
+            }
+        )
+    return nodes
+
+
+def _dedupe_nodes(nodes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    seen: set[str] = set()
+    out: list[dict[str, Any]] = []
+    for n in nodes:
+        key = f"{n.get('parent_name') or ''}::{(n.get('name') or '').lower()}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
+    return out
+
+
+def _needs_structure_doc(
+    mode: str, target: str, slug: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Bare title — do not invent a domain template."""
+    m = mode if mode in MODES else "open"
+    hint = _STRUCTURE_HINTS.get(m, _STRUCTURE_HINTS["open"])
+    cands = [
+        _cand(
+            f"{slug}_needs_structure",
+            f"Needs structure: {target.strip()[:80]}",
+            "research",
+            depth=0,
+            primary_use="Provide structured parts to deconstruct",
+            oracle_hint="human supplies structured target or from-json inventory",
+            notes=(
+                "No inventable structure in target. "
+                "Deconstructor does not stamp a fixed org template. "
+                f"Hint:\n{hint}"
+            ),
+        )
+    ]
+    meta = {
+        "needs_structure": True,
+        "structure_hint": hint,
+        "parse_source": "none",
+        "parsed_count": 0,
+    }
+    return cands, [], meta
+
+
+def deconstruct_target(
+    target: str,
+    *,
+    mode: str = "open",
+    max_nodes: int = DEFAULT_MAX_NODES,
+    max_depth: int = DEFAULT_MAX_DEPTH,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    """Parse target → classify → candidates. No fixed domain template."""
     m = (mode or "open").strip().lower()
     if m not in MODES:
         raise ValueError(f"mode must be one of {sorted(MODES)}")
-    t = (target or "").strip() or "untitled target"
-    slug = slugify_target(t)
+    t = (target or "").strip()
+    if not t:
+        raise ValueError("target is required")
+
+    slug = slugify_target(t.split("\n")[0], max_len=40)
+    parsed = parse_structure(t)
+
+    if not parsed:
+        return _needs_structure_doc(m, t, slug)
+
+    # Cap before building (prefer shallower nodes first)
+    if len(parsed) > max_nodes:
+        parsed = parsed[:max_nodes]
+
+    # Determine which names have children
+    children_of: set[str] = set()
+    for n in parsed:
+        p = n.get("parent_name")
+        if p:
+            children_of.add(str(p).lower())
+
+    # Map name@depth path → id for parent linking
+    # Use unique ids even if names repeat under different parents
+    name_to_ids: dict[str, str] = {}  # lower name of last occurrence at path
+    id_by_key: dict[str, str] = {}
     candidates: list[dict[str, Any]] = []
     departments: list[dict[str, Any]] = []
 
-    if m == "open":
-        candidates.append(
-            _cand(
-                f"{slug}_root",
-                t,
-                "research",
-                depth=0,
-                primary_use="classify then re-deconstruct with a named mode",
-                oracle_hint="human review of class choice",
-                notes="open mode: pick org|credits|tool_surface|genre for better seeds",
-            )
-        )
-        return candidates, departments
+    # Root context node (the whole target title) when first line is a title
+    # and children exist under depth 0 items — optional. Skip extra root to
+    # keep node budget for real parts.
 
-    if m == "org":
-        dept_specs = [
-            ("engineering", "mcp_simple", "Build and ship product code"),
-            ("product", "process", "Prioritize and specify outcomes"),
-            ("ops", "process_series", "Run deploy / support / metrics"),
-            ("qc", "human", "Legal/QA gates and liability"),
-            ("art", "mcp_complex", "Visual production surface"),
-        ]
-        for dname, dclass, duse in dept_specs:
-            did = f"{slug}_dept_{dname}"
+    used_ids: set[str] = set()
+
+    def _unique_id(base: str) -> str:
+        bid = slugify_target(base, max_len=40) or "item"
+        if bid not in used_ids:
+            used_ids.add(bid)
+            return bid
+        i = 2
+        while f"{bid}_{i}" in used_ids:
+            i += 1
+        uid = f"{bid}_{i}"
+        used_ids.add(uid)
+        return uid
+
+    sources: set[str] = set()
+    for n in parsed:
+        name = str(n.get("name") or "").strip()
+        if not name:
+            continue
+        depth = min(int(n.get("depth") or 0), max_depth)
+        parent_name = n.get("parent_name")
+        has_kids = name.lower() in children_of
+        rc = classify_name(name, mode=m, has_children=has_kids, depth=depth)
+        # Force depth clamp: if parent would exceed max_depth, promote parent_id null? keep parent if exists
+        if depth > max_depth:
+            depth = max_depth
+
+        parent_id = None
+        if parent_name:
+            # find most recent id for that parent name
+            parent_id = name_to_ids.get(str(parent_name).lower())
+
+        cid = _unique_id(f"{slug}_{name}")
+        key = f"{parent_id or ''}::{name.lower()}"
+        id_by_key[key] = cid
+        name_to_ids[name.lower()] = cid
+
+        dept = None
+        if parent_name and depth >= 1:
+            dept = str(parent_name)
+        elif has_kids or depth == 0:
+            dept = name
+
+        secondary = str(n.get("secondary_use") or "")
+        sources.add(str(n.get("source") or "parsed"))
+
+        cand = _cand(
+            cid,
+            name,
+            rc,
+            parent_id=parent_id,
+            depth=depth,
+            department=dept,
+            primary_use=f"{m}: {name}",
+            secondary_use=secondary,
+            oracle_hint=f"acceptance check for '{name}'",
+            notes=f"parsed via {n.get('source')}",
+        )
+        candidates.append(cand)
+
+        if has_kids or (depth == 0 and m == "org"):
             departments.append(
                 {
-                    "id": did,
-                    "name": dname,
-                    "replacement_class": dclass,
-                    "primary_use": duse,
-                    "oracle_hint": f"department outcome check for {dname}",
+                    "id": cid,
+                    "name": name,
+                    "replacement_class": rc,
+                    "primary_use": cand["primary_use"],
+                    "oracle_hint": cand["oracle_hint"],
                 }
             )
-            candidates.append(
-                _cand(
-                    did,
-                    f"{dname} (department)",
-                    dclass,
-                    depth=0,
-                    department=dname,
-                    primary_use=duse,
-                )
-            )
-            # one level of roles / processes under each department
-            if dname == "engineering":
-                roles = [
-                    ("implementer", "skill", "Execute plan tasks"),
-                    ("reviewer", "prompt", "Code review judgment"),
-                    ("ci", "mcp_simple", "Test/build tooling"),
-                ]
-            elif dname == "product":
-                roles = [
-                    ("roadmap", "process", "Order work by value"),
-                    ("acceptance", "human", "Accept done criteria"),
-                ]
-            elif dname == "ops":
-                roles = [
-                    ("deploy", "process", "Ship releases"),
-                    ("oncall", "human", "Incident judgment"),
-                ]
-            elif dname == "qc":
-                roles = [
-                    ("legal_review", "human", "Liability gate"),
-                    ("qa_checklist", "skill", "Repeatable QA steps"),
-                ]
-            else:  # art
-                roles = [
-                    ("animation", "mcp_complex", "Animation tool cluster — further deconstruct"),
-                    ("sprites", "mcp_simple", "2D asset export"),
-                    ("art_direction", "human", "Taste / brand judgment"),
-                ]
-            for rname, rclass, ruse in roles:
-                candidates.append(
-                    _cand(
-                        f"{slug}_{dname}_{rname}",
-                        rname,
-                        rclass,
-                        parent_id=did,
-                        depth=1,
-                        department=dname,
-                        primary_use=ruse,
-                    )
-                )
-        return candidates, departments
 
-    if m == "credits":
-        # Typical small game / product credits → replacement classes
-        credit_roles = [
-            ("director", "human", "Vision and liability"),
-            ("producer", "process", "Schedule and coordination"),
-            ("programmer", "skill", "Implement systems"),
-            ("designer", "prompt", "Mechanics judgment"),
-            ("pixel_artist", "mcp_simple", "2D art production tools"),
-            ("composer", "human", "Music taste / rights"),
-            ("tester", "skill", "Playtest checklist"),
-            ("localization", "process", "String pipeline"),
-        ]
-        root = f"{slug}_credits"
-        departments.append(
-            {
-                "id": root,
-                "name": "credits",
-                "replacement_class": "process_series",
-                "primary_use": f"Credit roles for: {t}",
-                "oracle_hint": "each role has class + oracle_hint",
-            }
-        )
-        candidates.append(
-            _cand(
-                root,
-                f"Credits: {t}",
-                "process_series",
-                depth=0,
-                department="credits",
-                primary_use="inventory of credit roles",
-            )
-        )
-        for rname, rclass, ruse in credit_roles:
-            candidates.append(
-                _cand(
-                    f"{slug}_{rname}",
-                    rname.replace("_", " "),
-                    rclass,
-                    parent_id=root,
-                    depth=1,
-                    department="credits",
-                    primary_use=ruse,
-                )
-            )
-        return candidates, departments
+    if not candidates:
+        return _needs_structure_doc(m, t, slug)
 
-    if m == "tool_surface":
-        root = f"{slug}_surface"
-        clusters = [
-            ("core_io", "mcp_simple", "Open/save/export entrypoints"),
-            ("selection", "mcp_simple", "Select / transform primitives"),
-            ("animation", "mcp_complex", "Animation tool cluster — further deconstruct"),
-            ("rendering", "mcp_complex", "Render pipeline — cluster before wrap"),
-            ("scripting", "factory", "Extension/scripting may need own factory"),
-            ("help_docs", "research", "Docs crawl for elicit inventory"),
-        ]
-        departments.append(
-            {
-                "id": root,
-                "name": "tool_surface",
-                "replacement_class": "mcp_complex",
-                "primary_use": f"Tool surface for: {t}",
-                "oracle_hint": "cluster smoke, not 100 flat tools",
-            }
-        )
-        candidates.append(
-            _cand(
-                root,
-                f"Tool surface: {t}",
-                "mcp_complex",
-                depth=0,
-                department="tool_surface",
-                primary_use="cluster tools before MCP wrap",
-                notes="Do not dump full API into one graph node",
-            )
-        )
-        for cname, cclass, cuse in clusters:
-            candidates.append(
-                _cand(
-                    f"{slug}_{cname}",
-                    cname.replace("_", " "),
-                    cclass,
-                    parent_id=root,
-                    depth=1,
-                    department="tool_surface",
-                    primary_use=cuse,
-                )
-            )
-        return candidates, departments
+    meta = {
+        "needs_structure": False,
+        "parse_source": ",".join(sorted(sources)) if sources else "parsed",
+        "parsed_count": len(candidates),
+        "structure_hint": None,
+    }
+    return candidates, departments, meta
 
-    if m == "genre":
-        root = f"{slug}_genre"
-        layers = [
-            ("core_loop", "process", "Primary player loop"),
-            ("controls", "skill", "Input / feel checklist"),
-            ("levels", "factory", "Level content pipeline"),
-            ("enemies", "skill", "Encounter patterns"),
-            ("audio", "mcp_simple", "SFX/music tooling"),
-            ("difficulty_v1", "research", "Easiest era / ladder step v1"),
-            ("difficulty_v2", "research", "Next ladder step after v1 proven"),
-            ("qc_playtest", "human", "Fun / fairness judgment"),
-        ]
-        departments.append(
-            {
-                "id": root,
-                "name": "genre",
-                "replacement_class": "process_series",
-                "primary_use": f"Genre systems for: {t}",
-                "oracle_hint": "playable vertical slice oracle per ladder step",
-            }
-        )
-        candidates.append(
-            _cand(
-                root,
-                f"Genre: {t}",
-                "process_series",
-                depth=0,
-                department="genre",
-                primary_use="genre systems inventory",
-                notes="Hard super-goals are chains; not one deconstruct call",
-            )
-        )
-        for lname, lclass, luse in layers:
-            candidates.append(
-                _cand(
-                    f"{slug}_{lname}",
-                    lname.replace("_", " "),
-                    lclass,
-                    parent_id=root,
-                    depth=1,
-                    department="genre",
-                    primary_use=luse,
-                )
-            )
-        return candidates, departments
 
-    return candidates, departments
+def seed_candidates(
+    mode: str, target: str
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Backward-compatible: deconstruct target (no fixed templates)."""
+    cands, depts, _meta = deconstruct_target(target, mode=mode)
+    return cands, depts
 
 
 def _normalize_candidate(raw: dict[str, Any], *, index: int) -> dict[str, Any]:
@@ -378,10 +859,9 @@ def _normalize_candidate(raw: dict[str, Any], *, index: int) -> dict[str, Any]:
         raise ValueError(f"candidate[{index}] must be an object")
     name = str(raw.get("name") or raw.get("id") or f"candidate_{index}").strip()
     cid = str(raw.get("id") or slugify_target(name) or f"c{index}").strip()
-    rc = str(raw.get("replacement_class") or raw.get("class") or "research").strip().lower()
-    if rc not in REPLACEMENT_CLASSES:
-        # keep invalid for critique to flag; still store normalized attempt
-        pass
+    rc = str(raw.get("replacement_class") or raw.get("class") or "").strip().lower()
+    if not rc:
+        rc = classify_name(name, mode="open")
     depth = int(raw.get("depth") or 0)
     parent = raw.get("parent_id")
     parent_id = str(parent).strip() if parent not in (None, "") else None
@@ -399,7 +879,7 @@ def _normalize_candidate(raw: dict[str, Any], *, index: int) -> dict[str, Any]:
     )
     if rc not in REPLACEMENT_CLASSES:
         out["replacement_class_raw"] = rc
-        out["replacement_class"] = rc  # preserve for critique fail
+        out["replacement_class"] = rc
         out["graph_kind_hint"] = "research"
         out["next_action"] = "fix class to closed enum"
     return out
@@ -433,6 +913,14 @@ def critique_deconstruct(
             {
                 "code": "size_budget",
                 "detail": f"{len(cands)} candidates > max_nodes={max_nodes}; split or nest",
+            }
+        )
+
+    if doc.get("needs_structure"):
+        warnings.append(
+            {
+                "code": "needs_structure",
+                "detail": "Target had no parseable parts; supply structured list or from-json",
             }
         )
 
@@ -472,7 +960,6 @@ def critique_deconstruct(
             warnings.append({"code": "oracle_hint", "detail": f"{cid or i}: empty oracle_hint"})
 
         if rc in ("mcp_complex", "factory") and depth < max_depth:
-            # encourage further deconstruct
             has_child = any(
                 isinstance(x, dict) and str(x.get("parent_id") or "") == cid for x in cands
             )
@@ -484,11 +971,6 @@ def critique_deconstruct(
                     }
                 )
 
-        if rc == "human":
-            # good — force awareness
-            pass
-
-    # parent references
     for c in cands:
         if not isinstance(c, dict):
             continue
@@ -517,6 +999,7 @@ def critique_deconstruct(
         "candidate_count": len(cands),
         "max_nodes": max_nodes,
         "max_depth": max_depth,
+        "needs_structure": bool(doc.get("needs_structure")),
     }
 
 
@@ -531,7 +1014,7 @@ def build_deconstruct(
     deconstruct_id: str | None = None,
     notes: str = "",
 ) -> dict[str, Any]:
-    """Build a deconstruct.v0 document (seed or supplied candidates)."""
+    """Build a deconstruct.v0 document by parsing target (or supplied candidates)."""
     m = (mode or "open").strip().lower()
     if m not in MODES:
         raise ValueError(f"mode must be one of {sorted(MODES)}")
@@ -539,17 +1022,32 @@ def build_deconstruct(
     if not t:
         raise ValueError("target is required")
 
+    meta: dict[str, Any] = {}
     if candidates is None:
-        cands, depts = seed_candidates(m, t)
+        cands, depts, meta = deconstruct_target(
+            t, mode=m, max_nodes=max_nodes, max_depth=max_depth
+        )
     else:
         cands = [_normalize_candidate(c, index=i) for i, c in enumerate(candidates)]
         depts = list(departments or [])
+        meta = {"needs_structure": False, "parse_source": "supplied", "parsed_count": len(cands)}
 
     if departments is not None and candidates is not None:
         depts = list(departments)
 
-    did = (deconstruct_id or f"{m}_{slugify_target(t)}").strip()
+    title = t.split("\n")[0].strip()
+    did = (deconstruct_id or f"{m}_{slugify_target(title)}").strip()
     did = slugify_target(did, max_len=64)
+
+    default_notes = (
+        "Proposal only — critique then fill classes; do not treat as graph.v1. "
+        "Candidates come from parsing the target, not a fixed domain template."
+    )
+    if meta.get("needs_structure"):
+        default_notes = (
+            "Target lacked parseable structure. Provide hierarchical lists, "
+            "'Dept: a, b' lines, or use from-json. " + default_notes
+        )
 
     doc: dict[str, Any] = {
         "schema": SCHEMA,
@@ -562,15 +1060,20 @@ def build_deconstruct(
         "max_depth": max_depth,
         "production_graph": False,
         "status": "candidate",
-        "notes": notes
-        or "Proposal only — critique then fill classes; do not treat as graph.v1",
+        "notes": notes or default_notes,
+        "needs_structure": bool(meta.get("needs_structure")),
+        "parse_source": meta.get("parse_source"),
+        "structure_hint": meta.get("structure_hint"),
         "departments": depts,
         "candidates": cands,
         "critique": {},
     }
     crit = critique_deconstruct(doc, max_nodes=max_nodes, max_depth=max_depth)
     doc["critique"] = crit
-    doc["status"] = "candidate_ok" if crit.get("ok") else "candidate_blocked"
+    if meta.get("needs_structure"):
+        doc["status"] = "needs_structure"
+    else:
+        doc["status"] = "candidate_ok" if crit.get("ok") else "candidate_blocked"
     return doc
 
 
@@ -613,14 +1116,16 @@ def save_deconstruct(doc: dict[str, Any]) -> Path:
         raise ValueError("doc.id required")
     doc = dict(doc)
     doc["updated_at"] = _iso()
-    # re-critique on save
     crit = critique_deconstruct(
         doc,
         max_nodes=int(doc.get("max_nodes") or DEFAULT_MAX_NODES),
         max_depth=int(doc.get("max_depth") or DEFAULT_MAX_DEPTH),
     )
     doc["critique"] = crit
-    doc["status"] = "candidate_ok" if crit.get("ok") else "candidate_blocked"
+    if doc.get("needs_structure"):
+        doc["status"] = "needs_structure"
+    else:
+        doc["status"] = "candidate_ok" if crit.get("ok") else "candidate_blocked"
     path = deconstruct_path(did)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -630,7 +1135,6 @@ def save_deconstruct(doc: dict[str, Any]) -> Path:
 def load_deconstruct(deconstruct_id: str) -> dict[str, Any] | None:
     path = deconstruct_path(deconstruct_id)
     if not path.is_file():
-        # try raw filename
         alt = deconstructs_dir() / f"{deconstruct_id}.json"
         if alt.is_file():
             path = alt
@@ -659,8 +1163,9 @@ def list_deconstructs() -> list[dict[str, Any]]:
             {
                 "id": data.get("id"),
                 "mode": data.get("mode"),
-                "target": data.get("target"),
+                "target": (str(data.get("target") or "")[:80]),
                 "status": data.get("status"),
+                "needs_structure": data.get("needs_structure"),
                 "candidate_count": len(data.get("candidates") or []),
                 "critique_ok": (data.get("critique") or {}).get("ok"),
                 "path": str(path),
@@ -677,6 +1182,9 @@ def plan_fill_actions(doc: dict[str, Any]) -> dict[str, Any]:
     for c in cands:
         if not isinstance(c, dict):
             continue
+        # skip pure needs_structure placeholder from fill priority noise
+        if "needs structure" in str(c.get("name") or "").lower():
+            continue
         rc = str(c.get("replacement_class") or "research")
         by_class[rc] = by_class.get(rc, 0) + 1
         actions.append(
@@ -690,7 +1198,6 @@ def plan_fill_actions(doc: dict[str, Any]) -> dict[str, Any]:
                 "oracle_hint": c.get("oracle_hint"),
             }
         )
-    # Prefer fill order: human/research last; skills/mcp_simple first
     priority = {
         "skill": 0,
         "prompt": 1,
@@ -703,16 +1210,20 @@ def plan_fill_actions(doc: dict[str, Any]) -> dict[str, Any]:
         "research": 8,
         "human": 9,
     }
-    actions.sort(key=lambda a: (priority.get(str(a.get("replacement_class")), 50), str(a.get("name"))))
+    actions.sort(
+        key=lambda a: (priority.get(str(a.get("replacement_class")), 50), str(a.get("name")))
+    )
     return {
         "deconstruct_id": doc.get("id"),
         "target": doc.get("target"),
         "mode": doc.get("mode"),
         "production_graph": False,
+        "needs_structure": bool(doc.get("needs_structure")),
         "by_class": by_class,
         "actions": actions,
         "notes": (
             "Do not auto-attach. Skills/prompts need register→sandbox→promote. "
-            "mcp_complex needs further deconstruct or external MCP first."
+            "mcp_complex needs further deconstruct or external MCP first. "
+            "If needs_structure, re-run with structured target text."
         ),
     }

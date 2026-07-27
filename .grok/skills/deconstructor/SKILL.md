@@ -40,25 +40,55 @@ Pair with: `notes/lmao-agi-discuss.md`, `notes/agi-lmaooo2.md`.
 | research | Hermes / knowledge |
 | process / process_series | connector / workflow later |
 
-## CLI (deterministic seeds + critique)
+## CLI (parse structure from target — no fixed templates)
+
+**Important:** A bare title like `"small indie game studio"` does **not** invent departments.
+Pass the actual parts to deconstruct (lists, hierarchy, credits lines).
 
 ```text
-python scripts/deconstructor.py build --mode org --target "small indie game studio"
-python scripts/deconstructor.py plan-fill --id org_small-indie-game-studio
+# Structured org (file recommended for multi-line)
+python scripts/deconstructor.py build --mode org --target-file hospital.txt
+python scripts/deconstructor.py build --mode org --target "Emergency: triage nurse, attending
+Radiology: MRI tech, radiologist"
+
+# Credits list
+python scripts/deconstructor.py build --mode credits --target "Director - A
+Programmer - B
+Tester - C"
+
+# Prose cue
+python scripts/deconstructor.py build --mode org --target "departments include emergency, radiology, and pharmacy"
+
+python scripts/deconstructor.py plan-fill --id <id>
 python scripts/deconstructor.py from-json --path my_inventory.json
 python scripts/deconstructor.py validate --id <id>
 python scripts/deconstructor.py list
 ```
 
+Exit codes: `0` ok, `1` critique fail, `2` needs_structure (bare title / unparseable).
+
 Store: `$PIPELINE_DIR/deconstructs/{id}.json` schema `deconstruct.v0`.
+
+## Accepted target shapes
+
+| Shape | Example |
+|-------|---------|
+| Hierarchy / bullets | `Hospital` then `- Emergency` / `  - triage nurse` |
+| Header: children | `Radiology: MRI tech, radiologist` |
+| Credits | `Director - Alice` |
+| CSV | `Director, Producer, Programmer` |
+| Prose cue | `departments include X, Y, and Z` |
+| Supplied JSON | `from-json` with full candidate objects |
 
 ## Agent workflow
 
 1. Clarify **what** is being deconstructed (not the universe).
-2. Pick **mode**; run `build` or draft candidates then `from-json`.
-3. Read `critique` — fix size budget (≤20 nodes default), closed classes, oracle_hint.
-4. Run `plan-fill` — fill **skill/prompt** via block_registry habit; **mcp_simple** via factory.
-5. Do **not** mark `production_graph: true`. Graph engineer / graph.v1 only after critique + block resolve + smoke.
+2. **Extract real parts** (roles, depts, tools) into structured text — do not rely on a canned template.
+3. Pick **mode**; run `build` / `--target-file` or `from-json`.
+4. If status `needs_structure`, the target was a bare title — add structure and re-run.
+5. Read `critique` — size budget (≤20), closed classes, oracle_hint.
+6. `plan-fill` → skill/prompt via register→sandbox→promote; mcp_simple via factory.
+7. Do **not** mark `production_graph: true`.
 
 ## Stop conditions
 

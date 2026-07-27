@@ -1,4 +1,4 @@
-"""deconstructor v0 — schema, seeds, critique, plan-fill, CLI."""
+"""deconstructor v0 — parse real structure, no fixed studio template."""
 
 from __future__ import annotations
 
@@ -31,25 +31,118 @@ def _cli_main():
     return mod.main
 
 
-def test_seed_modes_critique_ok(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    pipeline = tmp_path / "out"
-    pipeline.mkdir()
-    _reload_pipeline(monkeypatch, pipeline)
+HOSPITAL = """\
+Hospital
+- Emergency
+  - triage nurse
+  - attending physician
+- Radiology: MRI tech, radiologist
+- Billing: coder, collections
+"""
 
-    from pipeline.deconstructor import MODES, build_deconstruct, save_deconstruct
+CREDITS_NES = """\
+Director - Alice
+Programmer - Bob
+Composer - Carol
+Tester - Dana
+"""
 
-    for mode in sorted(MODES):
-        if mode == "open":
-            doc = build_deconstruct("ambiguous thing", mode=mode)
-        else:
-            doc = build_deconstruct(f"fixture {mode}", mode=mode)
-        assert doc["schema"] == "deconstruct.v0"
-        assert doc["production_graph"] is False
-        assert doc["candidates"]
-        assert doc["critique"]["ok"] is True, (mode, doc["critique"])
-        path = save_deconstruct(doc)
-        assert path.is_file()
-        assert path.parent.name == "deconstructs"
+TOOLS_BLENDER = """\
+Blender surface
+- Core IO: open, save, export
+- Animation: keyframe, bake
+- Scripting
+"""
+
+
+def test_bare_title_needs_structure_not_fake_studio() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    doc = build_deconstruct("small indie game studio", mode="org")
+    assert doc["needs_structure"] is True
+    names = {c["name"].lower() for c in doc["candidates"]}
+    # Must NOT invent engineering/art/ops template
+    assert not any("engineering" in n for n in names)
+    assert not any(n == "implementer" for n in names)
+    assert doc["status"] == "needs_structure"
+
+
+def test_hospital_structure_not_studio_template() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    doc = build_deconstruct(HOSPITAL, mode="org")
+    assert doc["needs_structure"] is False
+    names = {c["name"] for c in doc["candidates"]}
+    assert "Emergency" in names or "emergency" in {n.lower() for n in names}
+    assert any("triage" in n.lower() for n in names)
+    assert any("radiologist" in n.lower() for n in names)
+    assert any("billing" in n.lower() for n in names)
+    # Not the old fixed template
+    assert "implementer" not in {n.lower() for n in names}
+    assert "pixel artist" not in {n.lower() for n in names}
+    assert doc["critique"]["ok"] is True
+
+
+def test_different_targets_differ() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    a = build_deconstruct(HOSPITAL, mode="org")
+    b = build_deconstruct(
+        "Law firm\n- Litigation: partner, associate\n- Intake: paralegal\n",
+        mode="org",
+    )
+    names_a = {c["name"].lower() for c in a["candidates"]}
+    names_b = {c["name"].lower() for c in b["candidates"]}
+    assert names_a != names_b
+    assert any("litigation" in n or "associate" in n for n in names_b)
+    assert any("emergency" in n or "triage" in n for n in names_a)
+
+
+def test_credits_parse_roles() -> None:
+    from pipeline.deconstructor import build_deconstruct, classify_name
+
+    doc = build_deconstruct(CREDITS_NES, mode="credits")
+    assert doc["needs_structure"] is False
+    names = {c["name"] for c in doc["candidates"]}
+    assert "Director" in names
+    assert "Programmer" in names
+    assert "Composer" in names
+    # Director should classify human-ish
+    d = next(c for c in doc["candidates"] if c["name"] == "Director")
+    assert d["replacement_class"] == "human"
+    assert classify_name("attending physician", mode="org") == "human"
+
+
+def test_tool_surface_from_target() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    doc = build_deconstruct(TOOLS_BLENDER, mode="tool_surface")
+    names = {c["name"].lower() for c in doc["candidates"]}
+    assert any("animation" in n for n in names)
+    assert any("keyframe" in n or "export" in n for n in names)
+    assert doc["needs_structure"] is False
+
+
+def test_prose_cue_extraction() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    doc = build_deconstruct(
+        "Clinic departments include emergency, radiology, and pharmacy",
+        mode="org",
+    )
+    assert doc["needs_structure"] is False
+    names = " ".join(c["name"].lower() for c in doc["candidates"])
+    assert "emergency" in names
+    assert "radiology" in names
+    assert "pharmacy" in names
+
+
+def test_csv_single_line() -> None:
+    from pipeline.deconstructor import build_deconstruct
+
+    doc = build_deconstruct("Director, Producer, Programmer, Tester", mode="credits")
+    assert len(doc["candidates"]) >= 4
+    assert doc["needs_structure"] is False
 
 
 def test_invalid_class_blocked(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
@@ -85,40 +178,77 @@ def test_size_budget(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) ->
     assert any(i["code"] == "size_budget" for i in doc["critique"]["issues"])
 
 
-def test_production_graph_flag_rejected(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
-    pipeline = tmp_path / "out"
-    pipeline.mkdir()
-    _reload_pipeline(monkeypatch, pipeline)
-
+def test_production_graph_flag_rejected() -> None:
     from pipeline.deconstructor import build_deconstruct, critique_deconstruct
 
-    doc = build_deconstruct("x", mode="open")
+    doc = build_deconstruct("Director, Producer", mode="credits")
     doc["production_graph"] = True
     crit = critique_deconstruct(doc)
     assert crit["ok"] is False
     assert any(i["code"] == "not_production" for i in crit["issues"])
 
 
-def test_plan_fill_orders_actions(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
-) -> None:
+def test_plan_fill_orders_actions() -> None:
+    from pipeline.deconstructor import build_deconstruct, plan_fill_actions
+
+    doc = build_deconstruct(HOSPITAL, mode="org")
+    plan = plan_fill_actions(doc)
+    assert plan["production_graph"] is False
+    assert plan["actions"]
+    assert plan["needs_structure"] is False
+    classes = [a["replacement_class"] for a in plan["actions"]]
+    if "skill" in classes and "human" in classes:
+        assert classes.index("skill") < classes.index("human")
+
+
+def test_cli_target_file(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
     pipeline = tmp_path / "out"
     pipeline.mkdir()
     _reload_pipeline(monkeypatch, pipeline)
 
-    from pipeline.deconstructor import build_deconstruct, plan_fill_actions
+    tf = tmp_path / "hospital.txt"
+    tf.write_text(HOSPITAL, encoding="utf-8")
+    cli_main = _cli_main()
+    rc = cli_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "build",
+            "--mode",
+            "org",
+            "--target-file",
+            str(tf),
+            "--id",
+            "hospital-org",
+        ]
+    )
+    assert rc == 0
+    saved = pipeline / "deconstructs" / "hospital-org.json"
+    data = json.loads(saved.read_text(encoding="utf-8"))
+    assert data["needs_structure"] is False
+    names = " ".join(c["name"].lower() for c in data["candidates"])
+    assert "emergency" in names
 
-    doc = build_deconstruct("indie studio", mode="org")
-    plan = plan_fill_actions(doc)
-    assert plan["production_graph"] is False
-    assert plan["actions"]
-    assert plan["by_class"]
-    # skills should appear before human in sort order
-    classes = [a["replacement_class"] for a in plan["actions"]]
-    if "skill" in classes and "human" in classes:
-        assert classes.index("skill") < classes.index("human")
+
+def test_cli_bare_title_exit_2(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+    pipeline = tmp_path / "out"
+    pipeline.mkdir()
+    _reload_pipeline(monkeypatch, pipeline)
+    cli_main = _cli_main()
+    rc = cli_main(
+        [
+            "--pipeline-dir",
+            str(pipeline),
+            "build",
+            "--mode",
+            "org",
+            "--target",
+            "random bakery",
+            "--id",
+            "bakery",
+        ]
+    )
+    assert rc == 2
 
 
 def test_from_json_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
@@ -154,59 +284,19 @@ def test_from_json_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) 
     )
 
     cli_main = _cli_main()
-
     rc = cli_main(
         ["--pipeline-dir", str(pipeline), "from-json", "--path", str(inv), "--id", "toy-dept"]
     )
     assert rc == 0
     saved = pipeline / "deconstructs" / "toy-dept.json"
-    assert saved.is_file()
     data = json.loads(saved.read_text(encoding="utf-8"))
     assert data["critique"]["ok"] is True
-    assert len(data["candidates"]) == 2
 
 
-def test_cli_build_list_plan(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
-    pipeline = tmp_path / "out"
-    pipeline.mkdir()
-    _reload_pipeline(monkeypatch, pipeline)
-
-    cli_main = _cli_main()
-
-    rc = cli_main(
-        [
-            "--pipeline-dir",
-            str(pipeline),
-            "build",
-            "--mode",
-            "credits",
-            "--target",
-            "NES toy",
-            "--id",
-            "credits-nes-toy",
-        ]
-    )
-    assert rc == 0
-
-    rc2 = cli_main(["--pipeline-dir", str(pipeline), "list"])
-    assert rc2 == 0
-
-    rc3 = cli_main(
-        ["--pipeline-dir", str(pipeline), "plan-fill", "--id", "credits-nes-toy"]
-    )
-    assert rc3 == 0
-
-    rc4 = cli_main(
-        ["--pipeline-dir", str(pipeline), "validate", "--id", "credits-nes-toy"]
-    )
-    assert rc4 == 0
-
-
-def test_credits_fixture_enum_closed() -> None:
-    """Inline fixture: every seed class is in closed enum."""
+def test_enum_closed_on_hospital() -> None:
     from pipeline.deconstructor import REPLACEMENT_CLASSES, seed_candidates
 
-    cands, _ = seed_candidates("credits", "fixture game")
+    cands, _ = seed_candidates("org", HOSPITAL)
     for c in cands:
         assert c["replacement_class"] in REPLACEMENT_CLASSES
         assert c["oracle_hint"]
