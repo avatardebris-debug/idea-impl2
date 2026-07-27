@@ -103,13 +103,27 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - GitHub L1–L2 shipped thin — **met** (L1 local commit always on trigger; L2 `PIPELINE_GITHUB_PUBLISH=1` fail-soft; unit tests, no live network)
   - COMMANDS: health-tick order BE ladder → consumer limit 1 → prefer_thin preferred_slugs; status map honesty; overnight preflight notes — **met**
 
-## Phase 8: Graph engineer thin + success-model import (later)
+## Phase 8: Graph engineer thin + success-model import — **DONE**
+- **Status**: **DONE** (thin pure helpers + CLI; finalize fail-closed via smoke_graph; success-model fixture import)
 - **Description**: Thin graph engineer only authors into critique→resolve→smoke→attempt. Optional success-model import. No KG OS / RSI / trust stack.
-- **Deliverable**: agent/CLI; import fixture; tests.
-- **Dependencies**: Phases 1–6 preferred
+- **Deliverable**: `pipeline/graph_engineer.py` + `scripts/graph_engineer.py` (+ `goal_compose engineer` alias); fixture `tests/fixtures/success_model_inventory.json`; tests `test_graph_engineer.py`.
+- **Dependencies**: Phases 1–6 preferred (met)
 - **Success criteria**:
-  - Cannot mark smoke_pass without smoke_graph
-  - One imported fixture re-smokes + traces
+  - Cannot mark smoke_pass without smoke_graph — **met** (`engineer_finalize` always calls `smoke_graph`; author/revise strip claims)
+  - Failed smoke leaves smoke_failed/blocked (fail-closed) — **met**
+  - One imported fixture re-smokes + optional traces — **met** (`import_success_model` + stubs)
+  - Knowledge vs workflow separate on fixture — **met** (`layer` + node kinds)
+- **API**:
+  - `engineer_author` / `engineer_revise` / `engineer_finalize` / `import_success_model`
+  - CLI: `python scripts/graph_engineer.py author|revise|finalize|import-success-model`
+  - Alias: `python scripts/goal_compose.py engineer …`
+- **Non-goals** (explicit):
+  - Trust / funds / captcha stacks
+  - RSI as primary product path
+  - Nest-system-as-only-tool (Rhai / Grok Workflows as sole compose engine)
+  - Unattended external GitHub pull / auto-promote
+  - Full KG OS / multi-agent graph product
+  - High train_weight on untrusted external
 
 ## Architecture Notes
 
@@ -139,4 +153,4 @@ Grok Build thin ship (Phase 2):
 
 ## Suggested implement order
 
-1 (done) → **2 (field integrity)** → 3 (traces) → 4 → 5 → 6 → 7 → 8
+1 (done) → 2 (done) → 3 (done) → 4 (done) → 5 (done) → 6 (done) → 7 (done) → **8 (done)** — ladder complete

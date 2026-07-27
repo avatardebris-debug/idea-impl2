@@ -739,6 +739,37 @@ python scripts/goal_compose.py from-deconstruct --id <deconstruct_id> [--goal-id
 python scripts/goal_compose.py smoke --goal-id <gid>
 # Skill: .grok/skills/deconstructor/SKILL.md
 
+# --- Phase 8: thin graph engineer + success-model import ---
+# Authors/revises **draft** graph.v1 only through existing gates (load/save, critique,
+# compile_goal_graph / compile_graph_from_deconstruct). Pipeline:
+#   author/revise → draft|critiqued|blocked → resolve nodes → smoke_graph → attempt
+# Never set smoke_pass or field_proven from author/revise alone.
+# Finalize claims smoke_pass **only** via smoke_graph (fail-closed → smoke_failed/blocked).
+# smoke_pass is presence only — never field_proven (dual-gate field path stays separate).
+# Library: pipeline/graph_engineer.py
+# CLI (either):
+python scripts/graph_engineer.py author --goal-id g1 --text "use tool_x" --hits-json hits.json
+python scripts/graph_engineer.py author --goal-id g1 --from-deconstruct <deconstruct_id>
+python scripts/graph_engineer.py revise --goal-id g1 --patches-json patches.json
+python scripts/graph_engineer.py finalize --goal-id g1 [--write-trace]
+python scripts/graph_engineer.py import-success-model [--fixture tests/fixtures/success_model_inventory.json] [--write-trace]
+# Alias:
+python scripts/goal_compose.py engineer author --goal-id g1 --text "..."
+python scripts/goal_compose.py engineer finalize --goal-id g1
+python scripts/goal_compose.py engineer import-success-model --write-trace
+# Fixture: tests/fixtures/success_model_inventory.json
+#   knowledge layer = research/human (inventory only)
+#   workflow layer  = software/connector (presence stubs under temp PIPELINE_DIR for smoke)
+# Optional trace: goal_traces/{goal_id}.json (claim=mcp_smoke, train_weight low; not goal proven)
+#
+# Non-goals (Phase 8 explicitly does NOT build):
+#   - Trust / funds / captcha stacks
+#   - RSI as primary product path
+#   - Nest-system-as-only-tool (Rhai/Grok Workflows as sole compose engine)
+#   - Unattended external GitHub pull / auto-promote
+#   - Full knowledge-graph OS / multi-agent graph product
+#   - High train_weight on untrusted external success
+
 # P1 held-out gates (dep policy, budget ladder, canary, goal_trace sandbox):
 python scripts/run_held_out.py
 python scripts/run_held_out.py --json

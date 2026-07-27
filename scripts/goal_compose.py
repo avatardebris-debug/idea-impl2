@@ -9,12 +9,17 @@ Usage:
   python scripts/goal_compose.py plan-factories --goal-id ID
   python scripts/goal_compose.py smoke --goal-id ID
   python scripts/goal_compose.py attempt --goal-id ID --text "..."
+  python scripts/goal_compose.py engineer author|revise|finalize|import-success-model ...
+      (thin Phase 8; same as scripts/graph_engineer.py)
 
 Env:
   PIPELINE_DIR  — factory output root (graphs/ lives here)
 
 from-deconstruct writes **draft** graph.v1 only. Smoke is a separate step
 (never auto smoke_pass from deconstruct convert).
+
+Engineer (Phase 8): author/revise draft only (status draft|critiqued|blocked);
+finalize claims smoke_pass only via smoke_graph (fail-closed). Never field_proven.
 
 External nodes (Phase 6): only **promoted** ids under external/promoted/ may
 be attached via --include-external or hits-json (trust=external). Compose never
@@ -423,6 +428,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_fix.add_argument("--max-nodes", type=int, default=10)
 
+    p_eng = sub.add_parser(
+        "engineer",
+        help=(
+            "Thin graph engineer (Phase 8): author/revise draft; "
+            "finalize only via smoke_graph. Same as scripts/graph_engineer.py"
+        ),
+    )
+    p_eng.add_argument(
+        "engineer_argv",
+        nargs=argparse.REMAINDER,
+        help="author|revise|finalize|import-success-model + flags (pass after -- if needed)",
+    )
+
     args = ap.parse_args(argv)
     _bind_pipeline_dir(args.pipeline_dir)
 
@@ -438,6 +456,32 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_attempt(args)
     if args.cmd == "fixture-mcps":
         return cmd_fixture_mcps(args)
+    if args.cmd == "engineer":
+        # Delegate to scripts/graph_engineer.py (strip leading -- from REMAINDER)
+        eng_argv = list(getattr(args, "engineer_argv", None) or [])
+        if eng_argv and eng_argv[0] == "--":
+            eng_argv = eng_argv[1:]
+        if not eng_argv:
+            print(
+                json.dumps(
+                    {
+                        "error": "engineer requires a subcommand",
+                        "hint": (
+                            "python scripts/goal_compose.py engineer author "
+                            "--goal-id ID --text '...'  OR  "
+                            "python scripts/graph_engineer.py --help"
+                        ),
+                    },
+                    indent=2,
+                )
+            )
+            return 2
+        from scripts.graph_engineer import main as eng_main
+
+        # Preserve pipeline-dir if set on parent
+        if args.pipeline_dir:
+            eng_argv = ["--pipeline-dir", args.pipeline_dir, *eng_argv]
+        return eng_main(eng_argv)
     ap.error(f"unknown command: {args.cmd}")
     return 2
 

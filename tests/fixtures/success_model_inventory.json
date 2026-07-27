@@ -1,0 +1,58 @@
+{
+  "schema": "graph.v1",
+  "goal_id": "success_model_inventory",
+  "goal_text": "Success-model inventory: knowledge map + workflow blocks (fixture)",
+  "status": "draft",
+  "source": "success_model_fixture",
+  "production_graph": false,
+  "smoke_pass": false,
+  "field_proven": false,
+  "notes": "Knowledge (research/human) is inventory only — not a production workflow. Workflow nodes (software/connector) require resolve + separate smoke_graph. Import never sets field_proven.",
+  "nodes": [
+    {
+      "id": "n1",
+      "kind": "research",
+      "slug": "sm_knowledge_roles",
+      "label": "Role inventory (knowledge)",
+      "status": "draft",
+      "oracle": "",
+      "requires": [],
+      "layer": "knowledge"
+    },
+    {
+      "id": "n2",
+      "kind": "human",
+      "slug": "sm_human_gate",
+      "label": "Human review gate (knowledge)",
+      "status": "draft",
+      "oracle": "",
+      "requires": [],
+      "layer": "knowledge"
+    },
+    {
+      "id": "n3",
+      "kind": "software",
+      "slug": "sm_workflow_cli",
+      "label": "Workflow CLI block",
+      "status": "verified",
+      "oracle": "capability_invoke_help",
+      "requires": [],
+      "layer": "workflow"
+    },
+    {
+      "id": "n4",
+      "kind": "connector",
+      "slug": "sm_workflow_bridge",
+      "label": "Workflow connector bridge",
+      "status": "verified",
+      "oracle": "capability_invoke_help",
+      "requires": [],
+      "layer": "workflow"
+    }
+  ],
+  "edges": [
+    {"from": "n1", "to": "n3", "kind": "requires"},
+    {"from": "n3", "to": "n4", "kind": "control"}
+  ],
+  "critique": {"ok": true, "issues": []}
+}
