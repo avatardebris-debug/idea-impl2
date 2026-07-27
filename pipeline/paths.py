@@ -27,6 +27,7 @@ __all__ = [
     "graphs_dir",
     "mcps_dir",
     "shared_libs_dir",
+    "external_dir",
     "registry_db",
     "capabilities_md",
     "completions_jsonl",
@@ -89,6 +90,11 @@ def deconstructs_dir() -> pathlib.Path:
 
 def mcps_dir() -> pathlib.Path:
     return get_pipeline_dir() / "mcps"
+
+
+def external_dir() -> pathlib.Path:
+    """External ingest quarantine + promoted drafts ($PIPELINE_DIR/external/)."""
+    return get_pipeline_dir() / "external"
 
 
 def shared_libs_dir() -> pathlib.Path:

@@ -85,7 +85,10 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 
 ### Layer C — External world (after A–B)
 
-7. **Ingest pipeline:** find → fetch pinned → static scan → license/provenance → sandbox → rank → human gate → `external_*` draft → promote after smoke.
+7. **Ingest pipeline (P5 manual — shipped):** pin local path/fixture → static scan → license/provenance note → **human CLI approve** → presence smoke → `external_*` draft under `$PIPELINE_DIR/external/promoted/`.  
+   CLI: `python scripts/external_ingest.py pin|scan|approve|reject|promote|list|show`.  
+   **No unattended GitHub search/auto-pull.** Live network fetch default-off / not implemented in library path.  
+   Audit: `$PIPELINE_DIR/external/audit.jsonl`. Traces: `trust=external` (train_weight ≤ 0.2).
 
 8. **Human approval hook (defer product):**  
    `needs_human_approval(action, risk_class)` on disk first.  
@@ -115,8 +118,8 @@ Graph engineer later only **authors/revises** graphs into this pipeline.
 | **P2** | Skill/prompt promote (sandbox → verified) | **v0 done** — static sandbox + promote + revoke; executor socket hook thin |
 | **P3** | Whole-graph smoke after nodes resolved | **v0 done** — `smoke_graph` / `goal_compose smoke`; attempt auto-smokes when `executable`; cheap per-node checks only |
 | **P4** | MCP factory v1 (re-smoke, revoke, invoke oracle) | **v1 partial / in progress** — `resmoke_mcp` + `revoke_mcp` + CLI `re-smoke`/`revoke`; durable `invoke_report.json` on require_invoke; manifest provenance (`capability_slug`, `wrap_version`, `content_sha256`, `last_smoke_at`); graph smoke prefers invoke report else presence; revoked fails |
-| **P5** | External ingest **manual** (pin + sandbox + human CLI) | One external asset under audit log |
-| **P6** | Graph engineer (later plan) | Only authors into P3 pipeline |
+| **P5** | External ingest **manual** (pin + sandbox + human CLI) | **v1 done** — `pipeline/external_ingest.py` + CLI; pin local fixture → scan → approve → promote; audit jsonl; trust=external clamp; no auto-pull |
+| **P6** | Compose policy + smoke for external nodes (then graph engineer later) | Policy/smoke treat promoted external; only authors into P3 pipeline |
 | **Defer** | Push notifications + mute windows | Note until approval state exists |
 
 ---

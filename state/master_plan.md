@@ -65,13 +65,17 @@ Repair bridge uses **skill-style** steps (`field_repair`) and may invoke Grok CL
   - `python scripts/goal_compose.py from-deconstruct --id ...`
   - Smoke remains separate: `python scripts/goal_compose.py smoke --goal-id ...`
 
-## Phase 5: External ingest manual (P5) — pin, sandbox, human gate
+## Phase 5: External ingest manual (P5) — pin, sandbox, human gate — **DONE**
+- **Status**: **DONE** (pin/scan/approve/promote + audit + fixture tests)
 - **Description**: Manual path for GitHub tool/software/MCP/skill: pin → scan → quarantine → human CLI → external_* draft → smoke → promote. No unattended auto-pull.
-- **Deliverable**: `pipeline/external_ingest.py` + CLI; audit log; traces; tests with fixtures.
+- **Deliverable**: `pipeline/external_ingest.py` + `scripts/external_ingest.py`; audit log; traces; tests with fixtures.
 - **Dependencies**: Phase 1; Phase 2–3 preferred
 - **Success criteria**:
-  - One fixture asset pin → promote under temp PIPELINE_DIR
-  - Human gate required; compose never git-clones at attempt time
+  - One fixture asset pin → promote under temp PIPELINE_DIR — **met**
+  - Human gate required; compose never git-clones at attempt time — **met** (promote blocked without approve; docs + compose_hint)
+- **API**: `pipeline.external_ingest` — `pin_asset` / `scan_asset` / `approve_asset` / `reject_asset` / `promote_asset` / `list_assets`
+  - CLI: `python scripts/external_ingest.py pin|scan|approve|reject|promote|list|show|revoke`
+  - Store: `$PIPELINE_DIR/external/{assets,promoted,audit.jsonl}`
 
 ## Phase 6: Compose policy + smoke for external nodes
 - **Description**: goal_policy / smoke_graph / attempt treat promoted external nodes with provenance + low train_weight until goal/field proven.

@@ -625,6 +625,35 @@ python scripts/block_registry.py revoke --id skill_create-skill
 # Safe load: pipeline.block_registry.load_socket_skill_bodies("executor.pre_task_skills")
 # Thin hook: ExecutorAgent.build_context injects verified executor.pre_task_skills bodies.
 
+# External ingest v1 (manual pin → scan → human approve → promote; notes/agi-lmaooo2.md Layer C / P5)
+# Store: $PIPELINE_DIR/external/assets/{id}/{asset.json,payload/,scan_report.json}
+#         $PIPELINE_DIR/external/promoted/{id}.json  (external_* draft for later phases)
+#         $PIPELINE_DIR/external/audit.jsonl         (append-only human-gate log)
+# Kinds: skill | software | mcp | external_mcp
+# Statuses: quarantined → scanned → approved → promoted  (or rejected / revoked)
+# HUMAN GATE: promote is impossible without prior approve (security control — log + explicit CLI).
+# Pin is local path/fixture only (no live git clone in library path). No unattended GitHub auto-pull.
+# Presence smoke on promote only (SKILL.md / entrypoint / server stub) — not field_prove.
+# Graph nodes may only reference promoted ids; compose/attempt must NOT git-clone at attempt time.
+# Traces: trust=external → train_weight ≤ 0.2 (Phase 3 clamp). Env: EXTERNAL_INGEST_ACTOR for audit actor.
+#
+# HABIT for a local skill/tool fixture:
+#   1. pin      → quarantined (+ content_sha256 snapshot under payload/)
+#   2. scan      → scanned (or rejected on secrets/path/size/ext)
+#   3. approve   → approved (records actor + notes)
+#   4. promote   → promoted + external/promoted/{id}.json draft
+python scripts/external_ingest.py pin --path path/to/fixture-skill --kind skill --id skill_fixture
+python scripts/external_ingest.py pin --path path/to/tool --kind software --id software_mytool --license-note "MIT"
+python scripts/external_ingest.py scan --id skill_fixture
+python scripts/external_ingest.py approve --id skill_fixture --notes "reviewed fixture"
+python scripts/external_ingest.py reject --id skill_fixture --reason "license unclear"
+python scripts/external_ingest.py promote --id skill_fixture
+python scripts/external_ingest.py list
+python scripts/external_ingest.py list --status approved
+python scripts/external_ingest.py show --id skill_fixture
+python scripts/external_ingest.py revoke --id skill_fixture --reason "dep drift"
+# Out of scope: unattended search/clone/auto-promote; Phase 6 will teach smoke_graph about external nodes.
+
 # Deconstructor (LLM primary — same pattern as idea_planner: prompt + model + critique)
 # Store: $PIPELINE_DIR/deconstructs/{id}.json  schema deconstruct.v0  (NOT production graph.v1)
 # Prompt: pipeline/prompts/deconstructor.md  Agent: pipeline/agents/deconstructor.py
@@ -689,7 +718,7 @@ python scripts/classic_be_to_grok.py --slug supportagent_workflow_builder --run-
 #   field baseline-only / runner green alone → outcome=deeper (or low weight), not high proven
 #
 # KEEP_GOAL_TRACES default ON; set 0/false/no/off to skip disk writes (in-memory still updates).
-# Writers: goal_policy, connector_smoke, block_registry, mcp_factory (smoke/revoke).
+# Writers: goal_policy, connector_smoke, block_registry, mcp_factory (smoke/revoke), external_ingest (trust=external).
 
 # Budget yield ladder: budget_exceeded is a yield (strikes 1→2→3), not permanent death.
 # Skill /blocker-identifier produces the same blocker_report.v1 schema for manual BE3.
